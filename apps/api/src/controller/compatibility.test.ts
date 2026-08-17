@@ -35,6 +35,39 @@ vi.mock("../logic/compatibility-invitation-avatar", () => ({
   getCompatibilityInvitationAvatar,
 }));
 vi.mock("../logic/compatibility-relationship-end", () => ({ endCompatibilityRelationship }));
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      const authorization = c.req.header("authorization");
+      if (!authorization?.startsWith("Bearer ")) return c.json({ error: "Unauthorized" }, 401);
+      const actor = {
+        accountId: "account-1",
+        authenticationMethod: "liff" as const,
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      };
+      c.set("authenticatedActor", actor);
+      c.set("authenticationResult", {
+        type: "authenticated",
+        actor,
+        accountRole: "user",
+        displayProfile: { displayName: "あおい" },
+      });
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const dummyDb = {} as D1Database;
 const dummyAvatarBucket = {} as R2Bucket;
@@ -100,8 +133,8 @@ describe("GET /api/compatibility/share-consent", () => {
     });
     expect(getCompatibilityShareConsent).toHaveBeenCalledWith(
       expect.objectContaining({
-        idToken: "dummy.id.token",
-        lineLoginChannelId: "2010850319",
+        actor: expect.objectContaining({ accountId: "account-1" }),
+        verifiedDisplayName: "あおい",
         accountData: dummyAccountData,
         relationshipCategory: "family",
       }),
@@ -114,40 +147,6 @@ describe("GET /api/compatibility/share-consent", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "Invalid request" });
     expect(getCompatibilityShareConsent).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    { type: "not-configured" as const },
-    { type: "unauthenticated" as const, reason: "invalid" },
-  ])("$typeを401へ変換する", async (value) => {
-    outcome(value);
-
-    const response = await request();
-
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: "Unauthorized" });
-  });
-
-  it("Bearer形式でない認証情報をIDトークンとして渡さない", async () => {
-    outcome({ type: "unauthenticated", reason: "missing" });
-
-    await request({}, "Basic credentials");
-
-    expect(getCompatibilityShareConsent).toHaveBeenCalledWith(
-      expect.objectContaining({ idToken: undefined }),
-    );
-  });
-
-  it("Accountがなければ404を返す", async () => {
-    outcome({ type: "account-not-found" });
-
-    const response = await request();
-
-    expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({
-      error: "Account not found",
-      reason: "friendship_required",
-    });
   });
 
   it("storage bindingがなければlogicを呼ばず503を返す", async () => {
@@ -206,8 +205,8 @@ describe("GET /api/compatibility/share-content", () => {
     });
     expect(getCompatibilityShareContent).toHaveBeenCalledWith(
       expect.objectContaining({
-        idToken: "dummy.id.token",
-        lineLoginChannelId: "2010850319",
+        actor: expect.objectContaining({ accountId: "account-1" }),
+        verifiedDisplayName: "あおい",
         accountData: dummyAccountData,
         relationshipCategory: "partner",
       }),
@@ -220,18 +219,6 @@ describe("GET /api/compatibility/share-content", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "Invalid request" });
     expect(getCompatibilityShareContent).not.toHaveBeenCalled();
-  });
-
-  it("Accountがなければ404を返す", async () => {
-    contentOutcome({ type: "account-not-found" });
-
-    const response = await contentRequest("friend");
-
-    expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({
-      error: "Account not found",
-      reason: "friendship_required",
-    });
   });
 
   it("storage bindingがなければlogicを呼ばず503を返す", async () => {
@@ -292,11 +279,9 @@ describe("POST /api/compatibility/invitations", () => {
     });
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
-        idToken: "dummy.id.token",
-        liff: {
-          liffId: "2010850319-Yl63upAR",
-          lineLoginChannelId: "2010850319",
-        },
+        actor: expect.objectContaining({ accountId: "account-1" }),
+        verifiedDisplayName: "あおい",
+        liffId: "2010850319-Yl63upAR",
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
         relationshipCategory: "partner",
@@ -397,7 +382,7 @@ describe("GET /api/compatibility/invitations/:relationshipId", () => {
     expect(getCompatibilityInvitationContents).toHaveBeenCalledWith(
       expect.objectContaining({
         relationshipId,
-        idToken: "dummy.id.token",
+        actor: expect.objectContaining({ accountId: "account-1" }),
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
       }),
@@ -461,7 +446,7 @@ describe("GET /api/compatibility/invitations/:relationshipId/avatar", () => {
     expect(getCompatibilityInvitationAvatar).toHaveBeenCalledWith(
       expect.objectContaining({
         relationshipId,
-        idToken: "dummy.id.token",
+        actor: expect.objectContaining({ accountId: "account-1" }),
         avatarBucket: dummyAvatarBucket,
         lineChannelAccessToken: "line-token",
       }),
@@ -510,7 +495,7 @@ describe("DELETE /api/compatibility/relationships/:relationshipId", () => {
     expect(endCompatibilityRelationship).toHaveBeenCalledWith(
       expect.objectContaining({
         relationshipId,
-        idToken: "dummy.id.token",
+        actor: expect.objectContaining({ accountId: "account-1" }),
         accountData: dummyAccountData,
         compatibilityData: dummyCompatibilityData,
       }),
@@ -527,25 +512,6 @@ describe("DELETE /api/compatibility/relationships/:relationshipId", () => {
     });
   });
 
-  it.each([
-    { outcome: { type: "not-configured" }, status: 401, body: { error: "Unauthorized" } },
-    {
-      outcome: { type: "unauthenticated", reason: "invalid" },
-      status: 401,
-      body: { error: "Unauthorized" },
-    },
-    {
-      outcome: { type: "account-not-found" },
-      status: 404,
-      body: { error: "Account not found", reason: "friendship_required" },
-    },
-  ])("認証結果をHTTPへ変換する", async ({ outcome, status, body }) => {
-    endCompatibilityRelationship.mockResolvedValue(outcome);
-    const response = await endRequest();
-    expect(response.status).toBe(status);
-    expect(await response.json()).toEqual(body);
-  });
-
   it.each(["DB", "ACCOUNT_DATA", "COMPATIBILITY_DATA"])(
     "%s bindingがなければlogicを呼ばず503を返す",
     async (binding) => {
@@ -554,12 +520,4 @@ describe("DELETE /api/compatibility/relationships/:relationshipId", () => {
       expect(endCompatibilityRelationship).not.toHaveBeenCalled();
     },
   );
-
-  it("Bearer形式でない認証情報をIDトークンとして渡さない", async () => {
-    endCompatibilityRelationship.mockResolvedValue({ type: "unauthenticated", reason: "missing" });
-    await endRequest({}, "Basic credentials");
-    expect(endCompatibilityRelationship).toHaveBeenCalledWith(
-      expect.objectContaining({ idToken: undefined }),
-    );
-  });
 });

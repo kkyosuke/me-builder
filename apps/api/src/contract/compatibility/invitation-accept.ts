@@ -1,7 +1,7 @@
 import { compatibilityRelationshipId } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 export const AcceptCompatibilityInvitationResponseSchema = v.object({
   relationshipId: compatibilityRelationshipId.schema,
@@ -21,6 +21,7 @@ export const acceptCompatibilityInvitationRoute = describeRoute({
   responses: {
     200: jsonResponse("成立した相性関係", AcceptCompatibilityInvitationResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "招待または対応するAccountを利用できない",
       v.object({

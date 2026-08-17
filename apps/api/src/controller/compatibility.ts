@@ -33,11 +33,7 @@ import {
   CompatibilityShareContentResponseSchema,
   InvalidCompatibilityShareContentRequestSchema,
 } from "../contract/compatibility/share-content";
-import {
-  AccountNotFoundErrorSchema,
-  ServiceUnavailableErrorSchema,
-  UnauthorizedErrorSchema,
-} from "../contract/shared/errors";
+import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { issueCompatibilityInvitation } from "../logic/compatibility-invitation";
 import { acceptCompatibilityInvitation } from "../logic/compatibility-invitation-acceptance";
 import { getCompatibilityInvitationAvatar } from "../logic/compatibility-invitation-avatar";
@@ -50,10 +46,20 @@ import {
   getCompatibilityShareConsent,
   getCompatibilityShareContent,
 } from "../logic/compatibility-share-preview";
+import { authenticatedActor, authenticatedSession } from "../middleware/authentication";
 import { operationalHttpPath } from "../operational-http-path";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 import { avatarImageResponse } from "./avatar-image-response";
+
+function actorWithDisplayName(c: Context<AppEnv>) {
+  const session = authenticatedSession(c);
+  return {
+    actor: session.actor,
+    ...(session.displayProfile?.displayName
+      ? { verifiedDisplayName: session.displayProfile.displayName }
+      : {}),
+  };
+}
 
 /** `GET /api/compatibility/share-consent` — 招待発行前に本人の共有可否を返す。 */
 export async function getCompatibilityShareConsentContents(c: Context<AppEnv>): Promise<Response> {
@@ -74,9 +80,7 @@ export async function getCompatibilityShareConsentContents(c: Context<AppEnv>): 
   }
 
   const outcome = await getCompatibilityShareConsent({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    ...actorWithDisplayName(c),
     accountData: c.env.ACCOUNT_DATA,
     ...(parsed.output.relationshipCategory
       ? { relationshipCategory: parsed.output.relationshipCategory }
@@ -86,17 +90,6 @@ export async function getCompatibilityShareConsentContents(c: Context<AppEnv>): 
   switch (outcome.type) {
     case "resolved":
       return c.json(v.parse(CompatibilityShareConsentResponseSchema, outcome.consent));
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -119,9 +112,7 @@ export async function getCompatibilityShareContentContents(c: Context<AppEnv>): 
   }
 
   const outcome = await getCompatibilityShareContent({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    ...actorWithDisplayName(c),
     accountData: c.env.ACCOUNT_DATA,
     relationshipCategory: parsed.output.relationshipCategory,
   });
@@ -129,30 +120,13 @@ export async function getCompatibilityShareContentContents(c: Context<AppEnv>): 
   switch (outcome.type) {
     case "resolved":
       return c.json(v.parse(CompatibilityShareContentResponseSchema, outcome.content));
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
 /** `POST /api/compatibility/invitations` — 共有同意から1人用の招待を発行する。 */
 export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<Response> {
   const currentConfig = getConfig(c.env);
-  if (
-    !c.env?.DB ||
-    !c.env.ACCOUNT_DATA ||
-    !c.env.COMPATIBILITY_DATA ||
-    !currentConfig.liffId ||
-    !currentConfig.lineLoginChannelId
-  ) {
+  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.COMPATIBILITY_DATA || !currentConfig.liffId) {
     logger.error(
       { path: operationalHttpPath(c.req.path) },
       "Compatibility invitation binding is not configured",
@@ -179,12 +153,8 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
 
   const outcome = await issueCompatibilityInvitation({
     relationshipCategory: parsed.output.relationshipCategory,
-    idToken: bearerToken(c.req.header("authorization")),
-    liff: {
-      liffId: currentConfig.liffId,
-      lineLoginChannelId: currentConfig.lineLoginChannelId,
-    },
-    db: D1.shared.client.create(c.env.DB),
+    ...actorWithDisplayName(c),
+    liffId: currentConfig.liffId,
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
   });
@@ -201,17 +171,6 @@ export async function postCompatibilityInvitation(c: Context<AppEnv>): Promise<R
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -226,12 +185,9 @@ export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Re
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
-  const currentConfig = getConfig(c.env);
   const outcome = await getCompatibilityInvitationContents({
     relationshipId: c.req.param("relationshipId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    ...actorWithDisplayName(c),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
   });
@@ -255,17 +211,6 @@ export async function getCompatibilityInvitation(c: Context<AppEnv>): Promise<Re
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -285,8 +230,7 @@ export async function getCompatibilityInvitationAvatarContents(
   const currentConfig = getConfig(c.env);
   const outcome = await getCompatibilityInvitationAvatar({
     relationshipId: c.req.param("relationshipId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
+    actor: authenticatedActor(c),
     lineChannelAccessToken: currentConfig.lineChannelAccessToken,
     db: D1.shared.client.create(c.env.DB),
     avatarBucket: c.env.AVATAR_BUCKET,
@@ -314,17 +258,6 @@ export async function getCompatibilityInvitationAvatarContents(
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -341,9 +274,7 @@ export async function postCompatibilityInvitationAcceptance(c: Context<AppEnv>):
 
   const outcome = await acceptCompatibilityInvitation({
     relationshipId: c.req.param("relationshipId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    ...actorWithDisplayName(c),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
   });
@@ -374,17 +305,6 @@ export async function postCompatibilityInvitationAcceptance(c: Context<AppEnv>):
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -400,9 +320,7 @@ export async function getCompatibilityRelationship(c: Context<AppEnv>): Promise<
   }
   const outcome = await getCompatibilityRelationshipContents({
     relationshipId: c.req.param("relationshipId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
   });
@@ -423,17 +341,6 @@ export async function getCompatibilityRelationship(c: Context<AppEnv>): Promise<
         }),
         404,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -446,9 +353,7 @@ export async function getCompatibilityRelationships(c: Context<AppEnv>): Promise
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await listCompatibilityRelationships({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: currentConfig.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
     liffId: currentConfig.liffId,
@@ -456,17 +361,6 @@ export async function getCompatibilityRelationships(c: Context<AppEnv>): Promise
   switch (outcome.type) {
     case "resolved":
       return c.json(v.parse(CompatibilityRelationshipsResponseSchema, { items: outcome.items }));
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -482,9 +376,7 @@ export async function deleteCompatibilityInvitation(c: Context<AppEnv>): Promise
   }
   const outcome = await cancelCompatibilityInvitation({
     relationshipId: c.req.param("relationshipId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
   });
@@ -499,17 +391,6 @@ export async function deleteCompatibilityInvitation(c: Context<AppEnv>): Promise
         }),
         404,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -525,9 +406,7 @@ export async function deleteCompatibilityRelationship(c: Context<AppEnv>): Promi
   }
   const outcome = await endCompatibilityRelationship({
     relationshipId: c.req.param("relationshipId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
     compatibilityData: c.env.COMPATIBILITY_DATA,
   });
@@ -542,16 +421,5 @@ export async function deleteCompatibilityRelationship(c: Context<AppEnv>): Promi
         }),
         404,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }

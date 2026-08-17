@@ -4,7 +4,7 @@ import {
 } from "@me-builder/lib";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 import {
   CompatibilitySharePreviewThemeSchema,
   CompatibilityShareProfileSchema,
@@ -63,6 +63,7 @@ export const compatibilityRelationshipRoute = describeRoute({
       CompatibilityRelationshipResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "相性関係または対応するAccountを利用できない",
       v.union([

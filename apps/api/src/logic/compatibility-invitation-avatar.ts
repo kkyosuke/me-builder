@@ -7,13 +7,12 @@ import {
   compatibilityDataFor,
   compatibilityRelationshipId,
 } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 import { type ProfileAvatarImage, resolveProfileAvatarImage } from "./profile-avatar-image";
 
 type Params = Readonly<{
   relationshipId: string;
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
   avatarBucket: R2Bucket;
   lineChannelAccessToken?: string | undefined;
@@ -21,7 +20,6 @@ type Params = Readonly<{
 }>;
 
 type Dependencies = Readonly<{
-  createSession: typeof createLiffSession;
   getInvitationPreview: (
     namespace: CompatibilityDataNamespace,
     relationshipId: string,
@@ -35,7 +33,6 @@ type Dependencies = Readonly<{
 }>;
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   getInvitationPreview: (namespace, relationshipId, viewerAccountId) =>
     compatibilityDataFor(namespace, relationshipId).getInvitationPreview(viewerAccountId),
   getInvitationContext: (namespace, relationshipId) =>
@@ -47,10 +44,7 @@ export type CompatibilityInvitationAvatarOutcome =
   | { type: "resolved"; image: ProfileAvatarImage }
   | { type: "image-unavailable" }
   | { type: "unavailable" }
-  | { type: "own-invitation" }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+  | { type: "own-invitation" };
 
 /** pending招待を確認できる受信者だけに、招待contextの送信者画像を返す。 */
 export async function getCompatibilityInvitationAvatar(
@@ -58,13 +52,10 @@ export async function getCompatibilityInvitationAvatar(
   dependencies: Dependencies = defaultDependencies,
 ): Promise<CompatibilityInvitationAvatarOutcome> {
   if (!compatibilityRelationshipId.isValid(params.relationshipId)) return { type: "unavailable" };
-  const session = await dependencies.createSession(params);
-  if (session.type !== "resolved") return session;
-
   const preview = await dependencies.getInvitationPreview(
     params.compatibilityData,
     params.relationshipId,
-    session.session.accountId,
+    params.actor.accountId,
   );
   if (!preview) return { type: "unavailable" };
   if (preview.isOwnInvitation) return { type: "own-invitation" };

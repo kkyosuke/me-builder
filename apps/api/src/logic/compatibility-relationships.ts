@@ -2,13 +2,12 @@ import {
   type AccountDataNamespace,
   type CompatibilityDataNamespace,
   type CompatibilityRelationship,
-  type D1,
   accountDataFor,
   compatibilityDataFor,
 } from "@me-builder/lib";
+import type { AuthenticatedActor } from "./authentication/types";
 import { createCompatibilityInvitationUrl } from "./compatibility-invitation-url";
 import { resolveCompatibilityRelationshipContents } from "./compatibility-relationship";
-import { createLiffSession } from "./liff-session";
 
 type CompatibilityRelationshipListItem =
   | Readonly<{
@@ -31,16 +30,13 @@ type CompatibilityRelationshipListItem =
           }>;
     }>;
 
-export type CompatibilityRelationshipsOutcome =
-  | { type: "resolved"; items: readonly CompatibilityRelationshipListItem[] }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+export type CompatibilityRelationshipsOutcome = {
+  type: "resolved";
+  items: readonly CompatibilityRelationshipListItem[];
+};
 
 type Params = Readonly<{
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData: AccountDataNamespace;
   compatibilityData: CompatibilityDataNamespace;
   liffId: string;
@@ -49,17 +45,13 @@ type Params = Readonly<{
 
 /** AccountDataの一覧projectionを正本へ同期し、外部公開可能な最小カードへ変換する。 */
 export async function listCompatibilityRelationships({
-  idToken,
-  lineLoginChannelId,
-  db,
+  actor,
   accountData,
   compatibilityData,
   liffId,
   at = new Date(),
 }: Params): Promise<CompatibilityRelationshipsOutcome> {
-  const session = await createLiffSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") return session;
-  const accountId = session.session.accountId;
+  const accountId = actor.accountId;
   const references = await accountDataFor(accountData, accountId).execute(
     "compatibility.listVisibleReferences",
   );
