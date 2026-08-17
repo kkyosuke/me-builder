@@ -4,7 +4,7 @@ import { fetchCompatibilityAvatarImage } from "./compatibility-avatar-api";
 describe("fetchCompatibilityAvatarImage", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("許可されたAPI pathへだけBearer付きで画像を取得する", async () => {
+  it("許可されたAPI pathへだけアプリセッション付きで画像を取得する", async () => {
     const fetchMock = vi.fn().mockImplementation(
       async () =>
         new Response(Uint8Array.from([1, 2, 3]), {
@@ -14,45 +14,40 @@ describe("fetchCompatibilityAvatarImage", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      fetchCompatibilityAvatarImage("https://api.example.com", "id-token", "/api/profile/avatar"),
+      fetchCompatibilityAvatarImage("https://api.example.com", "/api/profile/avatar"),
     ).resolves.toMatchObject({ size: 3, type: "image/png" });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/profile/avatar",
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
 
     const invitationAvatarPath = `/api/compatibility/invitations/${"a".repeat(64)}/avatar`;
     await expect(
-      fetchCompatibilityAvatarImage("https://api.example.com", "id-token", invitationAvatarPath),
+      fetchCompatibilityAvatarImage("https://api.example.com", invitationAvatarPath),
     ).resolves.toMatchObject({ size: 3, type: "image/png" });
     expect(fetchMock).toHaveBeenLastCalledWith(
       `https://api.example.com${invitationAvatarPath}`,
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
-  it("外部URLへBearerを転送しない", async () => {
+  it("外部URLへCookieを送らない", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      fetchCompatibilityAvatarImage(
-        "https://api.example.com",
-        "id-token",
-        "https://attacker.example/avatar",
-      ),
+      fetchCompatibilityAvatarImage("https://api.example.com", "https://attacker.example/avatar"),
     ).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("不正な関係IDを含む内部pathへもBearerを送らない", async () => {
+  it("不正な関係IDを含む内部pathへもCookieを送らない", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
       fetchCompatibilityAvatarImage(
         "https://api.example.com",
-        "id-token",
         "/api/compatibility/invitations/invalid/avatar",
       ),
     ).resolves.toBeNull();
@@ -62,7 +57,7 @@ describe("fetchCompatibilityAvatarImage", () => {
   it("画像なしと対応外Content-Typeはnullへ縮退する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
     await expect(
-      fetchCompatibilityAvatarImage(undefined, "id-token", "/api/profile/avatar"),
+      fetchCompatibilityAvatarImage(undefined, "/api/profile/avatar"),
     ).resolves.toBeNull();
 
     vi.stubGlobal(
@@ -74,7 +69,7 @@ describe("fetchCompatibilityAvatarImage", () => {
         ),
     );
     await expect(
-      fetchCompatibilityAvatarImage(undefined, "id-token", "/api/profile/avatar"),
+      fetchCompatibilityAvatarImage(undefined, "/api/profile/avatar"),
     ).resolves.toBeNull();
   });
 });

@@ -7,10 +7,8 @@ import type { CompatibilityShareContent } from "../../model/compatibility-share-
 import { useCompatibilityCategoryQuery } from "./use-compatibility-category-query";
 
 export function useCompatibilityShareContent({
-  acquireIdToken,
   latestProfileSummaryVersionId,
 }: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
   latestProfileSummaryVersionId: string | null | undefined;
 }) {
   const { relationshipCategory, changeRelationshipCategory: changeCategoryQuery } =
@@ -24,43 +22,35 @@ export function useCompatibilityShareContent({
   const cachedProfileSummaryVersionId = useRef(latestProfileSummaryVersionId);
   const request = useRef<AbortController | null>(null);
 
-  const load = useCallback(
-    async (category: CompatibilityRelationshipCategory, force = false) => {
-      const cached = cache.current[category];
-      if (cached && !force) {
-        request.current?.abort();
-        setState({ status: "success", data: cached });
-        return;
-      }
-
+  const load = useCallback(async (category: CompatibilityRelationshipCategory, force = false) => {
+    const cached = cache.current[category];
+    if (cached && !force) {
       request.current?.abort();
-      const controller = new AbortController();
-      request.current = controller;
-      if (!cached) setState({ status: "loading" });
-      try {
-        const idToken = await acquireIdToken(controller.signal);
-        if (controller.signal.aborted) return;
-        if (!idToken) throw new Error("LINEから「わたし」を開いてください。");
-        const content = await fetchCompatibilityShareContent(
-          config.apiUrl,
-          idToken,
-          category,
-          controller.signal,
-        );
-        if (controller.signal.aborted || request.current !== controller) return;
-        cache.current[category] = content;
-        setState({ status: "success", data: content });
-      } catch (error) {
-        if (controller.signal.aborted || request.current !== controller) return;
-        setState({
-          status: "error",
-          message:
-            error instanceof Error ? error.message : "共有される内容を読み込めませんでした。",
-        });
-      }
-    },
-    [acquireIdToken],
-  );
+      setState({ status: "success", data: cached });
+      return;
+    }
+
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    if (!cached) setState({ status: "loading" });
+    try {
+      const content = await fetchCompatibilityShareContent(
+        config.apiUrl,
+        category,
+        controller.signal,
+      );
+      if (controller.signal.aborted || request.current !== controller) return;
+      cache.current[category] = content;
+      setState({ status: "success", data: content });
+    } catch (error) {
+      if (controller.signal.aborted || request.current !== controller) return;
+      setState({
+        status: "error",
+        message: error instanceof Error ? error.message : "共有される内容を読み込めませんでした。",
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const profileSummaryChanged =

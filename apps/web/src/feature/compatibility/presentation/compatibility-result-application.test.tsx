@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   useCompatibilityRelationship: vi.fn(),
 }));
 
-vi.mock("../../liff", () => ({ useLiffSession: () => ({ acquireIdToken: vi.fn() }) }));
 vi.mock("./hooks/use-compatibility-relationship", () => ({
   useCompatibilityRelationship: mocks.useCompatibilityRelationship,
 }));

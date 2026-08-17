@@ -10,10 +10,8 @@ import { isCompatibilityResourceUnavailableError } from "../../model/compatibili
 import { useRevalidateOnResume } from "./use-revalidate-on-resume";
 
 export function useCompatibilityRelationship({
-  acquireIdToken,
   relationshipId,
 }: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
   relationshipId: string | null;
 }) {
   const [state, setState] = useState<AsyncState<CompatibilityRelationship>>({ status: "loading" });
@@ -43,11 +41,8 @@ export function useCompatibilityRelationship({
         setState({ status: "loading" });
       }
       try {
-        const token = await acquireIdToken(controller.signal);
-        if (!token) throw new Error("LINEから相性画面を開いてください。");
         const data = await fetchCompatibilityRelationship(
           config.apiUrl,
-          token,
           relationshipId,
           controller.signal,
         );
@@ -78,7 +73,7 @@ export function useCompatibilityRelationship({
         }
       }
     },
-    [acquireIdToken, relationshipId],
+    [relationshipId],
   );
 
   const reload = useCallback(() => load(false), [load]);
@@ -107,10 +102,7 @@ export function useCompatibilityRelationship({
     endRequest.current = controller;
     setEnding({ status: "loading" });
     try {
-      const token = await acquireIdToken(controller.signal);
-      if (controller.signal.aborted) return;
-      if (!token) throw new Error("LINEから相性画面を開いてください。");
-      await endCompatibilityRelationship(config.apiUrl, token, relationshipId, controller.signal);
+      await endCompatibilityRelationship(config.apiUrl, relationshipId, controller.signal);
       if (!controller.signal.aborted) setEnding({ status: "success", data: null });
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -122,7 +114,7 @@ export function useCompatibilityRelationship({
     } finally {
       if (endRequest.current === controller) endRequest.current = null;
     }
-  }, [acquireIdToken, relationshipId]);
+  }, [relationshipId]);
 
   return { state, ending, isRefreshing, refreshError, reload, refresh, end };
 }

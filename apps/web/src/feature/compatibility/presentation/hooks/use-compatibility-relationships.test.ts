@@ -38,8 +38,7 @@ describe("useCompatibilityRelationships", () => {
           finishCancellation = resolve;
         }),
     );
-    const acquireIdToken = vi.fn(async () => "id-token");
-    const { result } = renderHook(() => useCompatibilityRelationships({ acquireIdToken }));
+    const { result } = renderHook(() => useCompatibilityRelationships());
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
 
@@ -75,8 +74,7 @@ describe("useCompatibilityRelationships", () => {
       ],
     });
     mocks.cancelCompatibilityInvitation.mockRejectedValue(new Error("取消に失敗しました"));
-    const acquireIdToken = vi.fn(async () => "id-token");
-    const { result } = renderHook(() => useCompatibilityRelationships({ acquireIdToken }));
+    const { result } = renderHook(() => useCompatibilityRelationships());
     await waitFor(() => expect(result.current.state.status).toBe("success"));
 
     await act(async () => {
@@ -116,8 +114,7 @@ describe("useCompatibilityRelationships", () => {
           finishRefresh = resolve;
         }),
     );
-    const acquireIdToken = vi.fn(async () => "id-token");
-    const { result } = renderHook(() => useCompatibilityRelationships({ acquireIdToken }));
+    const { result } = renderHook(() => useCompatibilityRelationships());
     await waitFor(() => expect(result.current.state.status).toBe("success"));
 
     now += 1_000;
@@ -167,8 +164,7 @@ describe("useCompatibilityRelationships", () => {
         ],
       })
       .mockRejectedValueOnce(new TypeError("ネットワークに接続できません"));
-    const acquireIdToken = vi.fn(async () => "id-token");
-    const { result } = renderHook(() => useCompatibilityRelationships({ acquireIdToken }));
+    const { result } = renderHook(() => useCompatibilityRelationships());
     await waitFor(() => expect(result.current.state.status).toBe("success"));
 
     now += 1_000;
