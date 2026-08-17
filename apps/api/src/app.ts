@@ -269,7 +269,13 @@ app.get("/api/health", (c) => {
 
 app.post("/api/line/webhook", postLineWebhook);
 app.post("/api/billing/webhook", postStripeWebhook);
-app.post("/api/account-recovery/codes", accountRecoveryCodeRoute, postAccountRecoveryCode);
+app.post(
+  "/api/account-recovery/codes",
+  requireAuthentication,
+  requireCurrentTerms,
+  accountRecoveryCodeRoute,
+  postAccountRecoveryCode,
+);
 app.post(
   "/api/account-recovery/complete",
   accountRecoveryCompleteRoute,
@@ -278,21 +284,37 @@ app.post(
 app.get("/api/billing/plans", billingPlanCatalogRoute, getBillingPlanCatalog);
 app.get(
   "/api/billing/trial-eligibility",
+  requireAuthentication,
   billingTrialEligibilityRoute,
   getBillingTrialEligibilityResponse,
 );
-app.post("/api/billing/checkout-sessions", billingCheckoutSessionRoute, postBillingCheckoutSession);
+app.post(
+  "/api/billing/checkout-sessions",
+  requireAuthentication,
+  requireCurrentTerms,
+  billingCheckoutSessionRoute,
+  postBillingCheckoutSession,
+);
 app.post(
   "/api/billing/plan-change-sessions",
+  requireAuthentication,
+  requireCurrentTerms,
   billingPlanChangeSessionRoute,
   postBillingPlanChangeSession,
 );
 app.get(
   "/api/billing/checkout-sessions/:checkoutSessionId",
+  requireAuthentication,
   billingCheckoutSessionStatusRoute,
   getBillingCheckoutSession,
 );
-app.post("/api/billing/portal-sessions", billingPortalSessionRoute, postBillingPortalSession);
+app.post(
+  "/api/billing/portal-sessions",
+  requireAuthentication,
+  requireCurrentTerms,
+  billingPortalSessionRoute,
+  postBillingPortalSession,
+);
 
 app.get("/api/legal/terms", requireAuthentication, getServiceTermsRoute, getServiceTermsContents);
 app.get(
@@ -453,23 +475,57 @@ app.delete(
   deletePersonalDataRecordContents,
 );
 
-app.get("/api/family/seats", familySeatManagementRoute, getFamilySeats);
-app.post("/api/family/invitations", issueFamilyInvitationRoute, postFamilyInvitation);
+app.get(
+  "/api/family/seats",
+  requireAuthentication,
+  requireCurrentTerms,
+  familySeatManagementRoute,
+  getFamilySeats,
+);
+app.post(
+  "/api/family/invitations",
+  requireAuthentication,
+  requireCurrentTerms,
+  issueFamilyInvitationRoute,
+  postFamilyInvitation,
+);
 app.post(
   "/api/family/invitations/accept",
+  requireAuthentication,
+  requireCurrentTerms,
   acceptFamilyInvitationRoute,
   familyInvitationTokenValidator,
   postFamilyInvitationAcceptance,
 );
 app.post(
   "/api/family/invitations/decline",
+  requireAuthentication,
+  requireCurrentTerms,
   declineFamilyInvitationRoute,
   familyInvitationTokenValidator,
   postFamilyInvitationDecline,
 );
-app.delete("/api/family/invitations/:seatId", cancelFamilyInvitationRoute, deleteFamilyInvitation);
-app.delete("/api/family/seats/:seatId", removeFamilyMemberRoute, deleteFamilyMember);
-app.delete("/api/family/membership", leaveFamilyPackRoute, deleteOwnFamilyMembership);
+app.delete(
+  "/api/family/invitations/:seatId",
+  requireAuthentication,
+  requireCurrentTerms,
+  cancelFamilyInvitationRoute,
+  deleteFamilyInvitation,
+);
+app.delete(
+  "/api/family/seats/:seatId",
+  requireAuthentication,
+  requireCurrentTerms,
+  removeFamilyMemberRoute,
+  deleteFamilyMember,
+);
+app.delete(
+  "/api/family/membership",
+  requireAuthentication,
+  requireCurrentTerms,
+  leaveFamilyPackRoute,
+  deleteOwnFamilyMembership,
+);
 app.post(
   "/api/personal-data/exports",
   requireAuthentication,

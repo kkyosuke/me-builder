@@ -1,18 +1,13 @@
 import { D1 } from "@me-builder/lib";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { getConfig } from "../config";
 import {
   FamilyInvitationResponseSchema,
   FamilyOperationUnavailableSchema,
   FamilySeatManagementResponseSchema,
   FamilySeatMutationResponseSchema,
 } from "../contract/family/seats";
-import {
-  ForbiddenErrorSchema,
-  ServiceUnavailableErrorSchema,
-  UnauthorizedErrorSchema,
-} from "../contract/shared/errors";
+import { ForbiddenErrorSchema, ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import {
   acceptFamilyInvitation,
   cancelFamilyInvitation,
@@ -22,15 +17,14 @@ import {
   leaveFamilyPack,
   removeFamilyMember,
 } from "../logic/family-seat-management";
+import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 
 function params(c: Context<AppEnv>) {
   const database = c.env.DB;
   if (!database) throw new Error("Family storage binding is not configured");
   return {
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(database),
   };
 }
@@ -45,10 +39,6 @@ function unavailable(
   );
 }
 
-function authFailure(c: Context<AppEnv>) {
-  return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
-}
-
 function missingDb(c: Context<AppEnv>) {
   return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
 }
@@ -58,9 +48,6 @@ function mutationResponse(c: Context<AppEnv>, outcome: MutationOutcome): Respons
   switch (outcome.type) {
     case "updated":
       return c.json(v.parse(FamilySeatMutationResponseSchema, { seat: outcome.seat }));
-    case "not-configured":
-    case "unauthenticated":
-      return authFailure(c);
     case "forbidden":
       return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
     case "not-found":
@@ -87,8 +74,7 @@ export async function getFamilySeats(c: Context<AppEnv>): Promise<Response> {
       }),
     );
   }
-  if (outcome.type === "no-membership") return unavailable(c, "no_membership");
-  return authFailure(c);
+  return unavailable(c, "no_membership");
 }
 
 export async function postFamilyInvitation(c: Context<AppEnv>): Promise<Response> {
@@ -99,8 +85,7 @@ export async function postFamilyInvitation(c: Context<AppEnv>): Promise<Response
     return c.json(v.parse(FamilyInvitationResponseSchema, outcome), 201);
   }
   if (outcome.type === "capacity-reached") return unavailable(c, "capacity_reached");
-  if (outcome.type === "no-membership") return unavailable(c, "no_membership");
-  return authFailure(c);
+  return unavailable(c, "no_membership");
 }
 
 async function token(c: Context<AppEnv>): Promise<string> {

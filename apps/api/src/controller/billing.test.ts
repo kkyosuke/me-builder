@@ -16,7 +16,7 @@ describe("billing plan catalog", () => {
     expect(JSON.stringify(body)).not.toMatch(/lookupKey|price_|productId/i);
   });
 
-  it("未認証probeで課金runtime構成済みと設定欠落を区別する", async () => {
+  it("未認証probeでは課金runtimeの設定有無を区別させない", async () => {
     const readyEnv = {
       DB: {},
       WEB_ORIGIN: "https://app.example.test",
@@ -60,7 +60,7 @@ describe("billing plan catalog", () => {
           STRIPE_PORTAL_CONFIGURATION_ID: undefined,
         } as never)
       ).status,
-    ).toBe(503);
+    ).toBe(401);
     expect(
       (
         await app.request("/api/billing/plan-change-sessions", jsonRequest, {
@@ -68,7 +68,7 @@ describe("billing plan catalog", () => {
           STRIPE_PORTAL_RESET_CONFIGURATION_ID: undefined,
         } as never)
       ).status,
-    ).toBe(503);
+    ).toBe(401);
     expect(
       (
         await app.request("/api/billing/checkout-sessions", jsonRequest, {
@@ -76,7 +76,7 @@ describe("billing plan catalog", () => {
           BILLING_LOOKUP_KEY_MAP: '{"lite.month":"only_one"}',
         } as never)
       ).status,
-    ).toBe(503);
+    ).toBe(401);
     expect(
       (
         await app.request("/api/billing/webhook", { method: "POST", body: "{}" }, {

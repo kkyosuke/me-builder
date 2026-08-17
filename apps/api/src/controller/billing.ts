@@ -14,11 +14,7 @@ import {
   BillingSessionResponseSchema,
   BillingTrialEligibilityResponseSchema,
 } from "../contract/billing/sessions";
-import {
-  AccountNotFoundErrorSchema,
-  ServiceUnavailableErrorSchema,
-  UnauthorizedErrorSchema,
-} from "../contract/shared/errors";
+import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import {
   createBillingCheckoutSession,
   createBillingPlanChangeSession,
@@ -27,8 +23,8 @@ import {
   getBillingTrialEligibility,
 } from "../logic/billing-sessions";
 import { receiveStripeWebhook } from "../logic/stripe-webhook";
+import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 
 export async function postStripeWebhook(c: Context<AppEnv>): Promise<Response> {
   const config = getConfig(c.env);
@@ -77,36 +73,21 @@ export function getBillingPlanCatalog(c: Context<AppEnv>): Response {
 
 export async function getBillingTrialEligibilityResponse(c: Context<AppEnv>): Promise<Response> {
   const config = getConfig(c.env);
-  if (!c.env?.DB || !config.stripeSecretKey || !config.lineLoginChannelId) {
+  if (!c.env?.DB || !config.stripeSecretKey) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await getBillingTrialEligibility({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
     provider: billing.createStripeBillingProvider({ secretKey: config.stripeSecretKey }),
   });
-  switch (outcome.type) {
-    case "resolved":
-      c.header("Cache-Control", "no-store");
-      return c.json(
-        v.parse(BillingTrialEligibilityResponseSchema, {
-          eligible: outcome.eligible,
-          trialDays: BILLING_INITIAL_TRIAL_DAYS,
-        }),
-      );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
-  }
+  c.header("Cache-Control", "no-store");
+  return c.json(
+    v.parse(BillingTrialEligibilityResponseSchema, {
+      eligible: outcome.eligible,
+      trialDays: BILLING_INITIAL_TRIAL_DAYS,
+    }),
+  );
 }
 
 export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Response> {
@@ -145,8 +126,7 @@ export async function getBillingCheckoutSession(c: Context<AppEnv>): Promise<Res
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await getBillingCheckoutSessionStatus({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
     provider: billing.createStripeBillingProvider({ secretKey: config.stripeSecretKey }),
     webOrigin: config.webOrigin,
@@ -163,17 +143,6 @@ export async function getBillingCheckoutSession(c: Context<AppEnv>): Promise<Res
         v.parse(BillingCheckoutSessionNotFoundSchema, { error: "Checkout session not found" }),
         404,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -198,18 +167,11 @@ async function createBillingSessionResponse(
               completeLookupKeyMap,
           )
         : completeLookupKeyMap;
-  if (
-    !c.env?.DB ||
-    !config.stripeSecretKey ||
-    !config.webOrigin ||
-    !config.lineLoginChannelId ||
-    !kindConfigurationAvailable
-  ) {
+  if (!c.env?.DB || !config.stripeSecretKey || !config.webOrigin || !kindConfigurationAvailable) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const base = {
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
     provider: billing.createStripeBillingProvider({
       secretKey: config.stripeSecretKey,
@@ -252,16 +214,5 @@ async function createBillingSessionResponse(
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }

@@ -168,6 +168,12 @@ export async function completeAccountRecovery(
       ),
   });
   const accountId = credential.accountId;
+  const account = await db.query.accounts.findFirst({
+    columns: { status: true, isDeleted: true },
+    where: (table, { eq }) => eq(table.id, accountId),
+  });
+  // コード発行後にAccountが削除・停止された場合も、Identityを再接続しない。
+  if (!account || account.status !== "active" || account.isDeleted) return "invalid";
   if (credential.usedAt) {
     return existingIdentities.some((identity) => identity.accountId === accountId)
       ? "already-recovered"

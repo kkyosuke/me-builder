@@ -1,7 +1,7 @@
 import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 export const BillingCheckoutRequestSchema = v.object({
   plan: v.picklist(["lite", "full", "family"]),
@@ -79,6 +79,7 @@ export const billingCheckoutSessionRoute = describeRoute({
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("購入を開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -92,7 +93,7 @@ export const billingCheckoutSessionStatusRoute = describeRoute({
     ...authenticatedErrors,
     404: jsonResponse(
       "Accountまたは本人のCheckout Sessionが存在しない",
-      v.union([AccountNotFoundErrorSchema, BillingCheckoutSessionNotFoundSchema]),
+      BillingCheckoutSessionNotFoundSchema,
     ),
   },
 } satisfies DescribeRouteOptions);
@@ -126,6 +127,7 @@ export const billingPortalSessionRoute = describeRoute({
     201: jsonResponse("短命なStripe Customer Portal URL", BillingSessionResponseSchema),
     409: jsonResponse("Portalを開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -143,5 +145,6 @@ export const billingPlanChangeSessionRoute = describeRoute({
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("プラン変更を開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
