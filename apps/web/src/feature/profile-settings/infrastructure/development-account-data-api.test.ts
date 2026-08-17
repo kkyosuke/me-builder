@@ -7,7 +7,7 @@ const API_URL = "https://api.stg.kagami.kyosuke.dev";
 describe("resetDevelopmentAccountData", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("Bearerトークンを付けてDELETEし、削除件数を返す", async () => {
+  it("application sessionでDELETEし、削除件数を返す", async () => {
     const deleted = {
       deletedDiagnosisResponseCount: 2,
       deletedConversationSessionCount: 3,
@@ -18,10 +18,10 @@ describe("resetDevelopmentAccountData", () => {
     };
     const fetchMock = vi.fn(async () => Response.json(deleted));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(resetDevelopmentAccountData(API_URL, "dummy.id.token")).resolves.toEqual(deleted);
+    await expect(resetDevelopmentAccountData(API_URL)).resolves.toEqual(deleted);
     expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/api/dev/account-data`, {
       method: "DELETE",
-      headers: { Authorization: "Bearer dummy.id.token" },
+      credentials: "include",
     });
   });
 
@@ -35,7 +35,7 @@ describe("resetDevelopmentAccountData", () => {
       vi.fn(async () => new Response(null, { status })),
     );
     try {
-      await resetDevelopmentAccountData(API_URL, "token");
+      await resetDevelopmentAccountData(API_URL);
       throw new Error("本人データ削除が成功してしまいました");
     } catch (error) {
       expect(error).toBeInstanceOf(ErrorType);

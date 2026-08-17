@@ -5,7 +5,7 @@ import {
   UnknownError,
   ValidationError,
 } from "../../../infrastructure/errors";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 const ResetDevelopmentAccountDataResponseSchema = v.object({
@@ -23,12 +23,10 @@ export type ResetDevelopmentAccountDataResult = v.InferOutput<
 
 export async function resetDevelopmentAccountData(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<ResetDevelopmentAccountDataResult> {
-  const response = await createHttpClient(apiUrl).request("/api/dev/account-data", {
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/dev/account-data", {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${idToken}` },
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {

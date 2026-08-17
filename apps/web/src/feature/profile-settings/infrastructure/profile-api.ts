@@ -1,7 +1,7 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { OperationError, ValidationError } from "../../../infrastructure/errors";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { AvatarSelection } from "../model/avatar";
 
 type ApiResponse = operations["getProfile"]["responses"][200]["content"]["application/json"];
@@ -64,7 +64,7 @@ async function requestProfile(
   operation: "取得" | "保存" | "削除",
 ): Promise<Response> {
   try {
-    return await createHttpClient(apiUrl).request(path, init);
+    return await createAuthenticatedHttpClient(apiUrl).request(path, init);
   } catch (error) {
     if (init.signal?.aborted) throw error;
     throw profileNetworkError(operation, error);
@@ -108,14 +108,12 @@ function decodeAvatarDataUrl(
 
 export async function fetchAccountProfile(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<AccountProfile> {
   const response = await requestProfile(
     apiUrl,
     "/api/profile",
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
     "取得",
@@ -125,7 +123,6 @@ export async function fetchAccountProfile(
 
 export async function saveAccountAvatar(
   apiUrl: string | undefined,
-  idToken: string,
   avatar: AvatarSelection,
   signal?: AbortSignal,
 ): Promise<AccountProfile> {
@@ -135,7 +132,7 @@ export async function saveAccountAvatar(
     "/api/profile/avatar",
     {
       method: "PUT",
-      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": contentType },
+      headers: { "Content-Type": contentType },
       body: bytes.buffer as ArrayBuffer,
       ...(signal ? { signal } : {}),
     },
@@ -146,7 +143,6 @@ export async function saveAccountAvatar(
 
 export async function deleteAccountAvatar(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<AccountProfile> {
   const response = await requestProfile(
@@ -154,7 +150,6 @@ export async function deleteAccountAvatar(
     "/api/profile/avatar",
     {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
     "削除",

@@ -39,7 +39,7 @@ describe("fetchProfileSummary", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await fetchProfileSummary("https://api.example.com", "id-token");
+    const result = await fetchProfileSummary("https://api.example.com");
 
     expect(result).toEqual({
       ...apiResponse,
@@ -48,7 +48,7 @@ describe("fetchProfileSummary", () => {
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/profile-summary",
-      expect.objectContaining({ headers: { Authorization: "Bearer id-token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
@@ -68,15 +68,13 @@ describe("fetchProfileSummary", () => {
       ),
     );
 
-    await expect(fetchProfileSummary(undefined, "id-token")).rejects.toThrow();
+    await expect(fetchProfileSummary(undefined)).rejects.toThrow();
   });
 
   it("認証失敗を利用者向けメッセージへ変換する", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
 
-    await expect(fetchProfileSummary(undefined, "id-token")).rejects.toThrow(
-      "本人確認に失敗しました",
-    );
+    await expect(fetchProfileSummary(undefined)).rejects.toThrow("本人確認に失敗しました");
   });
 
   it("新しいまとめ版の生成を要求する", async () => {
@@ -92,14 +90,16 @@ describe("fetchProfileSummary", () => {
         ),
     );
 
-    await expect(
-      requestProfileSummaryGeneration("https://api.example.com", "id-token"),
-    ).resolves.toEqual({ generationId: "generation-1", status: "queued", created: true });
+    await expect(requestProfileSummaryGeneration("https://api.example.com")).resolves.toEqual({
+      generationId: "generation-1",
+      status: "queued",
+      created: true,
+    });
     expect(fetch).toHaveBeenCalledWith(
       "https://api.example.com/api/profile-summary/generations",
       expect.objectContaining({
         method: "POST",
-        headers: { Authorization: "Bearer id-token" },
+        credentials: "include",
       }),
     );
   });
@@ -120,7 +120,7 @@ describe("fetchProfileSummary", () => {
         ),
     );
 
-    const request = requestProfileSummaryGeneration(undefined, "id-token");
+    const request = requestProfileSummaryGeneration(undefined);
 
     await expect(request).rejects.toEqual(
       expect.objectContaining<Partial<ProfileSummaryGenerationUnavailableError>>({

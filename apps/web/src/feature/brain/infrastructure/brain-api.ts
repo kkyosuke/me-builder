@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type {
   DevelopmentBrainItemsResult,
   DevelopmentBrainVectorResult,
@@ -76,11 +76,9 @@ const VectorResponseSchema = v.variant("state", [
 
 export async function fetchDevelopmentBrainItems(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<DevelopmentBrainItemsResult> {
-  const response = await createHttpClient(apiUrl).request("/api/dev/brain-items", {
-    headers: { Authorization: `Bearer ${idToken}` },
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/dev/brain-items", {
     ...(signal ? { signal } : {}),
   });
 
@@ -100,14 +98,12 @@ export async function fetchDevelopmentBrainItems(
 
 export async function fetchDevelopmentBrainVector(
   apiUrl: string | undefined,
-  idToken: string,
   brainItemId: string,
   signal?: AbortSignal,
 ): Promise<DevelopmentBrainVectorResult> {
-  const response = await createHttpClient(apiUrl).request(
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/dev/brain-items/${encodeURIComponent(brainItemId)}/vector`,
     {
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     },
   );

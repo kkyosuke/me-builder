@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import {
   ProfileSummaryGenerationUnavailableError,
   type ProfileSummaryReadResult,
@@ -94,11 +94,9 @@ const GenerationUnavailableResponseSchema = v.object({
 
 export async function fetchProfileSummary(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<ProfileSummaryReadResult> {
-  const response = await createHttpClient(apiUrl).request("/api/profile-summary", {
-    headers: { Authorization: `Bearer ${idToken}` },
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/profile-summary", {
     ...(signal ? { signal } : {}),
   });
 
@@ -128,14 +126,15 @@ export async function fetchProfileSummary(
 
 export async function requestProfileSummaryGeneration(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<GenerationResponse> {
-  const response = await createHttpClient(apiUrl).request("/api/profile-summary/generations", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${idToken}` },
-    ...(signal ? { signal } : {}),
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/profile-summary/generations",
+    {
+      method: "POST",
+      ...(signal ? { signal } : {}),
+    },
+  );
   if (!response.ok) {
     if (response.status === 401) {
       throw new Error("本人確認に失敗しました。LINEから開き直してください。");

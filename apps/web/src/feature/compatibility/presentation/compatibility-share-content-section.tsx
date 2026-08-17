@@ -11,6 +11,7 @@ import {
   getRelationshipCategoryFilterClassName,
   getRelationshipCategoryLabel,
 } from "../../diagnosis/model/relationship-category";
+import { useLiffSession } from "../../liff";
 import type { CompatibilityShareContent } from "../model/compatibility-share-content";
 import { useCompatibilityShareContent } from "./hooks/use-compatibility-share-content";
 
@@ -261,14 +262,13 @@ export function CompatibilityShareContentSectionScreen({
 }
 
 export function CompatibilityShareContentSection({
-  acquireIdToken,
   latestProfileSummaryVersionId,
 }: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
   latestProfileSummaryVersionId: string | null | undefined;
 }) {
+  const liffSession = useLiffSession();
   const content = useCompatibilityShareContent({
-    acquireIdToken,
+    acquireIdToken: liffSession.acquireIdToken,
     latestProfileSummaryVersionId,
   });
   return (

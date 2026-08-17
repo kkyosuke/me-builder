@@ -22,6 +22,13 @@ const mocks = vi.hoisted(() => ({
   },
   initializeLiff: vi.fn(),
   getLiffIdToken: vi.fn(),
+  authState: {
+    status: "authenticated" as const,
+    profile: { displayName: "テスト", pictureUrl: undefined as string | undefined },
+    role: "user" as "user" | "admin",
+    revision: 1,
+  },
+  retryAuthSession: vi.fn(),
   fetchAccountProfile: vi.fn(),
   saveAccountAvatar: vi.fn(),
   deleteAccountAvatar: vi.fn(),
@@ -54,6 +61,10 @@ vi.mock("./config", () => ({
 vi.mock("./feature/legal", () => ({
   ServiceTermsGate: ({ children }: { children: ReactNode }) => children,
   ServiceTermsAcceptanceHistory: () => null,
+}));
+vi.mock("./feature/auth", () => ({
+  AuthSessionProvider: ({ children }: { children: ReactNode }) => children,
+  useAuthSession: () => ({ state: mocks.authState, retry: mocks.retryAuthSession }),
 }));
 vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiff: mocks.initializeLiff,
@@ -215,6 +226,12 @@ describe("App", () => {
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
     mocks.config.environment = "development";
+    mocks.authState = {
+      status: "authenticated",
+      profile: { displayName: "テスト", pictureUrl: undefined },
+      role: "user",
+      revision: 1,
+    };
     mocks.initializeLiff.mockResolvedValue({
       status: "ready",
       inClient: true,
@@ -241,7 +258,7 @@ describe("App", () => {
       milestoneCards: [],
     });
     mocks.saveAccountAvatar.mockImplementation(
-      async (_apiUrl: string, _idToken: string, nextAvatar: { dataUrl: string }) => ({
+      async (_apiUrl: string, nextAvatar: { dataUrl: string }) => ({
         role: "user",
         displayName: "テスト",
         avatar: {
@@ -406,14 +423,7 @@ describe("App", () => {
 
   it("未設定時はLINEプロフィール画像を右上アイコンに表示する", async () => {
     const linePictureUrl = "https://example.com/line-profile.jpg";
-    mocks.initializeLiff.mockResolvedValue({
-      status: "ready",
-      inClient: true,
-      profile: {
-        displayName: "テスト",
-        pictureUrl: linePictureUrl,
-      },
-    });
+    mocks.authState.profile.pictureUrl = linePictureUrl;
     mocks.fetchAccountProfile.mockResolvedValue({
       role: "user",
       displayName: "テスト",
@@ -484,7 +494,6 @@ describe("App", () => {
     expect(adminLink.getAttribute("href")).toBe("/admin");
     expect(mocks.fetchAccountProfile).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       expect.any(AbortSignal),
     );
 
@@ -500,14 +509,7 @@ describe("App", () => {
 
   it("LINE画像を表示し、選んだ画像をアバターに設定してプロフィールへ戻る", async () => {
     const linePictureUrl = "https://example.com/line-profile.jpg";
-    mocks.initializeLiff.mockResolvedValue({
-      status: "ready",
-      inClient: true,
-      profile: {
-        displayName: "テスト",
-        pictureUrl: linePictureUrl,
-      },
-    });
+    mocks.authState.profile.pictureUrl = linePictureUrl;
     mocks.fetchAccountProfile.mockResolvedValue({
       role: "user",
       displayName: "テスト",
@@ -531,7 +533,6 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
     expect(mocks.saveAccountAvatar).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       {
         kind: "uploaded",
         dataUrl: "data:image/png;base64,normalized",
@@ -663,11 +664,7 @@ describe("App", () => {
   it("保存画像の取得前にLINE画像を先に表示しない", async () => {
     const linePictureUrl = "https://example.com/line-profile.jpg";
     let resolveProfile: ((profile: unknown) => void) | undefined;
-    mocks.initializeLiff.mockResolvedValue({
-      status: "ready",
-      inClient: true,
-      profile: { displayName: "テスト", pictureUrl: linePictureUrl },
-    });
+    mocks.authState.profile.pictureUrl = linePictureUrl;
     mocks.fetchAccountProfile.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveProfile = resolve;
@@ -702,11 +699,7 @@ describe("App", () => {
 
   it("保存済み画像を削除してLINE画像へ戻す", async () => {
     const linePictureUrl = "https://example.com/line-profile.jpg";
-    mocks.initializeLiff.mockResolvedValue({
-      status: "ready",
-      inClient: true,
-      profile: { displayName: "テスト", pictureUrl: linePictureUrl },
-    });
+    mocks.authState.profile.pictureUrl = linePictureUrl;
     mocks.fetchAccountProfile.mockResolvedValue({
       role: "user",
       displayName: "テスト",
@@ -730,11 +723,126 @@ describe("App", () => {
     await waitFor(() =>
       expect(mocks.deleteAccountAvatar).toHaveBeenCalledWith(
         "https://api.example.com",
-        "dummy.id.token",
         expect.any(AbortSignal),
       ),
     );
     expect(await screen.findByText("LINEのプロフィール画像")).toBeTruthy();
+  });
+
+  it("アプリセッション切替時に前アカウントのプロフィール表示と履歴を破棄する", async () => {
+    const previousAvatar = "data:image/png;base64,cHJldmlvdXM=";
+    const nextAvatar = "data:image/png;base64,bmV4dA==";
+    mocks.fetchAccountProfile
+      .mockResolvedValueOnce({
+        role: "user",
+        displayName: "切替前",
+        avatar: {
+          source: "uploaded",
+          url: previousAvatar,
+          updatedAt: "2026-08-11T00:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        role: "user",
+        displayName: "切替後",
+        avatar: {
+          source: "uploaded",
+          url: nextAvatar,
+          updatedAt: "2026-08-12T00:00:00.000Z",
+        },
+      });
+    const view = render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(previousAvatar),
+    );
+    fireEvent.click(profileButton);
+    expect(await screen.findByRole("dialog", { name: "プロフィール" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/profile");
+
+    mocks.authState = {
+      status: "authenticated",
+      profile: { displayName: "別アカウント", pictureUrl: undefined },
+      role: "user",
+      revision: 2,
+    };
+    view.rerender(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    expect(screen.queryByRole("dialog", { name: "プロフィール" })).toBeNull();
+    expect(document.querySelector(`img[src="${previousAvatar}"]`)).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "プロフィールを開く" })
+          .querySelector("img")
+          ?.getAttribute("src"),
+      ).toBe(nextAvatar),
+    );
+    expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(2);
+  });
+
+  it("session切替前のアバター保存結果で新Accountの表示を上書きしない", async () => {
+    const previousAvatar = "data:image/png;base64,b2xk";
+    const nextAvatar = "data:image/png;base64,bmV3";
+    let resolveDeletion: ((profile: unknown) => void) | undefined;
+    mocks.fetchAccountProfile
+      .mockResolvedValueOnce({
+        role: "user",
+        displayName: "切替前",
+        avatar: { source: "uploaded", url: previousAvatar, updatedAt: null },
+      })
+      .mockResolvedValueOnce({
+        role: "user",
+        displayName: "切替後",
+        avatar: { source: "uploaded", url: nextAvatar, updatedAt: null },
+      });
+    mocks.deleteAccountAvatar.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDeletion = resolve;
+      }),
+    );
+    const view = render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(previousAvatar),
+    );
+    fireEvent.click(profileButton);
+    fireEvent.click(await screen.findByRole("button", { name: /アバターを変更/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "現在の画像を削除" }));
+    await waitFor(() => expect(mocks.deleteAccountAvatar).toHaveBeenCalledTimes(1));
+
+    mocks.authState = {
+      status: "authenticated",
+      profile: { displayName: "別アカウント", pictureUrl: undefined },
+      role: "user",
+      revision: 2,
+    };
+    view.rerender(<App />);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "プロフィールを開く" })
+          .querySelector("img")
+          ?.getAttribute("src"),
+      ).toBe(nextAvatar),
+    );
+
+    await act(async () => {
+      resolveDeletion?.({
+        role: "user",
+        displayName: "切替前",
+        avatar: null,
+      });
+    });
+    expect(
+      screen
+        .getByRole("button", { name: "プロフィールを開く" })
+        .querySelector("img")
+        ?.getAttribute("src"),
+    ).toBe(nextAvatar);
   });
 
   it("プロフィール取得失敗を表示して再試行できる", async () => {
@@ -807,7 +915,6 @@ describe("App", () => {
     expect(mocks.initializeLiff).toHaveBeenCalled();
     expect(mocks.fetchProfileSummary).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       expect.any(AbortSignal),
     );
     expect(screen.queryByRole("heading", { name: "Brain Item一覧" })).toBeNull();
@@ -829,7 +936,6 @@ describe("App", () => {
     expect(screen.getByText("公園を散歩した")).toBeTruthy();
     expect(mocks.fetchDevelopmentBrainItems).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       expect.any(AbortSignal),
     );
 
@@ -878,7 +984,6 @@ describe("App", () => {
     await waitFor(() =>
       expect(mocks.requestProfileSummaryGeneration).toHaveBeenCalledWith(
         "https://api.example.com",
-        "dummy.id.token",
         expect.any(AbortSignal),
       ),
     );
@@ -944,7 +1049,6 @@ describe("App", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
-    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
     expect(mocks.fetchProfileSummary).toHaveBeenCalledTimes(1);
     expect(mocks.fetchDevelopmentBrainItems).not.toHaveBeenCalled();
   });
@@ -1213,7 +1317,6 @@ describe("App", () => {
     await waitFor(() =>
       expect(mocks.resetDevelopmentAccountData).toHaveBeenCalledWith(
         "https://api.example.com",
-        "dummy.id.token",
         expect.any(AbortSignal),
       ),
     );
