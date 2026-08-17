@@ -23,15 +23,14 @@ const clock = await stripe.testHelpers.testClocks.create({
 });
 
 try {
-  const [litePriceId, liteYearlyPriceId, fullPriceId, fullYearlyPriceId, portalConfigurations] =
-    await Promise.all([
-      resolvePriceId(stripe, "lite", "month"),
-      resolvePriceId(stripe, "lite", "year"),
-      resolvePriceId(stripe, "full", "month"),
-      resolvePriceId(stripe, "full", "year"),
-      resolvePortalConfigurations(stripe),
-    ]);
+  const [litePriceId, liteYearlyPriceId, fullPriceId, fullYearlyPriceId] = await Promise.all([
+    resolvePriceId(stripe, "lite", "month"),
+    resolvePriceId(stripe, "lite", "year"),
+    resolvePriceId(stripe, "full", "month"),
+    resolvePriceId(stripe, "full", "year"),
+  ]);
   await assertCheckoutSession(stripe, litePriceId);
+  const portalConfigurations = await resolvePortalConfigurations(stripe);
   const customer = await stripe.customers.create({
     test_clock: clock.id,
     metadata: { managed_by: "me-builder-e2e" },
@@ -234,6 +233,14 @@ async function assertCheckoutSession(client: Stripe, priceId: string): Promise<v
     });
     if (!session.url) throw new Error("Checkout Session URL was missing");
     await client.checkout.sessions.expire(session.id);
+    logger.info(
+      {
+        event: "stripe.sandbox.checkout.completed",
+        service: "api",
+        outcome: "succeeded",
+      },
+      "Stripe sandbox Checkout Session creation succeeded",
+    );
   } catch (error) {
     const stripeError = safeStripeErrorFields(error);
     logger.error(
