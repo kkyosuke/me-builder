@@ -36,7 +36,7 @@ export function ProfilePlanBadge({
   descriptionId,
 }: {
   plan: ProfileEntitlement["plan"];
-  descriptionId?: string | undefined;
+  descriptionId: string;
 }) {
   const badge = planBadge[plan];
   const Icon = "icon" in badge ? badge.icon : null;

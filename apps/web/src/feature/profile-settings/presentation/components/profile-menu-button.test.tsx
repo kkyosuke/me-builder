@@ -16,7 +16,11 @@ describe("ProfileMenuButton", () => {
     render(<ProfileMenuButton avatar={null} plan={plan} onOpen={vi.fn()} onPreload={vi.fn()} />);
 
     const button = screen.getByRole("button", { name: "プロフィールを開く" });
-    expect(button.textContent).toContain(badgeLabel);
+    expect(
+      [...button.querySelectorAll('[aria-hidden="true"]')].some(
+        (element) => element.textContent === badgeLabel,
+      ),
+    ).toBe(true);
     expect(screen.getByText(`現在のプラン: ${accessibleLabel}`)).toBeTruthy();
     expect(button.getAttribute("aria-describedby")).toBeTruthy();
   });
