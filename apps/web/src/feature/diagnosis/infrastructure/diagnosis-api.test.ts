@@ -21,7 +21,7 @@ describe("fetchDiagnosisList", () => {
     vi.unstubAllGlobals();
   });
 
-  it("Bearerトークンを付けて一覧APIを呼び、レスポンスを返すこと", async () => {
+  it("application session cookieで一覧APIを呼び、レスポンスを返すこと", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json({
         diagnoses: [
@@ -44,10 +44,10 @@ describe("fetchDiagnosisList", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const diagnoses = await fetchDiagnosisList(API_URL, "dummy.id.token");
+    const diagnoses = await fetchDiagnosisList(API_URL);
 
     expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/api/diagnoses`, {
-      headers: { Authorization: "Bearer dummy.id.token" },
+      credentials: "include",
     });
     expect(diagnoses[0]).toMatchObject({
       id: "relationship-priority",
@@ -64,9 +64,7 @@ describe("fetchDiagnosisList", () => {
       vi.fn(async () => new Response(null, { status: 401 })),
     );
 
-    await expect(fetchDiagnosisList(API_URL, "expired-token")).rejects.toThrow(
-      "本人確認に失敗しました",
-    );
+    await expect(fetchDiagnosisList(API_URL)).rejects.toThrow("本人確認に失敗しました");
   });
 
   it("不正なレスポンスを受け入れないこと", async () => {
@@ -75,7 +73,7 @@ describe("fetchDiagnosisList", () => {
       vi.fn(async () => Response.json({ diagnoses: [{ id: "broken" }] })),
     );
 
-    await expect(fetchDiagnosisList(API_URL, "dummy.id.token")).rejects.toThrow();
+    await expect(fetchDiagnosisList(API_URL)).rejects.toThrow();
   });
 });
 
@@ -84,7 +82,7 @@ describe("saveDiagnosisAnswer", () => {
     vi.unstubAllGlobals();
   });
 
-  it("BearerトークンとChoice IDでPUTし保存結果を返す", async () => {
+  it("application sessionとChoice IDでPUTし保存結果を返す", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json({
         outcome: "created",
@@ -100,24 +98,15 @@ describe("saveDiagnosisAnswer", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await saveDiagnosisAnswer(
-      API_URL,
-      "dummy.id.token",
-      "relationship-priority",
-      "dq-1",
-      "yes",
-    );
+    const result = await saveDiagnosisAnswer(API_URL, "relationship-priority", "dq-1", "yes");
 
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_URL}/api/diagnoses/relationship-priority/answers/dq-1`,
-      {
+      expect.objectContaining({
         method: "PUT",
-        headers: {
-          Authorization: "Bearer dummy.id.token",
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ choiceId: "yes" }),
-      },
+        credentials: "include",
+      }),
     );
     expect(result).toMatchObject({
       outcome: "created",
@@ -139,7 +128,7 @@ describe("saveDiagnosisAnswer", () => {
       vi.fn(async () => (body ? Response.json(body, { status }) : new Response(null, { status }))),
     );
     try {
-      await saveDiagnosisAnswer(API_URL, "token", "diagnosis", "sq", "yes");
+      await saveDiagnosisAnswer(API_URL, "diagnosis", "sq", "yes");
       throw new Error("回答保存が成功してしまいました");
     } catch (error) {
       expect(error).toBeInstanceOf(ErrorType);
@@ -153,7 +142,7 @@ describe("deferDiagnosisQuestion", () => {
     vi.unstubAllGlobals();
   });
 
-  it("BearerトークンでPUTし、延期結果を返す", async () => {
+  it("application sessionでPUTし、延期結果を返す", async () => {
     const deferred = {
       outcome: "created",
       deferredQuestion: {
@@ -164,14 +153,14 @@ describe("deferDiagnosisQuestion", () => {
     const fetchMock = vi.fn(async () => Response.json(deferred));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      deferDiagnosisQuestion(API_URL, "dummy.id.token", "relationship-priority", "dq-1"),
-    ).resolves.toEqual(deferred);
+    await expect(deferDiagnosisQuestion(API_URL, "relationship-priority", "dq-1")).resolves.toEqual(
+      deferred,
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_URL}/api/diagnoses/relationship-priority/deferred-questions/dq-1`,
       {
         method: "PUT",
-        headers: { Authorization: "Bearer dummy.id.token" },
+        credentials: "include",
       },
     );
   });
@@ -189,7 +178,7 @@ describe("deferDiagnosisQuestion", () => {
       vi.fn(async () => (body ? Response.json(body, { status }) : new Response(null, { status }))),
     );
     try {
-      await deferDiagnosisQuestion(API_URL, "token", "diagnosis", "dq-1");
+      await deferDiagnosisQuestion(API_URL, "diagnosis", "dq-1");
       throw new Error("あとで回答の保存が成功してしまいました");
     } catch (error) {
       expect(error).toBeInstanceOf(ErrorType);
@@ -229,14 +218,10 @@ describe("fetchDiagnosisDefinition", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const definition = await fetchDiagnosisDefinition(
-      API_URL,
-      "dummy.id.token",
-      "relationship-priority",
-    );
+    const definition = await fetchDiagnosisDefinition(API_URL, "relationship-priority");
 
     expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/api/diagnoses/relationship-priority`, {
-      headers: { Authorization: "Bearer dummy.id.token" },
+      credentials: "include",
     });
     expect(definition).toMatchObject({
       title: "API title",
@@ -262,7 +247,7 @@ describe("fetchDiagnosisDefinition", () => {
       vi.fn(async () => new Response(null, { status })),
     );
     try {
-      await fetchDiagnosisDefinition(API_URL, "dummy.id.token", "relationship-priority");
+      await fetchDiagnosisDefinition(API_URL, "relationship-priority");
       throw new Error("詳細取得が成功してしまいました");
     } catch (error) {
       expect(error).toBeInstanceOf(ErrorType);
@@ -277,7 +262,7 @@ describe("fetchDiagnosisDefinition", () => {
     );
 
     try {
-      await fetchDiagnosisDefinition(API_URL, "dummy.id.token", "relationship-priority");
+      await fetchDiagnosisDefinition(API_URL, "relationship-priority");
       throw new Error("不正なレスポンスを受け入れてしまいました");
     } catch (error) {
       expect(error).toBeInstanceOf(ValidationError);
@@ -295,13 +280,11 @@ describe("fetchDiagnosisResult", () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 404 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      fetchDiagnosisProgress(API_URL, "dummy.id.token", "relationship-priority"),
-    ).resolves.toBeUndefined();
+    await expect(fetchDiagnosisProgress(API_URL, "relationship-priority")).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_URL}/api/diagnoses/relationship-priority/answers`,
       {
-        headers: { Authorization: "Bearer dummy.id.token" },
+        credentials: "include",
       },
     );
   });
@@ -344,12 +327,12 @@ describe("fetchDiagnosisResult", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await fetchDiagnosisResult(API_URL, "dummy.id.token", "relationship-priority");
+    const result = await fetchDiagnosisResult(API_URL, "relationship-priority");
 
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_URL}/api/diagnoses/relationship-priority/answers`,
       {
-        headers: { Authorization: "Bearer dummy.id.token" },
+        credentials: "include",
       },
     );
     expect(result).toMatchObject({
@@ -370,7 +353,7 @@ describe("fetchDiagnosisResult", () => {
       vi.fn(async () => new Response(null, { status })),
     );
     try {
-      await fetchDiagnosisResult(API_URL, "dummy.id.token", "relationship-priority");
+      await fetchDiagnosisResult(API_URL, "relationship-priority");
       throw new Error("回答内容取得が成功してしまいました");
     } catch (error) {
       expect(error).toBeInstanceOf(ErrorType);

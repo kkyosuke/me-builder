@@ -41,19 +41,18 @@ type DiagnosisDetailState =
   | { status: "error"; message: string };
 
 interface UseDiagnosisDetailOptions {
-  idToken: string | null;
   onProgress: (
     diagnosisId: string,
     progress: Pick<DiagnosisListItem, "responseStatus" | "answeredCount" | "questionCount">,
   ) => void;
 }
 
-export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOptions) {
+export function useDiagnosisDetail({ onProgress }: UseDiagnosisDetailOptions) {
   const [state, setState] = useState<DiagnosisDetailState>({ status: "idle" });
   const selectedDefinition = useRef<DiagnosisDefinition | null>(null);
   const mounted = useRef(false);
   const request = useRef<AbortController | null>(null);
-  const answerSaver = useDiagnosisAnswerSaver({ idToken, onProgress });
+  const answerSaver = useDiagnosisAnswerSaver({ onProgress });
 
   useEffect(() => {
     mounted.current = true;
@@ -77,14 +76,6 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
         setState({ status: "success", data: { type: "guidance", kind: "closed" } });
         return;
       }
-      if (!idToken) {
-        setState({
-          status: "error",
-          message: "本人確認情報を取得できませんでした。LINEから開き直してください。",
-        });
-        return;
-      }
-
       request.current?.abort();
       const controller = new AbortController();
       request.current = controller;
@@ -104,12 +95,7 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
         }
 
         if (destination === "result") {
-          const result = await fetchDiagnosisResult(
-            config.apiUrl,
-            idToken,
-            diagnosis.id,
-            controller.signal,
-          );
+          const result = await fetchDiagnosisResult(config.apiUrl, diagnosis.id, controller.signal);
           await minimumLoading;
           if (!controller.signal.aborted && mounted.current) {
             setState(
@@ -122,8 +108,8 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
         }
 
         const [definition, savedResult] = await Promise.all([
-          fetchDiagnosisDefinition(config.apiUrl, idToken, diagnosis.id, controller.signal),
-          fetchDiagnosisProgress(config.apiUrl, idToken, diagnosis.id, controller.signal),
+          fetchDiagnosisDefinition(config.apiUrl, diagnosis.id, controller.signal),
+          fetchDiagnosisProgress(config.apiUrl, diagnosis.id, controller.signal),
         ]);
         await minimumLoading;
         if (!controller.signal.aborted && mounted.current) {
@@ -157,38 +143,38 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
         }
       }
     },
-    [answerSaver.waitForPendingSaves, idToken],
+    [answerSaver.waitForPendingSaves],
   );
 
   const saveAnswer = useCallback(
     async (answer: DiagnosisAnswer) => {
       const definition = selectedDefinition.current;
-      if (!idToken || !definition) {
-        throw new Error("本人確認情報を取得できませんでした。LINEから開き直してください。");
+      if (!definition) {
+        throw new Error("診断を読み込み直してください。");
       }
       return answerSaver.save(definition, answer);
     },
-    [answerSaver.save, idToken],
+    [answerSaver.save],
   );
 
   const deferQuestion = useCallback(
     async (diagnosisQuestionId: string): Promise<void> => {
       const definition = selectedDefinition.current;
-      if (!idToken || !definition) {
-        throw new Error("本人確認情報を取得できませんでした。LINEから開き直してください。");
+      if (!definition) {
+        throw new Error("診断を読み込み直してください。");
       }
-      await deferDiagnosisQuestion(config.apiUrl, idToken, definition.id, diagnosisQuestionId);
+      await deferDiagnosisQuestion(config.apiUrl, definition.id, diagnosisQuestionId);
       close();
     },
-    [close, idToken],
+    [close],
   );
 
   const openCompletedResult = useCallback(async (): Promise<void> => {
     const definition = selectedDefinition.current;
-    if (!idToken || !definition) {
+    if (!definition) {
       setState({
         status: "error",
-        message: "本人確認情報を取得できませんでした。LINEから開き直してください。",
+        message: "診断を読み込み直してください。",
       });
       return;
     }
@@ -204,12 +190,7 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
       questionCount: definition.questions.length,
     };
     try {
-      const result = await fetchDiagnosisResult(
-        config.apiUrl,
-        idToken,
-        definition.id,
-        controller.signal,
-      );
+      const result = await fetchDiagnosisResult(config.apiUrl, definition.id, controller.signal);
       await minimumLoading;
       if (controller.signal.aborted || !mounted.current) {
         return;
@@ -230,7 +211,7 @@ export function useDiagnosisDetail({ idToken, onProgress }: UseDiagnosisDetailOp
         });
       }
     }
-  }, [idToken, onProgress]);
+  }, [onProgress]);
 
   return { state, open, close, saveAnswer, deferQuestion, openCompletedResult };
 }

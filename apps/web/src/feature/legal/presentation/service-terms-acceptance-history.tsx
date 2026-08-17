@@ -1,7 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { config } from "../../../config";
-import { useLiffSession } from "../../liff";
 import { fetchServiceTermsAcceptanceHistory } from "../infrastructure/service-terms-api";
 import type { ServiceTermsAcceptanceHistoryItem } from "../model/service-terms";
 
@@ -17,7 +16,6 @@ const acceptedAtFormatter = new Intl.DateTimeFormat("ja-JP", {
 });
 
 export function ServiceTermsAcceptanceHistory() {
-  const liffSession = useLiffSession();
   const [state, setState] = useState<HistoryState>({ status: "loading" });
 
   useEffect(() => {
@@ -25,11 +23,8 @@ export function ServiceTermsAcceptanceHistory() {
     const controller = new AbortController();
     void (async () => {
       try {
-        const idToken = await liffSession.acquireIdToken(controller.signal);
-        if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
         const acceptances = await fetchServiceTermsAcceptanceHistory(
           config.apiUrl,
-          idToken,
           controller.signal,
         );
         if (!controller.signal.aborted) setState({ status: "ready", acceptances });
@@ -43,7 +38,7 @@ export function ServiceTermsAcceptanceHistory() {
       }
     })();
     return () => controller.abort();
-  }, [liffSession.acquireIdToken, state.status]);
+  }, [state.status]);
 
   if (state.status === "loading") {
     return (

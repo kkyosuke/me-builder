@@ -1114,7 +1114,6 @@ describe("App", () => {
     expect(screen.getByText(/回答は1問ずつ保存されます/)).toBeTruthy();
     expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       "diagnosis-1",
       expect.any(AbortSignal),
     );
@@ -1260,7 +1259,6 @@ describe("App", () => {
     await waitFor(() =>
       expect(mocks.saveDiagnosisAnswer).toHaveBeenCalledWith(
         "https://api.example.com",
-        "dummy.id.token",
         "diagnosis-1",
         "dq-1",
         "yes",
@@ -1278,7 +1276,6 @@ describe("App", () => {
     expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
     expect(mocks.fetchDiagnosisResult).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       "diagnosis-1",
       expect.any(AbortSignal),
     );
@@ -1326,13 +1323,11 @@ describe("App", () => {
     expect(screen.getByText("復元済み: 1件")).toBeTruthy();
     expect(mocks.fetchDiagnosisDefinition).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       "diagnosis-1",
       expect.any(AbortSignal),
     );
     expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       "diagnosis-1",
       expect.any(AbortSignal),
     );
@@ -1427,7 +1422,6 @@ describe("App", () => {
     expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
     expect(mocks.fetchDiagnosisResult).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       "diagnosis-1",
       expect.any(AbortSignal),
     );
@@ -1450,7 +1444,6 @@ describe("App", () => {
     expect(screen.getByText("回答UI: API追加診断")).toBeTruthy();
     expect(mocks.fetchDiagnosisDefinition).toHaveBeenCalledWith(
       "https://api.example.com",
-      "dummy.id.token",
       "new-diagnosis",
       expect.any(AbortSignal),
     );
@@ -1504,12 +1497,10 @@ describe("App", () => {
 
   it("アンマウント時に進行中の一覧リクエストを中断する", async () => {
     let signal: AbortSignal | undefined;
-    mocks.fetchDiagnosisList.mockImplementation(
-      (_apiUrl: string, _token: string, receivedSignal: AbortSignal) => {
-        signal = receivedSignal;
-        return new Promise<DiagnosisListItem[]>(() => undefined);
-      },
-    );
+    mocks.fetchDiagnosisList.mockImplementation((_apiUrl: string, receivedSignal: AbortSignal) => {
+      signal = receivedSignal;
+      return new Promise<DiagnosisListItem[]>(() => undefined);
+    });
     const view = render(<App />);
     await waitFor(() => expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(1));
 
