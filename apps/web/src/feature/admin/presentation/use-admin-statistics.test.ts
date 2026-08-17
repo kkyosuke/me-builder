@@ -40,30 +40,30 @@ const statistics = {
 };
 
 describe("useAdminStatistics", () => {
-  it("LIFFトークンを取得できなければローディングを終了して案内する", async () => {
-    const acquireIdToken = vi.fn().mockResolvedValue(null);
-    const { result } = renderHook(() => useAdminStatistics(acquireIdToken));
+  it("アプリセッションが期限切れならローディングを終了して案内する", async () => {
+    vi.mocked(fetchAdminStatistics).mockRejectedValue(
+      new Error("本人確認の有効期限が切れました。もう一度お試しください。"),
+    );
+    const { result } = renderHook(() => useAdminStatistics());
 
     await waitFor(() => expect(result.current.state.status).toBe("error"));
     expect(result.current.state).toEqual({
       status: "error",
-      message: "LINEから管理者画面を開いてください。",
+      message: "本人確認の有効期限が切れました。もう一度お試しください。",
     });
   });
 
   it("再取得中も取得済みの統計を保持する", async () => {
-    vi.mocked(fetchAdminStatistics).mockResolvedValue(statistics);
-    let resolveReload: ((token: string | null) => void) | undefined;
-    const acquireIdToken = vi
-      .fn()
-      .mockResolvedValueOnce("initial-token")
+    let resolveReload: ((value: typeof statistics) => void) | undefined;
+    vi.mocked(fetchAdminStatistics)
+      .mockResolvedValueOnce(statistics)
       .mockImplementationOnce(
         () =>
-          new Promise<string | null>((resolve) => {
+          new Promise<typeof statistics>((resolve) => {
             resolveReload = resolve;
           }),
       );
-    const { result } = renderHook(() => useAdminStatistics(acquireIdToken));
+    const { result } = renderHook(() => useAdminStatistics());
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     const currentState = result.current.state;
@@ -75,7 +75,7 @@ describe("useAdminStatistics", () => {
     expect(result.current.isRefreshing).toBe(true);
     expect(result.current.state).toBe(currentState);
 
-    await act(async () => resolveReload?.(null));
+    await act(async () => resolveReload?.(statistics));
     expect(result.current.isRefreshing).toBe(false);
   });
 });

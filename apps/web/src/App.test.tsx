@@ -53,6 +53,8 @@ const mocks = vi.hoisted(() => ({
   issueCompatibilityInvitation: vi.fn(),
   cancelCompatibilityInvitation: vi.fn(),
   endCompatibilityRelationship: vi.fn(),
+  fetchAdminAccounts: vi.fn(),
+  fetchAdminStatistics: vi.fn(),
 }));
 
 vi.mock("./config", () => ({
@@ -111,6 +113,10 @@ vi.mock("./feature/compatibility/infrastructure/compatibility-api", () => ({
   issueCompatibilityInvitation: mocks.issueCompatibilityInvitation,
   cancelCompatibilityInvitation: mocks.cancelCompatibilityInvitation,
   endCompatibilityRelationship: mocks.endCompatibilityRelationship,
+}));
+vi.mock("./feature/admin/infrastructure/admin-api", () => ({
+  fetchAdminAccounts: mocks.fetchAdminAccounts,
+  fetchAdminStatistics: mocks.fetchAdminStatistics,
 }));
 vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
   SwipeDiagnosis: ({
@@ -405,6 +411,8 @@ describe("App", () => {
     });
     mocks.cancelCompatibilityInvitation.mockResolvedValue(undefined);
     mocks.endCompatibilityRelationship.mockResolvedValue(undefined);
+    mocks.fetchAdminAccounts.mockResolvedValue({ accounts: [], total: 0, nextCursor: null });
+    mocks.fetchAdminStatistics.mockResolvedValue({});
     mocks.restoreDiagnosisProgress.mockImplementation(
       (_questions: DiagnosisDefinition["questions"], answers: DiagnosisResult["answers"]) => ({
         answers: answers.map((answer) => ({
@@ -480,6 +488,7 @@ describe("App", () => {
   });
 
   it("管理者のプロフィールにだけ管理者画面へのリンクを表示する", async () => {
+    mocks.authState.role = "admin";
     mocks.fetchAccountProfile.mockResolvedValue({
       role: "admin",
       displayName: "管理者",
@@ -505,6 +514,55 @@ describe("App", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/profile"));
     expect(await screen.findByRole("dialog", { name: "プロフィール" })).toBeTruthy();
     expect(startingDiagnosis.isConnected).toBe(true);
+  });
+
+  it("管理画面のセッション切替で前アカウントの一覧を破棄して再取得する", async () => {
+    mocks.authState.role = "admin";
+    mocks.fetchAdminAccounts
+      .mockResolvedValueOnce({
+        accounts: [
+          {
+            id: "account-before",
+            displayName: "切替前の利用者",
+            role: "user",
+            status: "active",
+            createdAt: "2026-08-01T00:00:00.000Z",
+            progression: { status: "pending" },
+          },
+        ],
+        total: 1,
+        nextCursor: null,
+      })
+      .mockResolvedValueOnce({
+        accounts: [
+          {
+            id: "account-after",
+            displayName: "切替後の利用者",
+            role: "user",
+            status: "active",
+            createdAt: "2026-08-02T00:00:00.000Z",
+            progression: { status: "pending" },
+          },
+        ],
+        total: 1,
+        nextCursor: null,
+      });
+    window.history.replaceState({}, "", "/admin");
+    const view = render(<App />);
+
+    expect((await screen.findAllByText("切替前の利用者")).length).toBeGreaterThan(0);
+
+    mocks.authState = {
+      status: "authenticated",
+      profile: { displayName: "別管理者", pictureUrl: undefined },
+      role: "admin",
+      revision: 2,
+    };
+    view.rerender(<App />);
+
+    expect((await screen.findAllByText("切替後の利用者")).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("切替前の利用者")).toHaveLength(0);
+    expect(mocks.fetchAdminAccounts).toHaveBeenCalledTimes(2);
   });
 
   it("LINE画像を表示し、選んだ画像をアバターに設定してプロフィールへ戻る", async () => {
@@ -845,6 +903,28 @@ describe("App", () => {
     ).toBe(nextAvatar);
   });
 
+  it("ファミリー招待表示中のセッション切替で招待tokenを履歴ごと破棄する", async () => {
+    window.history.replaceState({}, "", "/profile/family?token=family.invitation.secret");
+    const view = render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: "ファミリーパック" }, { timeout: 5_000 }),
+    ).toBeTruthy();
+    expect(window.location.search).toContain("family.invitation.secret");
+
+    mocks.authState = {
+      status: "authenticated",
+      profile: { displayName: "別アカウント", pictureUrl: undefined },
+      role: "user",
+      revision: 2,
+    };
+    view.rerender(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/me"));
+    expect(window.location.search).toBe("");
+    expect(screen.queryByRole("heading", { name: "ファミリーパック" })).toBeNull();
+  });
+
   it("プロフィール取得失敗を表示して再試行できる", async () => {
     mocks.fetchAccountProfile
       .mockRejectedValueOnce(new Error("プロフィールの取得に失敗しました。再試行してください。"))
@@ -912,7 +992,6 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
     expect(await screen.findByRole("heading", { name: "見通しを持って動く" })).toBeTruthy();
-    expect(mocks.initializeLiff).toHaveBeenCalled();
     expect(mocks.fetchProfileSummary).toHaveBeenCalledWith(
       "https://api.example.com",
       expect.any(AbortSignal),
@@ -1606,7 +1685,7 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
-  it("一覧取得失敗後の再試行では初期化済みLIFFを再利用する", async () => {
+  it("一覧取得失敗後の再試行ではアプリセッションを維持する", async () => {
     mocks.fetchDiagnosisList
       .mockRejectedValueOnce(new Error("network down"))
       .mockResolvedValueOnce([diagnosis()]);
@@ -1617,7 +1696,6 @@ describe("App", () => {
     fireEvent.click(retry);
 
     expect(await screen.findByRole("button", { name: /テスト診断/ })).toBeTruthy();
-    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(2);
     expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
   });
@@ -1630,7 +1708,6 @@ describe("App", () => {
     );
 
     expect(await screen.findByRole("button", { name: /テスト診断/ })).toBeTruthy();
-    expect(mocks.initializeLiff).toHaveBeenCalledTimes(1);
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(1);
   });
 

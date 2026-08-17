@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   createCheckout: vi.fn(),
   verifyCheckout: vi.fn(),
   fetchEntitlement: vi.fn(),
-  acquireIdToken: vi.fn(),
   fetchTrialEligibility: vi.fn(),
   createPortal: vi.fn(),
   createPlanChange: vi.fn(),
@@ -26,13 +25,6 @@ vi.mock("../feature/billing/infrastructure/billing-api", () => ({
 vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
   fetchProfileEntitlement: mocks.fetchEntitlement,
 }));
-vi.mock("../feature/liff/infrastructure/liff-client", () => ({
-  getLiffIdToken: () => "id-token",
-}));
-vi.mock("../feature/liff/presentation/liff-session-provider", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
-}));
-
 import BillingPlanApplication from "../feature/billing/presentation/billing-plan-application";
 
 const plan = {
@@ -96,7 +88,6 @@ describe("billing purchase user journey", () => {
     );
     expect(mocks.createCheckout).toHaveBeenCalledWith(
       undefined,
-      "id-token",
       { plan: "lite", interval: "month" },
       expect.any(AbortSignal),
     );
@@ -128,7 +119,6 @@ describe("billing purchase user journey", () => {
     );
     expect(mocks.verifyCheckout).toHaveBeenCalledWith(
       undefined,
-      "id-token",
       "cs_test_completed",
       expect.any(AbortSignal),
     );
@@ -181,7 +171,6 @@ describe("billing purchase user journey", () => {
     );
     expect(mocks.createPlanChange).toHaveBeenCalledWith(
       undefined,
-      "id-token",
       { plan: "lite", interval: "year" },
       expect.any(AbortSignal),
     );

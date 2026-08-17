@@ -6,7 +6,10 @@ import {
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { OperationError, ValidationError } from "../../../infrastructure/errors";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import {
+  createAuthenticatedHttpClient,
+  createHttpClient,
+} from "../../../infrastructure/http-client";
 import type { BillingPlan } from "../model/billing-plan";
 
 type PlanCatalogResponse =
@@ -70,15 +73,16 @@ export async function fetchBillingPlanCatalog(
 
 export async function fetchBillingTrialEligibility(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<boolean> {
   let response: Response;
   try {
-    response = await createHttpClient(apiUrl).request("/api/billing/trial-eligibility", {
-      headers: { Authorization: `Bearer ${idToken}` },
-      ...(signal ? { signal } : {}),
-    });
+    response = await createAuthenticatedHttpClient(apiUrl).request(
+      "/api/billing/trial-eligibility",
+      {
+        ...(signal ? { signal } : {}),
+      },
+    );
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new OperationError("トライアルの利用可否を取得できませんでした。", {
@@ -113,18 +117,20 @@ type CheckoutRequest = Readonly<{ plan: PaidPlanCode; interval: BillingInterval 
 
 export async function createCheckoutSession(
   apiUrl: string | undefined,
-  idToken: string,
   input: CheckoutRequest,
   signal?: AbortSignal,
 ): Promise<string> {
   let response: Response;
   try {
-    response = await createHttpClient(apiUrl).request("/api/billing/checkout-sessions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-      ...(signal ? { signal } : {}),
-    });
+    response = await createAuthenticatedHttpClient(apiUrl).request(
+      "/api/billing/checkout-sessions",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+        ...(signal ? { signal } : {}),
+      },
+    );
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new OperationError("購入手続きを開始できませんでした。時間をおいて再試行してください。", {
@@ -163,18 +169,20 @@ export async function createCheckoutSession(
 
 export async function createPlanChangeSession(
   apiUrl: string | undefined,
-  idToken: string,
   input: CheckoutRequest,
   signal?: AbortSignal,
 ): Promise<string> {
   let response: Response;
   try {
-    response = await createHttpClient(apiUrl).request("/api/billing/plan-change-sessions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-      ...(signal ? { signal } : {}),
-    });
+    response = await createAuthenticatedHttpClient(apiUrl).request(
+      "/api/billing/plan-change-sessions",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+        ...(signal ? { signal } : {}),
+      },
+    );
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new OperationError("プラン変更を開始できませんでした。時間をおいて再試行してください。", {
@@ -214,16 +222,14 @@ export async function createPlanChangeSession(
 
 export async function verifyCheckoutSessionCompletion(
   apiUrl: string | undefined,
-  idToken: string,
   checkoutSessionId: string,
   signal?: AbortSignal,
 ): Promise<void> {
   let response: Response;
   try {
-    response = await createHttpClient(apiUrl).request(
+    response = await createAuthenticatedHttpClient(apiUrl).request(
       `/api/billing/checkout-sessions/${encodeURIComponent(checkoutSessionId)}`,
       {
-        headers: { Authorization: `Bearer ${idToken}` },
         ...(signal ? { signal } : {}),
       },
     );
@@ -260,14 +266,12 @@ export async function verifyCheckoutSessionCompletion(
 
 export async function createCustomerPortalSession(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<string> {
   let response: Response;
   try {
-    response = await createHttpClient(apiUrl).request("/api/billing/portal-sessions", {
+    response = await createAuthenticatedHttpClient(apiUrl).request("/api/billing/portal-sessions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     });
   } catch (error) {

@@ -11,7 +11,7 @@ const initialFilters: AdminAccountFilters = {
   sort: "created",
 };
 
-export function useAdminAccounts(acquireIdToken: (signal: AbortSignal) => Promise<string | null>) {
+export function useAdminAccounts() {
   const [state, setState] = useState<AsyncState<AdminAccountPage>>({ status: "loading" });
   const [filters, setFilters] = useState(initialFilters);
   const [appliedQuery, setAppliedQuery] = useState("");
@@ -43,13 +43,7 @@ export function useAdminAccounts(acquireIdToken: (signal: AbortSignal) => Promis
       if (hasLoaded.current) setIsRefreshing(true);
       else setState({ status: "loading" });
       try {
-        const token = await acquireIdToken(signal);
-        if (signal.aborted) return;
-        if (!token) {
-          setState({ status: "error", message: "LINEから管理者画面を開いてください。" });
-          return;
-        }
-        const page = await fetchAdminAccounts(config.apiUrl, token, requestFilters, cursor, signal);
+        const page = await fetchAdminAccounts(config.apiUrl, requestFilters, cursor, signal);
         if (!signal.aborted) {
           hasLoaded.current = true;
           setState({ status: "success", data: page });
@@ -65,7 +59,7 @@ export function useAdminAccounts(acquireIdToken: (signal: AbortSignal) => Promis
         if (!signal.aborted) setIsRefreshing(false);
       }
     },
-    [acquireIdToken, cursor, requestFilters],
+    [cursor, requestFilters],
   );
 
   useEffect(() => {

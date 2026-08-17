@@ -1,4 +1,3 @@
-import { useLiffSession } from "../../liff";
 import { AdminAccountsScreen } from "./admin-accounts-screen";
 import { AdminStatisticsScreen } from "./admin-statistics-screen";
 import { useAdminAccounts } from "./use-admin-accounts";
@@ -12,8 +11,7 @@ export default function AdminApplication() {
 }
 
 function AccountsApplication() {
-  const liffSession = useLiffSession();
-  const accounts = useAdminAccounts(liffSession.acquireIdToken);
+  const accounts = useAdminAccounts();
   return (
     <AdminAccountsScreen
       state={accounts.state}
@@ -30,8 +28,7 @@ function AccountsApplication() {
 }
 
 function StatisticsApplication() {
-  const liffSession = useLiffSession();
-  const statistics = useAdminStatistics(liffSession.acquireIdToken);
+  const statistics = useAdminStatistics();
   return (
     <AdminStatisticsScreen
       state={statistics.state}

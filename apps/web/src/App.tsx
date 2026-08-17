@@ -7,8 +7,6 @@ import { AccountRecoveryScreen } from "./feature/account-recovery/presentation/a
 import { AuthSessionProvider, useAuthSession } from "./feature/auth";
 import { createCustomerPortalSession } from "./feature/billing/infrastructure/billing-api";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
-import { useLiffSession } from "./feature/liff";
-import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import {
   type ResetDevelopmentAccountDataResult,
   resetDevelopmentAccountData,
@@ -147,7 +145,6 @@ function AppContents() {
   const colorTheme = useColorTheme();
   const fontSize = useFontSize();
   const authSession = useAuthSession();
-  const liffSession = useLiffSession();
   const [navigation, setNavigation] = useState(() => {
     const requestedPathname = resolveRequestedPathname();
     const profileView = resolveProfileView(requestedPathname);
@@ -171,7 +168,6 @@ function AppContents() {
   const mainRouteScrollPositions = useRef(new Map<MainRoute, number>());
   const previousMainRoute = useRef<MainRoute | null>(null);
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
-  const [accountRole, setAccountRole] = useState<"user" | "admin" | null>(null);
   const [profileLinePictureUrl, setProfileLinePictureUrl] = useState<string | undefined>();
   const [profileReadState, setProfileReadState] = useState<
     { status: "loading" | "ready" } | { status: "error"; message: string }
@@ -196,7 +192,6 @@ function AppContents() {
 
   const applyAccountProfile = useCallback((profile: AccountProfile) => {
     setAvatar(uploadedAvatar(profile));
-    setAccountRole(profile.role);
     setProfileLinePictureUrl(profile.avatar?.source === "line" ? profile.avatar.url : undefined);
     setProfileReadState({ status: "ready" });
   }, []);
@@ -318,7 +313,6 @@ function AppContents() {
         }
       } catch (error) {
         if (controller.signal.aborted) return;
-        setAccountRole(null);
         setProfileReadState({ status: "error", message: errorMessage(error) });
       }
     })();
@@ -486,17 +480,21 @@ function AppContents() {
   };
 
   const createRecoveryCode = async () => {
-    const idToken =
-      getLiffIdToken() ?? (await liffSession.acquireIdToken(new AbortController().signal));
-    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
-    return await issueRecoveryCode(config.apiUrl, idToken);
+    const requestedRevision = sessionRevisionRef.current;
+    const result = await issueRecoveryCode(config.apiUrl);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
+    return result;
   };
 
   const openBillingPortal = async (): Promise<void> => {
+    const requestedRevision = sessionRevisionRef.current;
     const controller = new AbortController();
-    const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
-    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
-    const url = await createCustomerPortalSession(config.apiUrl, idToken, controller.signal);
+    const url = await createCustomerPortalSession(config.apiUrl, controller.signal);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
     window.location.assign(url);
   };
 
@@ -533,7 +531,7 @@ function AppContents() {
       {isAdminPath && (
         <RouteErrorBoundary>
           <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
-            <AdminApplication />
+            <AdminApplication key={sessionRevision} />
           </Suspense>
         </RouteErrorBoundary>
       )}
@@ -546,7 +544,9 @@ function AppContents() {
           >
             <ProfileSettingsScreen
               avatar={avatar}
-              isAdmin={accountRole === "admin"}
+              isAdmin={
+                authSession.state.status === "authenticated" && authSession.state.role === "admin"
+              }
               isInactive={profileView !== "profile"}
               inactiveFocusTarget={
                 profileView === "billing"

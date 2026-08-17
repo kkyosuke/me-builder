@@ -2,8 +2,6 @@ import type { BillingInterval, PaidPlanCode } from "@me-builder/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
-import { getLiffIdToken } from "../../liff/infrastructure/liff-client";
-import { useLiffSession } from "../../liff/presentation/liff-session-provider";
 import { fetchProfileEntitlement } from "../../profile-settings/infrastructure/entitlement-api";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
 import {
@@ -33,7 +31,6 @@ export default function BillingPlanApplication({
   navigateToCheckout?: (url: string) => void;
   projectionPollIntervalMs?: number;
 }) {
-  const { acquireIdToken } = useLiffSession();
   const checkoutResult = useMemo(
     () => new URLSearchParams(window.location.search).get("billing"),
     [],
@@ -52,24 +49,16 @@ export default function BillingPlanApplication({
     checkoutResult === "checkout-cancel" ? "購入手続きをキャンセルしました。" : null,
   );
 
-  const token = useCallback(
-    async (signal: AbortSignal) => {
-      const value = getLiffIdToken() ?? (await acquireIdToken(signal));
-      if (!value) throw new Error("LINEから料金プランを開き直してください。");
-      return value;
-    },
-    [acquireIdToken],
-  );
-
   const load = useCallback(async () => {
     loadController.current?.abort();
     const controller = new AbortController();
     loadController.current = controller;
     setPlans({ status: "loading" });
     setEntitlement({ status: "loading" });
-    const [catalogResult, tokenResult] = await Promise.allSettled([
+    const [catalogResult, trialResult, entitlementResult] = await Promise.allSettled([
       fetchBillingPlanCatalog(config.apiUrl, controller.signal),
-      token(controller.signal),
+      fetchBillingTrialEligibility(config.apiUrl, controller.signal),
+      fetchProfileEntitlement(config.apiUrl, controller.signal),
     ]);
     if (controller.signal.aborted) return;
 
@@ -82,17 +71,6 @@ export default function BillingPlanApplication({
     } else {
       setPlans({ status: "error", message: message(catalogResult.reason) });
     }
-
-    if (tokenResult.status === "rejected") {
-      setEntitlement({ status: "error", message: message(tokenResult.reason) });
-      return;
-    }
-
-    const [trialResult, entitlementResult] = await Promise.allSettled([
-      fetchBillingTrialEligibility(config.apiUrl, tokenResult.value, controller.signal),
-      fetchProfileEntitlement(config.apiUrl, tokenResult.value, controller.signal),
-    ]);
-    if (controller.signal.aborted) return;
 
     if (publicPlans && trialResult.status === "fulfilled") {
       setPlans({
@@ -108,7 +86,7 @@ export default function BillingPlanApplication({
         ? { status: "success", data: entitlementResult.value }
         : { status: "error", message: message(entitlementResult.reason) },
     );
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     if (checkoutResult === "checkout-return") return;
@@ -126,18 +104,12 @@ export default function BillingPlanApplication({
         if (!checkoutSessionId) {
           throw new Error("購入結果を確認できませんでした。料金プランからやり直してください。");
         }
-        const idToken = await token(controller.signal);
-        await verifyCheckoutSessionCompletion(
-          config.apiUrl,
-          idToken,
-          checkoutSessionId,
-          controller.signal,
-        );
+        await verifyCheckoutSessionCompletion(config.apiUrl, checkoutSessionId, controller.signal);
         const [catalogResult, trialResult, entitlementResult] = await Promise.allSettled([
           fetchBillingPlanCatalog(config.apiUrl, controller.signal),
-          fetchBillingTrialEligibility(config.apiUrl, idToken, controller.signal),
+          fetchBillingTrialEligibility(config.apiUrl, controller.signal),
           waitForSubscriptionProjection(
-            async (signal) => fetchProfileEntitlement(config.apiUrl, idToken, signal),
+            async (signal) => fetchProfileEntitlement(config.apiUrl, signal),
             { signal: controller.signal, intervalMs: projectionPollIntervalMs },
           ),
         ]);
@@ -176,7 +148,7 @@ export default function BillingPlanApplication({
       }
     })();
     return () => controller.abort();
-  }, [checkoutResult, checkoutSessionId, onEntitlementChanged, projectionPollIntervalMs, token]);
+  }, [checkoutResult, checkoutSessionId, onEntitlementChanged, projectionPollIntervalMs]);
 
   const checkout = async (plan: PaidPlanCode, interval: BillingInterval) => {
     const controller = new AbortController();
@@ -187,21 +159,10 @@ export default function BillingPlanApplication({
           "ファミリーパックに参加中です。個人契約を購入するには、先にファミリー席から退出してください。",
         );
       }
-      const idToken = await token(controller.signal);
       const url =
         entitlement.status === "success" && entitlement.data.source === "subscription"
-          ? await createPlanChangeSession(
-              config.apiUrl,
-              idToken,
-              { plan, interval },
-              controller.signal,
-            )
-          : await createCheckoutSession(
-              config.apiUrl,
-              idToken,
-              { plan, interval },
-              controller.signal,
-            );
+          ? await createPlanChangeSession(config.apiUrl, { plan, interval }, controller.signal)
+          : await createCheckoutSession(config.apiUrl, { plan, interval }, controller.signal);
       navigateToCheckout(url);
     } catch (error) {
       setCheckoutState({ status: "error", message: message(error) });
@@ -212,11 +173,7 @@ export default function BillingPlanApplication({
     const controller = new AbortController();
     setCheckoutState({ status: "loading" });
     try {
-      const url = await createCustomerPortalSession(
-        config.apiUrl,
-        await token(controller.signal),
-        controller.signal,
-      );
+      const url = await createCustomerPortalSession(config.apiUrl, controller.signal);
       navigateToCheckout(url);
     } catch (error) {
       setCheckoutState({ status: "error", message: message(error) });

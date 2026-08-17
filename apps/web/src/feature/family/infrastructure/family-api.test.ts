@@ -19,7 +19,7 @@ const seat = {
 describe("family api", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("認証付きで席一覧と招待tokenを検証する", async () => {
+  it("アプリセッション付きで席一覧と招待tokenを検証する", async () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(
@@ -32,35 +32,35 @@ describe("family api", () => {
       );
     vi.stubGlobal("fetch", fetch);
 
-    await expect(fetchFamilySeats("https://api.example.com", "token")).resolves.toMatchObject({
+    await expect(fetchFamilySeats("https://api.example.com")).resolves.toMatchObject({
       role: "member",
     });
-    await expect(issueFamilyInvitation("https://api.example.com", "token")).resolves.toMatchObject({
+    await expect(issueFamilyInvitation("https://api.example.com")).resolves.toMatchObject({
       token: "a".repeat(43),
     });
     expect(fetch).toHaveBeenNthCalledWith(
       1,
       "https://api.example.com/api/family/seats",
-      expect.objectContaining({ headers: { Authorization: "Bearer token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
   it("承諾tokenをJSON bodyで送り、席IDをURL encodeして取消する", async () => {
     const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ seat })));
     vi.stubGlobal("fetch", fetch);
-    await acceptFamilyInvitation("", "token", "a".repeat(43));
+    await acceptFamilyInvitation("", "a".repeat(43));
     expect(fetch).toHaveBeenNthCalledWith(
       1,
       "/api/family/invitations/accept",
       expect.objectContaining({ method: "POST", body: JSON.stringify({ token: "a".repeat(43) }) }),
     );
-    await cancelFamilyInvitation("", "token", "seat/2");
+    await cancelFamilyInvitation("", "seat/2");
     expect(fetch).toHaveBeenNthCalledWith(
       2,
       "/api/family/invitations/seat%2F2",
       expect.objectContaining({ method: "DELETE" }),
     );
-    await leaveFamilyPack("", "token");
+    await leaveFamilyPack("");
     expect(fetch).toHaveBeenNthCalledWith(
       3,
       "/api/family/membership",
@@ -82,7 +82,7 @@ describe("family api", () => {
           }),
         ),
       );
-      await expect(acceptFamilyInvitation("", "token", "a".repeat(43))).rejects.toThrow(expected);
+      await expect(acceptFamilyInvitation("", "a".repeat(43))).rejects.toThrow(expected);
     }
   });
 });
