@@ -299,7 +299,7 @@ flowchart TD
 
 依存: `AUTH-C-003`, `AUTH-B-006`
 
-実装と検証はPRへ移しました。未完了条件は`AUTH-A-011`のsession issuerをSSO callbackへ接続し、依存PRをmergeしてレビューを完了することです。
+実装と検証はPRへ移し、`AUTH-A-011`のsession issuerをSSO callbackへ接続しました。未完了条件は依存PRをmergeし、レビューとmergeを完了することです。
 
 ### AUTH-C-005 PreviewでLIFFとSSOを通しで検証する
 
