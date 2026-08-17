@@ -426,6 +426,60 @@
         }
       }
     },
+    "/api/auth/sso/login": {
+      "post": {
+        "operationId": "startSsoLogin",
+        "tags": ["Authentication"],
+        "summary": "外部ブラウザのSSOログインを開始する",
+        "parameters": [
+          {
+            "name": "returnTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "description": "認証後に復元する同一originの相対path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "同じbrowserで開くAuth0認可URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authorizationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": ["authorizationUrl"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SSOまたはstorage bindingが未設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/sso/callback": {
       "get": {
         "operationId": "completeSsoCallback",

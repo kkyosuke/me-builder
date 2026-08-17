@@ -23,13 +23,19 @@ export function createSsoExistingIdentityResolver(
   dependencies: Dependencies = defaultDependencies,
 ): SsoExistingIdentityResolver {
   return {
-    async findAccountId(identity) {
+    async findAccount(identity) {
       const found = await dependencies.findAccountByIdentity(
         db,
         identity.providerKey,
         identity.subject,
       );
-      return found?.account.id;
+      return found
+        ? {
+            accountId: found.account.id,
+            authenticatedIdentityId: found.identity.id,
+            role: found.account.role,
+          }
+        : undefined;
     },
   };
 }

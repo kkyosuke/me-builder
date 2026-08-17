@@ -79,14 +79,20 @@ type CompleteSsoAuthenticationInput = {
 };
 
 export interface SsoExistingIdentityResolver {
-  findAccountId(
-    identity: Pick<SsoVerifiedIdentity, "providerKey" | "subject">,
-  ): Promise<string | undefined>;
+  findAccount(identity: Pick<SsoVerifiedIdentity, "providerKey" | "subject">): Promise<
+    | {
+        accountId: string;
+        authenticatedIdentityId: string;
+        role: "user" | "admin";
+      }
+    | undefined
+  >;
 }
 
 export interface SsoApplicationSessionIssuer<SessionResult> {
   issue(input: {
     accountId: string;
+    authenticatedIdentityId: string;
     authenticationMethod: "sso";
     authenticatedAt: Date;
   }): Promise<SessionResult>;
@@ -219,18 +225,70 @@ export async function completeSsoLogin<SessionResult>(
   },
 ): Promise<{ session: SessionResult; returnTo: string }> {
   const { identity, returnTo } = await completeSsoAuthentication(input);
-  const accountId = await input.identityResolver.findAccountId({
+  const account = await input.identityResolver.findAccount({
     providerKey: identity.providerKey,
     subject: identity.subject,
   });
-  if (!accountId) throw new SsoAuthenticationError("identity_unlinked");
+  if (!account) throw new SsoAuthenticationError("identity_unlinked");
 
   const session = await input.sessionIssuer.issue({
-    accountId,
+    accountId: account.accountId,
+    authenticatedIdentityId: account.authenticatedIdentityId,
     authenticationMethod: identity.authenticationMethod,
     authenticatedAt: identity.authenticatedAt,
   });
   return { session, returnTo };
+}
+
+/** login/link callbackを一度だけ消費し、用途に応じた副作用へ分岐する。 */
+export async function completeSsoCallback<SessionResult>(
+  input: CompleteSsoAuthenticationInput & {
+    identityResolver: SsoExistingIdentityResolver;
+    identityLinker: SsoIdentityLinker;
+    sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
+  },
+): Promise<
+  | { purpose: "login"; session: SessionResult; returnTo: string }
+  | {
+      purpose: "link";
+      accountId: string;
+      authenticatedIdentityId: string;
+      authenticationMethod: "sso";
+      authenticatedAt: Date;
+      providerKey: "auth0";
+      returnTo: string;
+    }
+> {
+  const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  if (transaction.purpose === "login") {
+    const account = await input.identityResolver.findAccount({
+      providerKey: identity.providerKey,
+      subject: identity.subject,
+    });
+    if (!account) throw new SsoAuthenticationError("identity_unlinked");
+    const session = await input.sessionIssuer.issue({
+      accountId: account.accountId,
+      authenticatedIdentityId: account.authenticatedIdentityId,
+      authenticationMethod: identity.authenticationMethod,
+      authenticatedAt: identity.authenticatedAt,
+    });
+    return { purpose: "login", session, returnTo: transaction.returnTo };
+  }
+
+  const authenticatedIdentityId = await input.identityLinker.link({
+    accountId: transaction.initiatingAccountId,
+    providerKey: identity.providerKey,
+    subject: identity.subject,
+  });
+  return {
+    purpose: "link",
+    accountId: transaction.initiatingAccountId,
+    authenticatedIdentityId,
+    authenticationMethod: identity.authenticationMethod,
+    authenticatedAt: identity.authenticatedAt,
+    providerKey: identity.providerKey,
+    returnTo: transaction.returnTo,
+  };
 }
 
 /** 開始時のAccountへだけ検証済みAuth0 Identityを追加する。 */
@@ -263,20 +321,17 @@ export async function completeSsoIdentityLinking(
   };
 }
 
-/** IdPでキャンセルされたlink transactionも一度だけ消費する。 */
-export async function cancelSsoIdentityLinking(input: {
+/** IdPでキャンセルされたlogin/link transactionを一度だけ消費する。 */
+export async function cancelSsoAuthentication(input: {
   state: string;
   store: SsoAuthenticationTransactionStore;
   now?: () => number;
-}): Promise<{ returnTo: string }> {
+}): Promise<{ purpose: "link" | "login"; returnTo: string }> {
   if (!input.state) throw new SsoAuthenticationError("invalid_callback");
   const transaction = await input.store.consume(input.state);
   if (!transaction) throw new SsoAuthenticationError("transaction_missing");
   if (transaction.expiresAt <= (input.now?.() ?? Date.now())) {
     throw new SsoAuthenticationError("transaction_expired");
   }
-  if (transaction.purpose !== "link") {
-    throw new SsoAuthenticationError("transaction_purpose_mismatch");
-  }
-  return { returnTo: transaction.returnTo };
+  return { purpose: transaction.purpose, returnTo: transaction.returnTo };
 }

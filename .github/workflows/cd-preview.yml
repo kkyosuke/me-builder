@@ -61,6 +61,7 @@ jobs:
       # Vite は GitHub Actions 上のビルドで値を埋め込むため、LIFF ID は Pages 側ではなくここで渡す。
       # 未設定の場合は LIFF 初期化がスキップされる (画面は壊れない)。
       VITE_LIFF_ID: ${{ vars.LIFF_ID }}
+      VITE_SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
 
     steps:
       - uses: actions/checkout@v4

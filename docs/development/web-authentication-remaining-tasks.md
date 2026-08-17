@@ -295,17 +295,11 @@ flowchart TD
 
 実装と検証はPRへ移し、`AUTH-A-011`のsession / CSRF基盤へ接続しました。未完了条件は依存PRのmerge、レビュー、mergeです。
 
-### AUTH-C-004 LIFF内と外部ブラウザの認証入口を切り替える
+### AUTH-C-004 LIFF内と外部ブラウザの認証入口を切り替える ([PR #326](https://github.com/kkyosuke/me-builder/pull/326))
 
 依存: `AUTH-C-003`, `AUTH-B-006`
 
-- `AuthGate`がLIFF SDKで実行環境を確認し、LIFF内はLIFF adapter、外部ブラウザはSSO adapterを選ぶ
-- LIFF内では既存SSO sessionがあってもLIFF Identityを確認し、別AccountならUI cacheを破棄してLIFF側sessionへ切り替える
-- LIFF失敗時にSSOへ自動fallbackせず、外部ブラウザで開く案内を表示する
-- 外部ブラウザから`liff.login()`を呼ばず、要求された相対pathをSSO callback後に復元する
-- 段階公開flagが無効な環境では外部ブラウザの現行LINE Login adapterへ戻せるようにする
-
-完了条件は、実行環境ごとに認証入口が一意に決まり、別Accountのsessionや画面内容を引き継がないことです。
+実装と検証はPRへ移し、`AUTH-A-011`のsession issuerをSSO callbackへ接続しました。未完了条件は依存PRをmergeし、レビューとmergeを完了することです。
 
 ### AUTH-C-005 PreviewでLIFFとSSOを通しで検証する
 

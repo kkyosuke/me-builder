@@ -220,6 +220,30 @@ describe("ProfileSettingsScreen", () => {
     expect(onLinkSsoIdentity).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ["linked", "SSOを接続しました。"],
+    ["cancelled", "SSO接続をキャンセルしました。"],
+    ["error", "SSOを接続できませんでした。"],
+  ] as const)("SSO Identity連携callbackの%s結果を表示する", (result, message) => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+        ssoIdentity={{ status: "success", data: { linked: result === "linked", canUnlink: false } }}
+        ssoIdentityCallbackResult={result}
+        onLinkSsoIdentity={vi.fn()}
+        onUnlinkSsoIdentity={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(new RegExp(message))).toBeTruthy();
+  });
+
   it("別のログイン方法がある場合だけSSOを解除する", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const onUnlinkSsoIdentity = vi.fn().mockResolvedValue(undefined);

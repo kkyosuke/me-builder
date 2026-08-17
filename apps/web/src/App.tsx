@@ -5,6 +5,10 @@ import { config } from "./config";
 import { issueRecoveryCode } from "./feature/account-recovery/infrastructure/account-recovery-api";
 import { AccountRecoveryScreen } from "./feature/account-recovery/presentation/account-recovery-screen";
 import { AuthSessionProvider, useAuthSession } from "./feature/auth";
+import {
+  type SsoIdentityCallbackResult,
+  consumeSsoIdentityCallbackResult,
+} from "./feature/auth/infrastructure/sso-auth-adapter";
 import { createCustomerPortalSession } from "./feature/billing/infrastructure/billing-api";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
 import {
@@ -186,6 +190,9 @@ function AppContents() {
   const [ssoIdentityState, setSsoIdentityState] = useState<AsyncState<SsoIdentityStatus>>({
     status: "loading",
   });
+  const [ssoIdentityCallbackResult, setSsoIdentityCallbackResult] = useState<
+    SsoIdentityCallbackResult | undefined
+  >();
   const linePictureUrl =
     profileReadState.status === "ready"
       ? (profileLinePictureUrl ??
@@ -296,6 +303,18 @@ function AppContents() {
     if (!isProfileOpen) return;
     return scheduleIdlePreloadAfter(loadProfileSettingsScreen, preloadAvatarSettingsScreen);
   }, [isProfileOpen]);
+
+  useEffect(() => {
+    if (!isProfileOpen) {
+      setSsoIdentityCallbackResult(undefined);
+      return;
+    }
+    if (config.ssoRolloutMode === "disabled" || authSession.state.status !== "authenticated") {
+      return;
+    }
+    const result = consumeSsoIdentityCallbackResult();
+    if (result) setSsoIdentityCallbackResult(result);
+  }, [authSession.state.status, isProfileOpen]);
 
   useEffect(() => {
     if (!isProfileOpen || config.ssoRolloutMode === "disabled") return;
@@ -616,6 +635,7 @@ function AppContents() {
                 ? {}
                 : {
                     ssoIdentity: ssoIdentityState,
+                    ...(ssoIdentityCallbackResult ? { ssoIdentityCallbackResult } : {}),
                     onLinkSsoIdentity: linkSsoIdentity,
                     onUnlinkSsoIdentity: disconnectSsoIdentity,
                   })}
