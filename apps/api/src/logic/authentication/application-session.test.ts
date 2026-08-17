@@ -61,7 +61,7 @@ describe("ApplicationSessionService", () => {
       displayName: "利用者A",
       pictureUrl: "https://example.com/picture.jpg",
     };
-    const issued = await sessions.issue(actor, displayProfile, "identity-1");
+    const issued = await sessions.issue(actor, "identity-1", displayProfile);
     expect(issued).toBeDefined();
     const reference = [...store.records.keys()][0];
     expect(reference).toMatch(/^[a-f0-9]{64}$/);
@@ -86,7 +86,7 @@ describe("ApplicationSessionService", () => {
       policy,
       () => now,
     );
-    const idle = await idleSessions.issue(actor);
+    const idle = await idleSessions.issue(actor, "identity-1");
     now = new Date("2026-08-17T00:00:05.000Z");
     await expect(idleSessions.verify(idle?.sessionToken)).resolves.toBeUndefined();
     expect(idleStore.records.size).toBe(0);
@@ -99,7 +99,7 @@ describe("ApplicationSessionService", () => {
       policy,
       () => now,
     );
-    const absolute = await absoluteSessions.issue(actor);
+    const absolute = await absoluteSessions.issue(actor, "identity-1");
     now = new Date("2026-08-17T00:00:04.000Z");
     await absoluteSessions.verify(absolute?.sessionToken);
     now = new Date("2026-08-17T00:00:10.000Z");
@@ -116,12 +116,13 @@ describe("ApplicationSessionService", () => {
       { absoluteTtlMs: 10_000, idleTtlMs: 5_000 },
       () => now,
     );
-    const issued = await sessions.issue(actor);
+    const issued = await sessions.issue(actor, "identity-1");
     const issuedLastSeenAt = [...store.records.values()][0]?.lastSeenAt;
 
     now = new Date("2026-08-17T00:00:04.000Z");
     await expect(sessions.verify(issued?.sessionToken, { refreshIdle: false })).resolves.toEqual({
       actor,
+      authenticatedIdentityId: "identity-1",
     });
     expect([...store.records.values()][0]?.lastSeenAt).toBe(issuedLastSeenAt);
   });
@@ -136,8 +137,8 @@ describe("ApplicationSessionService", () => {
       { absoluteTtlMs: 10_000, idleTtlMs: 5_000 },
       () => now,
     );
-    const first = await sessions.issue(actor);
-    const sibling = await sessions.issue(actor);
+    const first = await sessions.issue(actor, "identity-1");
+    const sibling = await sessions.issue(actor, "identity-1");
     now = new Date("2026-08-17T00:00:04.000Z");
     const rotated = await sessions.rotate(first?.sessionToken ?? "");
 
@@ -146,7 +147,10 @@ describe("ApplicationSessionService", () => {
     expect(versions.versions.get(actor.accountId)).toBe(2);
     await expect(sessions.verify(first?.sessionToken)).resolves.toBeUndefined();
     await expect(sessions.verify(sibling?.sessionToken)).resolves.toBeUndefined();
-    await expect(sessions.verify(rotated?.sessionToken)).resolves.toEqual({ actor });
+    await expect(sessions.verify(rotated?.sessionToken)).resolves.toEqual({
+      actor,
+      authenticatedIdentityId: "identity-1",
+    });
 
     await sessions.logout(rotated?.sessionToken, actor.accountId);
     expect(versions.versions.get(actor.accountId)).toBe(3);
@@ -157,7 +161,7 @@ describe("ApplicationSessionService", () => {
     const store = new MemoryStore();
     const versions = new MemoryVersions();
     const sessions = new ApplicationSessionService(store, versions);
-    const issued = await sessions.issue(actor);
+    const issued = await sessions.issue(actor, "identity-1");
 
     await sessions.invalidateAccountSessions(actor.accountId);
     expect(store.records.size).toBe(1);
@@ -174,7 +178,7 @@ describe("ApplicationSessionService", () => {
       { absoluteTtlMs: 10_000, idleTtlMs: 5_000 },
       () => now,
     );
-    const issued = await sessions.issue(actor);
+    const issued = await sessions.issue(actor, "identity-1");
     const issuedLastSeenAt = [...store.records.values()][0]?.lastSeenAt;
 
     now = new Date("2026-08-17T00:00:04.000Z");
@@ -194,6 +198,6 @@ describe("ApplicationSessionService", () => {
     versions.versions.delete(actor.accountId);
     const sessions = new ApplicationSessionService(new MemoryStore(), versions);
 
-    await expect(sessions.issue(actor)).resolves.toBeUndefined();
+    await expect(sessions.issue(actor, "identity-1")).resolves.toBeUndefined();
   });
 });

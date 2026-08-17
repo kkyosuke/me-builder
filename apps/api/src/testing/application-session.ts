@@ -58,14 +58,15 @@ export function createApplicationSessionFixture(database: D1Database) {
             eq(table.isDeleted, false),
           ),
       });
+      if (!identity) throw new Error(`Active LINE identity was not found for ${accountId}`);
       const issued = await runtime.sessions.issue(
         {
           accountId,
           authenticationMethod: "liff",
           authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
         },
+        identity.id,
         displayProfile,
-        identity?.id,
       );
       if (!issued) throw new Error(`Application session could not be issued for ${accountId}`);
       return {

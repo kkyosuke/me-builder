@@ -8,6 +8,7 @@ type BaseParams = {
 };
 
 export type VerifiedRecoveryIdentity = Readonly<{
+  id: string;
   subject: string;
 }>;
 
@@ -100,6 +101,7 @@ export async function recoverAccountWithCode(
     expectedSecretHash: credential.secretHash,
     newProviderAccountId: params.identity.subject,
     sourceAccountId: params.sourceAccountId,
+    sourceIdentityId: params.identity.id,
     identityFingerprint,
     now,
   });

@@ -65,7 +65,7 @@ export async function postAccountRecoveryComplete(c: Context<AppEnv>): Promise<R
     return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
   const outcome = await recoverAccountWithCode({
-    identity: { subject: identity.providerAccountId },
+    identity: { id: authenticatedIdentityId, subject: identity.providerAccountId },
     sourceAccountId: actor.accountId,
     db,
     code: body.output.code,

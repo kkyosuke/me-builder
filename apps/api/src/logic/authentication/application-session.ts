@@ -9,7 +9,7 @@ export type ApplicationSessionRecord = Readonly<{
   expiresAt: string;
   sessionVersion: number;
   csrfToken: string;
-  authenticatedIdentityId?: string;
+  authenticatedIdentityId: string;
   displayProfile?: DisplayProfile;
 }>;
 
@@ -32,7 +32,7 @@ export type IssuedApplicationSession = Readonly<{
 
 export type VerifiedApplicationSession = Readonly<{
   actor: AuthenticatedActor;
-  authenticatedIdentityId?: string;
+  authenticatedIdentityId: string;
   displayProfile?: DisplayProfile;
 }>;
 
@@ -53,8 +53,8 @@ export class ApplicationSessionService {
 
   async issue(
     actor: AuthenticatedActor,
+    authenticatedIdentityId: string,
     displayProfile?: DisplayProfile,
-    authenticatedIdentityId?: string,
   ): Promise<IssuedApplicationSession | undefined> {
     const sessionVersion = await this.versions.current(actor.accountId);
     if (sessionVersion === undefined) return undefined;
@@ -63,8 +63,8 @@ export class ApplicationSessionService {
       actor,
       sessionVersion,
       new Date(now.getTime() + this.policy.absoluteTtlMs),
-      displayProfile,
       authenticatedIdentityId,
+      displayProfile,
     );
   }
 
@@ -72,8 +72,8 @@ export class ApplicationSessionService {
     actor: AuthenticatedActor,
     sessionVersion: number,
     expiresAt: Date,
+    authenticatedIdentityId: string,
     displayProfile?: DisplayProfile,
-    authenticatedIdentityId?: string,
   ): Promise<IssuedApplicationSession | undefined> {
     const now = this.now();
     if (expiresAt.getTime() <= now.getTime()) return undefined;
@@ -90,7 +90,7 @@ export class ApplicationSessionService {
         expiresAt: expiresAt.toISOString(),
         sessionVersion,
         csrfToken,
-        ...(authenticatedIdentityId ? { authenticatedIdentityId } : {}),
+        authenticatedIdentityId,
         ...(displayProfile ? { displayProfile } : {}),
       },
       Math.ceil((expiresAt.getTime() - now.getTime()) / 1_000),
@@ -125,9 +125,7 @@ export class ApplicationSessionService {
         authenticationMethod: record.authenticationMethod,
         authenticatedAt: new Date(record.authenticatedAt),
       },
-      ...(record.authenticatedIdentityId
-        ? { authenticatedIdentityId: record.authenticatedIdentityId }
-        : {}),
+      authenticatedIdentityId: record.authenticatedIdentityId,
       ...(record.displayProfile ? { displayProfile: record.displayProfile } : {}),
     };
   }
@@ -147,8 +145,8 @@ export class ApplicationSessionService {
       verified.actor,
       sessionVersion,
       new Date(record.expiresAt),
-      verified.displayProfile,
       verified.authenticatedIdentityId,
+      verified.displayProfile,
     );
   }
 

@@ -61,7 +61,7 @@ describe("account recovery authentication boundary", () => {
     });
     const params = {
       db,
-      identity: { subject: "new-line-identity" },
+      identity: { id: source.identity.id, subject: "new-line-identity" },
       sourceAccountId: source.account.id,
       code,
       requestKey: "request-key",
@@ -113,7 +113,7 @@ describe("account recovery authentication boundary", () => {
     await expect(
       recoverAccountWithCode({
         db,
-        identity: { subject: "other-account-identity" },
+        identity: { id: source.identity.id, subject: "other-account-identity" },
         sourceAccountId: source.account.id,
         code,
         requestKey: "request-key",
@@ -130,7 +130,7 @@ describe("account recovery authentication boundary", () => {
     });
     await recoverAccountWithCode({
       db,
-      identity: { subject: "first-new-identity" },
+      identity: { id: firstSource.identity.id, subject: "first-new-identity" },
       sourceAccountId: firstSource.account.id,
       code,
       requestKey: "first-request",
@@ -144,7 +144,7 @@ describe("account recovery authentication boundary", () => {
     await expect(
       recoverAccountWithCode({
         db,
-        identity: { subject: "second-new-identity" },
+        identity: { id: secondSource.identity.id, subject: "second-new-identity" },
         sourceAccountId: secondSource.account.id,
         code,
         requestKey: "second-request",

@@ -18,7 +18,7 @@ const applicationSessionRecordSchema = v.object({
   expiresAt: timestamp,
   sessionVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
   csrfToken: v.pipe(v.string(), v.nonEmpty(), v.maxLength(128)),
-  authenticatedIdentityId: v.optional(v.pipe(v.string(), v.nonEmpty(), v.maxLength(128))),
+  authenticatedIdentityId: v.pipe(v.string(), v.nonEmpty(), v.maxLength(128)),
   displayProfile: v.optional(
     v.object({
       displayName: v.optional(v.pipe(v.string(), v.maxLength(256))),
@@ -36,10 +36,9 @@ export class KvApplicationSessionStore implements ApplicationSessionStore {
     if (record === null) return undefined;
     const parsed = v.safeParse(applicationSessionRecordSchema, record);
     if (parsed.success) {
-      const { authenticatedIdentityId, displayProfile, ...session } = parsed.output;
+      const { displayProfile, ...session } = parsed.output;
       return {
         ...session,
-        ...(authenticatedIdentityId ? { authenticatedIdentityId } : {}),
         ...(displayProfile
           ? {
               displayProfile: {

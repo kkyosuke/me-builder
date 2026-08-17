@@ -52,4 +52,17 @@ describe("KvApplicationSessionStore", () => {
     await expect(store.get("corrupted-reference")).resolves.toBeUndefined();
     expect(namespace.delete).toHaveBeenCalledWith("session:v2:corrupted-reference");
   });
+
+  it("認証Identityを持たないrecordを削除して旧sessionを拒否する", async () => {
+    const { authenticatedIdentityId: _, ...legacyRecord } = record;
+    const namespace = {
+      get: vi.fn().mockResolvedValue(legacyRecord),
+      put: vi.fn(),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as KVNamespace;
+    const store = new KvApplicationSessionStore(namespace);
+
+    await expect(store.get("legacy-reference")).resolves.toBeUndefined();
+    expect(namespace.delete).toHaveBeenCalledWith("session:v2:legacy-reference");
+  });
 });
