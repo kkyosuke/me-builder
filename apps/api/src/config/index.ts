@@ -25,39 +25,6 @@ function parseBillingPricePlanMap(
   }
 }
 
-const DEFAULT_BILLING_LOOKUP_KEY_MAP: Readonly<Record<string, string>> = {
-  "lite.month": "me_builder_lite_monthly",
-  "lite.year": "me_builder_lite_yearly",
-  "full.month": "me_builder_full_monthly",
-  "full.year": "me_builder_full_yearly",
-  "family.month": "me_builder_family_monthly",
-  "family.year": "me_builder_family_yearly",
-};
-
-function parseBillingLookupKeyMap(raw: string | undefined): Record<string, string> {
-  if (!raw) return { ...DEFAULT_BILLING_LOOKUP_KEY_MAP };
-  try {
-    const value: unknown = JSON.parse(raw);
-    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-    const allowed = new Set([
-      "lite.month",
-      "lite.year",
-      "full.month",
-      "full.year",
-      "family.month",
-      "family.year",
-    ]);
-    return Object.fromEntries(
-      Object.entries(value).filter(
-        (entry): entry is [string, string] =>
-          allowed.has(entry[0]) && typeof entry[1] === "string" && entry[1].length > 0,
-      ),
-    );
-  } catch {
-    return {};
-  }
-}
-
 export function isDevelopmentEnvironment(environment: string): boolean {
   return DEVELOPMENT_ENVIRONMENTS.has(environment);
 }
@@ -121,17 +88,16 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     ),
     stripePortalResetConfigurationId: getEnv("STRIPE_PORTAL_RESET_CONFIGURATION_ID", env),
     billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
-    billingLookupKeyMap: parseBillingLookupKeyMap(getEnv("BILLING_LOOKUP_KEY_MAP", env)),
     billingProjectionStaleAfterSeconds: Number(
       getEnv("BILLING_PROJECTION_STALE_AFTER_SECONDS", env)?.trim() || 900,
     ),
     liffId: liffConfiguration.liffId,
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,
-    ssoRolloutMode: getEnv("SSO_ROLLOUT_MODE", env),
+    ssoRolloutMode: getEnv("SSO_ROLLOUT_MODE", env)?.trim() || undefined,
     ssoRolloutPercent: Number(getEnv("SSO_ROLLOUT_PERCENT", env) ?? 0),
-    ssoIssuerUrl: getEnv("SSO_ISSUER_URL", env),
-    ssoClientId: getEnv("SSO_CLIENT_ID", env),
-    ssoClientSecret: getEnv("SSO_CLIENT_SECRET", env),
+    ssoIssuerUrl: getEnv("SSO_ISSUER_URL", env)?.trim() || undefined,
+    ssoClientId: getEnv("SSO_CLIENT_ID", env)?.trim() || undefined,
+    ssoClientSecret: getEnv("SSO_CLIENT_SECRET", env)?.trim() || undefined,
     ssoCallbackUrl:
       rawBaseUrl && rawBaseUrl !== "/"
         ? `${rawBaseUrl.replace(/\/$/u, "")}/api/auth/sso/callback`

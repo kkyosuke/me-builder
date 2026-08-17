@@ -1,6 +1,8 @@
 import {
   WEB_CLIENT_ERROR_KINDS,
   WEB_CLIENT_ERROR_TYPES,
+  WEB_CLIENT_OPERATIONS,
+  WEB_CLIENT_OPERATION_ERROR_CODES,
   WEB_CLIENT_ROUTES,
 } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
@@ -22,12 +24,26 @@ const webClientErrorReportEntries = {
   sourceColumn: v.optional(
     v.pipe(v.number(), v.safeInteger(), v.minValue(1), v.maxValue(10_000_000)),
   ),
+  operation: v.optional(v.picklist(WEB_CLIENT_OPERATIONS)),
+  operationErrorCode: v.optional(v.picklist(WEB_CLIENT_OPERATION_ERROR_CODES)),
+  operationStatus: v.optional(
+    v.pipe(v.number(), v.safeInteger(), v.minValue(400), v.maxValue(599)),
+  ),
   online: v.boolean(),
   recovered: v.boolean(),
 } as const;
 
-/** runtimeではallowlist外のフィールドを受理しない。 */
-export const WebClientErrorReportSchema = v.strictObject(webClientErrorReportEntries);
+/** runtimeではallowlist外のフィールドと、操作エラー以外への操作情報の混入を受理しない。 */
+export const WebClientErrorReportSchema = v.pipe(
+  v.strictObject(webClientErrorReportEntries),
+  v.check((report) =>
+    report.kind === "handled-operation-error"
+      ? report.operation !== undefined && report.operationErrorCode !== undefined
+      : report.operation === undefined &&
+        report.operationErrorCode === undefined &&
+        report.operationStatus === undefined,
+  ),
+);
 const WebClientErrorReportDocumentationSchema = {
   type: "object",
   additionalProperties: false,
@@ -53,6 +69,12 @@ const WebClientErrorReportDocumentationSchema = {
     },
     sourceLine: { type: "integer", minimum: 1, maximum: 10_000_000 },
     sourceColumn: { type: "integer", minimum: 1, maximum: 10_000_000 },
+    operation: { type: "string", enum: [...WEB_CLIENT_OPERATIONS] as string[] },
+    operationErrorCode: {
+      type: "string",
+      enum: [...WEB_CLIENT_OPERATION_ERROR_CODES] as string[],
+    },
+    operationStatus: { type: "integer", minimum: 400, maximum: 599 },
     online: { type: "boolean" },
     recovered: { type: "boolean" },
   },
@@ -61,7 +83,7 @@ const WebClientErrorReportDocumentationSchema = {
 export const webClientErrorReportRoute = describeRoute({
   operationId: "reportWebClientError",
   tags: ["Observability"],
-  summary: "Web UIの安全化済み未捕捉エラーをWorkers Logsへ記録する",
+  summary: "Web UIの安全化済み未捕捉・操作エラーをWorkers Logsへ記録する",
   security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,

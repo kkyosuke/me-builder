@@ -152,6 +152,18 @@ tasks:
     cmds:
       - bun scripts/setup-avatar-bucket.ts production
 
+  session-store:setup:preview:
+    desc: 'Create the Preview application-session KV namespace if missing'
+    cmds:
+      - bun scripts/setup-session-store.ts preview
+      - bun --cwd infra generate:wrangler
+
+  session-store:setup:production:
+    desc: 'Create the Production application-session KV namespace if missing'
+    cmds:
+      - bun scripts/setup-session-store.ts production
+      - bun --cwd infra generate:wrangler
+
   access:setup:preview:
     desc: 'Protect preview OpenAPI and Swagger UI routes with Cloudflare Access'
     cmds:

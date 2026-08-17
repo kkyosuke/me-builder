@@ -50,7 +50,7 @@ export function getWebConfig(env?: Record<string, string | undefined>): WebConfi
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
     liffId: liffConfiguration.liffId,
-    ssoRolloutMode: getEnv("SSO_ROLLOUT_MODE"),
+    ssoRolloutMode: getEnv("SSO_ROLLOUT_MODE")?.trim() || undefined,
   };
 
   return v.parse(WebConfigSchema, rawConfig);
