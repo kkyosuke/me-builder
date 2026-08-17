@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 import { RelationshipCategorySchema } from "./shared";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
@@ -33,5 +33,6 @@ export const diagnosisListRoute = describeRoute({
   responses: {
     200: jsonResponse("診断一覧", DiagnosisListResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

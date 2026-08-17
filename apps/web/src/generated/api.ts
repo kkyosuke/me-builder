@@ -7089,6 +7089,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -7199,6 +7213,20 @@ export interface operations {
             error: "Diagnosis closed";
             /** @constant */
             reason: "diagnosis_closed";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -7313,6 +7341,20 @@ export interface operations {
                 /** @constant */
                 reason: "diagnosis_answers_not_found";
               };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
         };
       };
       /** @description 未処理のサーバーエラー */
@@ -7463,6 +7505,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -7583,6 +7639,20 @@ export interface operations {
             error: "Invalid deferred question";
             /** @constant */
             reason: "diagnosis_question_not_found";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };

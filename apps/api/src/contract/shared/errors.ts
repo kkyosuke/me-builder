@@ -43,4 +43,8 @@ export const authenticatedErrors = {
   500: jsonResponse("未処理のサーバーエラー", InternalServerErrorSchema),
 };
 
+export const currentTermsPolicyError = {
+  428: jsonResponse("現行利用規約への同意が必要", TermsAcceptanceRequiredErrorSchema),
+};
+
 export { jsonResponse };

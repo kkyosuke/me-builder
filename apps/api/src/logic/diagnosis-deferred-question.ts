@@ -1,5 +1,5 @@
-import { type AccountDataNamespace, type D1, type DO, accountDataFor } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import { type AccountDataNamespace, type DO, accountDataFor } from "@me-builder/lib";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type Deferred = Extract<
   Awaited<ReturnType<typeof DO.account.action.diagnosis.deferDiagnosisQuestion>>,
@@ -11,23 +11,17 @@ export type DeferDiagnosisQuestionOutcome =
   | { type: "diagnosis-not-found" }
   | { type: "diagnosis-closed" }
   | { type: "diagnosis-question-not-found" }
-  | { type: "question-already-answered" }
-  | { type: "not-configured" }
-  | { type: "unauthenticated"; reason: string }
-  | { type: "account-not-found" };
+  | { type: "question-already-answered" };
 
 type Params = {
   diagnosisId: string;
   diagnosisQuestionId: string;
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
-  db: D1.shared.Client;
+  actor: AuthenticatedActor;
   accountData?: AccountDataNamespace;
   at?: Date;
 };
 
 type Dependencies = {
-  createSession: typeof createLiffSession;
   deferQuestion: (
     accountData: AccountDataNamespace | undefined,
     accountId: string,
@@ -39,7 +33,6 @@ type Dependencies = {
 };
 
 const defaultDependencies: Dependencies = {
-  createSession: createLiffSession,
   deferQuestion: (accountData, accountId, input) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("diagnosis.deferQuestion", input);
@@ -48,22 +41,10 @@ const defaultDependencies: Dependencies = {
 
 /** 本人確認結果からAccountを解決し、その本人の延期操作だけを保存します。 */
 export async function deferDiagnosisQuestion(
-  {
-    diagnosisId,
-    diagnosisQuestionId,
-    idToken,
-    lineLoginChannelId,
-    db,
-    accountData,
-    at = new Date(),
-  }: Params,
+  { diagnosisId, diagnosisQuestionId, actor, accountData, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<DeferDiagnosisQuestionOutcome> {
-  const session = await dependencies.createSession({ idToken, lineLoginChannelId, db });
-  if (session.type !== "resolved") {
-    return session;
-  }
-  return dependencies.deferQuestion(accountData, session.session.accountId, {
+  return dependencies.deferQuestion(accountData, actor.accountId, {
     diagnosisId,
     diagnosisQuestionId,
     at,

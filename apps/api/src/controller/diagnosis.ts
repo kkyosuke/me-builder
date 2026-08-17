@@ -2,7 +2,6 @@ import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { getConfig } from "../config";
 import {
   AnswerConflictErrorSchema,
   InvalidAnswerErrorSchema,
@@ -25,18 +24,14 @@ import {
   DiagnosisNotFoundErrorSchema,
 } from "../contract/diagnosis/detail";
 import { DiagnosisListResponseSchema } from "../contract/diagnosis/list";
-import {
-  AccountNotFoundErrorSchema,
-  ServiceUnavailableErrorSchema,
-  UnauthorizedErrorSchema,
-} from "../contract/shared/errors";
+import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { saveDiagnosisAnswer } from "../logic/diagnosis-answer";
 import { getDiagnosisAnswers } from "../logic/diagnosis-answers";
 import { deferDiagnosisQuestion } from "../logic/diagnosis-deferred-question";
 import { getDiagnosisDetail } from "../logic/diagnosis-detail";
 import { getDiagnosisList } from "../logic/diagnosis-list";
+import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 
 /** `GET /api/diagnoses` — 回答進捗を含む、表示可能な診断一覧を返す。 */
 export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
@@ -46,9 +41,7 @@ export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
   }
 
   const outcome = await getDiagnosisList({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     ...(c.env.ACCOUNT_DATA ? { accountData: c.env.ACCOUNT_DATA } : {}),
   });
 
@@ -56,17 +49,6 @@ export async function getDiagnoses(c: Context<AppEnv>): Promise<Response> {
     case "resolved":
       c.header("Cache-Control", "no-store");
       return c.json(v.parse(DiagnosisListResponseSchema, { diagnoses: outcome.diagnoses }));
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -79,8 +61,7 @@ export async function getDiagnosis(c: Context<AppEnv>): Promise<Response> {
 
   const outcome = await getDiagnosisDetail({
     diagnosisId: c.req.param("diagnosisId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
     accountData: c.env.ACCOUNT_DATA,
   });
@@ -105,17 +86,6 @@ export async function getDiagnosis(c: Context<AppEnv>): Promise<Response> {
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -141,9 +111,7 @@ export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> 
     diagnosisId: c.req.param("diagnosisId") ?? "",
     diagnosisQuestionId: c.req.param("diagnosisQuestionId") ?? "",
     choiceId: parsed.output.choiceId,
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
     scheduleProjection: (task) => {
       try {
@@ -197,17 +165,6 @@ export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> 
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -221,9 +178,7 @@ export async function putDiagnosisDeferredQuestion(c: Context<AppEnv>): Promise<
   const outcome = await deferDiagnosisQuestion({
     diagnosisId: c.req.param("diagnosisId") ?? "",
     diagnosisQuestionId: c.req.param("diagnosisQuestionId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
   });
 
@@ -262,17 +217,6 @@ export async function putDiagnosisDeferredQuestion(c: Context<AppEnv>): Promise<
         }),
         409,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -285,9 +229,7 @@ export async function getDiagnosisAnswerContents(c: Context<AppEnv>): Promise<Re
 
   const outcome = await getDiagnosisAnswers({
     diagnosisId: c.req.param("diagnosisId") ?? "",
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
   });
 
@@ -303,16 +245,5 @@ export async function getDiagnosisAnswerContents(c: Context<AppEnv>): Promise<Re
         }),
         404,
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }

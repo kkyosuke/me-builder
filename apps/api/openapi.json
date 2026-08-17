@@ -10746,6 +10746,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -10971,6 +10990,25 @@
                     },
                     "reason": {
                       "const": "diagnosis_closed"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
@@ -11258,6 +11296,25 @@
                       "required": ["error", "reason"]
                     }
                   ]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -11557,6 +11614,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -11750,6 +11826,25 @@
                     },
                     "reason": {
                       "const": "diagnosis_question_not_found"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
                     }
                   },
                   "required": ["error", "reason"]
