@@ -127,10 +127,31 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     ),
     liffId: liffConfiguration.liffId,
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,
+    ssoRolloutMode: getEnv("SSO_ROLLOUT_MODE", env),
+    ssoIssuerUrl: getEnv("SSO_ISSUER_URL", env),
+    ssoClientId: getEnv("SSO_CLIENT_ID", env),
+    ssoClientSecret: getEnv("SSO_CLIENT_SECRET", env),
+    ssoCallbackUrl:
+      rawBaseUrl && rawBaseUrl !== "/"
+        ? `${rawBaseUrl.replace(/\/$/u, "")}/api/auth/sso/callback`
+        : undefined,
     adminLineUserIds,
   };
 
-  return v.parse(ConfigSchema, rawConfig);
+  const parsed = v.parse(ConfigSchema, rawConfig);
+  if (
+    parsed.ssoRolloutMode !== "disabled" &&
+    (!parsed.ssoIssuerUrl ||
+      !parsed.ssoClientId ||
+      !parsed.ssoClientSecret ||
+      !parsed.ssoCallbackUrl ||
+      !parsed.webOrigin)
+  ) {
+    throw new Error(
+      "SSO_ISSUER_URL, SSO_CLIENT_ID, SSO_CLIENT_SECRET, BASE_URL, and WEB_ORIGIN are required when SSO is enabled",
+    );
+  }
+  return parsed;
 }
 
 export const config = getConfig();

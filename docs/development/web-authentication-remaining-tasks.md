@@ -283,17 +283,11 @@ flowchart TD
 
 実装と検証はPRへ移しました。未完了条件はレビューとmergeです。
 
-### AUTH-C-002 SSO server adapterと認証transactionを追加する
+### AUTH-C-002 SSO server adapterと認証transactionを追加する ([PR #316](https://github.com/kkyosuke/me-builder/pull/316))
 
 依存: `AUTH-C-001`, `AUTH-A-011`
 
-- SSO開始、callback、token交換、issuer・audience・署名・期限検証をadapterへ実装する
-- state、nonce、PKCE verifier、要求pathを短命な認証transactionへ保存して一度だけ消費する
-- callbackで`VerifiedExternalIdentity`を生成し、共通Account resolverとsession issuerへ渡す
-- 未知Identityは`link-only`結果として拒否し、Accountを自動作成しない
-- IdPへ接続しないfake / fixture testで改ざん、再送、期限切れ、open redirectを拒否する
-
-完了条件は、SSO固有情報がadapter外へ漏れず、既知Identityだけがapplication sessionを取得できることです。
+実装と検証はPRへ移し、mainへmerge済みの`AUTH-A-011`が提供するKV bindingへ接続しました。未完了条件はレビューとmergeです。
 
 ### AUTH-C-003 既存AccountへSSO Identityを追加する
 

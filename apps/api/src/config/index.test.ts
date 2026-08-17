@@ -128,4 +128,75 @@ describe("getConfig & ConfigSchema", () => {
       }),
     ).toThrow("must match");
   });
+
+  it("SSO無効時はAuth0 secretを要求しないこと", () => {
+    expect(getConfig({ SSO_ROLLOUT_MODE: "disabled" }).ssoRolloutMode).toBe("disabled");
+  });
+
+  it("SSO有効時はAuth0設定と固定callback URLを解決すること", () => {
+    const conf = getConfig({
+      SSO_ROLLOUT_MODE: "linking",
+      SSO_ISSUER_URL: "https://tenant.auth0.com/",
+      SSO_CLIENT_ID: "client-id",
+      SSO_CLIENT_SECRET: "client-secret",
+      BASE_URL: "https://api.example.com/",
+      WEB_ORIGIN: "https://example.com",
+    });
+
+    expect(conf).toEqual(
+      expect.objectContaining({
+        ssoRolloutMode: "linking",
+        ssoIssuerUrl: "https://tenant.auth0.com/",
+        ssoClientId: "client-id",
+        ssoClientSecret: "client-secret",
+        ssoCallbackUrl: "https://api.example.com/api/auth/sso/callback",
+      }),
+    );
+  });
+
+  it("SSO有効時に必要な設定が欠けていれば起動前に拒否すること", () => {
+    expect(() =>
+      getConfig({
+        SSO_ROLLOUT_MODE: "linked-login",
+        SSO_ISSUER_URL: "https://tenant.auth0.com/",
+      }),
+    ).toThrow("SSO_CLIENT_ID");
+  });
+
+  it.each([
+    { SSO_ISSUER_URL: "http://tenant.auth0.com/" },
+    { SSO_ISSUER_URL: "https://tenant.auth0.com/oauth" },
+    { BASE_URL: "http://api.example.com" },
+    { BASE_URL: "https://api.example.com/prefix" },
+    { WEB_ORIGIN: "https://example.com/app" },
+    { WEB_ORIGIN: "https://user@example.com" },
+  ])("SSO有効時は曖昧または安全でないURL設定を起動前に拒否すること: %o", (override) => {
+    expect(() =>
+      getConfig({
+        SSO_ROLLOUT_MODE: "linked-login",
+        SSO_ISSUER_URL: "https://tenant.auth0.com/",
+        SSO_CLIENT_ID: "client-id",
+        SSO_CLIENT_SECRET: "client-secret",
+        BASE_URL: "https://api.example.com",
+        WEB_ORIGIN: "https://example.com",
+        ...override,
+      }),
+    ).toThrow();
+  });
+
+  it.each(["localhost", "127.0.0.1", "[::1]"])(
+    "local loopbackのHTTP originとcallbackだけを許可すること: %s",
+    (hostname) => {
+      expect(() =>
+        getConfig({
+          SSO_ROLLOUT_MODE: "linking",
+          SSO_ISSUER_URL: "https://tenant.auth0.com/",
+          SSO_CLIENT_ID: "client-id",
+          SSO_CLIENT_SECRET: "client-secret",
+          BASE_URL: `http://${hostname}:3000`,
+          WEB_ORIGIN: `http://${hostname}:5173`,
+        }),
+      ).not.toThrow();
+    },
+  );
 });
