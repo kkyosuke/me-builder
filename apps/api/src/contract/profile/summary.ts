@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
@@ -100,6 +100,7 @@ export const profileSummaryRoute = describeRoute({
       ProfileSummaryResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -118,5 +119,6 @@ export const profileSummaryGenerationRoute = describeRoute({
       ProfileSummaryGenerationUnavailableSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

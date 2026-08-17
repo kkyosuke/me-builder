@@ -1,10 +1,9 @@
 import { type AccountDataNamespace, type D1, accountDataFor, billing } from "@me-builder/lib";
 import type { SelfCareConfirmationKind } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type Common = Readonly<{
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
   accountData: AccountDataNamespace;
   at?: Date;
@@ -12,21 +11,18 @@ type Common = Readonly<{
 }>;
 
 async function resolve(params: Common) {
-  const session = await createLiffSession(params);
-  if (session.type !== "resolved") return session;
   const entitlement = await new billing.EntitlementService(
     new billing.FamilyAwareAccountPlanAssignmentProvider(params.db, params.planAssignmentProvider),
-  ).resolve(session.session.accountId, params.at);
+  ).resolve(params.actor.accountId, params.at);
   return {
     type: "resolved" as const,
     entitlement,
-    account: accountDataFor(params.accountData, session.session.accountId),
+    account: accountDataFor(params.accountData, params.actor.accountId),
   };
 }
 
 export async function getSelfCareContexts(params: Common) {
   const context = await resolve(params);
-  if (context.type !== "resolved") return context;
   return {
     type: "resolved" as const,
     ...(await context.account.execute("selfCareContext.read")),
@@ -38,7 +34,6 @@ export async function confirmSelfCareContext(
   params: Common & Readonly<{ brainItemId: string; kind: SelfCareConfirmationKind }>,
 ) {
   const context = await resolve(params);
-  if (context.type !== "resolved") return context;
   if (!context.entitlement.policy.features["personalized-self-care"]) {
     return { type: "unavailable" as const, reason: "feature_unavailable" as const };
   }
@@ -53,7 +48,6 @@ export async function confirmSelfCareContext(
 
 export async function revokeSelfCareContext(params: Common & Readonly<{ id: string }>) {
   const context = await resolve(params);
-  if (context.type !== "resolved") return context;
   if (!context.entitlement.policy.features["personalized-self-care"]) {
     return { type: "unavailable" as const, reason: "feature_unavailable" as const };
   }

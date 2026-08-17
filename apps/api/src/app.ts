@@ -318,21 +318,55 @@ app.post(
   postBillingReconciliation,
 );
 
-app.get("/api/profile-summary", profileSummaryRoute, getProfileSummaryContents);
+app.get(
+  "/api/profile-summary",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileSummaryRoute,
+  getProfileSummaryContents,
+);
 app.post(
   "/api/profile-summary/generations",
+  requireAuthentication,
+  requireCurrentTerms,
   profileSummaryGenerationRoute,
   postProfileSummaryGeneration,
 );
-app.get("/api/weekly-reflections", weeklyReflectionRoute, getWeeklyReflectionContents);
+app.get(
+  "/api/weekly-reflections",
+  requireAuthentication,
+  requireCurrentTerms,
+  weeklyReflectionRoute,
+  getWeeklyReflectionContents,
+);
 app.post(
   "/api/weekly-reflections/generations",
+  requireAuthentication,
+  requireCurrentTerms,
   weeklyReflectionGenerationRoute,
   postWeeklyReflectionGeneration,
 );
-app.get("/api/goal-follow-ups", goalFollowUpListRoute, getGoalFollowUpContents);
-app.post("/api/goal-follow-ups", goalFollowUpAgreementRoute, postGoalFollowUpAgreement);
-app.patch("/api/goal-follow-ups/:goalFollowUpId", goalFollowUpUpdateRoute, patchGoalFollowUp);
+app.get(
+  "/api/goal-follow-ups",
+  requireAuthentication,
+  requireCurrentTerms,
+  goalFollowUpListRoute,
+  getGoalFollowUpContents,
+);
+app.post(
+  "/api/goal-follow-ups",
+  requireAuthentication,
+  requireCurrentTerms,
+  goalFollowUpAgreementRoute,
+  postGoalFollowUpAgreement,
+);
+app.patch(
+  "/api/goal-follow-ups/:goalFollowUpId",
+  requireAuthentication,
+  requireCurrentTerms,
+  goalFollowUpUpdateRoute,
+  patchGoalFollowUp,
+);
 app.get(
   "/api/profile",
   requireAuthentication,
@@ -382,14 +416,24 @@ app.patch(
   correctPersonalDataRecordRoute,
   patchPersonalDataRecord,
 );
-app.get("/api/self-care/contexts", selfCareContextListRoute, getSelfCareContextContents);
+app.get(
+  "/api/self-care/contexts",
+  requireAuthentication,
+  requireCurrentTerms,
+  selfCareContextListRoute,
+  getSelfCareContextContents,
+);
 app.post(
   "/api/self-care/contexts",
+  requireAuthentication,
+  requireCurrentTerms,
   selfCareContextConfirmationRoute,
   postSelfCareContextConfirmation,
 );
 app.delete(
   "/api/self-care/contexts/:selfCareContextId",
+  requireAuthentication,
+  requireCurrentTerms,
   selfCareContextRevocationRoute,
   deleteSelfCareContextConfirmation,
 );

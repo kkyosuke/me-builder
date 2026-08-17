@@ -1,9 +1,8 @@
 import { type AccountDataNamespace, type D1, accountDataFor, billing } from "@me-builder/lib";
-import { createLiffSession } from "./liff-session";
+import type { AuthenticatedActor } from "./authentication/types";
 
 type CommonParams = Readonly<{
-  idToken: string | undefined;
-  lineLoginChannelId: string | undefined;
+  actor: AuthenticatedActor;
   db: D1.shared.Client;
   accountData: AccountDataNamespace;
   at?: Date;
@@ -11,22 +10,19 @@ type CommonParams = Readonly<{
 }>;
 
 const resolve = async (params: CommonParams) => {
-  const session = await createLiffSession(params);
-  if (session.type !== "resolved") return session;
   const entitlement = await new billing.EntitlementService(
     new billing.FamilyAwareAccountPlanAssignmentProvider(params.db, params.planAssignmentProvider),
-  ).resolve(session.session.accountId, params.at);
+  ).resolve(params.actor.accountId, params.at);
   return {
     type: "resolved" as const,
-    accountId: session.session.accountId,
+    accountId: params.actor.accountId,
     entitlement,
-    account: accountDataFor(params.accountData, session.session.accountId),
+    account: accountDataFor(params.accountData, params.actor.accountId),
   };
 };
 
 export async function getGoalFollowUps(params: CommonParams) {
   const context = await resolve(params);
-  if (context.type !== "resolved") return context;
   const model = await context.account.execute("goalFollowUp.read");
   return {
     type: "resolved" as const,
@@ -40,7 +36,6 @@ export async function agreeGoalFollowUp(
   params: CommonParams & Readonly<{ brainItemId: string; nextStep: string }>,
 ) {
   const context = await resolve(params);
-  if (context.type !== "resolved") return context;
   if (!context.entitlement.policy.features["goal-follow-up"]) {
     return { type: "unavailable" as const, reason: "feature_unavailable" as const };
   }
@@ -65,7 +60,6 @@ export async function updateGoalFollowUp(
     }>,
 ) {
   const context = await resolve(params);
-  if (context.type !== "resolved") return context;
   if (!context.entitlement.policy.features["goal-follow-up"]) {
     return { type: "unavailable" as const, reason: "feature_unavailable" as const };
   }

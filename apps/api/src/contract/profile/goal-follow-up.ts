@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 const Text = v.pipe(v.string(), v.trim(), v.nonEmpty());
 const GoalFollowUpSchema = v.object({
@@ -46,6 +46,7 @@ const errors = {
   400: jsonResponse("リクエストJSONが不正", InvalidGoalFollowUpSchema),
   409: jsonResponse("操作できない理由", GoalFollowUpUnavailableSchema),
   ...authenticatedErrors,
+  ...currentTermsPolicyError,
 };
 
 export const goalFollowUpListRoute = describeRoute({
@@ -56,6 +57,7 @@ export const goalFollowUpListRoute = describeRoute({
   responses: {
     200: jsonResponse("Goalフォローアップ", GoalFollowUpListSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 

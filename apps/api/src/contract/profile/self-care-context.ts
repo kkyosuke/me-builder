@@ -1,6 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, jsonResponse } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
 
 const Text = v.pipe(v.string(), v.trim(), v.nonEmpty());
 const Kind = v.picklist(["worked", "did-not-work", "recent-state"]);
@@ -28,6 +28,7 @@ const errors = {
   400: jsonResponse("リクエストJSONが不正", InvalidSelfCareContextSchema),
   409: jsonResponse("操作できない理由", SelfCareContextUnavailableSchema),
   ...authenticatedErrors,
+  ...currentTermsPolicyError,
 };
 
 export const selfCareContextListRoute = describeRoute({
@@ -38,6 +39,7 @@ export const selfCareContextListRoute = describeRoute({
   responses: {
     200: jsonResponse("確認済みセルフケア情報", SelfCareContextListSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 

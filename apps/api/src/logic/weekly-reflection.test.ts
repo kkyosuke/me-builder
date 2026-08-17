@@ -3,9 +3,6 @@ import type { Queue, ReflectionGenerationQueueMessage } from "@me-builder/shared
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getWeeklyReflections, requestWeeklyReflectionGeneration } from "./weekly-reflection";
 
-const { createLiffSession } = vi.hoisted(() => ({ createLiffSession: vi.fn() }));
-vi.mock("./liff-session", () => ({ createLiffSession }));
-
 const execute = vi.fn();
 const accountData = {
   getByName: vi.fn(() => ({ execute })),
@@ -13,6 +10,11 @@ const accountData = {
 const send = vi.fn();
 const queue = { send } as unknown as Queue<ReflectionGenerationQueueMessage>;
 const at = new Date("2026-08-15T00:00:00.000Z");
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: at,
+};
 const readModel = {
   reflections: [
     {
@@ -57,18 +59,13 @@ function provider(plan: "free" | "lite" | "full") {
 describe("weekly reflection entitlement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createLiffSession.mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-1", role: "user" },
-    });
   });
 
   it("Freeでも生成済み結果は返すが、新しい生成は開始しない", async () => {
     execute.mockResolvedValue(readModel);
     await expect(
       getWeeklyReflections({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         planAssignmentProvider: provider("free"),
@@ -81,8 +78,7 @@ describe("weekly reflection entitlement", () => {
     });
     await expect(
       requestWeeklyReflectionGeneration({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         queue,
@@ -100,8 +96,7 @@ describe("weekly reflection entitlement", () => {
   ] as const)("%sの月次表示modeをAccountDataへ渡す", async (plan, mode) => {
     execute.mockResolvedValue(readModel);
     await getWeeklyReflections({
-      idToken: "token",
-      lineLoginChannelId: "channel",
+      actor,
       db: {} as D1.shared.Client,
       accountData,
       planAssignmentProvider: provider(plan),
@@ -121,8 +116,7 @@ describe("weekly reflection entitlement", () => {
       .mockResolvedValueOnce(true);
     await expect(
       requestWeeklyReflectionGeneration({
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db: {} as D1.shared.Client,
         accountData,
         queue,
