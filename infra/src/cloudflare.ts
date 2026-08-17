@@ -162,6 +162,12 @@ export async function discoverPreviewInfrastructure(baseDomain: string) {
   const avatarBucket = remoteBuckets.buckets?.find(({ name }) => name === names.avatarBucket);
   if (!avatarBucket?.name) throw new Error(`Missing Avatar R2 bucket: ${names.avatarBucket}`);
 
+  const namespaces = await cloudflare<{ id: string; title: string }[]>(
+    `/accounts/${accountId}/storage/kv/namespaces?per_page=1000`,
+  );
+  const sessionStore = namespaces.find(({ title }) => title === names.sessionStore);
+  if (!sessionStore) throw new Error(`Missing Session KV namespace: ${names.sessionStore}`);
+
   const remoteQueues = await cloudflare<{ queue_id: string; queue_name: string }[]>(
     `/accounts/${accountId}/queues?per_page=100`,
   );
@@ -170,6 +176,7 @@ export async function discoverPreviewInfrastructure(baseDomain: string) {
     baseDomain,
     database: { id: database.uuid, name: database.name },
     avatarBucket: { name: avatarBucket.name },
+    sessionStore: { id: sessionStore.id, name: sessionStore.title },
     queues: Object.fromEntries(
       Object.entries(names.queues).map(([key, name]) => {
         const queue = remoteQueues.find(({ queue_name }) => queue_name === name);

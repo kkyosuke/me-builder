@@ -85,6 +85,7 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: |
           task avatar-bucket:setup:preview
+          task session-store:setup:preview
           task infra:preview:sync
 
       - name: Protect API Documentation with Cloudflare Access (Preview)
