@@ -311,7 +311,7 @@ flowchart TD
 
 依存: `AUTH-C-005`
 
-実装と公開RunbookはPRへ移しました。未完了条件は`AUTH-A-011`のsession issuerへ割合gateを接続し、Preview gate完了後にProductionの各phase、即時停止、0%からの再開結果を記録してレビューを完了することです。
+実装と公開RunbookはPRへ移し、`AUTH-A-011`のsession issuerへ割合gateを接続しました。未完了条件はPreview gate完了後にProductionの各phase、即時停止、0%からの再開結果を記録し、レビューとmergeを完了することです。
 
 ## 8. リリースゲート
 

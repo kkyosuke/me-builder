@@ -306,9 +306,7 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       client: dependencies.client,
       identityResolver: createSsoExistingIdentityResolver(runtime.db),
       identityLinker: createSsoIdentityLinker(runtime.db),
-      rolloutAuthorizer: createSsoRolloutAuthorizer(
-        dependencies.configuration.ssoRolloutPercent,
-      ),
+      rolloutAuthorizer: createSsoRolloutAuthorizer(dependencies.configuration.ssoRolloutPercent),
       sessionIssuer: {
         async issue(actor) {
           if (previousToken) await runtime.sessions.logout(previousToken, actor.accountId);
