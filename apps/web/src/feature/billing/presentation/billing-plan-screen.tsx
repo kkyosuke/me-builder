@@ -35,6 +35,10 @@ export function BillingPlanScreen({
   const paidSubscription =
     entitlement.status === "success" && entitlement.data.source === "subscription";
   const familySeat = entitlement.status === "success" && entitlement.data.source === "family-seat";
+  const currentPlan = entitlement.status === "success" ? entitlement.data.plan : "free";
+  const planRank = { free: -1, lite: 0, full: 1, family: 2 } as const;
+  const selectedPlanIsDowngrade =
+    selected !== null && planRank[selected.code] < planRank[currentPlan];
 
   useEffect(() => {
     backButtonRef.current?.focus();
@@ -281,9 +285,13 @@ export function BillingPlanScreen({
               <div>
                 <dt className="text-slate-500">請求</dt>
                 <dd className="mt-1">
-                  {selected.trialDays
-                    ? `無料期間終了後に${formatBillingAmount(billingPlanPrice(selected, interval).amount)}を請求し、選択した間隔で自動更新`
-                    : "Stripeで支払方法を登録した後、選択した間隔で自動更新"}
+                  {paidSubscription && selectedPlanIsDowngrade
+                    ? "現在の期間の終了時に変更。適用までは現在のプランを維持"
+                    : paidSubscription
+                      ? "Stripeの確認画面で差額と次回更新日を確認してから変更"
+                      : selected.trialDays
+                        ? `無料期間終了後に${formatBillingAmount(billingPlanPrice(selected, interval).amount)}を請求し、選択した間隔で自動更新`
+                        : "Stripeで支払方法を登録した後、選択した間隔で自動更新"}
                 </dd>
               </div>
               <div>
@@ -309,9 +317,13 @@ export function BillingPlanScreen({
               >
                 <ExternalLink className="size-4" aria-hidden="true" />
                 {checkoutState.status === "loading"
-                  ? "Stripeを開いています..."
+                  ? selectedPlanIsDowngrade
+                    ? "変更を予約しています..."
+                    : "Stripeを開いています..."
                   : paidSubscription
-                    ? "Stripeで変更内容を確認"
+                    ? selectedPlanIsDowngrade
+                      ? "期間末の変更を予約"
+                      : "Stripeで変更内容を確認"
                     : "Stripeで購入手続きへ"}
               </button>
               <button

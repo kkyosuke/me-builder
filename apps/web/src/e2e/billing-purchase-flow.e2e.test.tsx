@@ -187,4 +187,50 @@ describe("billing purchase user journey", () => {
     );
     expect(mocks.createCheckout).not.toHaveBeenCalled();
   });
+
+  it("下位Planはアプリで期間末変更を確認して予約する", async () => {
+    mocks.fetchEntitlement.mockResolvedValue({
+      ...entitlement("subscription"),
+      plan: "full",
+    });
+    mocks.createPlanChange.mockResolvedValue(
+      "https://app.example.test/profile/billing?billing=change-scheduled&plan=lite&effective_at=2026-09-01T00%3A00%3A00.000Z",
+    );
+    const navigate = vi.fn();
+    render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Liteを選ぶ" }));
+    expect(screen.getByText("現在の期間の終了時に変更。適用までは現在のプランを維持")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "期間末の変更を予約" }));
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(expect.stringContaining("billing=change-scheduled")),
+    );
+    expect(mocks.createPlanChange).toHaveBeenCalledWith(
+      undefined,
+      "id-token",
+      { plan: "lite", interval: "month" },
+      expect.any(AbortSignal),
+    );
+    expect(mocks.createCheckout).not.toHaveBeenCalled();
+  });
+
+  it("期間末変更の復帰URLで予約したPlanと適用日を表示する", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/profile/billing?billing=change-scheduled&plan=lite&effective_at=2026-09-01T00%3A00%3A00.000Z",
+    );
+    mocks.fetchEntitlement.mockResolvedValue(entitlement("subscription"));
+
+    render(<BillingPlanApplication onBack={vi.fn()} />);
+
+    expect(
+      await screen.findByText(
+        "Liteへの変更を2026年9月1日に予約しました。それまでは現在のプランを利用できます。",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("現在の契約があります")).toBeTruthy();
+    expect(mocks.verifyCheckout).not.toHaveBeenCalled();
+  });
 });

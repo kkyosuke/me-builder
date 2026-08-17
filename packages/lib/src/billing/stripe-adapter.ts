@@ -140,6 +140,53 @@ export class StripeBillingProvider implements BillingProvider {
     });
   }
 
+  async scheduleSubscriptionChange(
+    input: {
+      subscriptionId: string;
+      existingScheduleId?: string;
+      currentPriceId: string;
+      currentTrialEnd?: string;
+      targetPriceId: string;
+      targetInterval: "month" | "year";
+    },
+    idempotencyKey: string,
+  ): Promise<{ effectiveAt: string }> {
+    return this.call(async () => {
+      const schedule = input.existingScheduleId
+        ? await this.stripe.subscriptionSchedules.retrieve(input.existingScheduleId)
+        : await this.stripe.subscriptionSchedules.create(
+            { from_subscription: input.subscriptionId },
+            { idempotencyKey },
+          );
+      if (!schedule.current_phase) throw new BillingProviderError("provider", false);
+      const effectiveAt = schedule.current_phase.end_date;
+      await this.stripe.subscriptionSchedules.update(
+        schedule.id,
+        {
+          end_behavior: "release",
+          proration_behavior: "none",
+          phases: [
+            {
+              start_date: schedule.current_phase.start_date,
+              end_date: effectiveAt,
+              items: [{ price: input.currentPriceId, quantity: 1 }],
+              proration_behavior: "none",
+              ...(input.currentTrialEnd ? { trial_end: toUnixSeconds(input.currentTrialEnd) } : {}),
+            },
+            {
+              start_date: effectiveAt,
+              duration: { interval: input.targetInterval, interval_count: 1 },
+              items: [{ price: input.targetPriceId, quantity: 1 }],
+              proration_behavior: "none",
+            },
+          ],
+        },
+        { idempotencyKey: `${idempotencyKey}-phases` },
+      );
+      return { effectiveAt: fromUnixSeconds(effectiveAt) };
+    });
+  }
+
   async findPriceIdByLookupKey(lookupKey: string): Promise<string | null> {
     return this.call(async () => {
       const prices = await this.stripe.prices.list({
@@ -273,6 +320,7 @@ function mapSubscription(subscription: Stripe.Subscription): BillingSubscription
   return {
     id: subscription.id,
     itemId: item?.id ?? null,
+    scheduleId: stripeId(subscription.schedule),
     customerId,
     status: billingSubscriptionStatus(subscription.status),
     priceId: item?.price.id ?? null,
@@ -303,6 +351,12 @@ function billingSubscriptionStatus(status: string): BillingSubscriptionStatus {
 
 function fromUnixSeconds(value: number): string {
   return new Date(value * 1_000).toISOString();
+}
+
+function toUnixSeconds(value: string): number {
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds)) throw new BillingProviderError("provider", false);
+  return Math.floor(milliseconds / 1_000);
 }
 
 export function classifyStripeError(error: unknown): BillingProviderError {

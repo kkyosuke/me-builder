@@ -98,7 +98,7 @@ try {
       },
       {
         start_date: schedule.current_phase.end_date,
-        iterations: 1,
+        duration: { interval: "month", interval_count: 1 },
         items: [{ price: litePriceId, quantity: 1 }],
         proration_behavior: "none",
       },
@@ -140,7 +140,7 @@ try {
       },
       {
         start_date: annualSchedule.current_phase.end_date,
-        iterations: 1,
+        duration: { interval: "month", interval_count: 1 },
         items: [{ price: litePriceId, quantity: 1 }],
         proration_behavior: "none",
       },
@@ -256,15 +256,8 @@ async function resolvePortalConfigurations(client: Stripe): Promise<{
   if (standard.features.subscription_update.billing_cycle_anchor !== "unchanged") {
     throw new Error("Standard Portal must preserve the billing cycle");
   }
-  const standardScheduleTypes =
-    standard.features.subscription_update.schedule_at_period_end.conditions
-      .map(({ type }) => type)
-      .sort();
-  if (
-    standardScheduleTypes.join(",") !==
-    ["decreasing_item_amount", "shortening_interval"].sort().join(",")
-  ) {
-    throw new Error("Standard Portal must schedule only downgrades and interval shortening");
+  if (standard.features.subscription_update.schedule_at_period_end.conditions.length !== 0) {
+    throw new Error("Standard Portal must leave period-end changes to the API schedule path");
   }
   if (reset.features.subscription_update.billing_cycle_anchor !== "now") {
     throw new Error("Reset Portal must start a new billing cycle");

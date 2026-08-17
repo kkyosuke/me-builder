@@ -161,11 +161,12 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
 }
 
 describe("setupStripeBillingCatalog", () => {
-  it("Portalでupgrade即時請求、downgrade・年額から月額の期間末予約を設定する", () => {
+  it("Portalは即時upgradeだけを扱い、期間末変更条件を設定しない", () => {
     const params = billingPortalConfigurationParams({
       webBaseUrl: "https://example.test",
       metadata: { managed_by: "test" },
       products: [{ productId: "prod_lite", priceIds: ["price_month", "price_year"] }],
+      scheduleChangesAtPeriodEnd: false,
     });
 
     expect(params.features.subscription_update).toEqual({
@@ -174,9 +175,7 @@ describe("setupStripeBillingCatalog", () => {
       products: [{ product: "prod_lite", prices: ["price_month", "price_year"] }],
       billing_cycle_anchor: "unchanged",
       proration_behavior: "always_invoice",
-      schedule_at_period_end: {
-        conditions: [{ type: "decreasing_item_amount" }, { type: "shortening_interval" }],
-      },
+      schedule_at_period_end: { conditions: [] },
       trial_update_behavior: "continue_trial",
     });
     expect(params.features.subscription_cancel).toMatchObject({
@@ -227,6 +226,7 @@ describe("setupStripeBillingCatalog", () => {
     expect(api.webhooks[0]?.url).toBe("https://api.stg.kagami.kyosuke.dev/api/billing/webhook");
     expect(api.webhookEvents).toEqual(STRIPE_BILLING_EVENT_TYPES);
     expect(api.portals).toHaveLength(3);
+    expect(api.portalSpecs.every((spec) => spec.scheduleChangesAtPeriodEnd === false)).toBe(true);
     expect(api.portalSpecs[0]?.products).toEqual([
       { productId: "me_builder_lite", priceIds: ["price_1", "price_2"] },
       { productId: "me_builder_full", priceIds: ["price_3", "price_4"] },

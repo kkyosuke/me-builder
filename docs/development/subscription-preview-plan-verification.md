@@ -45,7 +45,7 @@ unset PREVIEW_BILLING_ID_TOKEN
 4. Preview LIFFを検証用Accountで開き、公開Planと初回trial表示を確認する
 5. sandboxの支払方法だけを使ってCheckoutを完了し、復帰画面がqueryだけで成功せず、projection反映後に現在Planを表示することを確認する
 
-Stripe同期はPlanごとの3 Product、月額・年額の6 Price、Webhook endpoint、Customer Portal configuration、Cloudflare secretsを同時に更新します。Customer Portalが要求する「1 Product内で課金間隔が一意」を満たしつつ、3 Productすべてを変更候補へ登録します。旧ProductのPrice IDは既存契約がなくなるまでPlan mapへ残します。
+Stripe同期はPlanごとの3 Product、月額・年額の6 Price、Webhook endpoint、Customer Portal configuration、Cloudflare secretsを同時に更新します。Customer Portalが要求する「1 Product内で課金間隔が一意」を満たしつつ、3 Productすべてを即時upgrade候補へ登録します。異なるProduct間の期間末downgradeはAPIがSubscription Scheduleを作成します。旧ProductのPrice IDは既存契約がなくなるまでPlan mapへ残します。
 
 ## 4. AccountとPlanの通し確認
 
@@ -54,7 +54,7 @@ Stripe同期はPlanごとの3 Product、月額・年額の6 Price、Webhook endp
 | `PREVIEW-BILLING-001` | Free Accountで料金プランを開く | 3 Plan、月額・年額、14日trial、終了後価格、自動更新、解約条件が表示される |
 | `PREVIEW-BILLING-002` | LiteをCheckoutで開始して復帰する | projection反映前は待機し、反映後だけLiteと契約管理導線を表示する |
 | `PREVIEW-BILLING-003` | PortalでFullへupgradeする | Stripe確定額の支払成功後にFullへ収束し、失敗時はLiteを維持する |
-| `PREVIEW-BILLING-004` | Liteへdowngradeする | Lite ProductのPriceへの変更が期間末予約され、期間末まではFullを維持する |
+| `PREVIEW-BILLING-004` | Liteへdowngradeする | APIがLite ProductのPriceへのSubscription Scheduleを作成し、予約完了と適用日を表示する。期間末まではFullを維持する |
 | `PREVIEW-BILLING-005` | 更新支払を失敗・回復させる | 最初の失敗から7日だけ直前Planを維持し、再通知で延長せず、成功後にactiveへ戻る |
 | `PREVIEW-BILLING-006` | 期間末解約を予約・取消・再予約する | 取消後は継続し、再予約の期間末後にFreeへ戻る。本人データは残る |
 | `PREVIEW-BILLING-007` | 同じWebhookを再送し、古いeventを後着させる | 重複通知を1回だけ処理し、古いeventで新しいPlanへ巻き戻らない |
@@ -71,8 +71,8 @@ Account復旧後も同じPlanへ到達する検証は`SUB-A-016`の本人確認�
 
 2026-08-16時点で次を再確認しました。Stripeの仕様とAPI versionはPreview同期ごとに再確認します。
 
-- [Customer Portalの設定](https://docs.stripe.com/customer-management/configure-portal): Portalで変更可能なProductとPriceを明示的に登録する
-- [Portal configuration API](https://docs.stripe.com/api/customer_portal/configurations/update): `decreasing_item_amount`と`shortening_interval`で期間末変更を設定できる
+- [Customer Portalの設定](https://docs.stripe.com/customer-management/configure-portal): Portalで変更可能なProductとPriceを明示的に登録する。期間末downgradeは同一Product間に限られる
+- [Portal deep links](https://docs.stripe.com/customer-management/portal-deep-links): 即時upgradeは`subscription_update_confirm`で確定額と支払をStripeへ委譲する
 - [Test Clock API](https://docs.stripe.com/billing/testing/test-clocks/api-advanced-usage): 時刻進行後は`ready`を待ち、一度に進められる期間上限を守る
 - [Subscription pending updates](https://docs.stripe.com/billing/subscriptions/pending-updates): 即時請求のupgradeは支払成功時だけ適用する
 - [Stripe test cards](https://docs.stripe.com/testing): server-side testでは実カード番号でなくtest PaymentMethodを使う

@@ -22,6 +22,24 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : "操作を完了できませんでした。";
 }
 
+function initialCompletionMessage(search: string): string | null {
+  const params = new URLSearchParams(search);
+  const result = params.get("billing");
+  if (result === "checkout-cancel") return "購入手続きをキャンセルしました。";
+  if (result !== "change-scheduled") return null;
+  const planName = {
+    lite: "Lite",
+    full: "Full",
+    family: "ファミリーパック",
+  }[params.get("plan") ?? ""];
+  const effectiveAt = params.get("effective_at");
+  const effectiveDate = effectiveAt ? new Date(effectiveAt) : null;
+  if (!planName || !effectiveDate || Number.isNaN(effectiveDate.getTime())) {
+    return "期間末のプラン変更を予約しました。";
+  }
+  return `${planName}への変更を${new Intl.DateTimeFormat("ja-JP", { dateStyle: "long" }).format(effectiveDate)}に予約しました。それまでは現在のプランを利用できます。`;
+}
+
 export default function BillingPlanApplication({
   onBack,
   onEntitlementChanged,
@@ -48,8 +66,8 @@ export default function BillingPlanApplication({
     status: "loading",
   });
   const [checkoutState, setCheckoutState] = useState<AsyncState<string>>({ status: "idle" });
-  const [completionMessage, setCompletionMessage] = useState<string | null>(
-    checkoutResult === "checkout-cancel" ? "購入手続きをキャンセルしました。" : null,
+  const [completionMessage, setCompletionMessage] = useState<string | null>(() =>
+    initialCompletionMessage(window.location.search),
   );
 
   const token = useCallback(

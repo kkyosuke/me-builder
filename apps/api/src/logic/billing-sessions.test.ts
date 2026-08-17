@@ -385,7 +385,6 @@ describe("billing sessions", () => {
   it.each([
     ["lite", "month", "lite", "year", "now"],
     ["lite", "month", "full", "year", "now"],
-    ["family", "year", "lite", "month", "unchanged"],
   ] as const)(
     "%s/%sから%s/%sへの変更にbilling cycle policy %sを使う",
     async (currentPlan, currentInterval, targetPlan, targetInterval, expectedAnchor) => {
@@ -461,6 +460,99 @@ describe("billing sessions", () => {
           billingCycleAnchor: expectedAnchor,
         },
       });
+    },
+  );
+
+  it.each([
+    ["full", "month", "lite", "month"],
+    ["family", "year", "lite", "month"],
+    ["full", "year", "family", "month"],
+  ] as const)(
+    "%s/%sから%s/%sへの期間末変更をSubscription Scheduleへ予約する",
+    async (currentPlan, currentInterval, targetPlan, targetInterval) => {
+      const { db, owner, createSession } = await setup();
+      await D1.shared.action.billing.linkBillingCustomer(db, {
+        accountId: owner.id,
+        providerCustomerId: "cus_change",
+      });
+      await D1.shared.action.billing.applyBillingProjection(db, {
+        accountId: owner.id,
+        event: {
+          id: "evt_scheduled_change_source",
+          type: "customer.subscription.created",
+          objectId: "sub_change",
+          createdAt: new Date("2026-08-01T00:00:00Z"),
+        },
+        subscription: {
+          id: "sub_change",
+          customerId: "cus_change",
+          status: "active",
+          priceId: "price_current",
+          currentPeriodStart: "2026-08-01T00:00:00.000Z",
+          currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+          cancelAtPeriodEnd: false,
+          trialEnd: null,
+          createdAt: "2026-08-01T00:00:00.000Z",
+        },
+        planCode: currentPlan,
+      });
+      const createPortalSession = vi.fn();
+      const scheduleSubscriptionChange = vi.fn().mockResolvedValue({
+        effectiveAt: "2026-09-01T00:00:00.000Z",
+      });
+      const provider = new billing.FakeBillingProvider({
+        retrieveSubscription: async () => ({
+          id: "sub_change",
+          itemId: "si_change",
+          scheduleId: null,
+          customerId: "cus_change",
+          status: "active",
+          priceId: "price_current",
+          interval: currentInterval,
+          currentPeriodStart: "2026-08-01T00:00:00.000Z",
+          currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+          cancelAtPeriodEnd: false,
+          trialEnd: null,
+          createdAt: "2026-08-01T00:00:00.000Z",
+        }),
+        findPriceIdByLookupKey: async () => "price_target",
+        scheduleSubscriptionChange,
+        createPortalSession,
+      });
+
+      const outcome = await createBillingPlanChangeSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        createSession,
+        plan: targetPlan,
+        interval: targetInterval,
+        lookupKeyMap: { [`${targetPlan}.${targetInterval}`]: "target_lookup" },
+        portalPlanChangeAvailable: true,
+        portalResetAvailable: true,
+      });
+
+      expect(outcome.type).toBe("created");
+      if (outcome.type !== "created") throw new Error("Expected a scheduled change URL");
+      const returnUrl = new URL(outcome.url);
+      expect(returnUrl.pathname).toBe("/profile/billing");
+      expect(Object.fromEntries(returnUrl.searchParams)).toEqual({
+        billing: "change-scheduled",
+        plan: targetPlan,
+        effective_at: "2026-09-01T00:00:00.000Z",
+      });
+      expect(scheduleSubscriptionChange).toHaveBeenCalledWith(
+        {
+          subscriptionId: "sub_change",
+          currentPriceId: "price_current",
+          targetPriceId: "price_target",
+          targetInterval,
+        },
+        `billing-plan-change-${owner.id}-sub_change-price_target`,
+      );
+      expect(createPortalSession).not.toHaveBeenCalled();
     },
   );
 

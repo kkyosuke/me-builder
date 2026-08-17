@@ -98,7 +98,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** 選択したPlanへのStripe確認画面を作成する */
+    /** 選択したPlanへの即時確認または期間末変更予約を作成する */
     post: operations["createBillingPlanChangeSession"];
     delete?: never;
     options?: never;
@@ -1459,7 +1459,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description プラン変更確認用の短命なStripe Portal URL */
+      /** @description 即時変更のStripe Portal URL、または期間末予約後のWeb復帰URL */
       201: {
         headers: {
           [name: string]: unknown;

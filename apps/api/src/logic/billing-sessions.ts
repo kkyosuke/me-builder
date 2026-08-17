@@ -28,6 +28,7 @@ type SessionFailure =
         | "customer_not_found"
         | "same_plan"
         | "subscription_not_found"
+        | "scheduled_change_exists"
         | "configuration_missing";
     };
 
@@ -248,6 +249,33 @@ export async function createBillingPlanChangeSession(
     return { type: "unavailable", reason: "same_plan" };
   }
   const planRank = { lite: 0, full: 1, family: 2 } as const;
+  const schedulesAtPeriodEnd =
+    planRank[params.plan] < planRank[projection.planCode] ||
+    (subscription.interval === "year" && params.interval === "month");
+  const origin = new URL(params.webOrigin).origin;
+  if (schedulesAtPeriodEnd) {
+    const scheduled = await params.provider.scheduleSubscriptionChange(
+      {
+        subscriptionId: subscription.id,
+        ...(subscription.scheduleId ? { existingScheduleId: subscription.scheduleId } : {}),
+        currentPriceId: subscription.priceId,
+        ...(subscription.status === "trialing" && subscription.trialEnd
+          ? { currentTrialEnd: subscription.trialEnd }
+          : {}),
+        targetPriceId,
+        targetInterval: params.interval,
+      },
+      `billing-plan-change-${accountId}-${subscription.id}-${targetPriceId}`,
+    );
+    const returnUrl = new URL("/profile/billing", origin);
+    returnUrl.searchParams.set("billing", "change-scheduled");
+    returnUrl.searchParams.set("plan", params.plan);
+    returnUrl.searchParams.set("effective_at", scheduled.effectiveAt);
+    return { type: "created", url: returnUrl.toString() };
+  }
+  if (subscription.scheduleId) {
+    return { type: "unavailable", reason: "scheduled_change_exists" };
+  }
   const resetsBillingCycle =
     subscription.interval === "month" &&
     params.interval === "year" &&
@@ -258,7 +286,6 @@ export async function createBillingPlanChangeSession(
   if (resetsBillingCycle && !params.portalResetAvailable) {
     return { type: "unavailable", reason: "configuration_missing" };
   }
-  const origin = new URL(params.webOrigin).origin;
   const portal = await params.provider.createPortalSession({
     customerId: customer.providerCustomerId,
     returnUrl: new URL("/profile/billing?billing=portal-return", origin).toString(),

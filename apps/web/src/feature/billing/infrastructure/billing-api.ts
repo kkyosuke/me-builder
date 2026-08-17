@@ -187,9 +187,11 @@ export async function createPlanChangeSession(
     const changeMessage =
       body?.reason === "same_plan"
         ? "現在と同じプラン・支払い間隔です。"
-        : body?.reason === "configuration_missing"
-          ? "年額への変更準備が完了していません。時間をおいて再試行してください。"
-          : "現在の契約ではこのプランへ変更できません。";
+        : body?.reason === "scheduled_change_exists"
+          ? "すでに期間末のプラン変更が予約されています。予約内容の変更は現在サポートへお問い合わせください。"
+          : body?.reason === "configuration_missing"
+            ? "年額への変更準備が完了していません。時間をおいて再試行してください。"
+            : "現在の契約ではこのプランへ変更できません。";
     throw new OperationError(changeMessage, {
       code: "BILLING_PLAN_CHANGE_UNAVAILABLE",
       status: 409,

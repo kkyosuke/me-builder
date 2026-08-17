@@ -389,7 +389,7 @@ export async function setupStripeBillingCatalog(input: {
       products: portalProducts,
       billingCycleAnchor: mode === "reset" ? "now" : "unchanged",
       subscriptionUpdateEnabled: mode !== "management",
-      scheduleChangesAtPeriodEnd: mode !== "reset",
+      scheduleChangesAtPeriodEnd: false,
     };
     if (portal) {
       await input.api.updatePortalConfiguration(portal.id, portalSpec);
