@@ -480,12 +480,21 @@ function AppContents() {
   };
 
   const createRecoveryCode = async () => {
-    return await issueRecoveryCode(config.apiUrl);
+    const requestedRevision = sessionRevisionRef.current;
+    const result = await issueRecoveryCode(config.apiUrl);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
+    return result;
   };
 
   const openBillingPortal = async (): Promise<void> => {
+    const requestedRevision = sessionRevisionRef.current;
     const controller = new AbortController();
     const url = await createCustomerPortalSession(config.apiUrl, controller.signal);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
     window.location.assign(url);
   };
 
