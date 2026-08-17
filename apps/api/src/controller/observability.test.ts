@@ -75,7 +75,8 @@ describe("POST /api/observability/web-errors", () => {
         kind: "render-error",
         route: "/diagnosis",
         release: "abcdef123456",
-        fingerprint: "render-error:TypeError:/diagnosis:abcdef123456:index-AbC_123.js:42:7",
+        fingerprint:
+          "render-error:TypeError:/diagnosis:abcdef123456:index-AbC_123.js:42:7:unknown:unknown:0",
       }),
       "[Web] render-error at /diagnosis -> failed",
     );
@@ -98,6 +99,37 @@ describe("POST /api/observability/web-errors", () => {
         kind: "chunk-load-error",
       }),
       "[Web] chunk-load-error at /diagnosis -> recovered",
+    );
+  });
+
+  it("UIで捕捉した課金操作エラーを原因コードとstatus付きで記録する", async () => {
+    const error = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+
+    const response = await request(
+      report({
+        kind: "handled-operation-error",
+        route: "/profile/billing",
+        operation: "billing-checkout",
+        operationErrorCode: "BILLING_CHECKOUT_FAILED",
+        operationStatus: 503,
+        sourceFile: undefined,
+        sourceLine: undefined,
+        sourceColumn: undefined,
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "web.client.failed",
+        kind: "handled-operation-error",
+        route: "/profile/billing",
+        operation: "billing-checkout",
+        operationErrorCode: "BILLING_CHECKOUT_FAILED",
+        operationStatus: 503,
+        fingerprint: expect.stringContaining("billing-checkout:BILLING_CHECKOUT_FAILED:503"),
+      }),
+      "[Web] handled-operation-error at /profile/billing -> failed",
     );
   });
 

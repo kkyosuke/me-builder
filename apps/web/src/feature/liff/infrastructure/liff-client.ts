@@ -29,6 +29,26 @@ export function redirectToLiffLogin(): void {
 }
 
 /**
+ * LIFFブラウザから外部URLをLINEのアプリ内ブラウザで開く。
+ *
+ * 外部ブラウザやLIFF SDKを利用できない状態ではfalseを返し、呼び出し側が通常の
+ * Web navigationへ切り替えられるようにする。
+ */
+export function openLiffWindow(url: string): boolean {
+  try {
+    if (!liff.isInClient()) return false;
+    liff.openWindow({ url, external: false });
+    return true;
+  } catch {
+    logger.warn(
+      { event: "liff.window.open.failed", outcome: "failed", reason: "sdk-error" },
+      "LIFF から外部 URL を開けませんでした",
+    );
+    return false;
+  }
+}
+
+/**
  * LIFFの共有先選択を開始する。利用できない場合は同期的にnullを返し、呼び出し側が
  * ユーザー操作の権限を失う前にWeb Share APIへ切り替えられるようにする。
  */

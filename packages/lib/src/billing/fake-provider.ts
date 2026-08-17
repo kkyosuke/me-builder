@@ -9,6 +9,7 @@ type Handlers = Partial<{
   createCustomer: BillingProvider["createCustomer"];
   createCheckoutSession: BillingProvider["createCheckoutSession"];
   createPortalSession: BillingProvider["createPortalSession"];
+  scheduleSubscriptionChange: BillingProvider["scheduleSubscriptionChange"];
   findPriceIdByLookupKey: BillingProvider["findPriceIdByLookupKey"];
   findLatestCheckoutSession: BillingProvider["findLatestCheckoutSession"];
   retrieveCheckoutSession: BillingProvider["retrieveCheckoutSession"];
@@ -56,6 +57,23 @@ export class FakeBillingProvider implements BillingProvider {
   }): Promise<{ url: string }> {
     if (this.handlers.createPortalSession) return this.handlers.createPortalSession(input);
     return { url: input.returnUrl };
+  }
+
+  async scheduleSubscriptionChange(
+    input: {
+      subscriptionId: string;
+      existingScheduleId?: string;
+      currentPriceId: string;
+      currentTrialEnd?: string;
+      targetPriceId: string;
+      targetInterval: "month" | "year";
+    },
+    key: string,
+  ): Promise<{ effectiveAt: string }> {
+    if (this.handlers.scheduleSubscriptionChange) {
+      return this.handlers.scheduleSubscriptionChange(input, key);
+    }
+    throw new Error("Fake scheduleSubscriptionChange handler is not configured");
   }
 
   async findPriceIdByLookupKey(lookupKey: string): Promise<string | null> {

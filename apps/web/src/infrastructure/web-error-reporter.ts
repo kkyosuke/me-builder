@@ -1,9 +1,12 @@
 import {
   WEB_CLIENT_ERROR_TYPES,
+  WEB_CLIENT_OPERATION_ERROR_CODES,
   WEB_CLIENT_ROUTES,
   type WebClientErrorKind,
   type WebClientErrorReport,
   type WebClientErrorType,
+  type WebClientOperation,
+  type WebClientOperationErrorCode,
   type WebClientRoute,
 } from "@me-builder/shared";
 import { config } from "../config";
@@ -11,6 +14,7 @@ import { config } from "../config";
 const WEB_ERROR_PATH = "/api/observability/web-errors";
 const DEDUPLICATION_WINDOW_MS = 5 * 60 * 1_000;
 const allowedErrorTypes = new Set<string>(WEB_CLIENT_ERROR_TYPES);
+const allowedOperationErrorCodes = new Set<string>(WEB_CLIENT_OPERATION_ERROR_CODES);
 
 type ReportInput = Readonly<{
   kind: WebClientErrorKind;
@@ -18,6 +22,9 @@ type ReportInput = Readonly<{
   filename?: string;
   line?: number;
   column?: number;
+  operation?: WebClientOperation;
+  operationErrorCode?: WebClientOperationErrorCode;
+  operationStatus?: number;
   recovered?: boolean;
 }>;
 
@@ -139,6 +146,9 @@ function reportKey(report: WebClientErrorReport): string {
     report.sourceFile ?? "unknown",
     report.sourceLine ?? 0,
     report.sourceColumn ?? 0,
+    report.operation ?? "unknown",
+    report.operationErrorCode ?? "unknown",
+    report.operationStatus ?? 0,
     report.recovered,
   ].join(":");
 }
@@ -172,6 +182,9 @@ export function createWebErrorReporter(dependencies: ReporterDependencies): WebE
         ...(sourceFile ? { sourceFile } : {}),
         ...(sourceLine ? { sourceLine } : {}),
         ...(sourceColumn ? { sourceColumn } : {}),
+        ...(input.operation ? { operation: input.operation } : {}),
+        ...(input.operationErrorCode ? { operationErrorCode: input.operationErrorCode } : {}),
+        ...(input.operationStatus ? { operationStatus: input.operationStatus } : {}),
         online: browser.online,
         recovered: input.recovered === true,
       };
@@ -261,5 +274,31 @@ export function reportRouteRenderError(error: Error, recovered: boolean): void {
     kind: recovered ? "chunk-load-error" : "render-error",
     error,
     recovered,
+  });
+}
+
+/** UIで捕捉して利用者へ表示した操作エラーも、固定コードだけをWorkers Logsへ送る。 */
+export function reportHandledOperationError(operation: WebClientOperation, error: unknown): void {
+  const candidate =
+    error && typeof error === "object"
+      ? (error as { code?: unknown; status?: unknown })
+      : undefined;
+  const operationErrorCode =
+    typeof candidate?.code === "string" && allowedOperationErrorCodes.has(candidate.code)
+      ? (candidate.code as WebClientOperationErrorCode)
+      : "UNKNOWN_CLIENT_OPERATION_ERROR";
+  const operationStatus =
+    typeof candidate?.status === "number" &&
+    Number.isSafeInteger(candidate.status) &&
+    candidate.status >= 400 &&
+    candidate.status <= 599
+      ? candidate.status
+      : undefined;
+  webErrorReporter.report({
+    kind: "handled-operation-error",
+    error,
+    operation,
+    operationErrorCode,
+    ...(operationStatus ? { operationStatus } : {}),
   });
 }

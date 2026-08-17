@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   fetchTrialEligibility: vi.fn(),
   createPortal: vi.fn(),
   createPlanChange: vi.fn(),
+  openLiffWindow: vi.fn(),
+  reportHandledOperationError: vi.fn(),
 }));
 
 vi.mock("../feature/billing/infrastructure/billing-api", () => ({
@@ -24,6 +26,12 @@ vi.mock("../feature/billing/infrastructure/billing-api", () => ({
 }));
 vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
   fetchProfileEntitlement: mocks.fetchEntitlement,
+}));
+vi.mock("../feature/liff/infrastructure/liff-client", () => ({
+  openLiffWindow: mocks.openLiffWindow,
+}));
+vi.mock("../infrastructure/web-error-reporter", () => ({
+  reportHandledOperationError: mocks.reportHandledOperationError,
 }));
 import BillingPlanApplication from "../feature/billing/presentation/billing-plan-application";
 
@@ -73,6 +81,8 @@ describe("billing purchase user journey", () => {
     mocks.fetchTrialEligibility.mockReset().mockResolvedValue(true);
     mocks.createPortal.mockReset().mockResolvedValue("https://billing.stripe.test/portal");
     mocks.createPlanChange.mockReset().mockResolvedValue("https://billing.stripe.test/plan-change");
+    mocks.openLiffWindow.mockReset().mockReturnValue(true);
+    mocks.reportHandledOperationError.mockReset();
   });
   afterEach(cleanup);
 
@@ -80,8 +90,8 @@ describe("billing purchase user journey", () => {
     const navigate = vi.fn();
     render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Liteを選ぶ" }));
-    fireEvent.click(screen.getByRole("button", { name: /Stripeで購入手続きへ/ }));
+    await screen.findByRole("radio", { name: "ノーマル Lite" });
+    fireEvent.click(screen.getByRole("button", { name: /プランを変更する/ }));
 
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith("https://checkout.stripe.test/session"),
@@ -91,6 +101,37 @@ describe("billing purchase user journey", () => {
       { plan: "lite", interval: "month" },
       expect.any(AbortSignal),
     );
+  });
+
+  it("LIFFブラウザではCheckoutをLINEのアプリ内ブラウザで開き再表示導線を残す", async () => {
+    render(<BillingPlanApplication onBack={vi.fn()} />);
+
+    await screen.findByRole("radio", { name: "ノーマル Lite" });
+    fireEvent.click(screen.getByRole("button", { name: /プランを変更する/ }));
+
+    await waitFor(() =>
+      expect(mocks.openLiffWindow).toHaveBeenCalledWith("https://checkout.stripe.test/session"),
+    );
+    expect(
+      screen.getByRole("link", { name: "こちらからStripeを開いてください" }).getAttribute("href"),
+    ).toBe("https://checkout.stripe.test/session");
+  });
+
+  it("Checkout失敗を画面表示だけで握りつぶさずWeb監視へ送る", async () => {
+    const error = Object.assign(new Error("購入手続きを開始できませんでした。"), {
+      code: "BILLING_CHECKOUT_FAILED",
+      status: 503,
+    });
+    mocks.createCheckout.mockRejectedValue(error);
+    render(<BillingPlanApplication onBack={vi.fn()} />);
+
+    await screen.findByRole("radio", { name: "ノーマル Lite" });
+    fireEvent.click(screen.getByRole("button", { name: /プランを変更する/ }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "購入手続きを開始できませんでした",
+    );
+    expect(mocks.reportHandledOperationError).toHaveBeenCalledWith("billing-checkout", error);
   });
 
   it("Checkout復帰後はprojectionが反映されてから購入完了を表示する", async () => {
@@ -113,7 +154,7 @@ describe("billing purchase user journey", () => {
     );
 
     expect(await screen.findByText("Liteが利用できるようになりました。")).toBeTruthy();
-    expect(screen.getByText("現在の契約があります")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "契約を管理" })).toBeTruthy();
     expect(onEntitlementChanged).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "lite", source: "subscription" }),
     );
@@ -163,8 +204,7 @@ describe("billing purchase user journey", () => {
     render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "年額" }));
-    fireEvent.click(screen.getByRole("button", { name: "Liteを選ぶ" }));
-    fireEvent.click(screen.getByRole("button", { name: "Stripeで変更内容を確認" }));
+    fireEvent.click(screen.getByRole("button", { name: "プランを変更する" }));
 
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith("https://billing.stripe.test/plan-change"),
@@ -175,5 +215,50 @@ describe("billing purchase user journey", () => {
       expect.any(AbortSignal),
     );
     expect(mocks.createCheckout).not.toHaveBeenCalled();
+  });
+
+  it("下位Planはアプリで期間末変更を確認して予約する", async () => {
+    mocks.fetchEntitlement.mockResolvedValue({
+      ...entitlement("subscription"),
+      plan: "full",
+    });
+    mocks.createPlanChange.mockResolvedValue(
+      "https://app.example.test/profile/billing?billing=change-scheduled&plan=lite&effective_at=2026-09-01T00%3A00%3A00.000Z",
+    );
+    const navigate = vi.fn();
+    render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
+
+    await screen.findByRole("radio", { name: "ノーマル Lite" });
+    expect(screen.getByText("現在の期間終了時に変更し、それまでは現在のプランを維持")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "期間末の変更を予約" }));
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(expect.stringContaining("billing=change-scheduled")),
+    );
+    expect(mocks.createPlanChange).toHaveBeenCalledWith(
+      undefined,
+      { plan: "lite", interval: "month" },
+      expect.any(AbortSignal),
+    );
+    expect(mocks.createCheckout).not.toHaveBeenCalled();
+  });
+
+  it("期間末変更の復帰URLで予約したPlanと適用日を表示する", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/profile/billing?billing=change-scheduled&plan=lite&effective_at=2026-09-01T00%3A00%3A00.000Z",
+    );
+    mocks.fetchEntitlement.mockResolvedValue(entitlement("subscription"));
+
+    render(<BillingPlanApplication onBack={vi.fn()} />);
+
+    expect(
+      await screen.findByText(
+        "Liteへの変更を2026年9月1日に予約しました。それまでは現在のプランを利用できます。",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "契約を管理" })).toBeTruthy();
+    expect(mocks.verifyCheckout).not.toHaveBeenCalled();
   });
 });

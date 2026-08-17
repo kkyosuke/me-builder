@@ -76,14 +76,6 @@ describe("billing plan catalog", () => {
     ).toBe(401);
     expect(
       (
-        await app.request("/api/billing/checkout-sessions", jsonRequest, {
-          ...readyEnv,
-          BILLING_LOOKUP_KEY_MAP: '{"lite.month":"only_one"}',
-        } as never)
-      ).status,
-    ).toBe(401);
-    expect(
-      (
         await app.request("/api/billing/webhook", { method: "POST", body: "{}" }, {
           ...readyEnv,
           BILLING_QUEUE: undefined,

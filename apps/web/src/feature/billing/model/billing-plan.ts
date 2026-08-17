@@ -13,10 +13,33 @@ export type BillingPlan = Readonly<{
   }>[];
 }>;
 
+const billingPlanRank = { free: -1, lite: 0, full: 1, family: 2 } as const;
+
+export function isBillingPlanDowngrade(
+  currentPlan: PaidPlanCode | "free",
+  targetPlan: PaidPlanCode,
+): boolean {
+  return billingPlanRank[targetPlan] < billingPlanRank[currentPlan];
+}
+
 export function billingPlanPrice(plan: BillingPlan, interval: BillingInterval) {
   const price = plan.prices.find((candidate) => candidate.interval === interval);
   if (!price) throw new Error("選択した請求間隔の価格がありません。");
   return price;
+}
+
+export function billingPlanAnnualSavings(plan: BillingPlan) {
+  const monthly = billingPlanPrice(plan, "month").amount;
+  const yearly = billingPlanPrice(plan, "year").amount;
+  const monthlyAnnualTotal = monthly * 12;
+  const amount = monthlyAnnualTotal - yearly;
+  if (amount <= 0) return null;
+  return {
+    amount,
+    percentage: Math.round((amount / monthlyAnnualTotal) * 100),
+    monthlyEquivalent: Math.round(yearly / 12),
+    equivalentFreeMonths: Math.round(amount / monthly),
+  };
 }
 
 export function formatBillingAmount(amount: number): string {

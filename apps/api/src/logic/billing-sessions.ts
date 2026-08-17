@@ -1,5 +1,10 @@
 import { D1, billing } from "@me-builder/lib";
-import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
+import {
+  BILLING_INITIAL_TRIAL_DAYS,
+  type BillingInterval,
+  type PaidPlanCode,
+  billingLookupKey,
+} from "@me-builder/shared";
 import type { AuthenticatedActor } from "./authentication/types";
 
 type BaseParams = {
@@ -19,6 +24,7 @@ type SessionFailure = {
     | "customer_not_found"
     | "same_plan"
     | "subscription_not_found"
+    | "scheduled_change_exists"
     | "configuration_missing";
 };
 
@@ -28,14 +34,12 @@ export type CheckoutSessionStatusResult =
 
 export async function createBillingCheckoutSession(
   params: BaseParams & {
-    plan: "lite" | "full" | "family";
-    interval: "month" | "year";
-    lookupKeyMap: Readonly<Record<string, string>>;
+    plan: PaidPlanCode;
+    interval: BillingInterval;
   },
 ): Promise<SessionFailure | { type: "created"; url: string }> {
   const accountId = params.actor.accountId;
-  const lookupKey = params.lookupKeyMap[`${params.plan}.${params.interval}`];
-  if (!lookupKey) return { type: "unavailable", reason: "plan_unavailable" };
+  const lookupKey = billingLookupKey(params.plan, params.interval);
   const familySeat = await D1.shared.action.familySeat.readActiveFamilySeatByMember(
     params.db,
     accountId,
@@ -50,7 +54,18 @@ export async function createBillingCheckoutSession(
   }
 
   let customer = await D1.shared.action.billing.findBillingCustomerByAccount(params.db, accountId);
-  if (!customer) {
+  if (customer && !(await providerCustomerExists(params.provider, customer.providerCustomerId))) {
+    const staleProviderCustomerId = customer.providerCustomerId;
+    const created = await params.provider.createCustomer(
+      { accountId },
+      `billing-customer-${accountId}-${staleProviderCustomerId}`,
+    );
+    customer = await D1.shared.action.billing.replaceBillingCustomer(params.db, {
+      accountId,
+      expectedProviderCustomerId: staleProviderCustomerId,
+      providerCustomerId: created.id,
+    });
+  } else if (!customer) {
     const created = await params.provider.createCustomer(
       { accountId },
       `billing-customer-${accountId}`,
@@ -86,20 +101,35 @@ export async function createBillingCheckoutSession(
     !(await D1.shared.action.billing.hasUsedBillingTrial(params.db, accountId)) &&
     !providerSubscriptions.some((subscription) => subscription.trialEnd !== null);
   const origin = new URL(params.webOrigin).origin;
+  const checkoutInput = {
+    customerId: customer.providerCustomerId,
+    priceId,
+    successUrl: `${origin}/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: new URL("/profile/billing?billing=checkout-cancel", origin).toString(),
+    accountId,
+    plan: params.plan,
+    interval: params.interval,
+    ...(trialEligible ? { trialPeriodDays: BILLING_INITIAL_TRIAL_DAYS } : {}),
+  };
   const checkout = await params.provider.createCheckoutSession(
-    {
-      customerId: customer.providerCustomerId,
-      priceId,
-      successUrl: `${origin}/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: new URL("/profile/billing?billing=checkout-cancel", origin).toString(),
-      accountId,
-      plan: params.plan,
-      interval: params.interval,
-      ...(trialEligible ? { trialPeriodDays: BILLING_INITIAL_TRIAL_DAYS } : {}),
-    },
-    `billing-checkout-${accountId}-${latestCheckout?.id ?? "initial"}`,
+    checkoutInput,
+    `billing-checkout-${accountId}-${crypto.randomUUID()}`,
   );
   return { type: "created", url: checkout.url };
+}
+
+async function providerCustomerExists(
+  provider: billing.BillingProvider,
+  providerCustomerId: string,
+): Promise<boolean> {
+  try {
+    return !(await provider.retrieveCustomer(providerCustomerId)).deleted;
+  } catch (error) {
+    if (error instanceof billing.BillingProviderError && error.kind === "invalid-request") {
+      return false;
+    }
+    throw error;
+  }
 }
 
 export async function getBillingCheckoutSessionStatus(
@@ -169,9 +199,8 @@ export async function createBillingPortalSession(
 
 export async function createBillingPlanChangeSession(
   params: BaseParams & {
-    plan: "lite" | "full" | "family";
-    interval: "month" | "year";
-    lookupKeyMap: Readonly<Record<string, string>>;
+    plan: PaidPlanCode;
+    interval: BillingInterval;
     portalPlanChangeAvailable: boolean;
     portalResetAvailable: boolean;
   },
@@ -197,14 +226,40 @@ export async function createBillingPlanChangeSession(
   ) {
     return { type: "unavailable", reason: "subscription_not_found" };
   }
-  const lookupKey = params.lookupKeyMap[`${params.plan}.${params.interval}`];
-  if (!lookupKey) return { type: "unavailable", reason: "plan_unavailable" };
+  const lookupKey = billingLookupKey(params.plan, params.interval);
   const targetPriceId = await params.provider.findPriceIdByLookupKey(lookupKey);
   if (!targetPriceId) return { type: "unavailable", reason: "plan_unavailable" };
   if (targetPriceId === subscription.priceId) {
     return { type: "unavailable", reason: "same_plan" };
   }
   const planRank = { lite: 0, full: 1, family: 2 } as const;
+  const schedulesAtPeriodEnd =
+    planRank[params.plan] < planRank[projection.planCode] ||
+    (subscription.interval === "year" && params.interval === "month");
+  const origin = new URL(params.webOrigin).origin;
+  if (schedulesAtPeriodEnd) {
+    const scheduled = await params.provider.scheduleSubscriptionChange(
+      {
+        subscriptionId: subscription.id,
+        ...(subscription.scheduleId ? { existingScheduleId: subscription.scheduleId } : {}),
+        currentPriceId: subscription.priceId,
+        ...(subscription.status === "trialing" && subscription.trialEnd
+          ? { currentTrialEnd: subscription.trialEnd }
+          : {}),
+        targetPriceId,
+        targetInterval: params.interval,
+      },
+      `billing-plan-change-${accountId}-${crypto.randomUUID()}`,
+    );
+    const returnUrl = new URL("/profile/billing", origin);
+    returnUrl.searchParams.set("billing", "change-scheduled");
+    returnUrl.searchParams.set("plan", params.plan);
+    returnUrl.searchParams.set("effective_at", scheduled.effectiveAt);
+    return { type: "created", url: returnUrl.toString() };
+  }
+  if (subscription.scheduleId) {
+    return { type: "unavailable", reason: "scheduled_change_exists" };
+  }
   const resetsBillingCycle =
     subscription.interval === "month" &&
     params.interval === "year" &&
@@ -215,7 +270,6 @@ export async function createBillingPlanChangeSession(
   if (resetsBillingCycle && !params.portalResetAvailable) {
     return { type: "unavailable", reason: "configuration_missing" };
   }
-  const origin = new URL(params.webOrigin).origin;
   const portal = await params.provider.createPortalSession({
     customerId: customer.providerCustomerId,
     returnUrl: new URL("/profile/billing?billing=portal-return", origin).toString(),

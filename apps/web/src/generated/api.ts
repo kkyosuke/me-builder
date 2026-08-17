@@ -13,7 +13,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Web UIの安全化済み未捕捉エラーをWorkers Logsへ記録する */
+    /** Web UIの安全化済み未捕捉・操作エラーをWorkers Logsへ記録する */
     post: operations["reportWebClientError"];
     delete?: never;
     options?: never;
@@ -219,7 +219,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** 選択したPlanへのStripe確認画面を作成する */
+    /** 選択したPlanへの即時確認または期間末変更予約を作成する */
     post: operations["createBillingPlanChangeSession"];
     delete?: never;
     options?: never;
@@ -1143,7 +1143,12 @@ export interface operations {
           /** @constant */
           schemaVersion: 1;
           /** @enum {string} */
-          kind: "unhandled-error" | "unhandled-rejection" | "render-error" | "chunk-load-error";
+          kind:
+            | "unhandled-error"
+            | "unhandled-rejection"
+            | "render-error"
+            | "chunk-load-error"
+            | "handled-operation-error";
           /** @enum {string} */
           route:
             | "/"
@@ -1183,6 +1188,24 @@ export interface operations {
           sourceFile?: string;
           sourceLine?: number;
           sourceColumn?: number;
+          /** @enum {string} */
+          operation?: "billing-checkout" | "billing-plan-change" | "billing-portal";
+          /** @enum {string} */
+          operationErrorCode?:
+            | "BILLING_CHECKOUT_NETWORK_FAILED"
+            | "BILLING_CHECKOUT_UNAVAILABLE"
+            | "BILLING_CHECKOUT_FAILED"
+            | "BILLING_CHECKOUT_RESPONSE_INVALID"
+            | "BILLING_PLAN_CHANGE_NETWORK_FAILED"
+            | "BILLING_PLAN_CHANGE_UNAVAILABLE"
+            | "BILLING_PLAN_CHANGE_FAILED"
+            | "BILLING_PLAN_CHANGE_RESPONSE_INVALID"
+            | "BILLING_PORTAL_NETWORK_FAILED"
+            | "BILLING_CUSTOMER_NOT_FOUND"
+            | "BILLING_PORTAL_FAILED"
+            | "BILLING_PORTAL_RESPONSE_INVALID"
+            | "UNKNOWN_CLIENT_OPERATION_ERROR";
+          operationStatus?: number;
           online: boolean;
           recovered: boolean;
         };
@@ -2188,6 +2211,7 @@ export interface operations {
               | "customer_not_found"
               | "same_plan"
               | "subscription_not_found"
+              | "scheduled_change_exists"
               | "configuration_missing";
           };
         };
@@ -2245,7 +2269,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description プラン変更確認用の短命なStripe Portal URL */
+      /** @description 即時変更のStripe Portal URL、または期間末予約後のWeb復帰URL */
       201: {
         headers: {
           [name: string]: unknown;
@@ -2313,6 +2337,7 @@ export interface operations {
               | "customer_not_found"
               | "same_plan"
               | "subscription_not_found"
+              | "scheduled_change_exists"
               | "configuration_missing";
           };
         };
@@ -2495,6 +2520,7 @@ export interface operations {
               | "customer_not_found"
               | "same_plan"
               | "subscription_not_found"
+              | "scheduled_change_exists"
               | "configuration_missing";
           };
         };

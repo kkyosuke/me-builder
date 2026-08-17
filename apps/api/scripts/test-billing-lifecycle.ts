@@ -1,6 +1,8 @@
-import { STRIPE_API_VERSION, STRIPE_BILLING_CATALOG } from "@me-builder/lib";
+import { billing } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import Stripe from "stripe";
+
+const { PORTAL_CONFIGURATION_VERSION, STRIPE_API_VERSION, STRIPE_BILLING_CATALOG } = billing;
 
 const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
 if (!secretKey || !["sk_test_", "rk_test_"].some((prefix) => secretKey.startsWith(prefix))) {
@@ -21,14 +23,15 @@ const clock = await stripe.testHelpers.testClocks.create({
 });
 
 try {
-  const [litePriceId, liteYearlyPriceId, fullPriceId, fullYearlyPriceId, portalConfigurations] =
-    await Promise.all([
-      resolvePriceId(stripe, "lite", "month"),
-      resolvePriceId(stripe, "lite", "year"),
-      resolvePriceId(stripe, "full", "month"),
-      resolvePriceId(stripe, "full", "year"),
-      resolvePortalConfigurations(stripe),
-    ]);
+  await logStripeAccountReadiness(stripe);
+  const [litePriceId, liteYearlyPriceId, fullPriceId, fullYearlyPriceId] = await Promise.all([
+    resolvePriceId(stripe, "lite", "month"),
+    resolvePriceId(stripe, "lite", "year"),
+    resolvePriceId(stripe, "full", "month"),
+    resolvePriceId(stripe, "full", "year"),
+  ]);
+  await assertCheckoutSession(stripe, litePriceId);
+  const portalConfigurations = await resolvePortalConfigurations(stripe);
   const customer = await stripe.customers.create({
     test_clock: clock.id,
     metadata: { managed_by: "me-builder-e2e" },
@@ -98,7 +101,7 @@ try {
       },
       {
         start_date: schedule.current_phase.end_date,
-        iterations: 1,
+        duration: { interval: "month", interval_count: 1 },
         items: [{ price: litePriceId, quantity: 1 }],
         proration_behavior: "none",
       },
@@ -140,7 +143,7 @@ try {
       },
       {
         start_date: annualSchedule.current_phase.end_date,
-        iterations: 1,
+        duration: { interval: "month", interval_count: 1 },
         items: [{ price: litePriceId, quantity: 1 }],
         proration_behavior: "none",
       },
@@ -191,6 +194,7 @@ try {
   logger.info(
     {
       scenarios: [
+        "checkout-session",
         "trial",
         "renewal",
         "upgrade",
@@ -208,6 +212,131 @@ try {
   );
 } finally {
   await stripe.testHelpers.testClocks.del(clock.id);
+}
+
+async function logStripeAccountReadiness(client: Stripe): Promise<void> {
+  const account = await client.accounts.retrieve();
+  const readiness = {
+    businessProfileNameConfigured: Boolean(account.business_profile?.name),
+    statementDescriptorConfigured: Boolean(account.settings?.payments?.statement_descriptor),
+    chargesEnabled: account.charges_enabled,
+    detailsSubmitted: account.details_submitted,
+    cardPaymentsCapability: account.capabilities?.card_payments ?? "unknown",
+  };
+  const ready =
+    readiness.businessProfileNameConfigured &&
+    readiness.statementDescriptorConfigured &&
+    readiness.chargesEnabled;
+  const fields = {
+    event: ready
+      ? "stripe.sandbox.account-configuration.completed"
+      : "stripe.sandbox.account-configuration.failed",
+    service: "api",
+    outcome: ready ? "succeeded" : "failed",
+    ...(ready ? {} : { errorCode: "STRIPE_SANDBOX_ACCOUNT_CONFIGURATION_INCOMPLETE" }),
+    ...readiness,
+  };
+  if (ready) logger.info(fields, "Stripe sandbox account configuration is ready");
+  else logger.error(fields, "Stripe sandbox account configuration is incomplete");
+}
+
+async function assertCheckoutSession(client: Stripe, priceId: string): Promise<void> {
+  let customerId: string | undefined;
+  try {
+    const customer = await client.customers.create({
+      metadata: { managed_by: "me-builder-e2e", purpose: "checkout-smoke" },
+    });
+    customerId = customer.id;
+    const session = await client.checkout.sessions.create({
+      mode: "subscription",
+      customer: customer.id,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url:
+        "https://stg.kagami.kyosuke.dev/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://stg.kagami.kyosuke.dev/profile/billing?billing=checkout-cancel",
+      client_reference_id: "me-builder-checkout-smoke",
+      metadata: { plan: "lite", interval: "month", managed_by: "me-builder-e2e" },
+      subscription_data: { trial_period_days: 14 },
+    });
+    if (!session.url) throw new Error("Checkout Session URL was missing");
+    await client.checkout.sessions.expire(session.id);
+    logger.info(
+      {
+        event: "stripe.sandbox.checkout.completed",
+        service: "api",
+        outcome: "succeeded",
+      },
+      "Stripe sandbox Checkout Session creation succeeded",
+    );
+  } catch (error) {
+    const stripeError = safeStripeErrorFields(error);
+    logger.error(
+      {
+        event: "stripe.sandbox.checkout.failed",
+        service: "api",
+        outcome: "failed",
+        errorCode: "STRIPE_SANDBOX_CHECKOUT_FAILED",
+        ...stripeError,
+      },
+      "Stripe sandbox Checkout Session creation failed",
+    );
+    // Stripe SDK例外のmessage/cause/responseはCIログへ出さない。
+    throw new Error("STRIPE_SANDBOX_CHECKOUT_FAILED");
+  } finally {
+    if (customerId) {
+      try {
+        await client.customers.del(customerId);
+      } catch {
+        logger.warn(
+          {
+            event: "stripe.sandbox.checkout.cleanup.degraded",
+            service: "api",
+            outcome: "degraded",
+            errorCode: "STRIPE_SANDBOX_CHECKOUT_CUSTOMER_CLEANUP_FAILED",
+          },
+          "Stripe sandbox Checkout smoke customer cleanup failed",
+        );
+      }
+    }
+  }
+}
+
+function safeStripeErrorFields(error: unknown): Record<string, string | number> {
+  const candidate = error as {
+    type?: unknown;
+    code?: unknown;
+    param?: unknown;
+    statusCode?: unknown;
+    requestId?: unknown;
+    raw?: { type?: unknown; code?: unknown; param?: unknown; requestId?: unknown };
+  };
+  const safeToken = (value: unknown, pattern: RegExp): string | undefined =>
+    typeof value === "string" && pattern.test(value) ? value : undefined;
+  const stripeErrorType = safeToken(
+    candidate?.type ?? candidate?.raw?.type,
+    /^[A-Za-z][A-Za-z0-9_]{0,79}$/u,
+  );
+  const stripeErrorCode = safeToken(
+    candidate?.code ?? candidate?.raw?.code,
+    /^[a-z][a-z0-9_]{0,79}$/u,
+  );
+  const stripeErrorParam = safeToken(
+    candidate?.param ?? candidate?.raw?.param,
+    /^[A-Za-z0-9_.[\]-]{1,120}$/u,
+  );
+  const dependencyRequestId = safeToken(
+    candidate?.requestId ?? candidate?.raw?.requestId,
+    /^req_[A-Za-z0-9]{1,80}$/u,
+  );
+  return {
+    ...(stripeErrorType ? { stripeErrorType } : {}),
+    ...(stripeErrorCode ? { stripeErrorCode } : {}),
+    ...(stripeErrorParam ? { stripeErrorParam } : {}),
+    ...(typeof candidate?.statusCode === "number"
+      ? { dependencyStatus: candidate.statusCode }
+      : {}),
+    ...(dependencyRequestId ? { dependencyRequestId } : {}),
+  };
 }
 
 async function resolvePriceId(
@@ -238,7 +367,10 @@ async function resolvePortalConfigurations(client: Stripe): Promise<{
 }> {
   const configurations = await client.billingPortal.configurations.list({ limit: 100 });
   const managed = configurations.data.filter(
-    (configuration) => configuration.metadata.managed_by === "me-builder-stripe-catalog",
+    (configuration) =>
+      configuration.active &&
+      configuration.metadata.managed_by === "me-builder-stripe-catalog" &&
+      configuration.metadata.portal_configuration_version === PORTAL_CONFIGURATION_VERSION,
   );
   const management = managed.find(
     (configuration) => configuration.metadata.portal_mode === "management",
@@ -256,15 +388,8 @@ async function resolvePortalConfigurations(client: Stripe): Promise<{
   if (standard.features.subscription_update.billing_cycle_anchor !== "unchanged") {
     throw new Error("Standard Portal must preserve the billing cycle");
   }
-  const standardScheduleTypes =
-    standard.features.subscription_update.schedule_at_period_end.conditions
-      .map(({ type }) => type)
-      .sort();
-  if (
-    standardScheduleTypes.join(",") !==
-    ["decreasing_item_amount", "shortening_interval"].sort().join(",")
-  ) {
-    throw new Error("Standard Portal must schedule only downgrades and interval shortening");
+  if (standard.features.subscription_update.schedule_at_period_end.conditions.length !== 0) {
+    throw new Error("Standard Portal must leave period-end changes to the API schedule path");
   }
   if (reset.features.subscription_update.billing_cycle_anchor !== "now") {
     throw new Error("Reset Portal must start a new billing cycle");
