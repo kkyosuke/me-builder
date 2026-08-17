@@ -929,9 +929,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -1237,9 +1234,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -1443,9 +1437,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {

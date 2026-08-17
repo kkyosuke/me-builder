@@ -87,7 +87,7 @@ export const billingCheckoutSessionStatusRoute = describeRoute({
   operationId: "getBillingCheckoutSessionStatus",
   tags: ["Billing"],
   summary: "Checkout Sessionが本人のものであることと完了状態を確認する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("本人のCheckout Session状態", BillingCheckoutSessionStatusResponseSchema),
     ...authenticatedErrors,
@@ -111,7 +111,7 @@ export const billingTrialEligibilityRoute = describeRoute({
   operationId: "getBillingTrialEligibility",
   tags: ["Billing"],
   summary: "本人が初回14日間trialを開始できるか取得する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("Account単位のtrial利用可否", BillingTrialEligibilityResponseSchema),
     ...authenticatedErrors,
@@ -135,7 +135,7 @@ export const billingPlanChangeSessionRoute = describeRoute({
   operationId: "createBillingPlanChangeSession",
   tags: ["Billing"],
   summary: "選択したPlanへのStripe確認画面を作成する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: BillingCheckoutRequestSchema } },

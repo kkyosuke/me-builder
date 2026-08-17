@@ -63,6 +63,7 @@ describe("authentication middleware", () => {
             expiresAt: new Date(now.getTime() + 60_000).toISOString(),
             sessionVersion: 1,
             csrfToken: "csrf-token",
+            authenticatedIdentityId: "identity-1",
           }),
           put,
         } as never,
