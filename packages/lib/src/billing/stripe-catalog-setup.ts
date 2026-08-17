@@ -67,6 +67,7 @@ export interface CatalogWebhookEndpoint {
 export interface CatalogPortalConfiguration {
   id: string;
   active: boolean;
+  isDefault: boolean;
   metadata: Readonly<Record<string, string>>;
 }
 
@@ -417,7 +418,7 @@ export async function setupStripeBillingCatalog(input: {
       portalId = createdPortal.id;
     }
     for (const previous of modePortals) {
-      if (!previous.active || previous.id === portalId) continue;
+      if (!previous.active || previous.isDefault || previous.id === portalId) continue;
       await input.api.deactivatePortalConfiguration(previous.id);
       updated.push(`customer-portal:${mode}:previous-disabled`);
     }
@@ -625,6 +626,7 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
         (configuration) => ({
           id: configuration.id,
           active: configuration.active,
+          isDefault: configuration.is_default,
           metadata: configuration.metadata ?? {},
         }),
       );
@@ -636,6 +638,7 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
       return {
         id: configuration.id,
         active: configuration.active,
+        isDefault: configuration.is_default,
         metadata: configuration.metadata ?? {},
       };
     },

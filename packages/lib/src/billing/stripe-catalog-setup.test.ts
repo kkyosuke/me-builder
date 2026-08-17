@@ -137,6 +137,7 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
     const portal = {
       id: `bpc_${this.portals.length + 1}`,
       active: true,
+      isDefault: this.portals.length === 0,
       metadata: spec.metadata,
     };
     this.portals.push(portal);
@@ -149,11 +150,14 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   ) {
     this.assertUniquePortalIntervals(spec);
     this.portals = this.portals.map((portal) =>
-      portal.id === id ? { id, active: true, metadata: spec.metadata } : portal,
+      portal.id === id ? { ...portal, active: true, metadata: spec.metadata } : portal,
     );
   }
 
   async deactivatePortalConfiguration(id: string) {
+    if (this.portals.some((portal) => portal.id === id && portal.isDefault)) {
+      throw new Error("You cannot deactivate the default PortalConfiguration");
+    }
     this.portals = this.portals.map((portal) =>
       portal.id === id ? { ...portal, active: false } : portal,
     );
@@ -290,33 +294,40 @@ describe("setupStripeBillingCatalog", () => {
       {
         id: "bpc_legacy_management",
         active: true,
+        isDefault: true,
         metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "management" },
       },
       {
         id: "bpc_legacy_standard",
         active: true,
+        isDefault: false,
         metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "standard" },
       },
       {
         id: "bpc_legacy_reset",
         active: true,
+        isDefault: false,
         metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "reset" },
       },
     );
 
     const result = await setupStripeBillingCatalog({ api, environment: "preview" });
 
-    expect(api.portals.filter((portal) => portal.active)).toHaveLength(3);
+    expect(api.portals.filter((portal) => portal.active)).toHaveLength(4);
     expect(
-      api.portals.filter((portal) => portal.active).map((portal) => portal.metadata.portal_mode),
+      api.portals
+        .filter(
+          (portal) =>
+            portal.active && portal.metadata.portal_configuration_version === "2026-08-18-1",
+        )
+        .map((portal) => portal.metadata.portal_mode),
     ).toEqual(["management", "standard", "reset"]);
-    expect(api.portals.filter((portal) => portal.id.startsWith("bpc_legacy"))).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ active: false }),
-        expect.objectContaining({ active: false }),
-        expect.objectContaining({ active: false }),
-      ]),
-    );
+    expect(api.portals.find(({ id }) => id === "bpc_legacy_management")).toMatchObject({
+      active: true,
+      isDefault: true,
+    });
+    expect(api.portals.find(({ id }) => id === "bpc_legacy_standard")?.active).toBe(false);
+    expect(api.portals.find(({ id }) => id === "bpc_legacy_reset")?.active).toBe(false);
     expect(result.portalPlanChangeConfigurationId).not.toBe("bpc_legacy_standard");
   });
 
