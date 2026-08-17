@@ -79,14 +79,20 @@ type CompleteSsoAuthenticationInput = {
 };
 
 export interface SsoExistingIdentityResolver {
-  findAccountId(
-    identity: Pick<SsoVerifiedIdentity, "providerKey" | "subject">,
-  ): Promise<string | undefined>;
+  findAccount(identity: Pick<SsoVerifiedIdentity, "providerKey" | "subject">): Promise<
+    | {
+        accountId: string;
+        authenticatedIdentityId: string;
+        role: "user" | "admin";
+      }
+    | undefined
+  >;
 }
 
 export interface SsoApplicationSessionIssuer<SessionResult> {
   issue(input: {
     accountId: string;
+    authenticatedIdentityId: string;
     authenticationMethod: "sso";
     authenticatedAt: Date;
   }): Promise<SessionResult>;
@@ -219,14 +225,15 @@ export async function completeSsoLogin<SessionResult>(
   },
 ): Promise<{ session: SessionResult; returnTo: string }> {
   const { identity, returnTo } = await completeSsoAuthentication(input);
-  const accountId = await input.identityResolver.findAccountId({
+  const account = await input.identityResolver.findAccount({
     providerKey: identity.providerKey,
     subject: identity.subject,
   });
-  if (!accountId) throw new SsoAuthenticationError("identity_unlinked");
+  if (!account) throw new SsoAuthenticationError("identity_unlinked");
 
   const session = await input.sessionIssuer.issue({
-    accountId,
+    accountId: account.accountId,
+    authenticatedIdentityId: account.authenticatedIdentityId,
     authenticationMethod: identity.authenticationMethod,
     authenticatedAt: identity.authenticatedAt,
   });
@@ -245,6 +252,7 @@ export async function completeSsoCallback<SessionResult>(
   | {
       purpose: "link";
       accountId: string;
+      authenticatedIdentityId: string;
       authenticationMethod: "sso";
       authenticatedAt: Date;
       providerKey: "auth0";
@@ -253,20 +261,21 @@ export async function completeSsoCallback<SessionResult>(
 > {
   const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
   if (transaction.purpose === "login") {
-    const accountId = await input.identityResolver.findAccountId({
+    const account = await input.identityResolver.findAccount({
       providerKey: identity.providerKey,
       subject: identity.subject,
     });
-    if (!accountId) throw new SsoAuthenticationError("identity_unlinked");
+    if (!account) throw new SsoAuthenticationError("identity_unlinked");
     const session = await input.sessionIssuer.issue({
-      accountId,
+      accountId: account.accountId,
+      authenticatedIdentityId: account.authenticatedIdentityId,
       authenticationMethod: identity.authenticationMethod,
       authenticatedAt: identity.authenticatedAt,
     });
     return { purpose: "login", session, returnTo: transaction.returnTo };
   }
 
-  await input.identityLinker.link({
+  const authenticatedIdentityId = await input.identityLinker.link({
     accountId: transaction.initiatingAccountId,
     providerKey: identity.providerKey,
     subject: identity.subject,
@@ -274,6 +283,7 @@ export async function completeSsoCallback<SessionResult>(
   return {
     purpose: "link",
     accountId: transaction.initiatingAccountId,
+    authenticatedIdentityId,
     authenticationMethod: identity.authenticationMethod,
     authenticatedAt: identity.authenticatedAt,
     providerKey: identity.providerKey,

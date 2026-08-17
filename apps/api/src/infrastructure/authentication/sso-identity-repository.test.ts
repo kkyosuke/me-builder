@@ -19,14 +19,21 @@ function dependencies(providers: Array<"line_login" | "auth0"> = []) {
 }
 
 describe("SSO identity repository adapters", () => {
-  it("既知Auth0 IdentityだけをAccount IDへ解決する", async () => {
+  it("既知Auth0 IdentityだけをAccountとIdentity IDへ解決する", async () => {
     const deps = dependencies();
-    deps.findAccountByIdentity.mockResolvedValue({ account: { id: "account-1" } });
+    deps.findAccountByIdentity.mockResolvedValue({
+      account: { id: "account-1", role: "user" },
+      identity: { id: "identity-auth0" },
+    });
     const resolver = createSsoExistingIdentityResolver(db, deps as never);
 
     await expect(
-      resolver.findAccountId({ providerKey: "auth0", subject: "auth0|subject" }),
-    ).resolves.toBe("account-1");
+      resolver.findAccount({ providerKey: "auth0", subject: "auth0|subject" }),
+    ).resolves.toEqual({
+      accountId: "account-1",
+      authenticatedIdentityId: "identity-auth0",
+      role: "user",
+    });
     expect(deps.findAccountByIdentity).toHaveBeenCalledWith(db, "auth0", "auth0|subject");
   });
 
@@ -35,7 +42,7 @@ describe("SSO identity repository adapters", () => {
     deps.findAccountByIdentity.mockResolvedValue(undefined);
 
     await expect(
-      createSsoExistingIdentityResolver(db, deps as never).findAccountId({
+      createSsoExistingIdentityResolver(db, deps as never).findAccount({
         providerKey: "auth0",
         subject: "unknown",
       }),

@@ -171,7 +171,7 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       sessionIssuer: {
         async issue(actor) {
           if (previousToken) await runtime.sessions.logout(previousToken, actor.accountId);
-          const issued = await runtime.sessions.issue(actor);
+          const issued = await runtime.sessions.issue(actor, actor.authenticatedIdentityId);
           if (!issued) throw new Error("Application session could not be issued");
           return issued;
         },

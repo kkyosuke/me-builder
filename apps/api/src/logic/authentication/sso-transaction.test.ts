@@ -191,7 +191,11 @@ describe("SSO authentication transaction", () => {
       expiresAt: 2_000,
     });
     const identityResolver = {
-      findAccountId: vi.fn(async () => "account-1"),
+      findAccount: vi.fn(async () => ({
+        accountId: "account-1",
+        authenticatedIdentityId: "identity-auth0",
+        role: "user" as const,
+      })),
     };
     const sessionIssuer = {
       issue: vi.fn(async () => ({ cookie: "opaque-cookie" })),
@@ -211,12 +215,13 @@ describe("SSO authentication transaction", () => {
       session: { cookie: "opaque-cookie" },
       returnTo: "/diagnoses",
     });
-    expect(identityResolver.findAccountId).toHaveBeenCalledWith({
+    expect(identityResolver.findAccount).toHaveBeenCalledWith({
       providerKey: "auth0",
       subject: "auth0|user-1",
     });
     expect(sessionIssuer.issue).toHaveBeenCalledWith({
       accountId: "account-1",
+      authenticatedIdentityId: "identity-auth0",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
     });
@@ -240,7 +245,7 @@ describe("SSO authentication transaction", () => {
         code: "code",
         store,
         client,
-        identityResolver: { findAccountId: vi.fn(async () => undefined) },
+        identityResolver: { findAccount: vi.fn(async () => undefined) },
         sessionIssuer,
         now: () => 1_000,
       }),
@@ -267,7 +272,13 @@ describe("SSO authentication transaction", () => {
         code: "code",
         store,
         client,
-        identityResolver: { findAccountId: vi.fn(async () => "account-1") },
+        identityResolver: {
+          findAccount: vi.fn(async () => ({
+            accountId: "account-1",
+            authenticatedIdentityId: "identity-auth0",
+            role: "user" as const,
+          })),
+        },
         identityLinker,
         sessionIssuer,
         now: () => 1_000,
@@ -287,7 +298,7 @@ describe("SSO authentication transaction", () => {
       returnTo: "/profile",
       expiresAt: 2_000,
     });
-    const identityLinker = { link: vi.fn(async () => undefined) };
+    const identityLinker = { link: vi.fn(async () => "identity-auth0") };
     const sessionIssuer = { issue: vi.fn() };
 
     await expect(
@@ -296,7 +307,7 @@ describe("SSO authentication transaction", () => {
         code: "code",
         store,
         client,
-        identityResolver: { findAccountId: vi.fn() },
+        identityResolver: { findAccount: vi.fn() },
         identityLinker,
         sessionIssuer,
         now: () => 1_000,
@@ -304,6 +315,7 @@ describe("SSO authentication transaction", () => {
     ).resolves.toEqual({
       purpose: "link",
       accountId: "account-at-start",
+      authenticatedIdentityId: "identity-auth0",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
       providerKey: "auth0",
