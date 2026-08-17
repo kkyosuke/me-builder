@@ -783,6 +783,68 @@ describe("App", () => {
     expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(2);
   });
 
+  it("session切替前のアバター保存結果で新Accountの表示を上書きしない", async () => {
+    const previousAvatar = "data:image/png;base64,b2xk";
+    const nextAvatar = "data:image/png;base64,bmV3";
+    let resolveDeletion: ((profile: unknown) => void) | undefined;
+    mocks.fetchAccountProfile
+      .mockResolvedValueOnce({
+        role: "user",
+        displayName: "切替前",
+        avatar: { source: "uploaded", url: previousAvatar, updatedAt: null },
+      })
+      .mockResolvedValueOnce({
+        role: "user",
+        displayName: "切替後",
+        avatar: { source: "uploaded", url: nextAvatar, updatedAt: null },
+      });
+    mocks.deleteAccountAvatar.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDeletion = resolve;
+      }),
+    );
+    const view = render(<App />);
+
+    const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(previousAvatar),
+    );
+    fireEvent.click(profileButton);
+    fireEvent.click(await screen.findByRole("button", { name: /アバターを変更/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "現在の画像を削除" }));
+    await waitFor(() => expect(mocks.deleteAccountAvatar).toHaveBeenCalledTimes(1));
+
+    mocks.authState = {
+      status: "authenticated",
+      profile: { displayName: "別アカウント", pictureUrl: undefined },
+      role: "user",
+      revision: 2,
+    };
+    view.rerender(<App />);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "プロフィールを開く" })
+          .querySelector("img")
+          ?.getAttribute("src"),
+      ).toBe(nextAvatar),
+    );
+
+    await act(async () => {
+      resolveDeletion?.({
+        role: "user",
+        displayName: "切替前",
+        avatar: null,
+      });
+    });
+    expect(
+      screen
+        .getByRole("button", { name: "プロフィールを開く" })
+        .querySelector("img")
+        ?.getAttribute("src"),
+    ).toBe(nextAvatar);
+  });
+
   it("プロフィール取得失敗を表示して再試行できる", async () => {
     mocks.fetchAccountProfile
       .mockRejectedValueOnce(new Error("プロフィールの取得に失敗しました。再試行してください。"))

@@ -190,6 +190,8 @@ function AppContents() {
       : undefined;
   const sessionRevision =
     authSession.state.status === "authenticated" ? authSession.state.revision : 0;
+  const sessionRevisionRef = useRef(sessionRevision);
+  sessionRevisionRef.current = sessionRevision;
   const previousSessionRevision = useRef(sessionRevision);
 
   const applyAccountProfile = useCallback((profile: AccountProfile) => {
@@ -455,17 +457,25 @@ function AppContents() {
   };
 
   const saveAvatar = async (nextAvatar: AvatarSelection | null) => {
+    const requestedRevision = sessionRevisionRef.current;
     const controller = new AbortController();
     const profile = nextAvatar
       ? await saveAccountAvatar(config.apiUrl, nextAvatar, controller.signal)
       : await deleteAccountAvatar(config.apiUrl, controller.signal);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
     applyAccountProfile(profile);
     closeAvatar();
   };
 
   const resetAccountData = async (): Promise<ResetDevelopmentAccountDataResult> => {
+    const requestedRevision = sessionRevisionRef.current;
     const controller = new AbortController();
     const result = await resetDevelopmentAccountData(config.apiUrl, controller.signal);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
     setAccountDataResetKey((current) => current + 1);
     return result;
   };
