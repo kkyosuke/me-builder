@@ -915,6 +915,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -999,29 +1018,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "error": {
-                          "const": "Account not found"
-                        },
-                        "reason": {
-                          "const": "friendship_required"
-                        }
-                      },
-                      "required": ["error", "reason"]
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "error": {
-                          "const": "Checkout session not found"
-                        }
-                      },
-                      "required": ["error"]
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Checkout session not found"
                     }
-                  ]
+                  },
+                  "required": ["error"]
                 }
               }
             }
