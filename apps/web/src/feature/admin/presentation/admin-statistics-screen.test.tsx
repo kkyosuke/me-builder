@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminStatisticsScreen } from "./admin-statistics-screen";
 
@@ -13,17 +13,18 @@ describe("AdminStatisticsScreen", () => {
     expect(screen.getByRole("status", { name: "統計情報を読み込み中" })).toBeTruthy();
   });
 
-  it("統計取得に失敗してもAccount一覧へ移動できる", () => {
+  it("統計取得に失敗したら再読み込みできる", () => {
+    const onReload = vi.fn();
     render(
       <AdminStatisticsScreen
         state={{ status: "error", message: "取得に失敗しました" }}
-        showNavigation
-        onReload={vi.fn()}
+        onReload={onReload}
       />,
     );
 
     expect(screen.getByText("取得に失敗しました")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Account" }).getAttribute("href")).toBe("/admin");
+    fireEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(onReload).toHaveBeenCalledOnce();
   });
 
   it("LINE返信数が前日までの集計であることを表示する", () => {

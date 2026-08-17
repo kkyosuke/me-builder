@@ -1,4 +1,5 @@
 import { BarChart3, Users } from "lucide-react";
+import { InternalLink } from "../../../components/internal-link";
 
 export function AdminNavigation({ current }: { current: "accounts" | "statistics" }) {
   return (
@@ -7,7 +8,7 @@ export function AdminNavigation({ current }: { current: "accounts" | "statistics
       className="mt-6 border-b border-slate-200 dark:border-slate-700"
     >
       <div className="flex gap-6">
-        <a
+        <InternalLink
           href="/admin"
           aria-current={current === "accounts" ? "page" : undefined}
           className={`flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-semibold ${
@@ -17,9 +18,9 @@ export function AdminNavigation({ current }: { current: "accounts" | "statistics
           }`}
         >
           <Users className="size-4" aria-hidden="true" />
-          Account
-        </a>
-        <a
+          アカウント
+        </InternalLink>
+        <InternalLink
           href="/admin/statistics"
           aria-current={current === "statistics" ? "page" : undefined}
           className={`flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-semibold ${
@@ -30,7 +31,7 @@ export function AdminNavigation({ current }: { current: "accounts" | "statistics
         >
           <BarChart3 className="size-4" aria-hidden="true" />
           利用統計
-        </a>
+        </InternalLink>
       </div>
     </nav>
   );

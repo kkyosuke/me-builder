@@ -58,7 +58,7 @@ describe("AdminAccountsScreen", () => {
   it("名前、ID、レベル、かけら、未集計状態を表示する", () => {
     renderScreen();
 
-    expect(screen.getByRole("heading", { name: "管理者ダッシュボード" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Account" })).toBeTruthy();
     expect(screen.getAllByText("山田 花子").length).toBeGreaterThan(0);
     expect(screen.getAllByText("account-user").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Lv.12").length).toBeGreaterThan(0);
@@ -98,12 +98,12 @@ describe("AdminAccountsScreen", () => {
     expect(onNextPage).toHaveBeenCalledOnce();
   });
 
-  it("一覧取得に失敗しても利用統計へ移動できる", () => {
-    renderScreen({ state: { status: "error", message: "取得に失敗しました" } });
+  it("一覧取得に失敗したら再読み込みできる", () => {
+    const onReload = vi.fn();
+    renderScreen({ state: { status: "error", message: "取得に失敗しました" }, onReload });
 
     expect(screen.getByText("取得に失敗しました")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "利用統計" }).getAttribute("href")).toBe(
-      "/admin/statistics",
-    );
+    fireEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(onReload).toHaveBeenCalledOnce();
   });
 });
