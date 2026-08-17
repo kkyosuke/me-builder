@@ -50,7 +50,6 @@ type Env = Omit<
   SSO_ISSUER_URL?: string;
   SSO_CLIENT_ID?: string;
   SSO_CLIENT_SECRET?: string;
-  SESSION_STORE?: KVNamespace;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   PROFILE_SUMMARY_QUEUE?: Queue<ReflectionGenerationQueueMessage>;
   BILLING_QUEUE?: Queue<BillingQueueMessage>;

@@ -13,7 +13,7 @@ import {
   listLoginIdentityProviders,
   resolveAccountByLineLogin,
   resolveAccountByLineMessagingApi,
-  unlinkIdentity,
+  unlinkLoginIdentityProvider,
   upsertIdentity,
 } from "./account";
 import { acceptCurrentTerms } from "./agreement";
@@ -218,7 +218,7 @@ describe("linkIdentity", () => {
   });
 });
 
-describe("unlinkIdentity", () => {
+describe("unlinkLoginIdentityProvider", () => {
   it("複数あるログイン手段からAuth0だけを解除できること", async () => {
     const db = createTestDb();
     const { account } = await upsertIdentity(db, {
@@ -231,7 +231,7 @@ describe("unlinkIdentity", () => {
       providerAccountId: "auth0|unlink",
     });
 
-    await unlinkIdentity(db, { accountId: account.id, provider: "auth0" });
+    await unlinkLoginIdentityProvider(db, { accountId: account.id, provider: "auth0" });
 
     await expect(listLoginIdentityProviders(db, account.id)).resolves.toEqual(["line_login"]);
     await expect(findAccountByIdentity(db, "auth0", "auth0|unlink")).resolves.toBeUndefined();
@@ -249,7 +249,7 @@ describe("unlinkIdentity", () => {
     });
 
     await expect(
-      unlinkIdentity(db, { accountId: first.account.id, provider: "auth0" }),
+      unlinkLoginIdentityProvider(db, { accountId: first.account.id, provider: "auth0" }),
     ).rejects.toThrow("last login identity");
     await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual(["auth0"]);
     await expect(listLoginIdentityProviders(db, other.account.id)).resolves.toEqual(["auth0"]);
@@ -268,7 +268,7 @@ describe("unlinkIdentity", () => {
     });
 
     await expect(
-      unlinkIdentity(db, { accountId: first.account.id, provider: "auth0" }),
+      unlinkLoginIdentityProvider(db, { accountId: first.account.id, provider: "auth0" }),
     ).rejects.toThrow("last login identity");
     await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual([
       "auth0",
@@ -293,7 +293,7 @@ describe("unlinkIdentity", () => {
       providerAccountId: "auth0|second",
     });
 
-    await unlinkIdentity(db, { accountId: first.account.id, provider: "auth0" });
+    await unlinkLoginIdentityProvider(db, { accountId: first.account.id, provider: "auth0" });
 
     await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual(["line_login"]);
   });

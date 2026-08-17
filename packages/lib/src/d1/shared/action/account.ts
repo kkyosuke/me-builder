@@ -101,7 +101,7 @@ export async function listLoginIdentityProviders(
 }
 
 /** 別providerのログイン手段を残す条件を同じUPDATE文で評価してIdentityを解除します。 */
-export async function unlinkIdentity(
+export async function unlinkLoginIdentityProvider(
   db: SharedD1Client,
   input: { accountId: string; provider: IdentityProvider },
 ): Promise<void> {

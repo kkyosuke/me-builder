@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => {
     createLinker: vi.fn(() => ({ linker: true })),
     getStatus: vi.fn(),
     unlink: vi.fn(),
+    invalidateSessions: vi.fn(),
+    logoutSession: vi.fn(),
+    issueSession: vi.fn(),
     startLinking: vi.fn(),
     completeLinking: vi.fn(),
     cancelLinking: vi.fn(),
@@ -38,6 +41,17 @@ vi.mock("@me-builder/lib", async (importOriginal) => {
 });
 vi.mock("../infrastructure/authentication/sso-client", () => ({
   createAuth0SsoClient: mocks.createClient,
+}));
+vi.mock("../infrastructure/authentication/application-session-runtime", () => ({
+  APPLICATION_SESSION_COOKIE: "__Host-me_builder_session",
+  createApplicationSessionService: vi.fn(() => ({
+    db: { db: true },
+    sessions: {
+      invalidateAccountSessions: mocks.invalidateSessions,
+      issue: mocks.issueSession,
+      logout: mocks.logoutSession,
+    },
+  })),
 }));
 vi.mock("../infrastructure/authentication/sso-transaction-store", () => ({
   createSsoTransactionStore: mocks.createStore,
@@ -89,7 +103,14 @@ function testApp(path: string, handler: Handler<AppEnv>) {
 }
 
 describe("SSO identity controller", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.issueSession.mockResolvedValue({
+      sessionToken: "rotated-session",
+      csrfToken: "csrf-token",
+      expiresAt: new Date("2026-09-16T00:00:00.000Z"),
+    });
+  });
 
   it("外部subjectを返さず本人のlink状態だけを返す", async () => {
     mocks.getStatus.mockResolvedValue({ linked: true, canUnlink: true });
@@ -130,7 +151,13 @@ describe("SSO identity controller", () => {
   });
 
   it("link callback成功後は保存済みpathだけへ復帰する", async () => {
-    mocks.completeLinking.mockResolvedValue({ providerKey: "auth0", returnTo: "/profile" });
+    mocks.completeLinking.mockResolvedValue({
+      accountId: "account-at-start",
+      authenticationMethod: "sso",
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      providerKey: "auth0",
+      returnTo: "/profile",
+    });
     const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
       "https://api.example.com/api/auth/sso/callback?state=opaque&code=code",
       { headers: { Cookie: "__Host-me_builder_sso_link_state=opaque" } },
@@ -142,7 +169,16 @@ describe("SSO identity controller", () => {
     expect(mocks.completeLinking).toHaveBeenCalledWith(
       expect.objectContaining({ state: "opaque", code: "code" }),
     );
+    expect(mocks.invalidateSessions).toHaveBeenCalledWith("account-at-start");
+    expect(mocks.issueSession).toHaveBeenCalledWith({
+      accountId: "account-at-start",
+      authenticationMethod: "sso",
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    });
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect(response.headers.get("set-cookie")).toContain(
+      "__Host-me_builder_session=rotated-session",
+    );
   });
 
   it("IdPキャンセルでもtransactionを消費して固定pathへ復帰する", async () => {
@@ -182,5 +218,21 @@ describe("SSO identity controller", () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: "Last login identity cannot be unlinked" });
+    expect(mocks.invalidateSessions).not.toHaveBeenCalled();
+  });
+
+  it("Identity解除後はAccountの全sessionを失効してcookieを破棄する", async () => {
+    mocks.unlink.mockResolvedValue(undefined);
+    const response = await testApp("/api/auth/sso/identity", deleteSsoIdentity).request(
+      "https://api.example.com/api/auth/sso/identity",
+      { method: "DELETE" },
+      env,
+    );
+
+    expect(response.status).toBe(204);
+    expect(mocks.unlink).toHaveBeenCalledWith(expect.anything(), "account-at-start");
+    expect(mocks.invalidateSessions).toHaveBeenCalledWith("account-at-start");
+    expect(response.headers.get("set-cookie")).toContain("__Host-me_builder_session=");
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 });

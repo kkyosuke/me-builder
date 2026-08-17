@@ -8,14 +8,14 @@ type Dependencies = {
   findAccountByIdentity: typeof D1.shared.action.account.findAccountByIdentity;
   linkIdentity: typeof D1.shared.action.account.linkIdentity;
   listLoginIdentityProviders: typeof D1.shared.action.account.listLoginIdentityProviders;
-  unlinkIdentity: typeof D1.shared.action.account.unlinkIdentity;
+  unlinkIdentity: typeof D1.shared.action.account.unlinkLoginIdentityProvider;
 };
 
 const defaultDependencies: Dependencies = {
   findAccountByIdentity: D1.shared.action.account.findAccountByIdentity,
   linkIdentity: D1.shared.action.account.linkIdentity,
   listLoginIdentityProviders: D1.shared.action.account.listLoginIdentityProviders,
-  unlinkIdentity: D1.shared.action.account.unlinkIdentity,
+  unlinkIdentity: D1.shared.action.account.unlinkLoginIdentityProvider,
 };
 
 export function createSsoExistingIdentityResolver(

@@ -294,7 +294,13 @@ describe("SSO authentication transaction", () => {
         identityLinker,
         now: () => 1_000,
       }),
-    ).resolves.toEqual({ providerKey: "auth0", returnTo: "/profile?sso=linked" });
+    ).resolves.toEqual({
+      accountId: "account-at-start",
+      authenticationMethod: "sso",
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      providerKey: "auth0",
+      returnTo: "/profile?sso=linked",
+    });
     expect(identityLinker.link).toHaveBeenCalledWith({
       accountId: "account-at-start",
       providerKey: "auth0",

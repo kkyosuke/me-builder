@@ -236,7 +236,13 @@ export async function completeSsoLogin<SessionResult>(
 /** 開始時のAccountへだけ検証済みAuth0 Identityを追加する。 */
 export async function completeSsoIdentityLinking(
   input: CompleteSsoAuthenticationInput & { identityLinker: SsoIdentityLinker },
-): Promise<{ providerKey: "auth0"; returnTo: string }> {
+): Promise<{
+  accountId: string;
+  authenticationMethod: "sso";
+  authenticatedAt: Date;
+  providerKey: "auth0";
+  returnTo: string;
+}> {
   const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
   if (transaction.purpose !== "link") {
     throw new SsoAuthenticationError("transaction_purpose_mismatch");
@@ -246,7 +252,13 @@ export async function completeSsoIdentityLinking(
     providerKey: identity.providerKey,
     subject: identity.subject,
   });
-  return { providerKey: identity.providerKey, returnTo: transaction.returnTo };
+  return {
+    accountId: transaction.initiatingAccountId,
+    authenticationMethod: identity.authenticationMethod,
+    authenticatedAt: identity.authenticatedAt,
+    providerKey: identity.providerKey,
+    returnTo: transaction.returnTo,
+  };
 }
 
 /** IdPでキャンセルされたlink transactionも一度だけ消費する。 */

@@ -9,6 +9,10 @@ import {
   SsoIdentityStatusSchema,
 } from "../contract/auth/sso-identity";
 import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
+import {
+  APPLICATION_SESSION_COOKIE,
+  createApplicationSessionService,
+} from "../infrastructure/authentication/application-session-runtime";
 import { createAuth0SsoClient } from "../infrastructure/authentication/sso-client";
 import {
   createSsoIdentityLinker,
@@ -23,6 +27,7 @@ import {
 } from "../logic/authentication/sso-transaction";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
+import { setApplicationSessionCookie } from "./authentication";
 
 const SSO_LINK_STATE_COOKIE = "me_builder_sso_link_state";
 const SECURE_SSO_LINK_STATE_COOKIE = "__Host-me_builder_sso_link_state";
@@ -132,6 +137,21 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       client: dependencies.client,
       identityLinker: createSsoIdentityLinker(D1.shared.client.create(c.env.DB)),
     });
+    const runtime = createApplicationSessionService(c.env);
+    if (!runtime) return unavailable(c);
+    const previousToken = getCookie(c, APPLICATION_SESSION_COOKIE);
+    if (previousToken) {
+      await runtime.sessions.logout(previousToken, completed.accountId);
+    } else {
+      await runtime.sessions.invalidateAccountSessions(completed.accountId);
+    }
+    const issued = await runtime.sessions.issue({
+      accountId: completed.accountId,
+      authenticationMethod: completed.authenticationMethod,
+      authenticatedAt: completed.authenticatedAt,
+    });
+    if (!issued) return unavailable(c);
+    setApplicationSessionCookie(c, issued.sessionToken, issued.expiresAt);
     return redirectToWeb(c, resultPath(completed.returnTo, "linked"));
   } catch {
     return redirectToWeb(c, "/profile?sso=error");
@@ -140,9 +160,18 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
 
 export async function deleteSsoIdentity(c: Context<AppEnv>): Promise<Response> {
   c.header("Cache-Control", "no-store");
-  if (getConfig(c.env).ssoRolloutMode === "disabled" || !c.env?.DB) return unavailable(c);
+  const runtime = createApplicationSessionService(c.env);
+  if (getConfig(c.env).ssoRolloutMode === "disabled" || !runtime) return unavailable(c);
+  const accountId = authenticatedActor(c).accountId;
   try {
-    await unlinkSsoIdentity(D1.shared.client.create(c.env.DB), authenticatedActor(c).accountId);
+    await unlinkSsoIdentity(runtime.db, accountId);
+    await runtime.sessions.invalidateAccountSessions(accountId);
+    deleteCookie(c, APPLICATION_SESSION_COOKIE, {
+      path: "/",
+      secure: true,
+      httpOnly: true,
+      sameSite: "Lax",
+    });
     return c.body(null, 204);
   } catch (error) {
     if (error instanceof D1.shared.action.account.CannotUnlinkLastIdentityError) {
