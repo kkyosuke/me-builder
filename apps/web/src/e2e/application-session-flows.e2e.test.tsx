@@ -4,6 +4,7 @@ import { currentServiceTerms } from "@me-builder/shared";
 import { cleanup, configure, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
+import { authSessionRuntime } from "../feature/auth/infrastructure/auth-session-runtime";
 
 // App全体のlazy routeとAPI往復を、E2E並列実行時の負荷でも待ち切る。
 configure({ asyncUtilTimeout: 10_000 });
@@ -82,6 +83,7 @@ function requestUrl(input: RequestInfo | URL): URL {
 describe("application session Web E2E", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authSessionRuntime.reset();
     liff.initialize.mockResolvedValue({
       status: "ready",
       inClient: true,
@@ -155,7 +157,8 @@ describe("application session Web E2E", () => {
       await screen.findByRole("heading", { name: "2人の相性シートを作りました" }),
     ).toBeTruthy();
 
-    expect(sessionChecks).toBe(1);
+    // LIFF内では別AccountのSSO cookieを採用しないため、既存sessionを確認せず交換する。
+    expect(sessionChecks).toBe(0);
     expect(exchangeRequests).toBe(1);
     expect(acceptanceRequests).toBe(1);
     expect(liff.initialize).toHaveBeenCalledTimes(1);
@@ -236,6 +239,10 @@ describe("application session Web E2E", () => {
       throw new Error(`Unexpected E2E request: ${url.pathname}`);
     });
     vi.stubGlobal("fetch", fetchMock);
+    liff.initialize.mockResolvedValue({
+      status: "disabled",
+      reason: "外部ブラウザからのアクセスです",
+    });
     window.history.replaceState({}, "", `/compatibility/invitations/${relationshipId}`);
 
     render(<App />);
