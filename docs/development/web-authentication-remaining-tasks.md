@@ -277,16 +277,11 @@ flowchart TD
 
 ## 7. 系列C: SSO追加と外部ブラウザ切替
 
-### AUTH-C-001 SSO実装条件と運用設定を確定する
+### AUTH-C-001 SSO実装条件と運用設定を確定する ([PR #310](https://github.com/kkyosuke/me-builder/pull/310))
 
 依存: なし
 
-- 採用するSSO製品、OIDC issuer、client、redirect URI、scope、Secret配布を決定する
-- subjectの安定性、provider key、link-only期間、session期限、local / IdP logoutの範囲を確定する
-- PreviewとProductionのtenant、callback、許可origin、段階公開flagを分離する
-- 公式情報でAuthorization Code Flow、PKCE、state、nonce、logout制約を確認して設計SSoTを更新する
-
-完了条件は、製品固有の未決事項がなく、Secret値を文書へ記載せずLocalとPreviewの設定を再現できることです。
+実装と検証はPRへ移しました。未完了条件はレビューとmergeです。
 
 ### AUTH-C-002 SSO server adapterと認証transactionを追加する
 

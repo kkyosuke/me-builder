@@ -19,11 +19,11 @@
 - AccountとIdentityのドメイン上の責務、不変条件 — [ドメイン設計](../domain/domain-design.md)
 - LINE Account喪失時の本人確認とIdentity再接続 — [Account復旧設計](account-recovery-design.md)
 - 実装の残タスク、依存順、各PRの完了条件 — [Web認証・SSO実装残タスク](../development/web-authentication-remaining-tasks.md)
-- SSO製品、IdP、session storeの物理構造と整合性方式
-- 個別APIのpath、request / response schema
+- session storeの物理構造と整合性方式
+- 個別feature APIのpath、request / response schema
 - cookie名、session store、期限と失効の具体的な実装契約 — [アプリケーションセッション実装契約](../development/application-session-contract.md)
 
-SSO製品はこの設計では選定しません。外部ブラウザ用adapterは、OpenID Connect（OIDC）のAuthorization Code Flow + PKCE相当の性質を満たす認証結果を受け取れることを前提にします。SAMLしか提供しないIdPを採る場合も、アプリケーションからはOIDC等へ仲介する認証基盤の背後に置きます。
+SSO製品とme-builder側の接続条件は[§9 Auth0接続条件](#9-auth0接続条件)を正とします。SAMLしか提供しないIdPを追加する場合も、アプリケーションからはAuth0のOIDC接続の背後に置き、この認証境界を増やしません。
 
 ## 2. 結論
 
@@ -356,14 +356,68 @@ OpenAPIのsecurity schemeは`liffIdToken`からprovider非依存のアプリケ�
 - 認証失敗、Account未解決、未同意、権限不足を区別して表示する
 - LIFFまたはSSOが一時的に失敗しても白画面にせず、同じ方式の再試行を提示する
 
-## 9. 実装前に決めること
+## 9. Auth0接続条件
+
+### 9.1 製品、client、subject
+
+外部ブラウザのSSO brokerにはAuth0を採用し、環境ごとに分離したAuth0 tenantへme-builder専用のRegular Web Applicationを1つ登録します。Auth0は外部IdPとの接続を所有しますが、me-builderのAccount、role、Plan、利用規約同意は所有しません。
+
+| 項目 | 決定 |
+| --- | --- |
+| flow | OIDC Authorization Code Flow + PKCE（`S256`のみ） |
+| response | `response_type=code`。API Serverがcodeをtokenへ交換し、ブラウザへAuth0 tokenを保存しない |
+| scope | `openid profile`。Account照合に使わない`email`と、不要な`offline_access`は要求しない |
+| audience | ID tokenの`aud`として環境別のAuth0 Client IDを要求する。me-builder API用access token audienceは設けない |
+| subject | 検証済みID tokenの`sub`。Auth0 userを削除・再作成した場合は別Identityとして扱う |
+| provider key | 全環境で`auth0`。共有D1自体を環境分離するためtenant名やissuerをprovider keyへ埋め込まない |
+| 登録policy | `link-only`。SSO Identityだけを根拠に新規Accountを作らない |
+
+Auth0の`sub`はAuth0 user profileの`user_id`に由来するため、email、表示名、接続先IdPの独自IDへ分解せず、tenant内で返された文字列全体をsubjectとして保存します。Identityを別Accountへ付け替えたり、Auth0 Dashboard上のuser統合をme-builderのAccount統合として扱ったりしません。
+
+### 9.2 transactionとtoken検証
+
+SSO開始時に256 bit以上の暗号学的乱数から`state`、`nonce`、PKCE `code_verifier`を生成し、`code_challenge_method=S256`を指定します。これらと許可済み相対pathの`returnTo`は、10分で失効するserver-side認証transactionへ保存し、一度だけ消費します。callback URLやtransaction参照へ`returnTo`、subject、Account IDを直接含めません。
+
+callbackでは、Auth0のOIDC discovery documentから得たissuer、authorization endpoint、token endpoint、JWKS URIを利用します。ID tokenはRS256署名、`iss`の完全一致、`aud`のClient ID一致、`exp`と`iat`、transactionの`nonce`完全一致を検証します。JWKSは`kid`で選び、未知の`kid`だけを契機に再取得します。検証失敗時はIdentity解決とapplication session発行へ進みません。
+
+### 9.3 環境とURL
+
+Auth0が推奨する環境分離に合わせ、PreviewとProductionは別tenant・別clientにします。LocalはPreview tenantの別clientを使い、Productionのuser、callback、Secretへ接続しません。callback、logout、Web originにはwildcardを使わず、次の値を完全一致で登録します。
+
+| 環境 | Auth0 tenant / client | Allowed Callback URL | Allowed Logout URL | Allowed Web Origin |
+| --- | --- | --- | --- | --- |
+| Local | Preview tenant / Local client | `http://localhost:3000/api/auth/sso/callback` | `http://localhost:5173` | `http://localhost:5173` |
+| Preview | Preview tenant / Preview client | `https://api.stg.kagami.kyosuke.dev/api/auth/sso/callback` | `https://stg.kagami.kyosuke.dev` | `https://stg.kagami.kyosuke.dev` |
+| Production | Production tenant / Production client | `https://api.kagami.kyosuke.dev/api/auth/sso/callback` | `https://kagami.kyosuke.dev` | `https://kagami.kyosuke.dev` |
+
+issuerはtenantのHTTPS URLを末尾`/`付きで`SSO_ISSUER_URL`へ、Client IDは`SSO_CLIENT_ID`へ設定します。`SSO_CLIENT_SECRET`だけを秘密値として扱います。Localはgit管理外の`.env`、PreviewはGitHub Environment `dev`、Productionは`prd`へ環境別に設定し、Cloudflare API Worker secretへデプロイします。Secret値、authorization code、token、subjectはworkflowの引数、ログ、artifactへ出しません。
+
+`SSO_ISSUER_URL`と`SSO_CLIENT_ID`は秘密値ではありませんが、環境を誤接続しないようGitHub Environmentのvariableとして配布します。起動時にissuerがHTTPSであること（Localも接続先Auth0はHTTPS）、callbackのoriginが`BASE_URL`、logoutのreturn URLが`WEB_ORIGIN`と一致することを検証します。
+
+段階公開は`SSO_ROLLOUT_MODE`だけで制御します。値は`disabled`（SSO開始・追加とも停止）、`linking`（認証済みAccountからのIdentity追加だけ許可）、`linked-login`（追加済みIdentityの外部ブラウザloginも許可）の3つです。未設定は`disabled`へ安全に倒します。Local、Preview、Productionで値を独立させ、Productionは`AUTH-C-006`の公開操作まで`disabled`を維持します。flagを無効化してもLIFF認証と既存application sessionは停止しません。
+
+### 9.4 session、link-only期間、logout
+
+SSO認証後もAUTH-A系列のapplication sessionだけを発行し、SSO専用sessionは作りません。絶対期限は30日、idle期限は7日、認証transactionは10分とします。権限上昇、Identity追加、Account復旧ではsessionをrotationし、Account停止、Identity解除、復旧完了、local logoutでは対象sessionを即時失効します。
+
+`link-only`はPreviewの通し検証完了後も維持し、ProductionではSSO追加済みAccountだけを段階公開対象にします。SSOだけによる新規Account作成は別のプロダクト決定とし、この系列では有効化しません。
+
+logoutの既定はme-builderのlocal logoutだけです。Auth0のlogout endpointや接続先IdPのfederated logoutは呼ばず、他アプリのSSO sessionへ影響させません。明示的な「すべてのSSOからログアウト」を将来追加する場合だけAuth0 OIDC logoutを別操作として使い、登録済みの完全一致URLへ戻します。Auth0のlogoutだけではme-builderのapplication sessionは失効しないため、必ずlocal sessionを先に失効させます。
+
+### 9.5 公式仕様との対応
+
+- Auth0は環境ごとにtenantを分離することを推奨しています（[Set Up Multiple Environments](https://auth0.com/docs/get-started/auth0-overview/create-tenants/set-up-multiple-environments)）。
+- Authorization Code Flow + PKCEでは`code_verifier`と`S256`の`code_challenge`を使い、code交換時にverifierを照合します（[Authorization Code Flow with PKCE](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce)）。
+- callback、logout、Web originはApplication Settingsの許可リストへ登録し、Productionでwildcardを使いません（[Application Settings](https://auth0.com/docs/get-started/applications/application-settings)）。
+- ID tokenは署名と標準claimに加えてClient IDへの`aud`と送信した`nonce`を検証します（[Validate ID Tokens](https://auth0.com/docs/secure/tokens/id-tokens/validate-id-tokens)）。
+- Auth0 logoutはme-builder側のsessionを失効しないため、application側で明示的に消去します。federated logoutはproviderごとに挙動が異なります（[Log Users Out of Identity Providers](https://auth0.com/docs/authenticate/login/logout/log-users-out-of-idps)）。
+
+## 10. 後続で決めること
 
 次は、このアーキテクチャを変えずに後続で決定できます。
 
-- 採用するSSO製品、OIDC issuer、client登録とSecret配布方法
 - SSOだけの新規Account作成を許可する時期と対象
-- logoutをme-builderだけにするか、IdPのlogoutまで連動するか
 - 再認証を要求する操作と認証からの最大経過時間
 - 既存利用者へSSO Identity追加を案内する画面と段階公開方法
 
-SSO製品を決める前でも、[Web認証・SSO実装残タスク](../development/web-authentication-remaining-tasks.md)のA・B系列はLIFFだけで実装でき、各featureから認証provider依存を除去できます。
+これらはAuth0接続条件とprovider非依存の認証境界を変更せず、後続のプロダクト判断または実装PRで確定します。
