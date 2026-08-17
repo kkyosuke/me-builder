@@ -6,39 +6,51 @@ function isLoopbackHttpUrl(url: URL): boolean {
 }
 
 function isSecureOrigin(value: string): boolean {
-  const url = new URL(value);
-  return (
-    (url.protocol === "https:" || isLoopbackHttpUrl(url)) &&
-    !url.username &&
-    !url.password &&
-    url.pathname === "/" &&
-    !url.search &&
-    !url.hash
-  );
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || isLoopbackHttpUrl(url)) &&
+      !url.username &&
+      !url.password &&
+      url.pathname === "/" &&
+      !url.search &&
+      !url.hash
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isSsoIssuer(value: string): boolean {
-  const url = new URL(value);
-  return (
-    url.protocol === "https:" &&
-    !url.username &&
-    !url.password &&
-    url.pathname === "/" &&
-    !url.search &&
-    !url.hash
-  );
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      url.pathname === "/" &&
+      !url.search &&
+      !url.hash
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isSsoCallback(value: string): boolean {
-  const url = new URL(value);
-  return (
-    (url.protocol === "https:" || isLoopbackHttpUrl(url)) &&
-    !url.username &&
-    !url.password &&
-    url.pathname === "/api/auth/sso/callback" &&
-    !url.search &&
-    !url.hash
-  );
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || isLoopbackHttpUrl(url)) &&
+      !url.username &&
+      !url.password &&
+      url.pathname === "/api/auth/sso/callback" &&
+      !url.search &&
+      !url.hash
+    );
+  } catch {
+    return false;
+  }
 }
 
 export const ConfigSchema = v.object({

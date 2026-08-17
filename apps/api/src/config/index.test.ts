@@ -135,6 +135,22 @@ describe("getConfig & ConfigSchema", () => {
     expect(conf.ssoRolloutPercent).toBe(0);
   });
 
+  it("GitHub Actionsから渡る空のSSO環境変数を未設定として扱うこと", () => {
+    const conf = getConfig({
+      SSO_ROLLOUT_MODE: "",
+      SSO_ROLLOUT_PERCENT: "",
+      SSO_ISSUER_URL: "",
+      SSO_CLIENT_ID: "",
+      SSO_CLIENT_SECRET: "",
+    });
+
+    expect(conf.ssoRolloutMode).toBe("disabled");
+    expect(conf.ssoRolloutPercent).toBe(0);
+    expect(conf.ssoIssuerUrl).toBeUndefined();
+    expect(conf.ssoClientId).toBeUndefined();
+    expect(conf.ssoClientSecret).toBeUndefined();
+  });
+
   it("SSO有効時はAuth0設定と固定callback URLを解決すること", () => {
     const conf = getConfig({
       SSO_ROLLOUT_MODE: "linking",
