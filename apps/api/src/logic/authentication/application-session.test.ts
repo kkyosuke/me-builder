@@ -119,9 +119,9 @@ describe("ApplicationSessionService", () => {
     const issuedLastSeenAt = [...store.records.values()][0]?.lastSeenAt;
 
     now = new Date("2026-08-17T00:00:04.000Z");
-    await expect(
-      sessions.verify(issued?.sessionToken, { refreshIdle: false }),
-    ).resolves.toEqual({ actor });
+    await expect(sessions.verify(issued?.sessionToken, { refreshIdle: false })).resolves.toEqual({
+      actor,
+    });
     expect([...store.records.values()][0]?.lastSeenAt).toBe(issuedLastSeenAt);
   });
 
