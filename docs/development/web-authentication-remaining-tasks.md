@@ -305,7 +305,7 @@ flowchart TD
 
 依存: `AUTH-C-004`
 
-実装と検証手順はPRへ移しました。未完了条件は`AUTH-A-011`のsession発行・失効eventを接続し、Preview deploy後にRunbookの実端末／実IdP／rollback結果を記録してレビューを完了することです。
+実装と検証手順はPRへ移し、`AUTH-A-011`のsession発行・失効eventへ接続しました。未完了条件はPreview deploy後にRunbookの実端末／実IdP／rollback結果を記録し、レビューとmergeを完了することです。
 
 ### AUTH-C-006 ProductionへSSOを段階公開する
 
