@@ -252,8 +252,8 @@ async function assertCheckoutSession(client: Stripe, priceId: string): Promise<v
       customer: customer.id,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url:
-        "https://example.test/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: "https://example.test/profile/billing?billing=checkout-cancel",
+        "https://stg.kagami.kyosuke.dev/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://stg.kagami.kyosuke.dev/profile/billing?billing=checkout-cancel",
       client_reference_id: "me-builder-checkout-smoke",
       metadata: { plan: "lite", interval: "month", managed_by: "me-builder-e2e" },
       subscription_data: { trial_period_days: 14 },
@@ -308,13 +308,22 @@ function safeStripeErrorFields(error: unknown): Record<string, string | number> 
     param?: unknown;
     statusCode?: unknown;
     requestId?: unknown;
-    raw?: { requestId?: unknown };
+    raw?: { type?: unknown; code?: unknown; param?: unknown; requestId?: unknown };
   };
   const safeToken = (value: unknown, pattern: RegExp): string | undefined =>
     typeof value === "string" && pattern.test(value) ? value : undefined;
-  const stripeErrorType = safeToken(candidate?.type, /^[A-Za-z][A-Za-z0-9]{0,79}$/u);
-  const stripeErrorCode = safeToken(candidate?.code, /^[a-z][a-z0-9_]{0,79}$/u);
-  const stripeErrorParam = safeToken(candidate?.param, /^[A-Za-z0-9_.[\]-]{1,120}$/u);
+  const stripeErrorType = safeToken(
+    candidate?.type ?? candidate?.raw?.type,
+    /^[A-Za-z][A-Za-z0-9_]{0,79}$/u,
+  );
+  const stripeErrorCode = safeToken(
+    candidate?.code ?? candidate?.raw?.code,
+    /^[a-z][a-z0-9_]{0,79}$/u,
+  );
+  const stripeErrorParam = safeToken(
+    candidate?.param ?? candidate?.raw?.param,
+    /^[A-Za-z0-9_.[\]-]{1,120}$/u,
+  );
   const dependencyRequestId = safeToken(
     candidate?.requestId ?? candidate?.raw?.requestId,
     /^req_[A-Za-z0-9]{1,80}$/u,
