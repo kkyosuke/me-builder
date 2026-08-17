@@ -19,6 +19,8 @@ concurrency:
 jobs:
   external:
     name: External Dependency Checks
+    # feature branchの手動実行はStripe sandboxの変更証跡に使い、prd Environmentへは接続しない。
+    if: ${{ github.event_name == 'schedule' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # LINE の疎通確認に本番のチャネルアクセストークンとドメインを使う。

@@ -36,14 +36,66 @@ jobs:
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
+      LIFF_ID: ${{ vars.LIFF_ID }}
       VITE_ENVIRONMENT: production
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       # Vite は GitHub Actions 上のビルドで値を埋め込むため、LIFF ID は Pages 側ではなくここで渡す。
-      # 未設定の場合は LIFF 初期化がスキップされる (画面は壊れない)。
+      # アプリ自体は未設定時も縮退できるが、Production CDでは下の必須検証で欠落を許容しない。
       VITE_LIFF_ID: ${{ vars.LIFF_ID }}
       VITE_SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
 
     steps:
+      # ProductionはMVP中核機能を提供する実環境なので、設定不足をskipや縮退成功として扱わない。
+      # 値そのものは出力せず、不足しているGitHub Environmentの項目名だけを報告する。
+      - name: Validate Production Configuration
+        shell: bash
+        run: |
+          configuration_invalid=0
+          required_variables=(
+            CLOUDFLARE_ACCOUNT_ID
+            CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_ACCESS_ALLOWED_EMAILS
+            BASE_DOMAIN
+            LINE_CHANNEL_ACCESS_TOKEN
+            LINE_CHANNEL_SECRET
+            LINE_LOGIN_CHANNEL_SECRET
+            LIFF_ID
+            GOOGLE_VERTEX_AI_API_KEY
+            CHAT_DELIVERY_SECRET
+            BRAIN_VECTOR_HMAC_SECRET
+          )
+          missing_variables=()
+          for variable_name in "${required_variables[@]}"; do
+            variable_value="${!variable_name}"
+            if [ -z "${variable_value//[[:space:]]/}" ]; then
+              missing_variables+=("${variable_name}")
+              echo "::error::${variable_name} が GitHub Environment prd に設定されていません。"
+            fi
+          done
+          if [ "${#missing_variables[@]}" -gt 0 ]; then
+            configuration_invalid=1
+          fi
+
+          sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
+          sso_percent="${SSO_ROLLOUT_PERCENT:-0}"
+          case "${sso_mode}" in
+            disabled|linking|linked-login) ;;
+            *) echo "::error::SSO_ROLLOUT_MODE が不正です。"; configuration_invalid=1 ;;
+          esac
+          if ! [[ "${sso_percent}" =~ ^([0-9]|[1-9][0-9]|100)$ ]]; then
+            echo "::error::SSO_ROLLOUT_PERCENT は0から100の整数で指定してください。"
+            configuration_invalid=1
+          fi
+          if [ "${sso_mode}" != "disabled" ] && { [ -z "${SSO_ISSUER_URL}" ] || [ -z "${SSO_CLIENT_ID}" ] || [ -z "${SSO_CLIENT_SECRET}" ]; }; then
+            echo "::error::SSOを有効にするにはSSO_ISSUER_URL、SSO_CLIENT_ID、SSO_CLIENT_SECRETが必要です。"
+            configuration_invalid=1
+          fi
+          if [ -n "${BILLING_PROJECTION_STALE_AFTER_SECONDS}" ] && { ! [[ "${BILLING_PROJECTION_STALE_AFTER_SECONDS}" =~ ^[0-9]+$ ]] || [ "${BILLING_PROJECTION_STALE_AFTER_SECONDS}" -lt 60 ]; }; then
+            echo "::error::BILLING_PROJECTION_STALE_AFTER_SECONDS は60以上の整数で指定してください。"
+            configuration_invalid=1
+          fi
+          exit "${configuration_invalid}"
+
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-bun-workspace
@@ -52,6 +104,44 @@ jobs:
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Stripe同期workflowがCloudflareへ永続化するruntime secretはGitHub側の空値検証では見えない。
+      # secret値は取得せずbinding名だけを照合し、課金設定が欠けた状態で本番を更新しない。
+      - name: Validate Production Runtime Secret Bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_secret_names="$(bun --cwd apps/api wrangler secret list --env production | jq -r '.[].name')"
+          worker_secret_names="$(bun --cwd apps/worker wrangler secret list --env production | jq -r '.[].name')"
+          validation_failed=0
+
+          require_secret() {
+            local service_name="$1"
+            local secret_names="$2"
+            local required_name="$3"
+            if ! grep -Fxq -- "${required_name}" <<< "${secret_names}"; then
+              echo "::error::${service_name} production に ${required_name} secret bindingがありません。Setup / Stripe Billingをmainからprd向けに実行してください。"
+              validation_failed=1
+            fi
+          }
+
+          required_api_secrets=(
+            STRIPE_SECRET_KEY
+            STRIPE_WEBHOOK_SECRET
+            STRIPE_PORTAL_CONFIGURATION_ID
+            STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID
+            STRIPE_PORTAL_RESET_CONFIGURATION_ID
+            BILLING_PRICE_PLAN_MAP
+          )
+          for secret_name in "${required_api_secrets[@]}"; do
+            require_secret "me-builder-api" "${api_secret_names}" "${secret_name}"
+          done
+
+          required_worker_secrets=(STRIPE_SECRET_KEY BILLING_PRICE_PLAN_MAP)
+          for secret_name in "${required_worker_secrets[@]}"; do
+            require_secret "me-builder-worker" "${worker_secret_names}" "${secret_name}"
+          done
+          exit "${validation_failed}"
 
       # PR の CI と同じ検証を、実際にデプロイするツリーへもう一度かける。
       # main への push で個別の CI ワークフローは走らせないため、これが本番前の唯一の関門。
@@ -69,23 +159,18 @@ jobs:
           key: ${{ runner.os }}-tsbuildinfo-${{ github.sha }}
 
       - name: Verify Vertex AI Connectivity (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: bun run --cwd apps/worker check:gemini "Reply with OK."
 
       - name: Protect API Documentation with Cloudflare Access (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task access:setup:production
 
       - name: Ensure Queues (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task queues:setup:production
 
       - name: Ensure Brain Vectorize Index (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task vectorize:setup:production
 
       - name: Ensure Private Avatar R2 Bucket (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task avatar-bucket:setup:production
 
       - name: Ensure Application Session KV (Production)
@@ -93,17 +178,12 @@ jobs:
         run: task session-store:setup:production
 
       - name: Apply D1 Migrations (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:migrate:production
 
       - name: Apply Diagnosis Seed (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task db:seed:production
 
       - name: Deploy to Cloudflare Production
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
-        env:
-          LIFF_ID: ${{ vars.LIFF_ID }}
         run: |
           if [ -z "${LINE_CHANNEL_SECRET}" ]; then
             echo "::error::LINE_CHANNEL_SECRET が GitHub Secrets に設定されていません。x-line-signature の検証に必須です。"
@@ -119,18 +199,6 @@ jobs:
           fi
           sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
           sso_percent="${SSO_ROLLOUT_PERCENT:-0}"
-          case "${sso_mode}" in
-            disabled|linking|linked-login) ;;
-            *) echo "::error::SSO_ROLLOUT_MODE が不正です。"; exit 1 ;;
-          esac
-          if ! [[ "${sso_percent}" =~ ^([0-9]|[1-9][0-9]|100)$ ]]; then
-            echo "::error::SSO_ROLLOUT_PERCENT は0から100の整数で指定してください。"
-            exit 1
-          fi
-          if [ "${sso_mode}" != "disabled" ] && { [ -z "${SSO_ISSUER_URL}" ] || [ -z "${SSO_CLIENT_ID}" ] || [ -z "${SSO_CLIENT_SECRET}" ]; }; then
-            echo "::error::SSOを有効にするにはSSO_ISSUER_URL、SSO_CLIENT_ID、SSO_CLIENT_SECRETが必要です。"
-            exit 1
-          fi
 
           umask 077
           secrets_dir="$(mktemp -d "${RUNNER_TEMP}/worker-secrets.XXXXXX")"
@@ -174,28 +242,13 @@ jobs:
 
       # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
       - name: Register LINE Webhook (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
-        env:
-          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
-          BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
         run: |
           bun --cwd apps/api scripts/register-webhook.ts
 
       # デプロイ済みの URL を LIFF アプリのエンドポイント URL へ反映する
       - name: Register LIFF Endpoint (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_LOGIN_CHANNEL_SECRET != '' }}
         run: |
           bun --cwd apps/web scripts/register-liff.ts production
 
       - name: Register LINE Rich Menu (Production)
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
-        env:
-          LIFF_ID: ${{ vars.LIFF_ID }}
         run: bun run --cwd apps/api register:rich-menu:production
-
-
-
-      - name: Skip Deployment Notice
-        if: ${{ env.CLOUDFLARE_API_TOKEN == '' }}
-        run: |
-          echo "::warning::CLOUDFLARE_DEPLOY_API_TOKEN が GitHub Secrets に設定されていないためデプロイをスキップしました。"

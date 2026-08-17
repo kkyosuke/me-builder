@@ -3,7 +3,6 @@ import { logger } from "@me-builder/shared";
 import Stripe from "stripe";
 
 const { PORTAL_CONFIGURATION_VERSION, STRIPE_API_VERSION, STRIPE_BILLING_CATALOG } = billing;
-
 const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
 if (!secretKey || !["sk_test_", "rk_test_"].some((prefix) => secretKey.startsWith(prefix))) {
   throw new Error("STRIPE_SECRET_KEY must be a Stripe sandbox key");
@@ -16,6 +15,9 @@ const stripe = new Stripe(secretKey, {
 });
 const DAY_SECONDS = 24 * 60 * 60;
 const HOUR_SECONDS = 60 * 60;
+// Stripe Test Clockは、そのclock上で最短の課金間隔の2倍までしか一度に進められない。
+// 年額から月額への期間末変更では次phaseの月額が基準になるため、年末まで月単位で刻む。
+const MAX_CLOCK_ADVANCE_SECONDS = 30 * DAY_SECONDS;
 const initialTime = Math.floor(Date.now() / 1_000) - 60;
 const clock = await stripe.testHelpers.testClocks.create({
   frozen_time: initialTime,
@@ -215,7 +217,7 @@ try {
 }
 
 async function logStripeAccountReadiness(client: Stripe): Promise<void> {
-  const account = await client.accounts.retrieve();
+  const account = await client.accounts.retrieveCurrent();
   const readiness = {
     businessProfileNameConfigured: Boolean(account.business_profile?.name),
     statementDescriptorConfigured: Boolean(account.settings?.payments?.statement_descriptor),
@@ -369,16 +371,16 @@ async function resolvePortalConfigurations(client: Stripe): Promise<{
   const managed = configurations.data.filter(
     (configuration) =>
       configuration.active &&
-      configuration.metadata.managed_by === "me-builder-stripe-catalog" &&
-      configuration.metadata.portal_configuration_version === PORTAL_CONFIGURATION_VERSION,
+      configuration.metadata?.managed_by === "me-builder-stripe-catalog" &&
+      configuration.metadata?.portal_configuration_version === PORTAL_CONFIGURATION_VERSION,
   );
   const management = managed.find(
-    (configuration) => configuration.metadata.portal_mode === "management",
+    (configuration) => configuration.metadata?.portal_mode === "management",
   );
   const standard = managed.find(
-    (configuration) => configuration.metadata.portal_mode === "standard",
+    (configuration) => configuration.metadata?.portal_mode === "standard",
   );
-  const reset = managed.find((configuration) => configuration.metadata.portal_mode === "reset");
+  const reset = managed.find((configuration) => configuration.metadata?.portal_mode === "reset");
   if (!management || !standard || !reset) {
     throw new Error("Expected management, standard, and reset Portal configurations");
   }
@@ -468,10 +470,21 @@ function stripeId(value: string | { id: string } | null): string | null {
 }
 
 async function advanceClock(client: Stripe, clockId: string, frozenTime: number): Promise<void> {
-  await client.testHelpers.testClocks.advance(clockId, { frozen_time: frozenTime });
+  let currentFrozenTime = (await client.testHelpers.testClocks.retrieve(clockId)).frozen_time;
+  while (currentFrozenTime < frozenTime) {
+    const nextFrozenTime = Math.min(frozenTime, currentFrozenTime + MAX_CLOCK_ADVANCE_SECONDS);
+    await client.testHelpers.testClocks.advance(clockId, { frozen_time: nextFrozenTime });
+    currentFrozenTime = (await waitForClock(client, clockId)).frozen_time;
+  }
+}
+
+async function waitForClock(
+  client: Stripe,
+  clockId: string,
+): Promise<Stripe.TestHelpers.TestClock> {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const current = await client.testHelpers.testClocks.retrieve(clockId);
-    if (current.status === "ready") return;
+    if (current.status === "ready") return current;
     if (current.status === "internal_failure") throw new Error("Stripe Test Clock failed");
     await Bun.sleep(1_000);
   }
