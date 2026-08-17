@@ -120,6 +120,7 @@ describe("Profile avatar storage API local E2E", () => {
           iss: "https://access.line.me",
           sub: "line-profile-e2e",
           aud: "1234567890",
+          iat: Math.floor(Date.now() / 1_000),
           exp: timestamp + 86_400,
           name: "プロフィール利用者",
           picture: lineAvatarUrl,
