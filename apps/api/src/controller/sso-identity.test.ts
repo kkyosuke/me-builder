@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(() => ({ client: true })),
     createStore: vi.fn(() => ({ store: true })),
     createLinker: vi.fn(() => ({ linker: true })),
+    createResolver: vi.fn(() => ({ resolver: true })),
     getStatus: vi.fn(),
     unlink: vi.fn(),
     invalidateSessions: vi.fn(),
@@ -16,7 +17,7 @@ const mocks = vi.hoisted(() => {
     issueSession: vi.fn(),
     startLinking: vi.fn(),
     startLogin: vi.fn(),
-    completeLinking: vi.fn(),
+    completeCallback: vi.fn(),
     cancelAuthentication: vi.fn(),
   };
 });
@@ -58,6 +59,7 @@ vi.mock("../infrastructure/authentication/sso-transaction-store", () => ({
   createSsoTransactionStore: mocks.createStore,
 }));
 vi.mock("../infrastructure/authentication/sso-identity-repository", () => ({
+  createSsoExistingIdentityResolver: mocks.createResolver,
   createSsoIdentityLinker: mocks.createLinker,
   getSsoIdentityStatus: mocks.getStatus,
   unlinkSsoIdentity: mocks.unlink,
@@ -65,7 +67,7 @@ vi.mock("../infrastructure/authentication/sso-identity-repository", () => ({
 vi.mock("../logic/authentication/sso-transaction", () => ({
   startSsoIdentityLinking: mocks.startLinking,
   startSsoAuthentication: mocks.startLogin,
-  completeSsoIdentityLinking: mocks.completeLinking,
+  completeSsoCallback: mocks.completeCallback,
   cancelSsoAuthentication: mocks.cancelAuthentication,
 }));
 
@@ -156,7 +158,8 @@ describe("SSO identity controller", () => {
   });
 
   it("link callback成功後は保存済みpathだけへ復帰する", async () => {
-    mocks.completeLinking.mockResolvedValue({
+    mocks.completeCallback.mockResolvedValue({
+      purpose: "link",
       accountId: "account-at-start",
       authenticatedIdentityId: "identity-auth0",
       authenticationMethod: "sso",
@@ -172,7 +175,7 @@ describe("SSO identity controller", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("https://stg.example.com/profile?sso=linked");
-    expect(mocks.completeLinking).toHaveBeenCalledWith(
+    expect(mocks.completeCallback).toHaveBeenCalledWith(
       expect.objectContaining({ state: "opaque", code: "code" }),
     );
     expect(mocks.invalidateSessions).toHaveBeenCalledWith("account-at-start");
@@ -208,6 +211,36 @@ describe("SSO identity controller", () => {
     );
   });
 
+  it("login callbackで共通application sessionをcookieへ設定して固定pathへ復帰する", async () => {
+    mocks.completeCallback.mockResolvedValue({
+      purpose: "login",
+      session: {
+        sessionToken: "sso-session",
+        csrfToken: "csrf-token",
+        expiresAt: new Date("2026-09-16T00:00:00.000Z"),
+      },
+      returnTo: "/admin",
+    });
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=login&code=code",
+      { headers: { Cookie: "__Host-me_builder_sso_callback_state=login" } },
+      { ...env, SSO_ROLLOUT_MODE: "linked-login" },
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("https://stg.example.com/admin");
+    expect(mocks.completeCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: "login",
+        code: "code",
+        identityResolver: { resolver: true },
+        identityLinker: { linker: true },
+        sessionIssuer: expect.objectContaining({ issue: expect.any(Function) }),
+      }),
+    );
+    expect(response.headers.get("set-cookie")).toContain("__Host-me_builder_session=sso-session");
+  });
+
   it.each([
     { purpose: "link", returnTo: "/profile" },
     { purpose: "login", returnTo: "/diagnosis/result" },
@@ -240,7 +273,7 @@ describe("SSO identity controller", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("https://stg.example.com/profile?sso=error");
-    expect(mocks.completeLinking).not.toHaveBeenCalled();
+    expect(mocks.completeCallback).not.toHaveBeenCalled();
     expect(mocks.cancelAuthentication).not.toHaveBeenCalled();
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
   });

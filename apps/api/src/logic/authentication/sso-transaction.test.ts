@@ -6,6 +6,7 @@ import {
   type SsoServerClient,
   cancelSsoAuthentication,
   completeSsoAuthentication,
+  completeSsoCallback,
   completeSsoIdentityLinking,
   completeSsoLogin,
   normalizeSsoReturnTo,
@@ -244,6 +245,70 @@ describe("SSO authentication transaction", () => {
         now: () => 1_000,
       }),
     ).rejects.toEqual(new SsoAuthenticationError("identity_unlinked"));
+    expect(sessionIssuer.issue).not.toHaveBeenCalled();
+  });
+
+  it("共通callbackはlogin transactionを解決してsessionを発行する", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("login-state", {
+      purpose: "login",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/admin",
+      expiresAt: 2_000,
+    });
+    const identityLinker = { link: vi.fn() };
+    const sessionIssuer = { issue: vi.fn(async () => ({ token: "session" })) };
+
+    await expect(
+      completeSsoCallback({
+        state: "login-state",
+        code: "code",
+        store,
+        client,
+        identityResolver: { findAccountId: vi.fn(async () => "account-1") },
+        identityLinker,
+        sessionIssuer,
+        now: () => 1_000,
+      }),
+    ).resolves.toEqual({ purpose: "login", session: { token: "session" }, returnTo: "/admin" });
+    expect(identityLinker.link).not.toHaveBeenCalled();
+  });
+
+  it("共通callbackはlink transactionを開始時Accountへだけ接続する", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("link-state", {
+      purpose: "link",
+      initiatingAccountId: "account-at-start",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/profile",
+      expiresAt: 2_000,
+    });
+    const identityLinker = { link: vi.fn(async () => undefined) };
+    const sessionIssuer = { issue: vi.fn() };
+
+    await expect(
+      completeSsoCallback({
+        state: "link-state",
+        code: "code",
+        store,
+        client,
+        identityResolver: { findAccountId: vi.fn() },
+        identityLinker,
+        sessionIssuer,
+        now: () => 1_000,
+      }),
+    ).resolves.toEqual({
+      purpose: "link",
+      accountId: "account-at-start",
+      authenticationMethod: "sso",
+      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      providerKey: "auth0",
+      returnTo: "/profile",
+    });
     expect(sessionIssuer.issue).not.toHaveBeenCalled();
   });
 

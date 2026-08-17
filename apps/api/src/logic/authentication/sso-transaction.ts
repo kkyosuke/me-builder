@@ -233,6 +233,54 @@ export async function completeSsoLogin<SessionResult>(
   return { session, returnTo };
 }
 
+/** login/link callbackを一度だけ消費し、用途に応じた副作用へ分岐する。 */
+export async function completeSsoCallback<SessionResult>(
+  input: CompleteSsoAuthenticationInput & {
+    identityResolver: SsoExistingIdentityResolver;
+    identityLinker: SsoIdentityLinker;
+    sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
+  },
+): Promise<
+  | { purpose: "login"; session: SessionResult; returnTo: string }
+  | {
+      purpose: "link";
+      accountId: string;
+      authenticationMethod: "sso";
+      authenticatedAt: Date;
+      providerKey: "auth0";
+      returnTo: string;
+    }
+> {
+  const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  if (transaction.purpose === "login") {
+    const accountId = await input.identityResolver.findAccountId({
+      providerKey: identity.providerKey,
+      subject: identity.subject,
+    });
+    if (!accountId) throw new SsoAuthenticationError("identity_unlinked");
+    const session = await input.sessionIssuer.issue({
+      accountId,
+      authenticationMethod: identity.authenticationMethod,
+      authenticatedAt: identity.authenticatedAt,
+    });
+    return { purpose: "login", session, returnTo: transaction.returnTo };
+  }
+
+  await input.identityLinker.link({
+    accountId: transaction.initiatingAccountId,
+    providerKey: identity.providerKey,
+    subject: identity.subject,
+  });
+  return {
+    purpose: "link",
+    accountId: transaction.initiatingAccountId,
+    authenticationMethod: identity.authenticationMethod,
+    authenticatedAt: identity.authenticatedAt,
+    providerKey: identity.providerKey,
+    returnTo: transaction.returnTo,
+  };
+}
+
 /** 開始時のAccountへだけ検証済みAuth0 Identityを追加する。 */
 export async function completeSsoIdentityLinking(
   input: CompleteSsoAuthenticationInput & { identityLinker: SsoIdentityLinker },

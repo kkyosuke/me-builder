@@ -15,6 +15,7 @@ import {
 } from "../infrastructure/authentication/application-session-runtime";
 import { createAuth0SsoClient } from "../infrastructure/authentication/sso-client";
 import {
+  createSsoExistingIdentityResolver,
   createSsoIdentityLinker,
   getSsoIdentityStatus,
   unlinkSsoIdentity,
@@ -22,7 +23,7 @@ import {
 import { createSsoTransactionStore } from "../infrastructure/authentication/sso-transaction-store";
 import {
   cancelSsoAuthentication,
-  completeSsoIdentityLinking,
+  completeSsoCallback,
   startSsoAuthentication,
   startSsoIdentityLinking,
 } from "../logic/authentication/sso-transaction";
@@ -157,16 +158,29 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       const cancelled = await cancelSsoAuthentication({ state, store: dependencies.store });
       return redirectToWeb(c, resultPath(cancelled.returnTo, "cancelled"));
     }
-    const completed = await completeSsoIdentityLinking({
+    const runtime = createApplicationSessionService(c.env);
+    if (!runtime) return unavailable(c);
+    const previousToken = getCookie(c, APPLICATION_SESSION_COOKIE);
+    const completed = await completeSsoCallback({
       state,
       code: c.req.query("code") ?? "",
       store: dependencies.store,
       client: dependencies.client,
-      identityLinker: createSsoIdentityLinker(D1.shared.client.create(c.env.DB)),
+      identityResolver: createSsoExistingIdentityResolver(runtime.db),
+      identityLinker: createSsoIdentityLinker(runtime.db),
+      sessionIssuer: {
+        async issue(actor) {
+          if (previousToken) await runtime.sessions.logout(previousToken, actor.accountId);
+          const issued = await runtime.sessions.issue(actor);
+          if (!issued) throw new Error("Application session could not be issued");
+          return issued;
+        },
+      },
     });
-    const runtime = createApplicationSessionService(c.env);
-    if (!runtime) return unavailable(c);
-    const previousToken = getCookie(c, APPLICATION_SESSION_COOKIE);
+    if (completed.purpose === "login") {
+      setApplicationSessionCookie(c, completed.session.sessionToken, completed.session.expiresAt);
+      return redirectToWeb(c, completed.returnTo);
+    }
     if (previousToken) {
       await runtime.sessions.logout(previousToken, completed.accountId);
     } else {
