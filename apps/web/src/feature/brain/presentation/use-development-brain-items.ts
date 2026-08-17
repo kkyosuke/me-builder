@@ -10,14 +10,10 @@ import type {
   DevelopmentBrainVectorResult,
 } from "../model/brain-item";
 
-const AUTHENTICATION_ERROR_MESSAGE = "本人確認に失敗しました。LINEから開き直してください。";
-
 export function useDevelopmentBrainItems({
   enabled,
-  acquireIdToken,
 }: {
   enabled: boolean;
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
 }) {
   const [state, setState] = useState<AsyncState<DevelopmentBrainItemsResult>>({
     status: "loading",
@@ -38,15 +34,7 @@ export function useDevelopmentBrainItems({
     request.current = controller;
     if (mounted.current) setState({ status: "loading" });
     try {
-      const idToken = await acquireIdToken(controller.signal);
-      if (controller.signal.aborted) return;
-      if (!idToken) {
-        if (mounted.current) {
-          setState({ status: "error", message: AUTHENTICATION_ERROR_MESSAGE });
-        }
-        return;
-      }
-      const result = await fetchDevelopmentBrainItems(config.apiUrl, idToken, controller.signal);
+      const result = await fetchDevelopmentBrainItems(config.apiUrl, controller.signal);
       if (mounted.current && !controller.signal.aborted) {
         setState({ status: "success", data: result });
       }
@@ -61,7 +49,7 @@ export function useDevelopmentBrainItems({
     } finally {
       if (request.current === controller) loading.current = false;
     }
-  }, [acquireIdToken, enabled]);
+  }, [enabled]);
 
   const verifyVector = useCallback(
     async (brainItemId: string) => {
@@ -74,20 +62,8 @@ export function useDevelopmentBrainItems({
         [brainItemId]: { status: "loading" },
       }));
       try {
-        const idToken = await acquireIdToken(controller.signal);
-        if (controller.signal.aborted) return;
-        if (!idToken) {
-          if (mounted.current) {
-            setVectorStates((current) => ({
-              ...current,
-              [brainItemId]: { status: "error", message: AUTHENTICATION_ERROR_MESSAGE },
-            }));
-          }
-          return;
-        }
         const result = await fetchDevelopmentBrainVector(
           config.apiUrl,
-          idToken,
           brainItemId,
           controller.signal,
         );
@@ -113,7 +89,7 @@ export function useDevelopmentBrainItems({
         }
       }
     },
-    [acquireIdToken, enabled],
+    [enabled],
   );
 
   useEffect(() => {

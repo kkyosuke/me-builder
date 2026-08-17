@@ -14,39 +14,29 @@ vi.mock("../infrastructure/brain-api", () => ({
 }));
 
 const emptyItems = { items: [], truncated: false };
-const authenticationError = "本人確認に失敗しました。LINEから開き直してください。";
-
 describe("useDevelopmentBrainItems", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("LIFFトークンを取得できなければ一覧のローディングを終了して案内する", async () => {
-    const acquireIdToken = vi.fn().mockResolvedValue(null);
-    const { result } = renderHook(() =>
-      useDevelopmentBrainItems({ enabled: true, acquireIdToken }),
-    );
+  it("session APIが失敗すれば一覧のローディングを終了して案内する", async () => {
+    vi.mocked(fetchDevelopmentBrainItems).mockRejectedValue(new Error("session expired"));
+    const { result } = renderHook(() => useDevelopmentBrainItems({ enabled: true }));
 
     await waitFor(() => expect(result.current.state.status).toBe("error"));
-    expect(result.current.state).toEqual({ status: "error", message: authenticationError });
-    expect(fetchDevelopmentBrainItems).not.toHaveBeenCalled();
+    expect(result.current.state).toEqual({ status: "error", message: "session expired" });
   });
 
-  it("Vector確認時にLIFFトークンを取得できなくても再試行できる状態に戻す", async () => {
+  it("Vector確認のsession失効後も再試行できる", async () => {
     vi.mocked(fetchDevelopmentBrainItems).mockResolvedValue(emptyItems);
-    vi.mocked(fetchDevelopmentBrainVector).mockResolvedValue({
-      state: "missing",
-      entryRevision: 1,
-      checkedAt: "2026-08-10T00:00:00.000Z",
-    });
-    const acquireIdToken = vi
-      .fn()
-      .mockResolvedValueOnce("initial-token")
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce("retry-token");
-    const { result } = renderHook(() =>
-      useDevelopmentBrainItems({ enabled: true, acquireIdToken }),
-    );
+    vi.mocked(fetchDevelopmentBrainVector)
+      .mockRejectedValueOnce(new Error("session expired"))
+      .mockResolvedValueOnce({
+        state: "missing",
+        entryRevision: 1,
+        checkedAt: "2026-08-10T00:00:00.000Z",
+      });
+    const { result } = renderHook(() => useDevelopmentBrainItems({ enabled: true }));
     await waitFor(() => expect(result.current.state.status).toBe("success"));
 
     await act(async () => {
@@ -55,9 +45,8 @@ describe("useDevelopmentBrainItems", () => {
 
     expect(result.current.vectorStates["brain-1"]).toEqual({
       status: "error",
-      message: authenticationError,
+      message: "session expired",
     });
-    expect(fetchDevelopmentBrainVector).not.toHaveBeenCalled();
 
     await act(async () => {
       await result.current.verifyVector("brain-1");
@@ -69,7 +58,6 @@ describe("useDevelopmentBrainItems", () => {
     });
     expect(fetchDevelopmentBrainVector).toHaveBeenCalledWith(
       undefined,
-      "retry-token",
       "brain-1",
       expect.any(AbortSignal),
     );

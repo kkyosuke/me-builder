@@ -3,8 +3,9 @@ import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 import { D1 } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../index";
+import { createApplicationSessionFixture } from "../testing/application-session";
 
 const repositoryRoot = path.resolve(__dirname, "../../../..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
@@ -15,6 +16,8 @@ const adminLineId = "line-admin-e2e";
 
 let miniflare: Miniflare;
 let database: D1Database;
+let sessionFixture: ReturnType<typeof createApplicationSessionFixture>;
+let sessionHeaders: Record<string, string>;
 
 async function applyMigrations(db: D1Database): Promise<void> {
   const migrationFiles = (await readdir(migrationsDirectory))
@@ -88,29 +91,19 @@ describe("Admin Account list local E2E", () => {
     });
     database = (await miniflare.getD1Database("DB")) as D1Database;
     await prepareAccounts(database);
+    sessionFixture = createApplicationSessionFixture(database);
   }, 90_000);
 
-  afterEach(() => vi.unstubAllGlobals());
+  beforeEach(async () => {
+    sessionHeaders = (await sessionFixture.issue(adminAccountId)).headers;
+  });
   afterAll(async () => miniflare.dispose());
 
   it("管理者が名前と進行度projectionを検索できる", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        Response.json({
-          iss: "https://access.line.me",
-          sub: adminLineId,
-          aud: "1234567890",
-          iat: Math.floor(Date.now() / 1_000),
-          exp: timestamp + 86_400,
-          name: "管理者",
-        }),
-      ),
-    );
     const response = await app.request(
       "/api/admin/accounts?query=%E5%B1%B1%E7%94%B0&sort=level",
-      { headers: { Authorization: "Bearer known-token" } },
-      { DB: database, LINE_LOGIN_CHANNEL_ID: "1234567890", ENVIRONMENT: "test" },
+      { headers: sessionHeaders },
+      { DB: database, ...sessionFixture.bindings, ENVIRONMENT: "test" },
     );
 
     expect(response.status).toBe(200);
@@ -140,26 +133,14 @@ describe("Admin Account list local E2E", () => {
   });
 
   it("認証後に共有D1のroleを失ったAccountをrequestごとに拒否する", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        Response.json({
-          iss: "https://access.line.me",
-          sub: adminLineId,
-          aud: "1234567890",
-          iat: Math.floor(Date.now() / 1_000),
-          exp: timestamp + 86_400,
-        }),
-      ),
-    );
     await database
       .prepare("UPDATE accounts SET role = 'user' WHERE id = ?")
       .bind(adminAccountId)
       .run();
     const response = await app.request(
       "/api/admin/accounts",
-      { headers: { Authorization: "Bearer previously-admin-token" } },
-      { DB: database, LINE_LOGIN_CHANNEL_ID: "1234567890", ENVIRONMENT: "test" },
+      { headers: sessionHeaders },
+      { DB: database, ...sessionFixture.bindings, ENVIRONMENT: "test" },
     );
     expect(response.status).toBe(403);
     await database

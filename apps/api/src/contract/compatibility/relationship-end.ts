@@ -6,7 +6,7 @@ export const compatibilityRelationshipEndRoute = describeRoute({
   operationId: "endCompatibilityRelationship",
   tags: ["Compatibility"],
   summary: "当事者が成立中の相性関係を終了する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     204: { description: "相性関係を終了した" },
     ...authenticatedErrors,

@@ -8,7 +8,7 @@ export const compatibilityShareCases = {
     in: {
       method: "GET",
       path: "/api/compatibility/share-consent",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: [
         "migrationとdiagnosis seedを適用",
         "relationship-priorityの10問すべてへchoiceId=yesを保存",
@@ -32,7 +32,7 @@ export const compatibilityShareCases = {
     in: {
       method: "POST",
       path: "/api/compatibility/invitations",
-      authorization: "Bearer known-token",
+      session: "known-token",
       body: { relationshipCategory: "partner" },
       setup: ["共有できる内容がまだない状態でも発行できることを含める"],
     },
@@ -53,7 +53,7 @@ export const compatibilityShareCases = {
     in: {
       method: "GET",
       path: "/api/compatibility/invitations/:relationshipId",
-      authorization: "Bearer recipient-token",
+      session: "recipient-token",
       setup: ["送信者が招待を発行"],
     },
     out: {
@@ -75,7 +75,7 @@ export const compatibilityShareCases = {
     in: {
       method: "POST",
       path: "/api/compatibility/invitations/:relationshipId/accept",
-      authorization: "Bearer recipient-token",
+      session: "recipient-token",
       setup: ["受信者がDiagnosis未回答・共有プロフィール未生成のまま承諾"],
     },
     out: {
@@ -97,7 +97,7 @@ export const compatibilityShareCases = {
     in: {
       method: "GET",
       path: "/api/compatibility/invitations/:relationshipId",
-      authorization: "Bearer recipient-token",
+      session: "recipient-token",
       setup: ["送信者が招待を発行", "送信者が招待を取り消す"],
     },
     out: {
@@ -115,7 +115,7 @@ export const compatibilityShareCases = {
     in: {
       method: "POST",
       path: "/api/compatibility/invitations/:relationshipId/accept",
-      authorization: "Bearer recipient-token",
+      session: "recipient-token",
       setup: ["送信者と受信者が共通Diagnosisを完了して共有プロフィールを生成"],
     },
     out: {
@@ -134,7 +134,7 @@ export const compatibilityShareCases = {
     in: {
       method: "GET",
       path: "/api/compatibility/relationships/:relationshipId",
-      authorization: "Bearer participant-token",
+      session: "participant-token",
       setup: [
         "送信者と受信者が招待を承諾して相性関係を成立",
         "承諾後に送信者のわたしのまとめを再生成",
@@ -161,7 +161,7 @@ export const compatibilityShareCases = {
     in: {
       method: "GET",
       path: "/api/compatibility/relationships",
-      authorization: "Bearer participant-token",
+      session: "participant-token",
       setup: ["送信者が招待を発行し、受信者が承諾"],
     },
     out: {
@@ -179,7 +179,7 @@ export const compatibilityShareCases = {
     in: {
       method: "DELETE",
       path: "/api/compatibility/invitations/:relationshipId",
-      authorization: "Bearer inviter-token",
+      session: "inviter-token",
       setup: ["送信者が招待を発行"],
     },
     out: {
@@ -197,7 +197,7 @@ export const compatibilityShareCases = {
     in: {
       method: "DELETE",
       path: "/api/compatibility/relationships/:relationshipId",
-      authorization: "Bearer recipient-token",
+      session: "recipient-token",
       setup: ["送信者と受信者が招待を承諾して相性関係を成立"],
     },
     out: {
@@ -215,7 +215,7 @@ export const compatibilityShareCases = {
     in: {
       method: "GET",
       path: "/api/compatibility/invitations/:relationshipId",
-      authorization: "Bearer recipient-token",
+      session: "recipient-token",
       setup: [
         "送信者が共有へ同意してLIFF招待リンクを発行",
         "受信者がリンク内のrelationshipIdで招待画面の表示内容を取得",

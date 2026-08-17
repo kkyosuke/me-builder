@@ -10,7 +10,6 @@ import CompatibilityInvitationApplication from "../feature/compatibility/present
 import CompatibilityResultApplication from "../feature/compatibility/presentation/compatibility-result-application";
 
 const mocks = vi.hoisted(() => ({
-  acquireIdToken: vi.fn().mockResolvedValue("recipient-token"),
   fetchCompatibilityAvatarImage: vi.fn(),
   fetchCompatibilityInvitation: vi.fn(),
   fetchCompatibilityShareConsent: vi.fn(),
@@ -41,9 +40,15 @@ vi.mock("../feature/compatibility/infrastructure/compatibility-invitation-sharin
 vi.mock("../feature/compatibility/infrastructure/compatibility-avatar-api", () => ({
   fetchCompatibilityAvatarImage: mocks.fetchCompatibilityAvatarImage,
 }));
-
-vi.mock("../feature/liff", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
+vi.mock("../feature/auth", () => ({
+  useAuthSession: () => ({
+    state: {
+      status: "authenticated",
+      profile: { displayName: "受信者" },
+      role: "user",
+      revision: 1,
+    },
+  }),
 }));
 
 describe("LIFF compatibility share link journey", () => {
@@ -151,7 +156,6 @@ describe("LIFF compatibility share link journey", () => {
     await waitFor(() =>
       expect(mocks.issueCompatibilityInvitation).toHaveBeenCalledWith(
         undefined,
-        "recipient-token",
         "partner",
         expect.any(AbortSignal),
       ),
@@ -195,7 +199,6 @@ describe("LIFF compatibility share link journey", () => {
     expect(await screen.findByRole("heading", { name: "共有を終了しました" })).toBeTruthy();
     expect(mocks.endCompatibilityRelationship).toHaveBeenCalledWith(
       undefined,
-      "recipient-token",
       relationshipId,
       expect.any(AbortSignal),
     );
@@ -248,7 +251,6 @@ describe("LIFF compatibility share link journey", () => {
     expect(screen.queryByText(/傾向があります/)).toBeNull();
     expect(mocks.fetchCompatibilityInvitation).toHaveBeenCalledWith(
       undefined,
-      "recipient-token",
       relationshipId,
       expect.any(AbortSignal),
     );

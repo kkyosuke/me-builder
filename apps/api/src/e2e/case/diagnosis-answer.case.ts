@@ -8,7 +8,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "PUT",
       path: "/api/diagnoses/relationship-priority/answers/dq-relationship-priority-01",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["migrationとdiagnosis seedを適用", "body: choiceId=yes"],
     },
     out: {
@@ -26,7 +26,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "PUT",
       path: "/api/diagnoses/relationship-priority/answers/dq-relationship-priority-01",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["同じパスとchoiceId=yesを並行して2回送信"],
     },
     out: {
@@ -43,7 +43,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "PUT",
       path: "/api/diagnoses/relationship-priority/answers/dq-relationship-priority-01",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["choiceId=yesを保存後、同じパスへchoiceId=noを送信"],
     },
     out: {
@@ -60,7 +60,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "PUT",
       path: "/api/diagnoses/relationship-priority/answers/{diagnosisQuestionId}",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["relationship-priorityの10問すべてへchoiceId=yesを送信"],
     },
     out: {
@@ -77,7 +77,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "GET",
       path: "/api/diagnoses/relationship-priority/answers",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["1問目へchoiceId=yes、2問目へchoiceId=noを保存"],
     },
     out: {
@@ -100,7 +100,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "GET",
       path: "/api/diagnoses/relationship-priority/answers",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["回答を保存しない"],
     },
     out: {
@@ -117,7 +117,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "DELETE",
       path: "/api/dev/account-data",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["2問分の回答、日記、Brain Item、わたしのまとめを保存", "ENVIRONMENT=test"],
     },
     out: {
@@ -139,7 +139,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "DELETE",
       path: "/api/dev/account-data",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["1問分の回答を保存", "ENVIRONMENT=production"],
     },
     out: {
@@ -153,7 +153,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "DELETE",
       path: "/api/dev/account-data",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["1問分の回答を保存", "ENVIRONMENT bindingなし"],
     },
     out: {
@@ -167,7 +167,7 @@ export const diagnosisAnswerCases = {
     in: {
       method: "PUT + DELETE",
       path: "/api/diagnoses/relationship-priority/answers/{diagnosisQuestionId} + /api/dev/account-data",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: ["1問分の回答を保存", "2問目の保存とリセットを同時実行"],
     },
     out: {

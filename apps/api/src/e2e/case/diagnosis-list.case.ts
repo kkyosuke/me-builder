@@ -8,7 +8,7 @@ export const diagnosisListCases = {
     in: {
       method: "GET",
       path: "/api/diagnoses",
-      authorization: "Bearer known-token",
+      session: "known-token",
       setup: [
         "migrationとdiagnosis seedを適用",
         "money-valuesへ1問、relationship-priorityへ10問の回答を登録",
@@ -34,13 +34,13 @@ export const diagnosisListCases = {
       },
     },
   },
-  missingAuthorization: {
+  missingSession: {
     id: "LIST-002",
-    name: "Bearerトークンが無い場合は401を返すこと",
+    name: "アプリセッションが無い場合は401を返すこと",
     in: {
       method: "GET",
       path: "/api/diagnoses",
-      authorization: null,
+      session: null,
     },
     out: {
       status: 401,
@@ -49,13 +49,13 @@ export const diagnosisListCases = {
       },
     },
   },
-  invalidToken: {
+  bearerRejected: {
     id: "LIST-003",
-    name: "LINEがIDトークンを検証できない場合は401を返すこと",
+    name: "Bearerトークンだけでは認証されず401を返すこと",
     in: {
       method: "GET",
       path: "/api/diagnoses",
-      authorization: "Bearer invalid-token",
+      session: "bearer-only",
     },
     out: {
       status: 401,
@@ -66,11 +66,11 @@ export const diagnosisListCases = {
   },
   webFirstAccountCreation: {
     id: "LIST-004",
-    name: "友だち追加前でも検証済みの本人用Accountを作成して一覧を返すこと",
+    name: "交換済みセッションの本人用Accountについて一覧を返すこと",
     in: {
       method: "GET",
       path: "/api/diagnoses",
-      authorization: "Bearer unknown-token",
+      session: "unknown-token",
     },
     out: {
       status: 200,

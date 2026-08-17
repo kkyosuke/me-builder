@@ -58,11 +58,11 @@ flowchart LR
 
 Phase 1で外部ブラウザにLINE Loginを使う現在のプロダクト決定は、SSO導入までは維持します。SSO導入時は外部ブラウザのadapterだけを切り替え、LIFF内の入口と各機能の認可は変更しません。
 
-## 3. 現状と変更理由
+## 3. 移行前の構造と変更理由
 
-現在のWeb UIは`apps/web/src/feature/liff/`がLIFF初期化、外部ブラウザでの`liff.login()`、IDトークン取得をまとめて担当しています。取得したLIFF IDトークンを各featureが`Authorization: Bearer`で送っています。
+移行前のWeb UIは`apps/web/src/feature/liff/`がLIFF初期化、外部ブラウザでの`liff.login()`、IDトークン取得をまとめて担当し、取得したLIFF IDトークンを各featureが`Authorization: Bearer`で送っていました。
 
-API Serverでは各controllerがBearer tokenとLINE LoginチャネルIDをlogicへ渡し、多数のlogicファイルが`createLiffSession`へ依存しています。`createLiffSession`は名前と異なりサーバーセッションを発行せず、リクエストごとに次を行います。
+API Serverでは各controllerがBearer tokenとLINE LoginチャネルIDをlogicへ渡し、多数のlogicファイルが`createLiffSession`へ依存していました。`createLiffSession`は名前と異なりサーバーセッションを発行せず、リクエストごとに次を行っていました。
 
 1. LINEへIDトークン検証を委譲する
 2. `line_login` IdentityからAccountを解決する

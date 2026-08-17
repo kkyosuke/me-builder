@@ -7,7 +7,9 @@ import { KvApplicationSessionStore } from "./kv-application-session-store";
 export const APPLICATION_SESSION_COOKIE = "__Host-me_builder_session";
 export const CSRF_HEADER = "X-CSRF-Token";
 
-export function createApplicationSessionService(env: AppEnv["Bindings"] | undefined) {
+export function createApplicationSessionService(
+  env: Pick<AppEnv["Bindings"], "DB" | "SESSION_STORE"> | undefined,
+) {
   if (!env?.DB || !env.SESSION_STORE) return undefined;
   const db = D1.shared.client.create(env.DB);
   return {

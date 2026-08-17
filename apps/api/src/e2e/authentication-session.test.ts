@@ -125,7 +125,19 @@ async function sessionReference(cookie: string): Promise<string> {
   const hash = Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
-  return `session:v1:${hash}`;
+  return `session:v2:${hash}`;
+}
+
+async function recoverySecretHash(secret: string, salt: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${salt}:${secret}`),
+  );
+  const encoded = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/u, "");
+  return `v1.${salt}.${encoded}`;
 }
 
 describe("application session local D1/KV E2E", () => {
@@ -266,16 +278,17 @@ describe("application session local D1/KV E2E", () => {
     expect((await getSession(invalidatedCookie)).status).toBe(401);
   });
 
-  it("明示Bearerを古い別Account cookieより優先し、不正Bearerでもfallbackしない", async () => {
+  it("Bearerを認証に使わず、有効なapplication sessionだけを採用する", async () => {
     const first = await exchange("credential-a");
     const cookie = cookieFrom(first);
+    vi.mocked(fetch).mockClear();
 
-    const requestWithAuthorization = (authorization: string) =>
+    const requestWithAuthorization = (authorization: string, includeCookie: boolean) =>
       app.request(
         "/api/auth/session",
         {
           headers: {
-            Cookie: cookie,
+            ...(includeCookie ? { Cookie: cookie } : {}),
             Origin: webOrigin,
             Authorization: authorization,
           },
@@ -283,11 +296,14 @@ describe("application session local D1/KV E2E", () => {
         bindings(),
       );
 
-    // session確認APIはapplication session専用なので、Account Bの有効なBearerが
-    // cookieより優先されればlegacy認証として401になる。
-    expect((await requestWithAuthorization("Bearer credential-b")).status).toBe(401);
-    expect((await requestWithAuthorization("Bearer invalid-credential")).status).toBe(401);
-    expect((await getSession(cookie)).status).toBe(200);
+    const withCookie = await requestWithAuthorization("Bearer credential-b", true);
+    expect(withCookie.status).toBe(200);
+    expect(await withCookie.json()).toMatchObject({
+      displayProfile: { displayName: "利用者A" },
+    });
+    expect((await requestWithAuthorization("Bearer credential-b", false)).status).toBe(401);
+    expect((await requestWithAuthorization("Bearer invalid-credential", false)).status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("logoutは同じAccountで並行発行された全sessionを即時失効する", async () => {
@@ -334,5 +350,79 @@ describe("application session local D1/KV E2E", () => {
         pictureUrl: "https://example.com/profile-b.jpg",
       },
     });
+  });
+
+  it("復旧コードで認証中のLINE Identityを既存Accountへ移し、双方の旧sessionを失効する", async () => {
+    const targetSession = await exchange("credential-a");
+    const targetCookie = cookieFrom(targetSession);
+    const sourceSession = await exchange("credential-b");
+    const sourceCookie = cookieFrom(sourceSession);
+    const { csrfToken } = (await sourceSession.json()) as { csrfToken: string };
+    const timestamp = Math.floor(Date.now() / 1_000);
+    await database
+      .prepare(
+        `INSERT INTO account_identities (
+           id, created_at, updated_at, is_deleted, account_id, provider, provider_account_id
+         ) VALUES (?, ?, ?, 0, 'account-b', 'line_login', ?)`,
+      )
+      .bind("identity-b-other", timestamp, timestamp, "line-subject-b-other")
+      .run();
+
+    const credentialId = "recovery-e2e";
+    const secret = "recovery-secret";
+    const now = new Date();
+    await D1.shared.action.accountRecovery.issueAccountRecoveryCredential(
+      D1.shared.client.create(database),
+      {
+        id: credentialId,
+        accountId: "account-a",
+        secretHash: await recoverySecretHash(secret, "recovery-salt"),
+        expiresAt: new Date(now.getTime() + 60_000),
+        now,
+      },
+    );
+
+    const recovered = await app.request(
+      "/api/account-recovery/complete",
+      {
+        method: "POST",
+        headers: {
+          Cookie: sourceCookie,
+          Origin: webOrigin,
+          "X-CSRF-Token": csrfToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code: `${credentialId}.${secret}` }),
+      },
+      bindings(),
+    );
+
+    expect(recovered.status).toBe(200);
+    expect(await recovered.json()).toEqual({ status: "recovered", alreadyRecovered: false });
+    expect((await getSession(targetCookie)).status).toBe(401);
+    expect((await getSession(sourceCookie)).status).toBe(401);
+
+    const transferred = await database
+      .prepare(
+        `SELECT account_id
+         FROM account_identities
+         WHERE provider = 'line_login' AND provider_account_id = ? AND is_deleted = 0`,
+      )
+      .bind("line-subject-b")
+      .first<{ account_id: string }>();
+    expect(transferred?.account_id).toBe("account-a");
+    const untouchedIdentity = await database
+      .prepare(
+        `SELECT account_id
+         FROM account_identities
+         WHERE id = ? AND is_deleted = 0`,
+      )
+      .bind("identity-b-other")
+      .first<{ account_id: string }>();
+    expect(untouchedIdentity?.account_id).toBe("account-b");
+
+    const reexchanged = await exchange("credential-b");
+    expect(reexchanged.status).toBe(200);
+    expect((await getSession(cookieFrom(reexchanged))).status).toBe(200);
   });
 });

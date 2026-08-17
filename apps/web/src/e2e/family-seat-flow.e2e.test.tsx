@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FamilySeatApplication from "../feature/family/presentation/family-seat-application";
 
 const mocks = vi.hoisted(() => ({
-  acquireIdToken: vi.fn().mockResolvedValue("verified-id-token"),
   fetchFamilySeats: vi.fn(),
   issueFamilyInvitation: vi.fn(),
   acceptFamilyInvitation: vi.fn(),
@@ -15,9 +14,6 @@ const mocks = vi.hoisted(() => ({
   leaveFamilyPack: vi.fn(),
 }));
 
-vi.mock("../feature/liff/presentation/liff-session-provider", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
-}));
 vi.mock("../feature/family/infrastructure/family-api", () => ({
   fetchFamilySeats: mocks.fetchFamilySeats,
   issueFamilyInvitation: mocks.issueFamilyInvitation,
@@ -97,5 +93,21 @@ describe("family seat user journey", () => {
     fireEvent.click(await screen.findByRole("button", { name: "辞退する" }));
     expect(await screen.findByText("招待を辞退しました。")).toBeTruthy();
     expect(window.location.search).toBe("?source=line");
+  });
+
+  it("Account切替で画面を破棄したら席一覧の取得を中断する", async () => {
+    let requestSignal: AbortSignal | undefined;
+    mocks.fetchFamilySeats.mockImplementationOnce(
+      (_apiUrl: string | undefined, signal: AbortSignal) => {
+        requestSignal = signal;
+        return new Promise(() => undefined);
+      },
+    );
+    const view = render(<FamilySeatApplication onBack={vi.fn()} />);
+    await waitFor(() => expect(requestSignal).toBeDefined());
+
+    view.unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
   });
 });

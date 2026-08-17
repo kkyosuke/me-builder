@@ -1,5 +1,5 @@
 import { compatibilityRelationshipId } from "@me-builder/lib/compatibility";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 
 const PROFILE_AVATAR_PATH = "/api/profile/avatar";
 const INVITATION_AVATAR_PREFIX = "/api/compatibility/invitations/";
@@ -19,18 +19,16 @@ function isAllowedAvatarPath(path: string): boolean {
   return compatibilityRelationshipId.isValid(relationshipId);
 }
 
-/** APIが返した認可対象pathだけへBearerを送り、表示用Blobを取得する。 */
+/** APIが返した認可対象pathだけをCookie付きで取得し、表示用Blobへ変換する。 */
 export async function fetchCompatibilityAvatarImage(
   apiUrl: string | undefined,
-  idToken: string,
   avatarPath: string | null,
   signal?: AbortSignal,
 ): Promise<Blob | null> {
   if (!avatarPath || !isAllowedAvatarPath(avatarPath)) return null;
   let response: Response;
   try {
-    response = await createHttpClient(apiUrl).request(avatarPath, {
-      headers: { Authorization: `Bearer ${idToken}` },
+    response = await createAuthenticatedHttpClient(apiUrl).request(avatarPath, {
       ...(signal ? { signal } : {}),
     });
   } catch (error) {

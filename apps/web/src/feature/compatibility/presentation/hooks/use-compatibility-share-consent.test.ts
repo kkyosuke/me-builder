@@ -28,18 +28,16 @@ describe("useCompatibilityShareConsent", () => {
     vi.mocked(fetchCompatibilityAvatarImage).mockResolvedValue(null);
   });
 
-  it("LIFFトークンで共有可否を取得する", async () => {
+  it("アプリセッションで共有可否を取得する", async () => {
     vi.mocked(fetchCompatibilityShareConsent).mockResolvedValue(consent);
-    const acquireIdToken = vi.fn().mockResolvedValue("id-token");
     const { result } = renderHook(() =>
-      useCompatibilityShareConsent({ acquireIdToken, relationshipCategory: null }),
+      useCompatibilityShareConsent({ relationshipCategory: null }),
     );
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     expect(result.current.state).toEqual({ status: "success", data: consent });
     expect(fetchCompatibilityShareConsent).toHaveBeenCalledWith(
       undefined,
-      "id-token",
       undefined,
       expect.anything(),
     );
@@ -47,16 +45,14 @@ describe("useCompatibilityShareConsent", () => {
 
   it("初期選択カテゴリを最初の取得へ含め、案内を再取得しない", async () => {
     vi.mocked(fetchCompatibilityShareConsent).mockResolvedValue(consent);
-    const acquireIdToken = vi.fn().mockResolvedValue("id-token");
     const { result } = renderHook(() =>
-      useCompatibilityShareConsent({ acquireIdToken, relationshipCategory: "partner" }),
+      useCompatibilityShareConsent({ relationshipCategory: "partner" }),
     );
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     expect(fetchCompatibilityShareConsent).toHaveBeenCalledTimes(1);
     expect(fetchCompatibilityShareConsent).toHaveBeenCalledWith(
       undefined,
-      "id-token",
       "partner",
       expect.anything(),
     );
@@ -72,10 +68,9 @@ describe("useCompatibilityShareConsent", () => {
     );
     URL.createObjectURL = vi.fn().mockReturnValue("blob:profile-avatar");
     URL.revokeObjectURL = vi.fn();
-    const acquireIdToken = vi.fn().mockResolvedValue("id-token");
     const { result, rerender } = renderHook(
       ({ category }: { category: CompatibilityRelationshipCategory | null }) =>
-        useCompatibilityShareConsent({ acquireIdToken, relationshipCategory: category }),
+        useCompatibilityShareConsent({ relationshipCategory: category }),
       {
         initialProps: {
           category: null as CompatibilityRelationshipCategory | null,
@@ -98,23 +93,24 @@ describe("useCompatibilityShareConsent", () => {
 
     expect(fetchCompatibilityShareConsent).toHaveBeenLastCalledWith(
       undefined,
-      "id-token",
       "family",
       expect.anything(),
     );
     expect(fetchCompatibilityAvatarImage).toHaveBeenCalledTimes(1);
   });
 
-  it("LIFFトークンを取得できなければ案内を表示する", async () => {
-    const acquireIdToken = vi.fn().mockResolvedValue(null);
+  it("セッションが期限切れなら案内を表示する", async () => {
+    vi.mocked(fetchCompatibilityShareConsent).mockRejectedValue(
+      new Error("本人確認の有効期限が切れました。もう一度お試しください。"),
+    );
     const { result } = renderHook(() =>
-      useCompatibilityShareConsent({ acquireIdToken, relationshipCategory: null }),
+      useCompatibilityShareConsent({ relationshipCategory: null }),
     );
 
     await waitFor(() => expect(result.current.state.status).toBe("error"));
     expect(result.current.state).toEqual({
       status: "error",
-      message: "LINEから相性共有画面を開いてください。",
+      message: "本人確認の有効期限が切れました。もう一度お試しください。",
     });
   });
 });

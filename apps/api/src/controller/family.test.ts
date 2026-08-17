@@ -44,7 +44,7 @@ vi.mock("../middleware/authorization", async (importOriginal) => {
 });
 
 const env = { DB: {} as D1Database, LIFF_ID: "2010850319-Yl63upAR" };
-const headers = { Authorization: "Bearer verified.id.token", "Content-Type": "application/json" };
+const headers = { "Content-Type": "application/json" };
 const seat = {
   id: "seat-2",
   slotNumber: 2,

@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { FamilyInvitation, FamilySeat, FamilySeatManagement } from "../model/family-seat";
 
 type ManagementResponse =
@@ -32,7 +32,7 @@ const MutationSchema = v.object({ seat: SeatSchema }) satisfies v.GenericSchema<
 
 async function familyError(response: Response, fallback: string): Promise<Error> {
   if (response.status === 401)
-    return new Error("本人確認に失敗しました。LINEから開き直してください。");
+    return new Error("本人確認の有効期限が切れました。もう一度お試しください。");
   if (response.status === 403) return new Error("この操作を行う権限がありません。");
   const body = (await response.json().catch(() => null)) as { reason?: string } | null;
   const message = body?.reason
@@ -48,15 +48,11 @@ async function familyError(response: Response, fallback: string): Promise<Error>
   return new Error(message ?? `${fallback} (HTTP ${response.status})`);
 }
 
-const auth = (idToken: string) => ({ Authorization: `Bearer ${idToken}` });
-
 export async function fetchFamilySeats(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<FamilySeatManagement> {
-  const response = await createHttpClient(apiUrl).request("/api/family/seats", {
-    headers: auth(idToken),
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/family/seats", {
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw await familyError(response, "席状態を取得できませんでした");
@@ -65,12 +61,10 @@ export async function fetchFamilySeats(
 
 export async function issueFamilyInvitation(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<FamilyInvitation> {
-  const response = await createHttpClient(apiUrl).request("/api/family/invitations", {
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/family/invitations", {
     method: "POST",
-    headers: auth(idToken),
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw await familyError(response, "招待を発行できませんでした");
@@ -79,52 +73,40 @@ export async function issueFamilyInvitation(
 
 async function tokenMutation(
   apiUrl: string | undefined,
-  idToken: string,
   action: "accept" | "decline",
   token: string,
 ): Promise<FamilySeat> {
-  const response = await createHttpClient(apiUrl).request(`/api/family/invitations/${action}`, {
-    method: "POST",
-    headers: { ...auth(idToken), "Content-Type": "application/json" },
-    body: JSON.stringify({ token }),
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    `/api/family/invitations/${action}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    },
+  );
   if (!response.ok) throw await familyError(response, "招待を更新できませんでした");
   return v.parse(MutationSchema, await response.json()).seat;
 }
 
-export const acceptFamilyInvitation = (
-  apiUrl: string | undefined,
-  idToken: string,
-  token: string,
-) => tokenMutation(apiUrl, idToken, "accept", token);
+export const acceptFamilyInvitation = (apiUrl: string | undefined, token: string) =>
+  tokenMutation(apiUrl, "accept", token);
 
-export const declineFamilyInvitation = (
-  apiUrl: string | undefined,
-  idToken: string,
-  token: string,
-) => tokenMutation(apiUrl, idToken, "decline", token);
+export const declineFamilyInvitation = (apiUrl: string | undefined, token: string) =>
+  tokenMutation(apiUrl, "decline", token);
 
-async function deleteSeat(
-  apiUrl: string | undefined,
-  idToken: string,
-  path: string,
-): Promise<FamilySeat> {
-  const response = await createHttpClient(apiUrl).request(path, {
+async function deleteSeat(apiUrl: string | undefined, path: string): Promise<FamilySeat> {
+  const response = await createAuthenticatedHttpClient(apiUrl).request(path, {
     method: "DELETE",
-    headers: auth(idToken),
   });
   if (!response.ok) throw await familyError(response, "席を更新できませんでした");
   return v.parse(MutationSchema, await response.json()).seat;
 }
 
-export const cancelFamilyInvitation = (
-  apiUrl: string | undefined,
-  idToken: string,
-  seatId: string,
-) => deleteSeat(apiUrl, idToken, `/api/family/invitations/${encodeURIComponent(seatId)}`);
+export const cancelFamilyInvitation = (apiUrl: string | undefined, seatId: string) =>
+  deleteSeat(apiUrl, `/api/family/invitations/${encodeURIComponent(seatId)}`);
 
-export const removeFamilyMember = (apiUrl: string | undefined, idToken: string, seatId: string) =>
-  deleteSeat(apiUrl, idToken, `/api/family/seats/${encodeURIComponent(seatId)}`);
+export const removeFamilyMember = (apiUrl: string | undefined, seatId: string) =>
+  deleteSeat(apiUrl, `/api/family/seats/${encodeURIComponent(seatId)}`);
 
-export const leaveFamilyPack = (apiUrl: string | undefined, idToken: string) =>
-  deleteSeat(apiUrl, idToken, "/api/family/membership");
+export const leaveFamilyPack = (apiUrl: string | undefined) =>
+  deleteSeat(apiUrl, "/api/family/membership");

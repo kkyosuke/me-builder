@@ -5,13 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ServiceTermsGate } from "./service-terms-gate";
 
 const mocks = vi.hoisted(() => ({
-  acquireIdToken: vi.fn(),
+  authState: { status: "authenticated", revision: 1 } as {
+    status: string;
+    revision?: number;
+    message?: string;
+  },
+  retry: vi.fn(),
   fetchStatus: vi.fn(),
   accept: vi.fn(),
 }));
 
-vi.mock("../../liff", () => ({
-  useLiffSession: () => ({ acquireIdToken: mocks.acquireIdToken }),
+vi.mock("../../auth", () => ({
+  useAuthSession: () => ({ state: mocks.authState, retry: mocks.retry }),
 }));
 vi.mock("../infrastructure/service-terms-api", () => ({
   ServiceTermsVersionConflictError: class extends Error {},
@@ -33,7 +38,7 @@ const document = {
 describe("ServiceTermsGate", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
-    mocks.acquireIdToken.mockResolvedValue("id-token");
+    mocks.authState = { status: "authenticated", revision: 1 };
     mocks.accept.mockResolvedValue({
       acceptedAt: "2026-08-15T01:23:45.000Z",
       version: document.version,
@@ -65,7 +70,7 @@ describe("ServiceTermsGate", () => {
     fireEvent.click(screen.getByRole("button", { name: "同意して利用を始める" }));
 
     await waitFor(() => expect(screen.getByText("主機能")).toBeTruthy());
-    expect(mocks.accept).toHaveBeenCalledWith(undefined, "id-token", document.version);
+    expect(mocks.accept).toHaveBeenCalledWith(undefined, document.version);
     expect(window.location.pathname).toBe("/me");
   });
 
@@ -113,6 +118,45 @@ describe("ServiceTermsGate", () => {
     expect(await screen.findByText("主機能")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: document.title })).toBeNull();
     expect(mocks.accept).not.toHaveBeenCalled();
+  });
+
+  it("Account切替時は前Accountの同意状態を破棄して新しいsessionで再確認する", async () => {
+    mocks.fetchStatus
+      .mockResolvedValueOnce({
+        document,
+        acceptance: {
+          required: false,
+          acceptedVersion: document.version,
+          documentHash: document.contentHash,
+          acceptedAt: "2026-08-15T01:23:45.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        document,
+        acceptance: {
+          required: true,
+          acceptedVersion: null,
+          documentHash: null,
+          acceptedAt: null,
+        },
+      });
+    const { rerender } = render(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+    expect(await screen.findByText("主機能")).toBeTruthy();
+
+    mocks.authState = { status: "authenticated", revision: 2 };
+    rerender(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(screen.queryByText("主機能")).toBeNull();
+    expect(await screen.findByRole("heading", { name: document.title })).toBeTruthy();
+    expect(mocks.fetchStatus).toHaveBeenCalledTimes(2);
   });
 
   it("LIFF deep linkのterms指定では同意済みでも規約を表示する", async () => {
@@ -175,5 +219,20 @@ describe("ServiceTermsGate", () => {
     expect(await screen.findByText(latestDocument.summary)).toBeTruthy();
     expect(mocks.fetchStatus).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("主機能")).toBeNull();
+  });
+
+  it("session期限切れでは規約APIを呼ばず共通認証を再試行する", async () => {
+    mocks.authState = { status: "unauthenticated" };
+
+    render(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(screen.getByRole("heading", { name: "本人確認が必要です" })).toBeTruthy();
+    expect(mocks.fetchStatus).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    expect(mocks.retry).toHaveBeenCalledOnce();
   });
 });

@@ -51,9 +51,9 @@ stateDiagram-v2
 | `GET` | `/api/personal-data/exports/:exportId` | 本人の要求状態、完成日時、期限、download pathを返す |
 | `GET` | `/api/personal-data/exports/:exportId/download` | `ready`かつ期限内ならJSON attachmentを返す |
 
-すべての経路でLIFF ID tokenを検証し、解決したAccountのAccountDataだけを参照します。Account IDはクライアントから受け取りません。別Accountの要求は`404`、生成前は`409`、期限切れは`410`です。状態とarchiveは`Cache-Control: no-store`とし、運用ログではexport IDをroute patternへ置換し、archive本文を記録しません。
+すべての経路でHttpOnlyのアプリセッションCookieを検証し、解決したAccountのAccountDataだけを参照します。Account IDはクライアントから受け取りません。変更系リクエストでは同一OriginとCSRFトークンも検証します。別Accountの要求は`404`、生成前は`409`、期限切れは`410`です。状態とarchiveは`Cache-Control: no-store`とし、運用ログではexport IDをroute patternへ置換し、archive本文を記録しません。
 
-Webは要求後に状態をpollし、完成後もID token付き`fetch`でarchiveを取得して端末へ保存します。認証headerを付けられない直接リンクは提供しません。
+Webは要求後に状態をpollし、完成後も同一Originのcredential付き`fetch`でarchiveを取得して端末へ保存します。CookieをURLへ露出する直接リンクは提供しません。
 
 ## 5. Planとの関係
 

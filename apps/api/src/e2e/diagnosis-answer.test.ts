@@ -3,9 +3,10 @@ import path from "node:path";
 import type { D1Database } from "@cloudflare/workers-types";
 import { D1, DO } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../index";
 import { type AccountDataTestStore, createAccountDataTestStore } from "../testing/account-data";
+import { createApplicationSessionFixture } from "../testing/application-session";
 import {
   type CompatibilityDataTestStore,
   createCompatibilityDataTestStore,
@@ -23,6 +24,8 @@ let miniflare: Miniflare;
 let database: D1Database;
 let accountDataStore: AccountDataTestStore;
 let compatibilityDataStore: CompatibilityDataTestStore;
+let sessionFixture: ReturnType<typeof createApplicationSessionFixture>;
+let sessionHeaders: Record<string, string>;
 
 async function applySqlFile(db: D1Database, sql: string): Promise<void> {
   const statements = sql
@@ -63,22 +66,6 @@ async function prepareDatabase(db: D1Database): Promise<void> {
   );
 }
 
-function mockLineVerification(): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () =>
-      Response.json({
-        iss: "https://access.line.me",
-        sub: "line-answer-e2e",
-        aud: "1234567890",
-        iat: Math.floor(Date.now() / 1_000),
-        exp: timestamp + 86_400,
-        name: "あおい",
-      }),
-    ),
-  );
-}
-
 const env = () => ({
   DB: database,
   ACCOUNT_DATA: accountDataStore.namespace,
@@ -86,9 +73,8 @@ const env = () => ({
   CONVERSATION_COORDINATOR: {
     getByName: () => ({ resetAccountData: async () => 1 }),
   },
-  LINE_LOGIN_CHANNEL_ID: "1234567890",
+  ...sessionFixture.bindings,
   ENVIRONMENT: "test",
-  WEB_ORIGIN: "https://example.com",
   LIFF_ID: "1234567890-testliff",
 });
 
@@ -102,7 +88,7 @@ async function putAnswer(
     {
       method: "PUT",
       headers: {
-        Authorization: "Bearer known-token",
+        ...sessionHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ choiceId }),
@@ -112,11 +98,7 @@ async function putAnswer(
 }
 
 async function getAnswers(diagnosisId = "relationship-priority"): Promise<Response> {
-  return app.request(
-    `/api/diagnoses/${diagnosisId}/answers`,
-    { headers: { Authorization: "Bearer known-token" } },
-    env(),
-  );
+  return app.request(`/api/diagnoses/${diagnosisId}/answers`, { headers: sessionHeaders }, env());
 }
 
 async function personalDataRequest(
@@ -129,7 +111,7 @@ async function personalDataRequest(
     {
       method,
       headers: {
-        Authorization: "Bearer known-token",
+        ...sessionHeaders,
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -139,11 +121,7 @@ async function personalDataRequest(
 }
 
 async function getCompatibilityShareConsent(): Promise<Response> {
-  return app.request(
-    "/api/compatibility/share-consent",
-    { headers: { Authorization: "Bearer known-token" } },
-    env(),
-  );
+  return app.request("/api/compatibility/share-consent", { headers: sessionHeaders }, env());
 }
 
 async function issueCompatibilityInvitation(): Promise<Response> {
@@ -152,7 +130,7 @@ async function issueCompatibilityInvitation(): Promise<Response> {
     {
       method: "POST",
       headers: {
-        Authorization: "Bearer known-token",
+        ...sessionHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ relationshipCategory: "partner" }),
@@ -162,11 +140,7 @@ async function issueCompatibilityInvitation(): Promise<Response> {
 }
 
 async function getDetail(diagnosisId = "relationship-priority"): Promise<Response> {
-  return app.request(
-    `/api/diagnoses/${diagnosisId}`,
-    { headers: { Authorization: "Bearer known-token" } },
-    env(),
-  );
+  return app.request(`/api/diagnoses/${diagnosisId}`, { headers: sessionHeaders }, env());
 }
 
 async function completeRelationshipDiagnosis(): Promise<unknown> {
@@ -265,7 +239,7 @@ async function deferQuestion(
 ): Promise<Response> {
   return app.request(
     `/api/diagnoses/${diagnosisId}/deferred-questions/${diagnosisQuestionId}`,
-    { method: "PUT", headers: { Authorization: "Bearer known-token" } },
+    { method: "PUT", headers: sessionHeaders },
     env(),
   );
 }
@@ -274,7 +248,7 @@ async function deleteAccountData(environment: string | undefined): Promise<Respo
   const { ENVIRONMENT: _, ...baseEnv } = env();
   return app.request(
     "/api/dev/account-data",
-    { method: "DELETE", headers: { Authorization: "Bearer known-token" } },
+    { method: "DELETE", headers: sessionHeaders },
     { ...baseEnv, ...(environment === undefined ? {} : { ENVIRONMENT: environment }) },
   );
 }
@@ -283,11 +257,7 @@ async function listRelationshipDiagnosis(): Promise<{
   responseStatus: string;
   answeredCount: number;
 }> {
-  const response = await app.request(
-    "/api/diagnoses",
-    { headers: { Authorization: "Bearer known-token" } },
-    env(),
-  );
+  const response = await app.request("/api/diagnoses", { headers: sessionHeaders }, env());
   const body = (await response.json()) as {
     diagnoses: Array<{ id: string; responseStatus: string; answeredCount: number }>;
   };
@@ -329,11 +299,12 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     accountDataStore = createAccountDataTestStore();
     compatibilityDataStore = createCompatibilityDataTestStore();
     await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
-    mockLineVerification();
+    sessionFixture = createApplicationSessionFixture(database);
+    sessionHeaders = (await sessionFixture.issue("account-answer-e2e", { displayName: "あおい" }))
+      .headers;
   }, e2eTimeoutMs);
 
   afterEach(async () => {
-    vi.unstubAllGlobals();
     await miniflare.dispose();
   });
 
@@ -679,10 +650,12 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     });
   });
 
-  it("seedで参照される全採点設定がQuestion ID・Version・Choiceと一致する", async () => {
-    const rows = await database
-      .prepare(
-        `SELECT
+  it(
+    "seedで参照される全採点設定がQuestion ID・Version・Choiceと一致する",
+    async () => {
+      const rows = await database
+        .prepare(
+          `SELECT
            d.id AS diagnosis_id,
            dq.id AS diagnosis_question_id,
            qc.choice_id
@@ -697,38 +670,40 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
           AND qc.is_deleted = 0
          WHERE d.state = 'published' AND d.is_deleted = 0
          ORDER BY d.id, dq.position, qc.position`,
-      )
-      .all<{
-        diagnosis_id: string;
-        diagnosis_question_id: string;
-        choice_id: string;
-      }>();
-    const targets = new Map<string, { diagnosisQuestionId: string; choiceId: string }>();
-    for (const row of rows.results) {
-      if (!targets.has(row.diagnosis_id)) {
-        targets.set(row.diagnosis_id, {
-          diagnosisQuestionId: row.diagnosis_question_id,
-          choiceId: row.choice_id,
+        )
+        .all<{
+          diagnosis_id: string;
+          diagnosis_question_id: string;
+          choice_id: string;
+        }>();
+      const targets = new Map<string, { diagnosisQuestionId: string; choiceId: string }>();
+      for (const row of rows.results) {
+        if (!targets.has(row.diagnosis_id)) {
+          targets.set(row.diagnosis_id, {
+            diagnosisQuestionId: row.diagnosis_question_id,
+            choiceId: row.choice_id,
+          });
+        }
+      }
+      expect(targets.size).toBeGreaterThan(0);
+
+      for (const [diagnosisId, target] of targets) {
+        const saved = await putAnswer(target.diagnosisQuestionId, target.choiceId, diagnosisId);
+        expect(saved.status).toBe(200);
+
+        const response = await getAnswers(diagnosisId);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          id: diagnosisId,
+          scoring: {
+            scoringVersion: expect.any(Number),
+            parameters: expect.any(Array),
+          },
         });
       }
-    }
-    expect(targets.size).toBeGreaterThan(0);
-
-    for (const [diagnosisId, target] of targets) {
-      const saved = await putAnswer(target.diagnosisQuestionId, target.choiceId, diagnosisId);
-      expect(saved.status).toBe(200);
-
-      const response = await getAnswers(diagnosisId);
-      expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
-        id: diagnosisId,
-        scoring: {
-          scoringVersion: expect.any(Number),
-          parameters: expect.any(Array),
-        },
-      });
-    }
-  });
+    },
+    e2eTimeoutMs,
+  );
 
   it(
     "インドア・アウトドアと余暇の回答を4つのパラメータへ採点する",
@@ -1291,11 +1266,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
   it("未回答ならwithdrawnの一覧・詳細・回答内容を公開しない", async () => {
     await withdrawDiagnosis();
 
-    const list = await app.request(
-      "/api/diagnoses",
-      { headers: { Authorization: "Bearer known-token" } },
-      env(),
-    );
+    const list = await app.request("/api/diagnoses", { headers: sessionHeaders }, env());
     const listBody = (await list.json()) as { diagnoses: Array<{ id: string }> };
     expect(listBody.diagnoses.some(({ id }) => id === "relationship-priority")).toBe(false);
 

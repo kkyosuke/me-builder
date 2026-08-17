@@ -7,10 +7,8 @@ import { fetchCompatibilityAvatarImage } from "../../infrastructure/compatibilit
 import type { CompatibilityShareConsent } from "../../model/compatibility-share-consent";
 
 export function useCompatibilityShareConsent({
-  acquireIdToken,
   relationshipCategory,
 }: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
   relationshipCategory: CompatibilityRelationshipCategory | null;
 }) {
   const [state, setState] = useState<AsyncState<CompatibilityShareConsent>>({
@@ -33,20 +31,13 @@ export function useCompatibilityShareConsent({
     if (mounted.current) setState({ status: "loading" });
     try {
       const category = relationshipCategoryRef.current;
-      const idToken = await acquireIdToken(controller.signal);
-      if (controller.signal.aborted) return;
-      if (!idToken) {
-        throw new Error("LINEから相性共有画面を開いてください。");
-      }
       const consent = await fetchCompatibilityShareConsent(
         config.apiUrl,
-        idToken,
         category ?? undefined,
         controller.signal,
       );
       const avatarBlob = await fetchCompatibilityAvatarImage(
         config.apiUrl,
-        idToken,
         consent.avatarUrl,
         controller.signal,
       );
@@ -70,44 +61,38 @@ export function useCompatibilityShareConsent({
     } finally {
       if (request.current === controller) loading.current = false;
     }
-  }, [acquireIdToken]);
+  }, []);
 
-  const refreshGuidance = useCallback(
-    async (category: CompatibilityRelationshipCategory) => {
-      request.current?.abort();
-      const controller = new AbortController();
-      request.current = controller;
-      setState((current) =>
-        current.status === "success"
-          ? { status: "success", data: { ...current.data, nextAction: null } }
-          : current,
+  const refreshGuidance = useCallback(async (category: CompatibilityRelationshipCategory) => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    setState((current) =>
+      current.status === "success"
+        ? { status: "success", data: { ...current.data, nextAction: null } }
+        : current,
+    );
+    try {
+      const consent = await fetchCompatibilityShareConsent(
+        config.apiUrl,
+        category,
+        controller.signal,
       );
-      try {
-        const idToken = await acquireIdToken(controller.signal);
-        if (controller.signal.aborted || !idToken) return;
-        const consent = await fetchCompatibilityShareConsent(
-          config.apiUrl,
-          idToken,
-          category,
-          controller.signal,
+      if (mounted.current && !controller.signal.aborted) {
+        loadedGuidanceCategory.current = category;
+        setState((current) =>
+          current.status === "success"
+            ? {
+                status: "success",
+                data: { ...consent, avatarUrl: current.data.avatarUrl },
+              }
+            : current,
         );
-        if (mounted.current && !controller.signal.aborted) {
-          loadedGuidanceCategory.current = category;
-          setState((current) =>
-            current.status === "success"
-              ? {
-                  status: "success",
-                  data: { ...consent, avatarUrl: current.data.avatarUrl },
-                }
-              : current,
-          );
-        }
-      } catch {
-        // 案内の再取得に失敗しても、確認済みの共有可否とプロフィール表示は維持する。
       }
-    },
-    [acquireIdToken],
-  );
+    } catch {
+      // 案内の再取得に失敗しても、確認済みの共有可否とプロフィール表示は維持する。
+    }
+  }, []);
 
   useEffect(() => {
     mounted.current = true;

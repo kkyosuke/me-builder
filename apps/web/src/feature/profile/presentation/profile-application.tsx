@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { CompatibilityShareContentSection } from "../../compatibility";
-import { useLiffSession } from "../../liff";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
 import { useProfileProgression } from "./use-profile-progression";
@@ -9,10 +8,9 @@ import { useWeeklyReflection } from "./use-weekly-reflection";
 import { WeeklyReflectionSection } from "./weekly-reflection-section";
 
 export default function ProfileApplication() {
-  const liffSession = useLiffSession();
-  const summary = useProfileSummary({ acquireIdToken: liffSession.acquireIdToken });
-  const progression = useProfileProgression({ acquireIdToken: liffSession.acquireIdToken });
-  const weeklyReflection = useWeeklyReflection({ acquireIdToken: liffSession.acquireIdToken });
+  const summary = useProfileSummary();
+  const progression = useProfileProgression();
+  const weeklyReflection = useWeeklyReflection();
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const result = summary.state.status === "success" ? summary.state.data : null;
   const selectedVersion = result
@@ -55,10 +53,7 @@ export default function ProfileApplication() {
         state={weeklyReflection.state}
         onGenerate={() => void weeklyReflection.generate()}
       />
-      <CompatibilityShareContentSection
-        acquireIdToken={liffSession.acquireIdToken}
-        latestProfileSummaryVersionId={latestVersionId}
-      />
+      <CompatibilityShareContentSection latestProfileSummaryVersionId={latestVersionId} />
     </ProfileSummaryScreen>
   );
 }

@@ -4,6 +4,7 @@ import path from "node:path";
 import type { BillingQueueMessage, Queue } from "@me-builder/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../apps/api/src";
+import { createApplicationSessionFixture } from "../apps/api/src/testing/application-session";
 import { createLocalD1 } from "../apps/api/src/testing/local-d1";
 import { convergeBillingEvent } from "../apps/worker/src/handler/billing";
 import { D1, billing } from "../packages/lib/src";
@@ -11,7 +12,6 @@ import { D1, billing } from "../packages/lib/src";
 const repositoryRoot = path.resolve(__dirname, "..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
 const stripeWebhookSecret = "whsec_user_journey";
-const lineChannelId = "1234567890";
 const paidPeriodStart = "2026-08-01T00:00:00.000Z";
 const paidPeriodEnd = "2026-09-01T00:00:00.000Z";
 type LocalD1 = Awaited<ReturnType<typeof createLocalD1>>;
@@ -20,6 +20,7 @@ let localD1: LocalD1;
 let database: LocalD1["database"];
 let queuedMessages: BillingQueueMessage[];
 let currentSubscription: billing.BillingSubscription;
+let sessionFixture: ReturnType<typeof createApplicationSessionFixture>;
 
 async function applyMigrations(): Promise<void> {
   const files = (await readdir(migrationsDirectory))
@@ -122,29 +123,6 @@ async function createPaidAccount() {
   return { db, account: account.account };
 }
 
-function stubLineVerification(): void {
-  const subjects: Record<string, string> = {
-    "paid-user-token": "line-paid-user",
-    "recovered-user-token": "line-recovered-user",
-    "conflict-user-token": "line-conflict-user",
-    "free-user-token": "line-free-user",
-    "attacker-token": "line-attacker",
-  };
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      const idToken = new URLSearchParams(String(init?.body)).get("id_token") ?? "";
-      return Response.json({
-        iss: "https://access.line.me",
-        sub: subjects[idToken] ?? "line-unknown",
-        aud: lineChannelId,
-        iat: Math.floor(Date.now() / 1_000),
-        exp: 4_000_000_000,
-      });
-    }),
-  );
-}
-
 describe("billing user journeys E2E", () => {
   beforeEach(async () => {
     localD1 = await createLocalD1(`billing-user-journey-${crypto.randomUUID()}`);
@@ -162,6 +140,7 @@ describe("billing user journeys E2E", () => {
       createdAt: paidPeriodStart,
     };
     await applyMigrations();
+    sessionFixture = createApplicationSessionFixture(database);
   }, 90_000);
 
   afterEach(async () => {
@@ -238,24 +217,34 @@ describe("billing user journeys E2E", () => {
     });
     await acceptWebhook(activated);
     await consumeNextBillingMessage();
-    stubLineVerification();
-    const bindings = { DB: database, LINE_LOGIN_CHANNEL_ID: lineChannelId, ENVIRONMENT: "test" };
+    const recovered = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-recovered-user",
+    });
+    const attacker = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-attacker",
+    });
+    const paidSession = await sessionFixture.issue(account.id);
+    const recoveredSession = await sessionFixture.issue(recovered.account.id);
+    const attackerSession = await sessionFixture.issue(attacker.account.id);
+    const bindings = { DB: database, ...sessionFixture.bindings, ENVIRONMENT: "test" };
 
     const issue = await app.request(
       "/api/account-recovery/codes",
-      { method: "POST", headers: { Authorization: "Bearer paid-user-token" } },
+      { method: "POST", headers: paidSession.headers },
       bindings,
     );
     expect(issue.status).toBe(201);
     expect(issue.headers.get("cache-control")).toBe("no-store");
     const { code } = (await issue.json()) as { code: string };
 
-    const recover = await app.request(
+    const recoverResponse = await app.request(
       "/api/account-recovery/complete",
       {
         method: "POST",
         headers: {
-          Authorization: "Bearer recovered-user-token",
+          ...recoveredSession.headers,
           "Content-Type": "application/json",
           "CF-Connecting-IP": "203.0.113.10",
         },
@@ -263,8 +252,8 @@ describe("billing user journeys E2E", () => {
       },
       bindings,
     );
-    expect(recover.status).toBe(200);
-    expect(await recover.json()).toEqual({ status: "recovered", alreadyRecovered: false });
+    expect(recoverResponse.status).toBe(200);
+    expect(await recoverResponse.json()).toEqual({ status: "recovered", alreadyRecovered: false });
     const identities = await db.query.accountIdentities.findMany({
       where: (table, { eq }) => eq(table.accountId, account.id),
     });
@@ -281,12 +270,13 @@ describe("billing user journeys E2E", () => {
       ),
     ).resolves.toMatchObject({ plan: "full", payerAccountId: account.id });
 
+    const refreshedRecoveredSession = await sessionFixture.issue(account.id);
     const retry = await app.request(
       "/api/account-recovery/complete",
       {
         method: "POST",
         headers: {
-          Authorization: "Bearer recovered-user-token",
+          ...refreshedRecoveredSession.headers,
           "Content-Type": "application/json",
           "CF-Connecting-IP": "203.0.113.10",
         },
@@ -295,14 +285,39 @@ describe("billing user journeys E2E", () => {
       bindings,
     );
     expect(await retry.json()).toEqual({ status: "recovered", alreadyRecovered: true });
+    const activeRecoveredSession = await sessionFixture.issue(account.id);
 
     await D1.shared.action.account.upsertIdentity(db, {
       provider: "line",
       providerAccountId: "line-conflict-user",
     });
+    const conflictSourceAccountId = crypto.randomUUID();
+    const conflictTimestamp = Math.floor(Date.now() / 1_000);
+    await database
+      .prepare(
+        `INSERT INTO accounts (id, created_at, updated_at, is_deleted, status, role)
+         VALUES (?, ?, ?, 0, 'active', 'user')`,
+      )
+      .bind(conflictSourceAccountId, conflictTimestamp, conflictTimestamp)
+      .run();
+    await database
+      .prepare(
+        `INSERT INTO account_identities (
+           id, created_at, updated_at, is_deleted, account_id, provider, provider_account_id
+         ) VALUES (?, ?, ?, 0, ?, 'line_login', ?)`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        conflictTimestamp,
+        conflictTimestamp,
+        conflictSourceAccountId,
+        "line-conflict-user",
+      )
+      .run();
+    const conflictSession = await sessionFixture.issue(conflictSourceAccountId);
     const secondIssue = await app.request(
       "/api/account-recovery/codes",
-      { method: "POST", headers: { Authorization: "Bearer recovered-user-token" } },
+      { method: "POST", headers: activeRecoveredSession.headers },
       bindings,
     );
     const secondCode = ((await secondIssue.json()) as { code: string }).code;
@@ -311,7 +326,7 @@ describe("billing user journeys E2E", () => {
       {
         method: "POST",
         headers: {
-          Authorization: "Bearer conflict-user-token",
+          ...conflictSession.headers,
           "Content-Type": "application/json",
           "CF-Connecting-IP": "203.0.113.11",
         },
@@ -327,7 +342,7 @@ describe("billing user journeys E2E", () => {
         {
           method: "POST",
           headers: {
-            Authorization: "Bearer attacker-token",
+            ...attackerSession.headers,
             "Content-Type": "application/json",
             "CF-Connecting-IP": "203.0.113.12",
           },
@@ -342,7 +357,7 @@ describe("billing user journeys E2E", () => {
       {
         method: "POST",
         headers: {
-          Authorization: "Bearer attacker-token",
+          ...attackerSession.headers,
           "Content-Type": "application/json",
           "CF-Connecting-IP": "203.0.113.12",
         },
@@ -355,8 +370,8 @@ describe("billing user journeys E2E", () => {
       await db.query.accountIdentities.findFirst({
         where: (table, { eq }) => eq(table.providerAccountId, "line-attacker"),
       }),
-    ).toBeUndefined();
-  }, 20_000);
+    ).toMatchObject({ accountId: attacker.account.id, isDeleted: false });
+  }, 30_000);
 
   it("Customerだけが紐付いたFree利用者には復旧コードを発行しない", async () => {
     const db = D1.shared.client.create(database);
@@ -369,12 +384,12 @@ describe("billing user journeys E2E", () => {
       accountId: free.account.id,
       providerCustomerId: "cus_without_paid_projection",
     });
-    stubLineVerification();
+    const freeSession = await sessionFixture.issue(free.account.id);
 
     const response = await app.request(
       "/api/account-recovery/codes",
-      { method: "POST", headers: { Authorization: "Bearer free-user-token" } },
-      { DB: database, LINE_LOGIN_CHANNEL_ID: lineChannelId, ENVIRONMENT: "test" },
+      { method: "POST", headers: freeSession.headers },
+      { DB: database, ...sessionFixture.bindings, ENVIRONMENT: "test" },
     );
 
     expect(response.status).toBe(409);

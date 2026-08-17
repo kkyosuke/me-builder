@@ -8,13 +8,13 @@ Question、Diagnosis、DiagnosisResponseの状態と不変条件は[Phase 1 診�
 
 ## 2. 認証境界
 
-診断APIはクライアント指定のAccount IDを受け付けません。LIFF IDトークンをAuthorizationヘッダーで受け取り、API ServerがLINEへ検証した`sub`からAccountを解決します。
+診断APIはクライアント指定のAccount IDを受け付けません。`POST /api/auth/liff/exchange`で発行したHttpOnlyのアプリセッションCookieから、API ServerがAccountを解決します。
 
 ```http
-Authorization: Bearer <LIFF ID token>
+Cookie: __Host-me_builder_session=<opaque session token>
 ```
 
-サーバー発行セッションが導入されるまでは、各リクエストでIDトークンを検証します。これは継続リクエスト用セッションを確定するまでの境界であり、URL、レスポンス、ログへIDトークンやAccount IDを出しません。
+LIFF IDトークンは交換時にだけ検証し、機能APIへは送信しません。変更系リクエストは同一Originと`X-CSRF-Token`も検証します。URL、レスポンス、ログへセッショントークン、CSRFトークン、IDトークン、Account IDを出しません。
 
 ## 3. 診断一覧
 
@@ -238,8 +238,9 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 | HTTP | 条件 | レスポンス |
 | --- | --- | --- |
-| `401` | Bearerトークンがない、検証できない、または検証設定がない | `{ "error": "Unauthorized" }` |
-| `503` | D1 bindingがない | `{ "error": "Service Unavailable" }` |
+| `401` | アプリセッションCookieがない、無効、または期限切れ | `{ "error": "Unauthorized" }` |
+| `403` | 変更系リクエストのOriginまたはCSRFトークンが不正 | `{ "error": "Forbidden" }` |
+| `503` | D1またはセッションストアbindingがない | `{ "error": "Service Unavailable" }` |
 | `500` | 未処理のサーバーエラー | `{ "error": "Internal Server Error" }` |
 
 認証失敗の詳細、トークン、`sub`、Account IDはレスポンスへ含めません。
@@ -250,7 +251,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 各テストの入力と期待出力は、`apps/api/src/e2e/case/`の`*.case.ts`へ`id`、`name`、`in`、`out`を持つオブジェクトとして記録します。caseファイルはテストの索引であり、APIの正式な契約はこの文書を正とします。
 
-LINEのIDトークン検証エンドポイントだけは外部通信を行わず、検証成功・失敗のHTTP応答へ差し替えます。Honoのルーティング、Bearerヘッダーの解釈、Account解決、Drizzleのクエリ、D1上の回答進捗集計、JSONレスポンスはモックしません。
+機能APIのE2Eではインメモリのセッションストアからアプリセッションを発行します。Honoのルーティング、Cookie・CSRFの解釈、Account解決、Drizzleのクエリ、D1上の回答進捗集計、JSONレスポンスはモックしません。
 
 テストごとに独立したインメモリD1を作り、終了時にMiniflareを破棄します。開発者の`.wrangler/state`やpreview、productionのD1は使用しません。
 

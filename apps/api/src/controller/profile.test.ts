@@ -50,7 +50,7 @@ const outcome = (value: ProfileSummaryOutcome) => getProfileSummary.mockResolved
 function request(withDb = true, environment?: string) {
   return app.request(
     "/api/profile-summary",
-    { headers: { Authorization: "Bearer dummy.id.token" } },
+    {},
     {
       LIFF_ID: "2010850319-Yl63upAR",
       ...(environment ? { ENVIRONMENT: environment } : {}),
@@ -62,7 +62,7 @@ function request(withDb = true, environment?: string) {
 function generationRequest(withBindings = true, environment?: string) {
   return app.request(
     "/api/profile-summary/generations",
-    { method: "POST", headers: { Authorization: "Bearer dummy.id.token" } },
+    { method: "POST" },
     {
       LIFF_ID: "2010850319-Yl63upAR",
       ...(environment ? { ENVIRONMENT: environment } : {}),

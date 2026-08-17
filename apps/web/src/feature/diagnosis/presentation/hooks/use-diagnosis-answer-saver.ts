@@ -6,10 +6,8 @@ import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
 import type { DiagnosisAnswer } from "../../model/types";
 
 export function useDiagnosisAnswerSaver({
-  idToken,
   onProgress,
 }: {
-  idToken: string | null;
   onProgress: (
     diagnosisId: string,
     progress: Pick<DiagnosisListItem, "responseStatus" | "answeredCount" | "questionCount"> & {
@@ -28,12 +26,8 @@ export function useDiagnosisAnswerSaver({
 
   const save = useCallback(
     async (definition: DiagnosisDefinition, answer: DiagnosisAnswer) => {
-      if (!idToken) {
-        throw new Error("本人確認情報を取得できませんでした。LINEから開き直してください。");
-      }
       const saveRequest = saveDiagnosisAnswer(
         config.apiUrl,
-        idToken,
         definition.id,
         answer.diagnosisQuestionId,
         answer.choiceId,
@@ -59,7 +53,7 @@ export function useDiagnosisAnswerSaver({
         }
       }
     },
-    [idToken, onProgress],
+    [onProgress],
   );
 
   return { save, waitForPendingSaves };

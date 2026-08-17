@@ -34,7 +34,7 @@ export const profileProgressionRoute = describeRoute({
   operationId: "getProfileProgression",
   tags: ["Profile"],
   summary: "本人のうつしレベル進行度を取得する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("本人の累積成長値と現在有効なかけら集計", ProfileProgressionResponseSchema),
     ...authenticatedErrors,

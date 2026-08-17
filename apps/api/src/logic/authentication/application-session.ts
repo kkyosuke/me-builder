@@ -9,6 +9,7 @@ export type ApplicationSessionRecord = Readonly<{
   expiresAt: string;
   sessionVersion: number;
   csrfToken: string;
+  authenticatedIdentityId: string;
   displayProfile?: DisplayProfile;
 }>;
 
@@ -31,6 +32,7 @@ export type IssuedApplicationSession = Readonly<{
 
 export type VerifiedApplicationSession = Readonly<{
   actor: AuthenticatedActor;
+  authenticatedIdentityId: string;
   displayProfile?: DisplayProfile;
 }>;
 
@@ -51,6 +53,7 @@ export class ApplicationSessionService {
 
   async issue(
     actor: AuthenticatedActor,
+    authenticatedIdentityId: string,
     displayProfile?: DisplayProfile,
   ): Promise<IssuedApplicationSession | undefined> {
     const sessionVersion = await this.versions.current(actor.accountId);
@@ -60,6 +63,7 @@ export class ApplicationSessionService {
       actor,
       sessionVersion,
       new Date(now.getTime() + this.policy.absoluteTtlMs),
+      authenticatedIdentityId,
       displayProfile,
     );
   }
@@ -68,6 +72,7 @@ export class ApplicationSessionService {
     actor: AuthenticatedActor,
     sessionVersion: number,
     expiresAt: Date,
+    authenticatedIdentityId: string,
     displayProfile?: DisplayProfile,
   ): Promise<IssuedApplicationSession | undefined> {
     const now = this.now();
@@ -85,6 +90,7 @@ export class ApplicationSessionService {
         expiresAt: expiresAt.toISOString(),
         sessionVersion,
         csrfToken,
+        authenticatedIdentityId,
         ...(displayProfile ? { displayProfile } : {}),
       },
       Math.ceil((expiresAt.getTime() - now.getTime()) / 1_000),
@@ -119,6 +125,7 @@ export class ApplicationSessionService {
         authenticationMethod: record.authenticationMethod,
         authenticatedAt: new Date(record.authenticatedAt),
       },
+      authenticatedIdentityId: record.authenticatedIdentityId,
       ...(record.displayProfile ? { displayProfile: record.displayProfile } : {}),
     };
   }
@@ -138,6 +145,7 @@ export class ApplicationSessionService {
       verified.actor,
       sessionVersion,
       new Date(record.expiresAt),
+      verified.authenticatedIdentityId,
       verified.displayProfile,
     );
   }

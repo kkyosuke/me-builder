@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { ServiceTermsAcceptanceHistoryItem, ServiceTermsStatus } from "../model/service-terms";
 
 type StatusResponse =
@@ -63,11 +63,9 @@ export class ServiceTermsVersionConflictError extends Error {
 
 export async function fetchServiceTermsStatus(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<ServiceTermsStatus> {
-  const response = await createHttpClient(apiUrl).request("/api/legal/terms", {
-    headers: { Authorization: `Bearer ${idToken}` },
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/legal/terms", {
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw errorFor(response.status);
@@ -76,16 +74,18 @@ export async function fetchServiceTermsStatus(
 
 export async function acceptServiceTerms(
   apiUrl: string | undefined,
-  idToken: string,
   version: string,
   signal?: AbortSignal,
 ): Promise<{ acceptedAt: string; version: string; documentHash: string }> {
-  const response = await createHttpClient(apiUrl).request("/api/legal/terms/acceptance", {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ version }),
-    ...(signal ? { signal } : {}),
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/legal/terms/acceptance",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version }),
+      ...(signal ? { signal } : {}),
+    },
+  );
   if (response.status === 409) {
     throw new ServiceTermsVersionConflictError();
   }
@@ -100,13 +100,14 @@ export async function acceptServiceTerms(
 
 export async function fetchServiceTermsAcceptanceHistory(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<readonly ServiceTermsAcceptanceHistoryItem[]> {
-  const response = await createHttpClient(apiUrl).request("/api/legal/terms/acceptances", {
-    headers: { Authorization: `Bearer ${idToken}` },
-    ...(signal ? { signal } : {}),
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/legal/terms/acceptances",
+    {
+      ...(signal ? { signal } : {}),
+    },
+  );
   if (!response.ok) throw errorFor(response.status);
   return v.parse(AcceptanceHistorySchema, await response.json()).acceptances;
 }

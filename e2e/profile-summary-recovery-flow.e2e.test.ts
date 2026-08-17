@@ -6,6 +6,7 @@ import {
   type AccountDataTestStore,
   createAccountDataTestStore,
 } from "../apps/api/src/testing/account-data";
+import { createApplicationSessionFixture } from "../apps/api/src/testing/application-session";
 import { createLocalD1 } from "../apps/api/src/testing/local-d1";
 import { dispatchUndispatchedProfileSummaryGenerations } from "../apps/worker/src/account-data";
 import { type CloudflareBindings, getWorkerConfig } from "../apps/worker/src/config";
@@ -30,6 +31,8 @@ type LocalD1 = Awaited<ReturnType<typeof createLocalD1>>;
 let localD1: LocalD1;
 let database: LocalD1["database"];
 let accountDataStore: AccountDataTestStore;
+let sessionFixture: ReturnType<typeof createApplicationSessionFixture>;
+let sessionHeaders: Record<string, string>;
 
 function queueFromSend(
   send: (message: ProfileSummaryGenerationQueueMessage) => Promise<void>,
@@ -123,18 +126,8 @@ describe("Profile Summary Queue recovery E2E", () => {
   beforeEach(async () => {
     accountDataStore = createAccountDataTestStore();
     await accountDataStore.syncCatalogFrom(D1.shared.client.create(database));
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        Response.json({
-          iss: "https://access.line.me",
-          sub: lineId,
-          aud: "1234567890",
-          iat: Math.floor(Date.now() / 1_000),
-          exp: timestamp + 86_400,
-        }),
-      ),
-    );
+    sessionFixture = createApplicationSessionFixture(database);
+    sessionHeaders = (await sessionFixture.issue(accountId)).headers;
     generateProfileSummary.mockImplementation(async (context: ProfileSummaryGenerationContext) => ({
       type: "generated",
       summary: {
@@ -174,12 +167,12 @@ describe("Profile Summary Queue recovery E2E", () => {
     });
     const apiResponse = await app.request(
       "/api/profile-summary/generations",
-      { method: "POST", headers: { Authorization: "Bearer known-token" } },
+      { method: "POST", headers: sessionHeaders },
       {
         DB: database,
         ACCOUNT_DATA: accountDataStore.namespace,
         PROFILE_SUMMARY_QUEUE: queueFromSend(apiSend),
-        LINE_LOGIN_CHANNEL_ID: "1234567890",
+        ...sessionFixture.bindings,
         ENVIRONMENT: "test",
       },
     );
@@ -242,12 +235,12 @@ describe("Profile Summary Queue recovery E2E", () => {
     expect(message.retry).not.toHaveBeenCalled();
     const readResponse = await app.request(
       "/api/profile-summary",
-      { headers: { Authorization: "Bearer known-token" } },
+      { headers: sessionHeaders },
       {
         DB: database,
         ACCOUNT_DATA: accountDataStore.namespace,
         PROFILE_SUMMARY_QUEUE: recoveryQueue,
-        LINE_LOGIN_CHANNEL_ID: "1234567890",
+        ...sessionFixture.bindings,
         ENVIRONMENT: "test",
       },
     );

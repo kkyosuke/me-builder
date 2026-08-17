@@ -5,10 +5,8 @@ import { acceptCompatibilityInvitation } from "../../infrastructure/compatibilit
 import type { CompatibilityInvitationAcceptance } from "../../model/compatibility-relationship";
 
 export function useCompatibilityInvitationAcceptance({
-  acquireIdToken,
   relationshipId,
 }: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
   relationshipId: string | null;
 }) {
   const [state, setState] = useState<AsyncState<CompatibilityInvitationAcceptance>>({
@@ -24,12 +22,8 @@ export function useCompatibilityInvitationAcceptance({
     request.current = controller;
     setState({ status: "loading" });
     try {
-      const token = await acquireIdToken(controller.signal);
-      if (controller.signal.aborted) return;
-      if (!token) throw new Error("LINEから招待画面を開いてください。");
       const data = await acceptCompatibilityInvitation(
         config.apiUrl,
-        token,
         relationshipId,
         controller.signal,
       );
@@ -44,7 +38,7 @@ export function useCompatibilityInvitationAcceptance({
     } finally {
       if (request.current === controller) request.current = null;
     }
-  }, [acquireIdToken, relationshipId]);
+  }, [relationshipId]);
 
   return { state, accept };
 }

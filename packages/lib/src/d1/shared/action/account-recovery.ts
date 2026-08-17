@@ -145,6 +145,8 @@ export async function completeAccountRecovery(
     credentialId: string;
     expectedSecretHash: string;
     newProviderAccountId: string;
+    sourceAccountId: string;
+    sourceIdentityId: string;
     identityFingerprint: string;
     now?: Date;
   },
@@ -179,9 +181,21 @@ export async function completeAccountRecovery(
       ? "already-recovered"
       : "invalid";
   }
-  if (existingIdentities.some((identity) => identity.accountId !== accountId)) {
+  if (
+    existingIdentities.some(
+      (identity) =>
+        identity.accountId !== accountId && identity.accountId !== input.sourceAccountId,
+    )
+  ) {
     return "conflict";
   }
+  const sourceIdentity = existingIdentities.find(
+    (identity) =>
+      identity.id === input.sourceIdentityId &&
+      identity.accountId === input.sourceAccountId &&
+      identity.provider === "line_login",
+  );
+  if (!sourceIdentity) return "invalid";
 
   await db
     .update(accountRecoveryCredentials)
@@ -198,22 +212,16 @@ export async function completeAccountRecovery(
     return "conflict";
 
   const queries = [];
-  if (!existingIdentities.some((identity) => identity.provider === "line_login")) {
+  if (sourceIdentity.accountId !== accountId) {
     queries.push(
-      db.insert(accountIdentities).values({
-        id: crypto.randomUUID(),
-        accountId: credential.accountId,
-        provider: "line_login",
-        providerAccountId: input.newProviderAccountId,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-        isDeleted: false,
-      }),
+      db
+        .update(accountIdentities)
+        .set({ accountId, updatedAt: now })
+        .where(eq(accountIdentities.id, sourceIdentity.id)),
     );
   }
   queries.push(
-    // Identity再接続と同じD1 batchでversionを進め、旧sessionを即時失効させる。
+    // Identity再接続と同じD1 batchで復旧先のversionを進め、旧sessionを即時失効させる。
     db
       .update(accounts)
       .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
@@ -248,6 +256,15 @@ export async function completeAccountRecovery(
       createdAt: now,
     }),
   );
+  if (input.sourceAccountId !== credential.accountId) {
+    // Identity移管後も移管元Accountのsessionが残らないよう、同じbatchで失効させる。
+    queries.push(
+      db
+        .update(accounts)
+        .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
+        .where(eq(accounts.id, input.sourceAccountId)),
+    );
+  }
   // Drizzleのbatch tuple型は可変長配列を受けないため、実行境界で共通query型へ狭める。
   await db.batch(queries as [(typeof queries)[number], ...Array<(typeof queries)[number]>]);
   return "recovered";

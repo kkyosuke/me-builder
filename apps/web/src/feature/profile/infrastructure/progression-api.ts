@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { UtsushiProgression } from "../model/progression";
 
 type ApiResponse =
@@ -35,11 +35,9 @@ const ResponseSchema = v.object({
 
 export async function fetchProfileProgression(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<UtsushiProgression> {
-  const response = await createHttpClient(apiUrl).request("/api/profile/progression", {
-    headers: { Authorization: `Bearer ${idToken}` },
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/profile/progression", {
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {

@@ -29,7 +29,7 @@ export const diagnosisListRoute = describeRoute({
   operationId: "listDiagnoses",
   tags: ["Diagnosis"],
   summary: "回答進捗を含む診断一覧を取得する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("診断一覧", DiagnosisListResponseSchema),
     ...authenticatedErrors,

@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { WeeklyReflectionResult } from "../model/weekly-reflection";
 
 const Text = v.pipe(v.string(), v.nonEmpty());
@@ -60,12 +60,10 @@ async function assertResponse(response: Response): Promise<Response> {
 
 export async function fetchWeeklyReflections(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<WeeklyReflectionResult> {
   const response = await assertResponse(
-    await createHttpClient(apiUrl).request("/api/weekly-reflections", {
-      headers: { Authorization: `Bearer ${idToken}` },
+    await createAuthenticatedHttpClient(apiUrl).request("/api/weekly-reflections", {
       ...(signal ? { signal } : {}),
     }),
   );
@@ -74,13 +72,11 @@ export async function fetchWeeklyReflections(
 
 export async function startWeeklyReflection(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<void> {
   await assertResponse(
-    await createHttpClient(apiUrl).request("/api/weekly-reflections/generations", {
+    await createAuthenticatedHttpClient(apiUrl).request("/api/weekly-reflections/generations", {
       method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
       ...(signal ? { signal } : {}),
     }),
   );

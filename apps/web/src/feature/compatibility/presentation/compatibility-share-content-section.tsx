@@ -261,16 +261,11 @@ export function CompatibilityShareContentSectionScreen({
 }
 
 export function CompatibilityShareContentSection({
-  acquireIdToken,
   latestProfileSummaryVersionId,
 }: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
   latestProfileSummaryVersionId: string | null | undefined;
 }) {
-  const content = useCompatibilityShareContent({
-    acquireIdToken,
-    latestProfileSummaryVersionId,
-  });
+  const content = useCompatibilityShareContent({ latestProfileSummaryVersionId });
   return (
     <CompatibilityShareContentSectionScreen
       relationshipCategory={content.relationshipCategory}

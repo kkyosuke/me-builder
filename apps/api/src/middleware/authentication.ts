@@ -1,4 +1,3 @@
-import { D1 } from "@me-builder/lib";
 import type { Context, MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import * as v from "valibot";
@@ -8,14 +7,11 @@ import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
 } from "../contract/shared/errors";
-import { bearerToken } from "../controller/auth";
 import {
   APPLICATION_SESSION_COOKIE,
   CSRF_HEADER,
   createApplicationSessionService,
 } from "../infrastructure/authentication/application-session-runtime";
-import { createLineCredentialVerifier } from "../infrastructure/authentication/line-credential-verifier";
-import { authenticateLiff } from "../logic/authentication/authenticate-liff";
 import type { AuthenticatedActor, AuthenticationResult } from "../logic/authentication/types";
 import type { AppEnv } from "../types";
 
@@ -25,59 +21,50 @@ async function resolveRequestAuthentication(c: Context<AppEnv>): Promise<Authent
   if (!c.env?.DB) {
     return { type: "unauthenticated", reason: "authentication_not_configured" };
   }
-  const config = getConfig(c.env);
-  const authorization = c.req.header("authorization");
-  // 移行中に明示されたBearerを古いcookieで上書きしない。不正なBearerでもcookieへ
-  // fallbackせず、LIFFが確認したAccountをrequestの正とする。
-  if (authorization !== undefined) {
-    const result = await authenticateLiff({
-      idToken: bearerToken(authorization),
-      db: D1.shared.client.create(c.env.DB),
-      verifier: createLineCredentialVerifier(config.lineLoginChannelId),
-      adminLineUserIds: config.adminLineUserIds,
-    });
-    if (result.type === "authenticated") c.set("authenticationSource", "legacy-bearer");
-    return result;
-  }
   const applicationSession = createApplicationSessionService(c.env);
-  const sessionToken = getCookie(c, APPLICATION_SESSION_COOKIE);
-  if (applicationSession && sessionToken) {
-    const verified = await applicationSession.sessions.verify(sessionToken, {
-      refreshIdle: ["GET", "HEAD", "OPTIONS"].includes(c.req.method),
-    });
-    if (verified) {
-      const [account, profile] = await Promise.all([
-        applicationSession.db.query.accounts.findFirst({
-          columns: { role: true },
-          where: (table, { eq }) => eq(table.id, verified.actor.accountId),
-        }),
-        applicationSession.db.query.accountProfiles.findFirst({
-          columns: { displayName: true },
-          where: (table, { eq }) => eq(table.accountId, verified.actor.accountId),
-        }),
-      ]);
-      if (account) {
-        const displayName = verified.displayProfile?.displayName ?? profile?.displayName;
-        const pictureUrl = verified.displayProfile?.pictureUrl;
-        c.set("authenticationSource", "application-session");
-        c.set("applicationSessionToken", sessionToken);
-        return {
-          type: "authenticated",
-          actor: verified.actor,
-          accountRole: account.role,
-          ...(displayName || pictureUrl
-            ? {
-                displayProfile: {
-                  ...(displayName ? { displayName } : {}),
-                  ...(pictureUrl ? { pictureUrl } : {}),
-                },
-              }
-            : {}),
-        };
-      }
-    }
+  if (!applicationSession) {
+    return { type: "unauthenticated", reason: "authentication_not_configured" };
   }
-  return { type: "unauthenticated", reason: "credential_missing" };
+  const sessionToken = getCookie(c, APPLICATION_SESSION_COOKIE);
+  if (!sessionToken) return { type: "unauthenticated", reason: "credential_missing" };
+
+  const verified = await applicationSession.sessions.verify(sessionToken, {
+    refreshIdle: ["GET", "HEAD", "OPTIONS"].includes(c.req.method),
+  });
+  if (!verified) return { type: "unauthenticated", reason: "credential_invalid" };
+
+  const [account, profile] = await Promise.all([
+    applicationSession.db.query.accounts.findFirst({
+      columns: { role: true },
+      where: (table, { eq }) => eq(table.id, verified.actor.accountId),
+    }),
+    applicationSession.db.query.accountProfiles.findFirst({
+      columns: { displayName: true },
+      where: (table, { eq }) => eq(table.accountId, verified.actor.accountId),
+    }),
+  ]);
+  if (!account) return { type: "unauthenticated", reason: "credential_invalid" };
+
+  c.set("authenticationSource", "application-session");
+  c.set("applicationSessionToken", sessionToken);
+  const displayName = profile?.displayName ?? verified.displayProfile?.displayName;
+  const pictureUrl = verified.displayProfile?.pictureUrl;
+  return {
+    type: "authenticated",
+    actor: verified.actor,
+    accountRole: account.role,
+    ...(verified.authenticatedIdentityId
+      ? { authenticatedIdentityId: verified.authenticatedIdentityId }
+      : {}),
+    ...(displayName || pictureUrl
+      ? {
+          displayProfile: {
+            ...(displayName ? { displayName } : {}),
+            ...(pictureUrl ? { pictureUrl } : {}),
+          },
+        }
+      : {}),
+  };
 }
 
 /** 同じContextでは認証resolverを1度だけ実行し、後続middlewareとcontrollerへ共有する。 */

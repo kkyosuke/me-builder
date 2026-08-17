@@ -18,12 +18,6 @@
         "in": "header",
         "name": "X-CSRF-Token",
         "description": "application sessionによる状態変更requestで要求するCSRF token"
-      },
-      "liffIdToken": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "LIFF ID token",
-        "description": "段階移行中の旧LIFF Bearer認証。認証交換以外の新規経路では使用しない"
       }
     }
   },
@@ -145,7 +139,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -298,7 +292,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -392,7 +386,7 @@
             "description": "sessionを失効した"
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -486,9 +480,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -514,7 +505,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -631,7 +622,8 @@
         "summary": "新しいLINE Identityを既存Accountへ再接続する",
         "security": [
           {
-            "liffIdToken": []
+            "applicationSession": [],
+            "csrfToken": []
           }
         ],
         "requestBody": {
@@ -731,7 +723,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -937,9 +929,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -963,7 +952,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -1041,9 +1030,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -1122,7 +1108,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -1249,9 +1235,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -1330,7 +1313,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -1456,9 +1439,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -1480,7 +1460,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -1565,9 +1545,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -1589,7 +1566,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -1715,9 +1692,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -1880,9 +1854,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -1984,9 +1955,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -2114,9 +2082,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -2332,7 +2297,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -2444,9 +2409,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "parameters": [
@@ -2649,7 +2611,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -2761,9 +2723,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -2846,7 +2805,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -2959,9 +2918,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -3091,7 +3047,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3216,9 +3172,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -3540,7 +3493,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3637,9 +3590,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -3668,7 +3618,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -3788,9 +3738,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -3983,7 +3930,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4080,9 +4027,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -4111,7 +4055,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4227,9 +4171,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -4305,7 +4246,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4400,9 +4341,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -4500,7 +4438,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4622,9 +4560,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -4722,7 +4657,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4853,9 +4788,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -4913,7 +4845,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5009,9 +4941,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -5138,7 +5067,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5234,9 +5163,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -5357,7 +5283,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5453,9 +5379,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -5486,7 +5409,7 @@
             "description": "表示できるアバター画像がない"
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5581,9 +5504,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -5680,7 +5600,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5823,9 +5743,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -5883,7 +5800,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -5979,9 +5896,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -6084,7 +5998,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6181,9 +6095,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -6272,7 +6183,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6390,9 +6301,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -6422,7 +6330,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6525,9 +6433,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -6593,7 +6498,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6688,9 +6593,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -6787,7 +6689,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -6904,9 +6806,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -6982,7 +6881,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7108,9 +7007,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -7184,7 +7080,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7324,9 +7220,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -7397,7 +7290,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7537,9 +7430,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -7603,7 +7493,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7760,9 +7650,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -7826,7 +7713,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -7983,9 +7870,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -8049,7 +7933,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8199,9 +8083,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -8265,7 +8146,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8415,9 +8296,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -8481,7 +8359,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8621,9 +8499,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -8689,7 +8564,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8785,9 +8660,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -8853,7 +8725,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -8956,9 +8828,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -8974,7 +8843,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9109,9 +8978,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -9264,7 +9130,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9373,9 +9239,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -9469,7 +9332,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9589,9 +9452,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -9616,7 +9476,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9745,9 +9605,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -9793,7 +9650,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -9925,9 +9782,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -9958,7 +9812,7 @@
             "description": "表示できるアバター画像がない"
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10099,9 +9953,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -10205,7 +10056,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10345,9 +10196,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -10355,7 +10203,7 @@
             "description": "招待を取り消した"
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10477,9 +10325,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -10599,7 +10444,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10695,9 +10540,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -11062,7 +10904,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11183,9 +11025,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -11193,7 +11032,7 @@
             "description": "相性関係を終了した"
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11315,9 +11154,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -11385,7 +11221,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11495,9 +11331,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -11520,7 +11353,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11630,9 +11463,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -11653,7 +11483,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11781,9 +11611,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "parameters": [
@@ -11878,7 +11705,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -11974,9 +11801,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "parameters": [
@@ -12149,7 +11973,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -12245,9 +12069,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -12352,7 +12173,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -12448,9 +12269,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -12571,7 +12389,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -12712,9 +12530,6 @@
         "security": [
           {
             "applicationSession": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -12896,7 +12711,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -13019,9 +12834,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "requestBody": {
@@ -13159,7 +12971,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -13345,9 +13157,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -13383,7 +13192,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -13568,9 +13377,6 @@
           {
             "applicationSession": [],
             "csrfToken": []
-          },
-          {
-            "liffIdToken": []
           }
         ],
         "responses": {
@@ -13625,7 +13431,7 @@
             }
           },
           "401": {
-            "description": "application sessionまたは旧LIFF credentialを検証できない",
+            "description": "application sessionを検証できない",
             "content": {
               "application/json": {
                 "schema": {

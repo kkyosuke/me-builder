@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { ProfileEntitlement } from "../model/entitlement";
 
 type ApiResponse =
@@ -27,11 +27,9 @@ const ResponseSchema = v.object({
 
 export async function fetchProfileEntitlement(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<ProfileEntitlement> {
-  const response = await createHttpClient(apiUrl).request("/api/profile/entitlement", {
-    headers: { Authorization: `Bearer ${idToken}` },
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/profile/entitlement", {
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {

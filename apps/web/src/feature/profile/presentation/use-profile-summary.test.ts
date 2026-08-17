@@ -52,12 +52,9 @@ function readResult(
   };
 }
 
-const acquireIdToken = vi.fn().mockResolvedValue("id-token");
-
 describe("useProfileSummary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    acquireIdToken.mockResolvedValue("id-token");
     vi.mocked(requestProfileSummaryGeneration).mockResolvedValue({
       generationId: "generation-1",
       status: "queued",
@@ -81,7 +78,7 @@ describe("useProfileSummary", () => {
       .mockResolvedValueOnce(generating)
       .mockResolvedValueOnce(completed);
 
-    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    const { result } = renderHook(() => useProfileSummary());
     await waitFor(() => expect(result.current.state).toEqual({ status: "success", data: initial }));
     vi.useFakeTimers();
 
@@ -108,7 +105,7 @@ describe("useProfileSummary", () => {
         }),
     );
 
-    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    const { result } = renderHook(() => useProfileSummary());
     await waitFor(() => expect(result.current.state).toEqual({ status: "success", data: initial }));
 
     act(() => {
@@ -137,7 +134,7 @@ describe("useProfileSummary", () => {
       .mockResolvedValueOnce(queued)
       .mockResolvedValueOnce(failed);
 
-    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    const { result } = renderHook(() => useProfileSummary());
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     vi.useFakeTimers();
 
@@ -156,7 +153,7 @@ describe("useProfileSummary", () => {
     const queued = readResult("queued");
     vi.mocked(fetchProfileSummary).mockResolvedValueOnce(initial).mockResolvedValue(queued);
 
-    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    const { result } = renderHook(() => useProfileSummary());
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     vi.useFakeTimers();
 
@@ -183,7 +180,7 @@ describe("useProfileSummary", () => {
       new Error("まとめの生成を開始できませんでした。"),
     );
 
-    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    const { result } = renderHook(() => useProfileSummary());
     await waitFor(() => expect(result.current.state).toEqual({ status: "success", data: initial }));
 
     await act(async () => {
@@ -210,7 +207,7 @@ describe("useProfileSummary", () => {
       new Error("POST response was lost"),
     );
 
-    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    const { result } = renderHook(() => useProfileSummary());
     await waitFor(() => expect(result.current.state).toEqual({ status: "success", data: initial }));
 
     await act(async () => {
@@ -228,7 +225,7 @@ describe("useProfileSummary", () => {
       .mockResolvedValueOnce(initial)
       .mockRejectedValueOnce(new Error("状態を確認できませんでした。"));
 
-    const { result } = renderHook(() => useProfileSummary({ acquireIdToken }));
+    const { result } = renderHook(() => useProfileSummary());
     await waitFor(() => expect(result.current.state).toEqual({ status: "success", data: initial }));
 
     await act(async () => {

@@ -4,7 +4,7 @@ import { fetchDevelopmentBrainItems, fetchDevelopmentBrainVector } from "./brain
 describe("fetchDevelopmentBrainItems", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("本人のBrain Item一覧をBearer token付きで取得する", async () => {
+  it("本人のBrain Item一覧をapplication sessionで取得する", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -35,17 +35,18 @@ describe("fetchDevelopmentBrainItems", () => {
       ),
     );
 
-    await expect(
-      fetchDevelopmentBrainItems("https://api.example.com", "id-token"),
-    ).resolves.toMatchObject({ items: [{ id: "brain-1" }], truncated: false });
+    await expect(fetchDevelopmentBrainItems("https://api.example.com")).resolves.toMatchObject({
+      items: [{ id: "brain-1" }],
+      truncated: false,
+    });
     expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/api/dev/brain-items", {
-      headers: { Authorization: "Bearer id-token" },
+      credentials: "include",
     });
   });
 
   it("production相当の404を利用不可として扱う", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 404 }));
-    await expect(fetchDevelopmentBrainItems(undefined, "id-token")).rejects.toThrow(
+    await expect(fetchDevelopmentBrainItems(undefined)).rejects.toThrow(
       "この環境では利用できません",
     );
   });
@@ -65,11 +66,11 @@ describe("fetchDevelopmentBrainItems", () => {
     );
 
     await expect(
-      fetchDevelopmentBrainVector("https://api.example.com", "id-token", "brain/item"),
+      fetchDevelopmentBrainVector("https://api.example.com", "brain/item"),
     ).resolves.toMatchObject({ state: "present", dimensions: 768 });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/dev/brain-items/brain%2Fitem/vector",
-      { headers: { Authorization: "Bearer id-token" } },
+      { credentials: "include" },
     );
   });
 });

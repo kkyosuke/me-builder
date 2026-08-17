@@ -6,11 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
 
 // App全体の初期描画とAPI往復を待つため、他のE2Eと同時実行しても既定の1秒で切らない。
-configure({ asyncUtilTimeout: 5_000 });
+configure({ asyncUtilTimeout: 10_000 });
 
 const liff = vi.hoisted(() => ({
   initialize: vi.fn(),
-  getIdToken: vi.fn(),
+  readCredential: vi.fn(),
 }));
 
 vi.mock("../config", () => ({
@@ -21,11 +21,17 @@ vi.mock("../config", () => ({
   },
 }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
-  initializeLiff: liff.initialize,
-  getLiffIdToken: liff.getIdToken,
+  initializeLiffForAuthExchange: liff.initialize,
+  readLiffAuthExchangeCredential: liff.readCredential,
 }));
 
 const accountProfile = { role: "user", avatar: null };
+const authSession = {
+  authenticated: true,
+  displayProfile: { displayName: "テスト" },
+  role: "user",
+  csrfToken: "csrf-test-token",
+};
 const progression = {
   level: 2,
   growthValue: 7,
@@ -152,9 +158,8 @@ describe("Web recovery flows E2E", () => {
     liff.initialize.mockResolvedValue({
       status: "ready",
       inClient: true,
-      profile: { displayName: "テスト" },
     });
-    liff.getIdToken.mockReturnValue("dummy.id.token");
+    liff.readCredential.mockReturnValue("dummy.id.token");
   });
 
   afterEach(() => {
@@ -167,6 +172,7 @@ describe("Web recovery flows E2E", () => {
     let resultRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/diagnoses") return Response.json(diagnosisList);
@@ -223,6 +229,7 @@ describe("Web recovery flows E2E", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = urlOf(input);
       const method = init?.method ?? "GET";
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/profile/progression") return Response.json(progression);
@@ -261,6 +268,7 @@ describe("Web recovery flows E2E", () => {
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/profile-summary") return Response.json(summary);
@@ -278,13 +286,14 @@ describe("Web recovery flows E2E", () => {
     expect(screen.queryByText("UIプレビュー用のサンプルデータです")).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.com/api/profile/progression",
-      expect.objectContaining({ headers: { Authorization: "Bearer dummy.id.token" } }),
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 
   it("診断画面のうつしレベルを固定プロフィールアイコンと重ならない位置に表示する", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/legal/terms") return Response.json(acceptedTermsStatus);
       if (url.pathname === "/api/profile") return Response.json(accountProfile);
       if (url.pathname === "/api/diagnoses") return Response.json(diagnosisList);
@@ -301,5 +310,5 @@ describe("Web recovery flows E2E", () => {
     const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
     expect(level.parentElement?.className).toContain("pr-14");
     expect(profileButton.className).toContain("fixed");
-  });
+  }, 10_000);
 });

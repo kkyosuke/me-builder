@@ -6,10 +6,8 @@ import { fetchCompatibilityAvatarImage } from "../../infrastructure/compatibilit
 import type { CompatibilityInvitationPreview } from "../../model/compatibility-invitation-preview";
 
 export function useCompatibilityInvitationPreview({
-  acquireIdToken,
   relationshipId,
 }: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
   relationshipId: string | null;
 }) {
   const [state, setState] = useState<AsyncState<CompatibilityInvitationPreview>>({
@@ -26,25 +24,19 @@ export function useCompatibilityInvitationPreview({
     if (mounted.current) setState({ status: "loading" });
     try {
       if (!relationshipId) throw new Error("この招待リンクは利用できません。");
-      const idToken = await acquireIdToken(controller.signal);
-      if (controller.signal.aborted) return;
-      if (!idToken) throw new Error("LINEから招待リンクを開いてください。");
       const invitation = await fetchCompatibilityInvitation(
         config.apiUrl,
-        idToken,
         relationshipId,
         controller.signal,
       );
       const [inviterAvatarBlob, recipientAvatarBlob] = await Promise.all([
         fetchCompatibilityAvatarImage(
           config.apiUrl,
-          idToken,
           invitation.inviter.avatarUrl,
           controller.signal,
         ),
         fetchCompatibilityAvatarImage(
           config.apiUrl,
-          idToken,
           invitation.recipient.avatarUrl,
           controller.signal,
         ),
@@ -74,7 +66,7 @@ export function useCompatibilityInvitationPreview({
         });
       }
     }
-  }, [acquireIdToken, relationshipId]);
+  }, [relationshipId]);
 
   useEffect(() => {
     mounted.current = true;

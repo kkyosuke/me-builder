@@ -27,7 +27,7 @@ export const compatibilityShareConsentRoute = describeRoute({
   operationId: "getCompatibilityShareConsent",
   tags: ["Compatibility"],
   summary: "招待発行前に本人の共有可否を確認する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   parameters: [
     {
       name: "relationshipCategory",

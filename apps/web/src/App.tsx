@@ -4,10 +4,9 @@ import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
 import { issueRecoveryCode } from "./feature/account-recovery/infrastructure/account-recovery-api";
 import { AccountRecoveryScreen } from "./feature/account-recovery/presentation/account-recovery-screen";
+import { AuthSessionProvider, useAuthSession } from "./feature/auth";
 import { createCustomerPortalSession } from "./feature/billing/infrastructure/billing-api";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
-import { LiffSessionProvider, useLiffSession } from "./feature/liff";
-import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import {
   type ResetDevelopmentAccountDataResult,
   resetDevelopmentAccountData,
@@ -145,7 +144,7 @@ function focusMainRouteHeading(container: HTMLElement, route: MainRoute): () => 
 function AppContents() {
   const colorTheme = useColorTheme();
   const fontSize = useFontSize();
-  const liffSession = useLiffSession();
+  const authSession = useAuthSession();
   const [navigation, setNavigation] = useState(() => {
     const requestedPathname = resolveRequestedPathname();
     const profileView = resolveProfileView(requestedPathname);
@@ -169,7 +168,6 @@ function AppContents() {
   const mainRouteScrollPositions = useRef(new Map<MainRoute, number>());
   const previousMainRoute = useRef<MainRoute | null>(null);
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
-  const [accountRole, setAccountRole] = useState<"user" | "admin" | null>(null);
   const [profileLinePictureUrl, setProfileLinePictureUrl] = useState<string | undefined>();
   const [profileReadState, setProfileReadState] = useState<
     { status: "loading" | "ready" } | { status: "error"; message: string }
@@ -181,12 +179,19 @@ function AppContents() {
   const [accountDataResetKey, setAccountDataResetKey] = useState(0);
   const linePictureUrl =
     profileReadState.status === "ready"
-      ? (profileLinePictureUrl ?? liffSession.profile?.pictureUrl)
+      ? (profileLinePictureUrl ??
+        (authSession.state.status === "authenticated"
+          ? authSession.state.profile.pictureUrl
+          : undefined))
       : undefined;
+  const sessionRevision =
+    authSession.state.status === "authenticated" ? authSession.state.revision : 0;
+  const sessionRevisionRef = useRef(sessionRevision);
+  sessionRevisionRef.current = sessionRevision;
+  const previousSessionRevision = useRef<number | null>(null);
 
   const applyAccountProfile = useCallback((profile: AccountProfile) => {
     setAvatar(uploadedAvatar(profile));
-    setAccountRole(profile.role);
     setProfileLinePictureUrl(profile.avatar?.source === "line" ? profile.avatar.url : undefined);
     setProfileReadState({ status: "ready" });
   }, []);
@@ -285,23 +290,19 @@ function AppContents() {
 
   useEffect(() => {
     if (isAdminPath) return;
+    if (authSession.state.status !== "authenticated") return;
     const controller = new AbortController();
+    setAvatar(null);
+    setProfileLinePictureUrl(undefined);
     setProfileReadState((current) =>
       profileReloadKey === 0 && current.status === "ready" ? current : { status: "loading" },
     );
     setEntitlementState({ status: "loading" });
     void (async () => {
       try {
-        const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
-        if (controller.signal.aborted) return;
-        if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
-        applyAccountProfile(await fetchAccountProfile(config.apiUrl, idToken, controller.signal));
+        applyAccountProfile(await fetchAccountProfile(config.apiUrl, controller.signal));
         try {
-          const entitlement = await fetchProfileEntitlement(
-            config.apiUrl,
-            idToken,
-            controller.signal,
-          );
+          const entitlement = await fetchProfileEntitlement(config.apiUrl, controller.signal);
           if (!controller.signal.aborted) {
             setEntitlementState({ status: "success", data: entitlement });
           }
@@ -312,13 +313,32 @@ function AppContents() {
         }
       } catch (error) {
         if (controller.signal.aborted) return;
-        setAccountRole(null);
         setProfileReadState({ status: "error", message: errorMessage(error) });
       }
     })();
 
     return () => controller.abort();
-  }, [applyAccountProfile, isAdminPath, liffSession.acquireIdToken, profileReloadKey]);
+  }, [applyAccountProfile, authSession.state, isAdminPath, profileReloadKey]);
+
+  useEffect(() => {
+    if (authSession.state.status !== "authenticated") return;
+    if (previousSessionRevision.current === null) {
+      previousSessionRevision.current = sessionRevision;
+      return;
+    }
+    if (previousSessionRevision.current === sessionRevision) return;
+    previousSessionRevision.current = sessionRevision;
+    mainRouteScrollPositions.current.clear();
+    setAccountDataResetKey((current) => current + 1);
+    if (profileView === "closed") return;
+    const returnPathname = mainPathname ?? "/diagnosis";
+    window.history.replaceState({}, "", returnPathname);
+    setNavigation({
+      pathname: returnPathname,
+      mainPathname: returnPathname,
+      profileView: "closed",
+    });
+  }, [authSession.state.status, mainPathname, profileView, sessionRevision]);
 
   const openProfile = () => {
     shouldRestoreProfileButtonFocus.current = true;
@@ -436,37 +456,45 @@ function AppContents() {
   };
 
   const saveAvatar = async (nextAvatar: AvatarSelection | null) => {
+    const requestedRevision = sessionRevisionRef.current;
     const controller = new AbortController();
-    const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
-    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
     const profile = nextAvatar
-      ? await saveAccountAvatar(config.apiUrl, idToken, nextAvatar, controller.signal)
-      : await deleteAccountAvatar(config.apiUrl, idToken, controller.signal);
+      ? await saveAccountAvatar(config.apiUrl, nextAvatar, controller.signal)
+      : await deleteAccountAvatar(config.apiUrl, controller.signal);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
     applyAccountProfile(profile);
     closeAvatar();
   };
 
   const resetAccountData = async (): Promise<ResetDevelopmentAccountDataResult> => {
+    const requestedRevision = sessionRevisionRef.current;
     const controller = new AbortController();
-    const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
-    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
-    const result = await resetDevelopmentAccountData(config.apiUrl, idToken, controller.signal);
+    const result = await resetDevelopmentAccountData(config.apiUrl, controller.signal);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
     setAccountDataResetKey((current) => current + 1);
     return result;
   };
 
   const createRecoveryCode = async () => {
-    const idToken =
-      getLiffIdToken() ?? (await liffSession.acquireIdToken(new AbortController().signal));
-    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
-    return await issueRecoveryCode(config.apiUrl, idToken);
+    const requestedRevision = sessionRevisionRef.current;
+    const result = await issueRecoveryCode(config.apiUrl);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
+    return result;
   };
 
   const openBillingPortal = async (): Promise<void> => {
+    const requestedRevision = sessionRevisionRef.current;
     const controller = new AbortController();
-    const idToken = getLiffIdToken() ?? (await liffSession.acquireIdToken(controller.signal));
-    if (!idToken) throw new Error("LINEからプロフィールを開き直してください。");
-    const url = await createCustomerPortalSession(config.apiUrl, idToken, controller.signal);
+    const url = await createCustomerPortalSession(config.apiUrl, controller.signal);
+    if (sessionRevisionRef.current !== requestedRevision) {
+      throw new Error("本人確認が更新されました。現在のAccountでもう一度お試しください。");
+    }
     window.location.assign(url);
   };
 
@@ -490,11 +518,11 @@ function AppContents() {
           <RouteErrorBoundary>
             <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
               {isCompatibilityPath ? (
-                <CompatibilityApplication key={accountDataResetKey} />
+                <CompatibilityApplication key={`${sessionRevision}:${accountDataResetKey}`} />
               ) : isMePath ? (
-                <ProfileApplication key={accountDataResetKey} />
+                <ProfileApplication key={`${sessionRevision}:${accountDataResetKey}`} />
               ) : (
-                <DiagnosisApplication key={accountDataResetKey} />
+                <DiagnosisApplication key={`${sessionRevision}:${accountDataResetKey}`} />
               )}
             </Suspense>
           </RouteErrorBoundary>
@@ -503,7 +531,7 @@ function AppContents() {
       {isAdminPath && (
         <RouteErrorBoundary>
           <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
-            <AdminApplication />
+            <AdminApplication key={sessionRevision} />
           </Suspense>
         </RouteErrorBoundary>
       )}
@@ -516,7 +544,9 @@ function AppContents() {
           >
             <ProfileSettingsScreen
               avatar={avatar}
-              isAdmin={accountRole === "admin"}
+              isAdmin={
+                authSession.state.status === "authenticated" && authSession.state.role === "admin"
+              }
               isInactive={profileView !== "profile"}
               inactiveFocusTarget={
                 profileView === "billing"
@@ -621,7 +651,7 @@ function AppContents() {
 
 export function App() {
   return (
-    <LiffSessionProvider>
+    <AuthSessionProvider>
       {resolveRequestedPathname() === "/account-recovery" ? (
         <AccountRecoveryScreen />
       ) : (
@@ -629,6 +659,6 @@ export function App() {
           <AppContents />
         </ServiceTermsGate>
       )}
-    </LiffSessionProvider>
+    </AuthSessionProvider>
   );
 }

@@ -10,15 +10,14 @@ vi.mock("../../infrastructure/compatibility-api", () => ({
 }));
 
 describe("useCompatibilityInvitationIssue", () => {
-  it("クリック時にLIFFトークンを取得して招待を発行する", async () => {
+  it("クリック時にアプリセッションで招待を発行する", async () => {
     const invitation = {
       invitationUrl: `https://example.com/compatibility/invitations/${"1".repeat(64)}`,
       expiresAt: "2026-08-26T00:00:00.000Z",
       relationshipCategory: "family" as const,
     };
     vi.mocked(issueCompatibilityInvitation).mockResolvedValue(invitation);
-    const acquireIdToken = vi.fn().mockResolvedValue("id-token");
-    const { result } = renderHook(() => useCompatibilityInvitationIssue({ acquireIdToken }));
+    const { result } = renderHook(() => useCompatibilityInvitationIssue());
 
     act(() => void result.current.issue("family"));
 
@@ -27,7 +26,6 @@ describe("useCompatibilityInvitationIssue", () => {
     );
     expect(issueCompatibilityInvitation).toHaveBeenCalledWith(
       undefined,
-      "id-token",
       "family",
       expect.any(AbortSignal),
     );

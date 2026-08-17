@@ -27,6 +27,11 @@ describe("billing plan catalog", () => {
       STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID: "bpc_standard",
       STRIPE_PORTAL_RESET_CONFIGURATION_ID: "bpc_reset",
       BILLING_QUEUE: { send: async () => undefined },
+      SESSION_STORE: {
+        get: async () => null,
+        put: async () => undefined,
+        delete: async () => undefined,
+      },
     };
     const jsonRequest = {
       method: "POST",

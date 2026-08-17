@@ -9,7 +9,7 @@ configure({ asyncUtilTimeout: 5_000 });
 
 const liff = vi.hoisted(() => ({
   initialize: vi.fn(),
-  getIdToken: vi.fn(),
+  readCredential: vi.fn(),
 }));
 
 vi.mock("../config", () => ({
@@ -24,12 +24,19 @@ vi.mock("../feature/legal", () => ({
   ServiceTermsAcceptanceHistory: () => null,
 }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
-  initializeLiff: liff.initialize,
-  getLiffIdToken: liff.getIdToken,
+  initializeLiffForAuthExchange: liff.initialize,
+  readLiffAuthExchangeCredential: liff.readCredential,
 }));
 vi.mock("../feature/profile", () => ({
   ProfileApplication: () => <main aria-label="わたしのまとめ" />,
 }));
+
+const authSession = {
+  authenticated: true,
+  displayProfile: { displayName: "テスト" },
+  role: "user",
+  csrfToken: "csrf-test-token",
+};
 
 function urlOf(input: RequestInfo | URL): URL {
   return input instanceof Request ? new URL(input.url) : new URL(String(input));
@@ -44,7 +51,7 @@ describe("subscription entitlement user journey", () => {
       inClient: true,
       profile: { displayName: "テスト" },
     });
-    liff.getIdToken.mockReturnValue("dummy.id.token");
+    liff.readCredential.mockReturnValue("dummy.id.token");
   });
 
   afterEach(() => {
@@ -53,8 +60,9 @@ describe("subscription entitlement user journey", () => {
   });
 
   it("年額契約では月次AI枠のリセット日でなく契約の利用可能期限を表示する", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/profile") {
         return Response.json({ role: "user", displayName: "テスト", avatar: null });
       }
@@ -102,15 +110,20 @@ describe("subscription entitlement user journey", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "https://api.example.com/api/profile/entitlement",
-        expect.objectContaining({ headers: { Authorization: "Bearer dummy.id.token" } }),
+        expect.objectContaining({ credentials: "include" }),
       );
     });
-  });
+    const entitlementCall = fetchMock.mock.calls.find(
+      ([input]) => urlOf(input).pathname === "/api/profile/entitlement",
+    );
+    expect(new Headers(entitlementCall?.[1]?.headers).get("Authorization")).toBeNull();
+  }, 10_000);
 
   it("Free Planからアップグレード画面をプロフィールより前面に開く", async () => {
     let entitlementRequests = 0;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = urlOf(input);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
       if (url.pathname === "/api/profile") {
         return Response.json({ role: "user", displayName: "テスト", avatar: null });
       }
@@ -180,5 +193,5 @@ describe("subscription entitlement user journey", () => {
     );
     expect(profileDialog?.getAttribute("aria-hidden")).toBe("true");
     expect(profileDialog?.hasAttribute("inert")).toBe(true);
-  });
+  }, 10_000);
 });

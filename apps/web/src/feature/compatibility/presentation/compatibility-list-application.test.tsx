@@ -12,8 +12,15 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../liff", () => ({
-  useLiffSession: () => ({ acquireIdToken: vi.fn(), profile: { displayName: "テスト" } }),
+vi.mock("../../auth", () => ({
+  useAuthSession: () => ({
+    state: {
+      status: "authenticated",
+      profile: { displayName: "テスト" },
+      role: "user",
+      revision: 1,
+    },
+  }),
 }));
 vi.mock("./compatibility-list-screen", () => ({
   CompatibilityListScreen: (props: {

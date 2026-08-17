@@ -70,7 +70,7 @@ export const billingCheckoutSessionRoute = describeRoute({
   operationId: "createBillingCheckoutSession",
   tags: ["Billing"],
   summary: "本人の選択したPlanに対するStripe Checkout Sessionを作成する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: BillingCheckoutRequestSchema } },
@@ -88,7 +88,7 @@ export const billingCheckoutSessionStatusRoute = describeRoute({
   operationId: "getBillingCheckoutSessionStatus",
   tags: ["Billing"],
   summary: "Checkout Sessionが本人のものであることと完了状態を確認する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("本人のCheckout Session状態", BillingCheckoutSessionStatusResponseSchema),
     ...authenticatedErrors,
@@ -112,7 +112,7 @@ export const billingTrialEligibilityRoute = describeRoute({
   operationId: "getBillingTrialEligibility",
   tags: ["Billing"],
   summary: "本人が初回14日間trialを開始できるか取得する",
-  security: [{ applicationSession: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("Account単位のtrial利用可否", BillingTrialEligibilityResponseSchema),
     ...authenticatedErrors,
@@ -123,7 +123,7 @@ export const billingPortalSessionRoute = describeRoute({
   operationId: "createBillingPortalSession",
   tags: ["Billing"],
   summary: "本人のStripe Customerに対するCustomer Portal Sessionを作成する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     201: jsonResponse("短命なStripe Customer Portal URL", BillingSessionResponseSchema),
     409: jsonResponse("Portalを開始できない", BillingSessionConflictSchema),
@@ -136,7 +136,7 @@ export const billingPlanChangeSessionRoute = describeRoute({
   operationId: "createBillingPlanChangeSession",
   tags: ["Billing"],
   summary: "選択したPlanへの即時確認または期間末変更予約を作成する",
-  security: [{ applicationSession: [], csrfToken: [] }, { liffIdToken: [] }],
+  security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: { "application/json": { schema: BillingCheckoutRequestSchema } },

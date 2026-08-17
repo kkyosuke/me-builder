@@ -14,7 +14,7 @@ Source Recordの不変性、Revision、tombstoneの意味は[Source Recordのラ
 | `PATCH` | `/api/personal-data/records/:sourceRecordId` | 原本を上書きせず、新しいSource RecordとRevisionを作る |
 | `DELETE` | `/api/personal-data/records/:sourceRecordId` | Source Recordをtombstoneへ遷移する |
 
-全経路でLIFF ID tokenを検証し、解決したAccountのAccountDataだけを操作します。Account IDはpath、query、bodyのいずれからも受け取りません。`sourceRecordId`が別Accountの所有物、削除済み、または既に訂正された旧版の場合は、存在を区別せず`404`を返します。
+全経路でHttpOnlyのアプリセッションCookieを検証し、解決したAccountのAccountDataだけを操作します。Account IDはpath、query、bodyのいずれからも受け取りません。変更系リクエストでは同一OriginとCSRFトークンも検証します。`sourceRecordId`が別Accountの所有物、削除済み、または既に訂正された旧版の場合は、存在を区別せず`404`を返します。
 
 一覧は本人の原文を含むため`Cache-Control: no-store`を付けます。運用ログにはpathの`sourceRecordId`も、診断回答、日記本文、訂正後の本文も記録しません。
 
@@ -29,7 +29,7 @@ sequenceDiagram
     participant D as AccountData
     participant V as Vectorize Queue
 
-    W->>A: PATCH + ID token + 訂正内容
+    W->>A: PATCH + session cookie + CSRF + 訂正内容
     A->>D: 検証済みAccount / Source Record
     D->>D: 新Source + Revision + 現在参照の差し替え
     D->>D: 旧Evidence由来のBrainと生成物を利用不能化

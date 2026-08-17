@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
-import { createHttpClient } from "../../../infrastructure/http-client";
+import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 import type { AdminAccountFilters, AdminAccountPage } from "../model/account";
 import type { AdminStatistics } from "../model/statistics";
 
@@ -94,17 +94,15 @@ const AccountsResponseSchema = v.object({
 
 export async function fetchAdminStatistics(
   apiUrl: string | undefined,
-  idToken: string,
   signal?: AbortSignal,
 ): Promise<AdminStatistics> {
-  const response = await createHttpClient(apiUrl).request("/api/admin/statistics", {
-    headers: { Authorization: `Bearer ${idToken}` },
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/admin/statistics", {
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
     if (response.status === 403) throw new Error("この画面を表示する管理者権限がありません。");
     if (response.status === 401)
-      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+      throw new Error("本人確認の有効期限が切れました。もう一度お試しください。");
     throw new Error(`統計情報の取得に失敗しました (HTTP ${response.status})`);
   }
   return v.parse(ResponseSchema, await response.json());
@@ -112,7 +110,6 @@ export async function fetchAdminStatistics(
 
 export async function fetchAdminAccounts(
   apiUrl: string | undefined,
-  idToken: string,
   filters: AdminAccountFilters,
   cursor?: string,
   signal?: AbortSignal,
@@ -124,14 +121,16 @@ export async function fetchAdminAccounts(
   if (filters.sort !== "created") query.set("sort", filters.sort);
   if (cursor) query.set("cursor", cursor);
   const suffix = query.size > 0 ? `?${query.toString()}` : "";
-  const response = await createHttpClient(apiUrl).request(`/api/admin/accounts${suffix}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-    ...(signal ? { signal } : {}),
-  });
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    `/api/admin/accounts${suffix}`,
+    {
+      ...(signal ? { signal } : {}),
+    },
+  );
   if (!response.ok) {
     if (response.status === 403) throw new Error("この画面を表示する管理者権限がありません。");
     if (response.status === 401) {
-      throw new Error("本人確認に失敗しました。LINEから開き直してください。");
+      throw new Error("本人確認の有効期限が切れました。もう一度お試しください。");
     }
     if (response.status === 400) throw new Error("検索条件を確認してください。");
     throw new Error(`Account一覧の取得に失敗しました (HTTP ${response.status})`);

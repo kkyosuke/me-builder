@@ -23,6 +23,8 @@ export type AuthenticationResult =
       type: "authenticated";
       actor: AuthenticatedActor;
       accountRole: "user" | "admin";
+      /** 認証に使ったD1 Identity。HTTP responseやfeature actorへは公開しない。 */
+      authenticatedIdentityId?: string;
       displayProfile?: DisplayProfile;
     }
   | { type: "unauthenticated"; reason: AuthenticationFailureReason };

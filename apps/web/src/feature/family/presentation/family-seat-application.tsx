@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
-import { getLiffIdToken } from "../../liff/infrastructure/liff-client";
-import { useLiffSession } from "../../liff/presentation/liff-session-provider";
 import {
   acceptFamilyInvitation,
   cancelFamilyInvitation,
@@ -26,7 +24,6 @@ function clearInvitationTokenFromUrl(): void {
 }
 
 export default function FamilySeatApplication({ onBack }: { onBack: () => void }) {
-  const { acquireIdToken } = useLiffSession();
   const invitationToken = useMemo(
     () => new URLSearchParams(window.location.search).get("token"),
     [],
@@ -38,48 +35,48 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
   const [issuedInvitation, setIssuedInvitation] = useState<FamilyInvitation | null>(null);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [isFreeAfterExit, setIsFreeAfterExit] = useState(false);
-
-  const token = useCallback(
-    async (signal?: AbortSignal) => {
-      const value =
-        getLiffIdToken() ?? (await acquireIdToken(signal ?? new AbortController().signal));
-      if (!value) throw new Error("LINEからプロフィールを開き直してください。");
-      return value;
-    },
-    [acquireIdToken],
-  );
+  const mounted = useRef(false);
+  const loadRequest = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    loadRequest.current?.abort();
     const controller = new AbortController();
-    setState({ status: "loading" });
+    loadRequest.current = controller;
+    if (mounted.current) setState({ status: "loading" });
     try {
-      setState({
-        status: "success",
-        data: await fetchFamilySeats(
-          config.apiUrl,
-          await token(controller.signal),
-          controller.signal,
-        ),
-      });
+      const data = await fetchFamilySeats(config.apiUrl, controller.signal);
+      if (mounted.current && !controller.signal.aborted) {
+        setState({ status: "success", data });
+      }
     } catch (error) {
-      setState({ status: "error", message: message(error) });
+      if (mounted.current && !controller.signal.aborted) {
+        setState({ status: "error", message: message(error) });
+      }
+    } finally {
+      if (loadRequest.current === controller) loadRequest.current = null;
     }
-    return () => controller.abort();
-  }, [token]);
+  }, []);
 
   useEffect(() => {
+    mounted.current = true;
     if (!invitationToken) void load();
+    return () => {
+      mounted.current = false;
+      loadRequest.current?.abort();
+      loadRequest.current = null;
+    };
   }, [invitationToken, load]);
 
-  const run = async (operation: (idToken: string) => Promise<unknown>, done?: string) => {
+  const run = async (operation: () => Promise<unknown>, done?: string) => {
     setActionState({ status: "loading" });
     try {
-      await operation(await token());
+      await operation();
+      if (!mounted.current) return false;
       setActionState({ status: "success", data: done ?? "更新しました。" });
       if (done) setCompletionMessage(done);
       return true;
     } catch (error) {
-      setActionState({ status: "error", message: message(error) });
+      if (mounted.current) setActionState({ status: "error", message: message(error) });
       return false;
     }
   };
@@ -87,12 +84,13 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
   const issue = async () => {
     setActionState({ status: "loading" });
     try {
-      const invitation = await issueFamilyInvitation(config.apiUrl, await token());
+      const invitation = await issueFamilyInvitation(config.apiUrl);
+      if (!mounted.current) return;
       setIssuedInvitation(invitation);
       setActionState({ status: "success", data: "招待リンクを作成しました。" });
       await load();
     } catch (error) {
-      setActionState({ status: "error", message: message(error) });
+      if (mounted.current) setActionState({ status: "error", message: message(error) });
     }
   };
 
@@ -103,7 +101,7 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
     return url.toString();
   }, [issuedInvitation]);
 
-  const updateAndReload = async (operation: (idToken: string) => Promise<unknown>) => {
+  const updateAndReload = async (operation: () => Promise<unknown>) => {
     if (await run(operation)) await load();
   };
 
@@ -127,7 +125,7 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
         void (async () => {
           if (
             await run(
-              (idToken) => acceptFamilyInvitation(config.apiUrl, idToken, invitationToken),
+              () => acceptFamilyInvitation(config.apiUrl, invitationToken),
               "ファミリーパックに参加しました。",
             )
           ) {
@@ -141,7 +139,7 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
         void (async () => {
           if (
             await run(
-              (idToken) => declineFamilyInvitation(config.apiUrl, idToken, invitationToken),
+              () => declineFamilyInvitation(config.apiUrl, invitationToken),
               "招待を辞退しました。",
             )
           ) {
@@ -151,16 +149,14 @@ export default function FamilySeatApplication({ onBack }: { onBack: () => void }
         })();
       }}
       onCancel={(seatId) =>
-        void updateAndReload((idToken) => cancelFamilyInvitation(config.apiUrl, idToken, seatId))
+        void updateAndReload(() => cancelFamilyInvitation(config.apiUrl, seatId))
       }
-      onRemove={(seatId) =>
-        void updateAndReload((idToken) => removeFamilyMember(config.apiUrl, idToken, seatId))
-      }
+      onRemove={(seatId) => void updateAndReload(() => removeFamilyMember(config.apiUrl, seatId))}
       onLeave={() =>
         void (async () => {
           if (
             await run(
-              (idToken) => leaveFamilyPack(config.apiUrl, idToken),
+              () => leaveFamilyPack(config.apiUrl),
               "ファミリーパックから退出し、Freeへ戻りました。",
             )
           ) {

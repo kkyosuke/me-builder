@@ -18,7 +18,7 @@
 
 ## 2. 保存と有効期限
 
-session参照は32 byteの乱数をbase64urlで表現し、cookie値そのものは保存しません。Cloudflare KVではSHA-256 hashを`session:v1:{hash}`として引き、Account ID、認証方式、外部providerでの認証時刻、発行時刻、最終利用時刻、絶対期限、D1 session version、CSRF検証情報、交換時に検証済みの表示プロフィールを保存します。
+session参照は32 byteの乱数をbase64urlで表現し、cookie値そのものは保存しません。Cloudflare KVではSHA-256 hashを`session:v2:{hash}`として引き、Account ID、認証方式、認証に使ったD1 Identity ID、外部providerでの認証時刻、発行時刻、最終利用時刻、絶対期限、D1 session version、CSRF検証情報、交換時に検証済みの表示プロフィールを保存します。D1 Identity IDはAccount復旧等のIdentity固有操作だけに使い、`AuthenticatedActor`、HTTP response、Web UIへ公開しません。`authenticatedIdentityId`を持たないv1 recordは読み取らず、再認証交換でv2 sessionへ更新します。
 
 - 絶対期限: 発行から30日
 - idle期限: 最終利用から7日
@@ -58,4 +58,4 @@ session参照は`__Host-me_builder_session` cookieへ保存します。属性は
 - `GET /api/auth/session`: application sessionだけを受け付け、CSRF tokenを含む表示可能なsession状態を返す
 - `DELETE /api/auth/session`: application session、許可済みOrigin、`X-CSRF-Token`を要求し、Accountの全sessionを失効する
 
-移行期間に機能APIへ`Authorization`が明示された場合は旧LIFF Bearerを優先し、不正なBearerでもcookieへfallbackしません。`POST`、`PUT`、`PATCH`、`DELETE`をapplication sessionで呼ぶ場合、cookieに加えて許可済みOriginの完全一致と`X-CSRF-Token`を必須にします。旧LIFF Bearerはambient credentialではないため、このCSRF tokenを要求しません。
+機能APIはapplication sessionだけを認証に使用します。`Authorization: Bearer`は認証情報として扱わず、Bearerだけのリクエストは拒否し、有効なcookie sessionへ添付されていても認証結果へ影響させません。`POST`、`PUT`、`PATCH`、`DELETE`では、cookieに加えて許可済みOriginの完全一致と`X-CSRF-Token`を必須にします。

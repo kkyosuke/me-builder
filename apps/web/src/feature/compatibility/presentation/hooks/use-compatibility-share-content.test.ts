@@ -19,19 +19,16 @@ describe("useCompatibilityShareContent", () => {
   });
 
   it("パートナーを初期表示し、取得済みカテゴリへ戻るとキャッシュを使う", async () => {
-    mocks.fetchCompatibilityShareContent.mockImplementation(
-      (_apiUrl, _idToken, relationshipCategory) =>
-        Promise.resolve({
-          relationshipCategory,
-          aboutMe: null,
-          themes: [],
-          nextAction: "profile-summary",
-        }),
+    mocks.fetchCompatibilityShareContent.mockImplementation((_apiUrl, relationshipCategory) =>
+      Promise.resolve({
+        relationshipCategory,
+        aboutMe: null,
+        themes: [],
+        nextAction: "profile-summary",
+      }),
     );
-    const acquireIdToken = vi.fn(async () => "id-token");
     const { result } = renderHook(() =>
       useCompatibilityShareContent({
-        acquireIdToken,
         latestProfileSummaryVersionId: "summary-version-1",
       }),
     );
@@ -56,26 +53,24 @@ describe("useCompatibilityShareContent", () => {
     });
 
     expect(mocks.fetchCompatibilityShareContent).toHaveBeenCalledTimes(2);
-    expect(mocks.fetchCompatibilityShareContent.mock.calls.map((call) => call[2])).toEqual([
+    expect(mocks.fetchCompatibilityShareContent.mock.calls.map((call) => call[1])).toEqual([
       "partner",
       "family",
     ]);
   });
 
   it("最新のまとめが変わると全カテゴリのキャッシュを破棄する", async () => {
-    mocks.fetchCompatibilityShareContent.mockImplementation(
-      (_apiUrl, _idToken, relationshipCategory) =>
-        Promise.resolve({
-          relationshipCategory,
-          aboutMe: null,
-          themes: [],
-          nextAction: "profile-summary",
-        }),
+    mocks.fetchCompatibilityShareContent.mockImplementation((_apiUrl, relationshipCategory) =>
+      Promise.resolve({
+        relationshipCategory,
+        aboutMe: null,
+        themes: [],
+        nextAction: "profile-summary",
+      }),
     );
-    const acquireIdToken = vi.fn(async () => "id-token");
     const { result, rerender } = renderHook(
       ({ latestProfileSummaryVersionId }) =>
-        useCompatibilityShareContent({ acquireIdToken, latestProfileSummaryVersionId }),
+        useCompatibilityShareContent({ latestProfileSummaryVersionId }),
       { initialProps: { latestProfileSummaryVersionId: "summary-version-1" } },
     );
 
@@ -93,7 +88,7 @@ describe("useCompatibilityShareContent", () => {
 
     act(() => result.current.changeRelationshipCategory("partner"));
     await waitFor(() => expect(mocks.fetchCompatibilityShareContent).toHaveBeenCalledTimes(4));
-    expect(mocks.fetchCompatibilityShareContent.mock.calls.map((call) => call[2])).toEqual([
+    expect(mocks.fetchCompatibilityShareContent.mock.calls.map((call) => call[1])).toEqual([
       "partner",
       "family",
       "family",
@@ -109,10 +104,8 @@ describe("useCompatibilityShareContent", () => {
       themes: [],
       nextAction: "profile-summary",
     });
-    const acquireIdToken = vi.fn(async () => "id-token");
     const { result } = renderHook(() =>
       useCompatibilityShareContent({
-        acquireIdToken,
         latestProfileSummaryVersionId: "summary-version-1",
       }),
     );
@@ -120,9 +113,8 @@ describe("useCompatibilityShareContent", () => {
     expect(result.current.relationshipCategory).toBe("friend");
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     expect(mocks.fetchCompatibilityShareContent).toHaveBeenCalledOnce();
-    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[1]).toBe("id-token");
-    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[2]).toBe("friend");
-    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[3]).toBeInstanceOf(AbortSignal);
+    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[1]).toBe("friend");
+    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[2]).toBeInstanceOf(AbortSignal);
   });
 
   it("LIFF復帰URLで指定されたカテゴリを最初に取得する", async () => {
@@ -137,16 +129,14 @@ describe("useCompatibilityShareContent", () => {
       themes: [],
       nextAction: "profile-summary",
     });
-    const acquireIdToken = vi.fn(async () => "id-token");
     const { result } = renderHook(() =>
       useCompatibilityShareContent({
-        acquireIdToken,
         latestProfileSummaryVersionId: "summary-version-1",
       }),
     );
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
     expect(result.current.relationshipCategory).toBe("friend");
-    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[2]).toBe("friend");
+    expect(mocks.fetchCompatibilityShareContent.mock.calls[0]?.[1]).toBe("friend");
   });
 });

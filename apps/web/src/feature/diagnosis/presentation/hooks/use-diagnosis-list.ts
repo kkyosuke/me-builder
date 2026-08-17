@@ -5,13 +5,8 @@ import { fetchDiagnosisList } from "../../infrastructure/diagnosis-api";
 import type { DiagnosisListItem } from "../../model/diagnosis-list-item";
 import { applySavedProgress } from "../../model/diagnosis-navigation";
 
-export function useDiagnosisList({
-  acquireIdToken,
-}: {
-  acquireIdToken: (signal: AbortSignal) => Promise<string | null>;
-}) {
+export function useDiagnosisList() {
   const [state, setState] = useState<AsyncState<DiagnosisListItem[]>>({ status: "loading" });
-  const [idToken, setIdToken] = useState<string | null>(null);
   const mounted = useRef(false);
   const hasLoaded = useRef(false);
   const loading = useRef(false);
@@ -30,13 +25,7 @@ export function useDiagnosisList({
     }
 
     try {
-      const currentIdToken = await acquireIdToken(controller.signal);
-      if (controller.signal.aborted || !currentIdToken) {
-        return;
-      }
-      setIdToken(currentIdToken);
-
-      const diagnoses = await fetchDiagnosisList(config.apiUrl, currentIdToken, controller.signal);
+      const diagnoses = await fetchDiagnosisList(config.apiUrl, controller.signal);
       if (mounted.current && !controller.signal.aborted) {
         hasLoaded.current = true;
         setState({ status: "success", data: diagnoses });
@@ -53,7 +42,7 @@ export function useDiagnosisList({
         loading.current = false;
       }
     }
-  }, [acquireIdToken]);
+  }, []);
 
   useEffect(() => {
     mounted.current = true;
@@ -92,5 +81,5 @@ export function useDiagnosisList({
     [],
   );
 
-  return { state, idToken, load, updateProgress };
+  return { state, load, updateProgress };
 }

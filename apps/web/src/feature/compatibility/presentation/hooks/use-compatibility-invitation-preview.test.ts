@@ -37,11 +37,10 @@ describe("useCompatibilityInvitationPreview", () => {
     URL.revokeObjectURL = vi.fn();
   });
 
-  it("LIFFトークンと関係IDで招待内容を取得する", async () => {
+  it("アプリセッションと関係IDで招待内容を取得する", async () => {
     vi.mocked(fetchCompatibilityInvitation).mockResolvedValue(invitation);
-    const acquireIdToken = vi.fn().mockResolvedValue("id-token");
-    const { result } = renderHook(() =>
-      useCompatibilityInvitationPreview({ acquireIdToken, relationshipId }),
+    const { result, unmount } = renderHook(() =>
+      useCompatibilityInvitationPreview({ relationshipId }),
     );
 
     await waitFor(() => expect(result.current.state.status).toBe("success"));
@@ -55,17 +54,18 @@ describe("useCompatibilityInvitationPreview", () => {
     });
     expect(fetchCompatibilityInvitation).toHaveBeenCalledWith(
       undefined,
-      "id-token",
       relationshipId,
       expect.anything(),
     );
     expect(fetchCompatibilityAvatarImage).toHaveBeenCalledTimes(2);
+
+    unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:inviter-avatar");
   });
 
   it("関係IDを取り出せなければAPIを呼ばずエラーにする", async () => {
-    const acquireIdToken = vi.fn();
     const { result } = renderHook(() =>
-      useCompatibilityInvitationPreview({ acquireIdToken, relationshipId: null }),
+      useCompatibilityInvitationPreview({ relationshipId: null }),
     );
 
     await waitFor(() => expect(result.current.state.status).toBe("error"));
@@ -73,7 +73,6 @@ describe("useCompatibilityInvitationPreview", () => {
       status: "error",
       message: "この招待リンクは利用できません。",
     });
-    expect(acquireIdToken).not.toHaveBeenCalled();
     expect(fetchCompatibilityInvitation).not.toHaveBeenCalled();
   });
 });
