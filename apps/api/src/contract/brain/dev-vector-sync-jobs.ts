@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
@@ -54,6 +59,7 @@ export const developmentFailedBrainVectorSyncJobsRoute = describeRoute({
       DevelopmentFailedBrainVectorSyncJobsResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "開発環境ではない、または対応するAccountがない",
       DevelopmentOrAccountNotFoundSchema,
@@ -69,6 +75,7 @@ export const resetDevelopmentBrainVectorSyncJobRoute = describeRoute({
   responses: {
     200: jsonResponse("reset結果", ResetDevelopmentBrainVectorSyncJobResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "開発環境ではない、対応するAccountがない、または指定jobが終端状態ではない",
       DevelopmentAccountOrJobNotFoundSchema,
@@ -84,6 +91,7 @@ export const resetAllDevelopmentBrainVectorSyncJobsRoute = describeRoute({
   responses: {
     200: jsonResponse("resetしたjob件数", ResetAllDevelopmentBrainVectorSyncJobsResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "開発環境ではない、または対応するAccountがない",
       DevelopmentOrAccountNotFoundSchema,

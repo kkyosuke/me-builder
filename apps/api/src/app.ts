@@ -194,7 +194,7 @@ import {
   postSelfCareContextConfirmation,
 } from "./controller/self-care-context";
 import { requireAuthentication } from "./middleware/authentication";
-import { requireCurrentTerms } from "./middleware/authorization";
+import { requireCurrentTerms, requireDevelopmentEnvironment } from "./middleware/authorization";
 import { operationalHttpPath } from "./operational-http-path";
 import type { AppEnv } from "./types";
 
@@ -410,9 +410,17 @@ app.delete(
   deleteProfileAvatarContents,
 );
 
-app.get("/api/personal-data/records", personalDataRecordsRoute, getPersonalDataRecords);
+app.get(
+  "/api/personal-data/records",
+  requireAuthentication,
+  requireCurrentTerms,
+  personalDataRecordsRoute,
+  getPersonalDataRecords,
+);
 app.patch(
   "/api/personal-data/records/:sourceRecordId",
+  requireAuthentication,
+  requireCurrentTerms,
   correctPersonalDataRecordRoute,
   patchPersonalDataRecord,
 );
@@ -439,6 +447,8 @@ app.delete(
 );
 app.delete(
   "/api/personal-data/records/:sourceRecordId",
+  requireAuthentication,
+  requireCurrentTerms,
   deletePersonalDataRecordRoute,
   deletePersonalDataRecordContents,
 );
@@ -460,21 +470,41 @@ app.post(
 app.delete("/api/family/invitations/:seatId", cancelFamilyInvitationRoute, deleteFamilyInvitation);
 app.delete("/api/family/seats/:seatId", removeFamilyMemberRoute, deleteFamilyMember);
 app.delete("/api/family/membership", leaveFamilyPackRoute, deleteOwnFamilyMembership);
-app.post("/api/personal-data/exports", requestPersonalDataExportRoute, postPersonalDataExport);
+app.post(
+  "/api/personal-data/exports",
+  requireAuthentication,
+  requireCurrentTerms,
+  requestPersonalDataExportRoute,
+  postPersonalDataExport,
+);
 app.get(
   "/api/personal-data/exports/:exportId",
+  requireAuthentication,
+  requireCurrentTerms,
   personalDataExportStatusRoute,
   getPersonalDataExportStatus,
 );
 app.get(
   "/api/personal-data/exports/:exportId/download",
+  requireAuthentication,
+  requireCurrentTerms,
   downloadPersonalDataExportRoute,
   downloadPersonalDataExportContents,
 );
 
-app.get("/api/dev/brain-items", developmentBrainItemsRoute, getDevelopmentBrainItems);
+app.get(
+  "/api/dev/brain-items",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
+  developmentBrainItemsRoute,
+  getDevelopmentBrainItems,
+);
 app.get(
   "/api/dev/brain-items/:brainItemId/vector",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
   developmentBrainVectorRoute,
   getDevelopmentBrainVector,
 );
@@ -521,16 +551,25 @@ app.delete(
 );
 app.get(
   "/api/dev/brain-vector-sync-jobs/failed",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
   developmentFailedBrainVectorSyncJobsRoute,
   getDevelopmentFailedBrainVectorSyncJobs,
 );
 app.post(
   "/api/dev/brain-vector-sync-jobs/reset-failed",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
   resetAllDevelopmentBrainVectorSyncJobsRoute,
   postDevelopmentBrainVectorSyncJobsResetAll,
 );
 app.post(
   "/api/dev/brain-vector-sync-jobs/:jobId/reset",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
   resetDevelopmentBrainVectorSyncJobRoute,
   postDevelopmentBrainVectorSyncJobReset,
 );
@@ -580,7 +619,14 @@ app.put(
   deferDiagnosisQuestionRoute,
   putDiagnosisDeferredQuestion,
 );
-app.delete("/api/dev/account-data", resetDevelopmentAccountDataRoute, deleteDevelopmentAccountData);
+app.delete(
+  "/api/dev/account-data",
+  requireDevelopmentEnvironment,
+  requireAuthentication,
+  requireCurrentTerms,
+  resetDevelopmentAccountDataRoute,
+  deleteDevelopmentAccountData,
+);
 
 // Web UIの型生成にも使う、機械可読なAPI契約。
 app.get("/api/openapi.json", openAPIRouteHandler(app, openApiOptions));

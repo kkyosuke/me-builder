@@ -1,8 +1,7 @@
-import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { getConfig, isDevelopmentEnvironment } from "../config";
+import { isDevelopmentEnvironment } from "../config";
 import {
   DevelopmentBrainItemsResponseSchema,
   DevelopmentBrainVectorResponseSchema,
@@ -12,11 +11,7 @@ import {
   ResetAllDevelopmentBrainVectorSyncJobsResponseSchema,
   ResetDevelopmentBrainVectorSyncJobResponseSchema,
 } from "../contract/brain/dev-vector-sync-jobs";
-import {
-  AccountNotFoundErrorSchema,
-  ServiceUnavailableErrorSchema,
-  UnauthorizedErrorSchema,
-} from "../contract/shared/errors";
+import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { getDevelopmentBrainItems as loadDevelopmentBrainItems } from "../logic/development-brain-items";
 import { getDevelopmentBrainVector as loadDevelopmentBrainVector } from "../logic/development-brain-items";
 import {
@@ -24,8 +19,8 @@ import {
   resetAllDevelopmentBrainVectorSyncJobs as resetAllDevelopmentFailedBrainVectorSyncJobs,
   resetDevelopmentBrainVectorSyncJob as resetDevelopmentFailedBrainVectorSyncJob,
 } from "../logic/development-brain-vector-sync-jobs";
+import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 
 /** `GET /api/dev/brain-items` — 開発環境だけで本人のactive Itemを返す。 */
 export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Response> {
@@ -33,16 +28,13 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
   if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
     return c.json({ error: "Not Found" } as const, 404);
   }
-  const config = getConfig(c.env);
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
     logger.error({ path: c.req.path }, "Brain Item storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
   const outcome = await loadDevelopmentBrainItems({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
   });
 
@@ -74,17 +66,6 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
           truncated: outcome.truncated,
         }),
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -94,7 +75,6 @@ export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Res
   if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
     return c.json({ error: "Not Found" } as const, 404);
   }
-  const config = getConfig(c.env);
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.BRAIN_VECTOR_INDEX) {
     logger.error({ path: c.req.path }, "Brain vector storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
@@ -103,9 +83,7 @@ export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Res
   if (!brainItemId) return c.json({ error: "Not Found" } as const, 404);
 
   const outcome = await loadDevelopmentBrainVector({
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
     vectorIndex: c.env.BRAIN_VECTOR_INDEX,
     brainItemId,
@@ -120,17 +98,6 @@ export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Res
           checkedAt: outcome.result.checkedAt.toISOString(),
         }),
       );
-    case "account-not-found":
-      return c.json(
-        v.parse(AccountNotFoundErrorSchema, {
-          error: "Account not found",
-          reason: "friendship_required",
-        }),
-        404,
-      );
-    case "not-configured":
-    case "unauthenticated":
-      return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
 }
 
@@ -140,30 +107,11 @@ function developmentRouteIsAvailable(c: Context<AppEnv>): boolean {
 }
 
 function failedJobParams(c: Context<AppEnv>) {
-  const config = getConfig(c.env);
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) return undefined;
   return {
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: config.lineLoginChannelId,
-    db: D1.shared.client.create(c.env.DB),
+    actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
   };
-}
-
-function sessionFailureResponse(
-  c: Context<AppEnv>,
-  outcome: { type: "not-configured" } | { type: "unauthenticated" } | { type: "account-not-found" },
-) {
-  if (outcome.type === "account-not-found") {
-    return c.json(
-      v.parse(AccountNotFoundErrorSchema, {
-        error: "Account not found",
-        reason: "friendship_required",
-      }),
-      404,
-    );
-  }
-  return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
 }
 
 /** `GET /api/dev/brain-vector-sync-jobs/failed` — 本人の終端jobだけを返す。 */
@@ -177,7 +125,6 @@ export async function getDevelopmentFailedBrainVectorSyncJobs(
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await loadDevelopmentFailedBrainVectorSyncJobs(params);
-  if (outcome.type !== "resolved") return sessionFailureResponse(c, outcome);
   c.header("Cache-Control", "no-store");
   return c.json(
     v.parse(DevelopmentFailedBrainVectorSyncJobsResponseSchema, {
@@ -200,7 +147,6 @@ export async function postDevelopmentBrainVectorSyncJobReset(
   const jobId = c.req.param("jobId");
   if (!jobId) return c.json({ error: "Not Found" } as const, 404);
   const outcome = await resetDevelopmentFailedBrainVectorSyncJob({ ...params, jobId });
-  if (outcome.type !== "resolved") return sessionFailureResponse(c, outcome);
   if (!outcome.reset) return c.json({ error: "Failed vector sync job not found" } as const, 404);
   return c.json(v.parse(ResetDevelopmentBrainVectorSyncJobResponseSchema, { reset: true }));
 }
@@ -216,7 +162,6 @@ export async function postDevelopmentBrainVectorSyncJobsResetAll(
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await resetAllDevelopmentFailedBrainVectorSyncJobs(params);
-  if (outcome.type !== "resolved") return sessionFailureResponse(c, outcome);
   return c.json(
     v.parse(ResetAllDevelopmentBrainVectorSyncJobsResponseSchema, {
       resetCount: outcome.resetCount,

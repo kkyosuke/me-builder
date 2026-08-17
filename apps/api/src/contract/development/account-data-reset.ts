@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { AccountNotFoundErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 
@@ -33,6 +38,7 @@ export const resetDevelopmentAccountDataRoute = describeRoute({
       ResetDevelopmentAccountDataResponseSchema,
     ),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse("開発環境ではない、または対応するAccountがない", ResetNotFoundErrorSchema),
   },
 } satisfies DescribeRouteOptions);

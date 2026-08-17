@@ -1,17 +1,17 @@
-import type { AccountDataNamespace, D1 } from "@me-builder/lib";
+import type { AccountDataNamespace } from "@me-builder/lib";
 import { describe, expect, it, vi } from "vitest";
 import { getDevelopmentBrainItems, getDevelopmentBrainVector } from "./development-brain-items";
 
-const db = {} as D1.shared.Client;
 const accountData = {} as AccountDataNamespace;
 const vectorIndex = {} as ApiBindings["BRAIN_VECTOR_INDEX"];
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+};
 
 function dependencies() {
   return {
-    createSession: vi.fn().mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-1", role: "user" },
-    }),
     listActive: vi.fn().mockResolvedValue({ items: [], truncated: false }),
   };
 }
@@ -20,35 +20,17 @@ describe("getDevelopmentBrainItems", () => {
   it("本人確認で解決したAccountのactive Itemを取得する", async () => {
     const deps = dependencies();
 
-    await expect(
-      getDevelopmentBrainItems(
-        { idToken: "token", lineLoginChannelId: "channel", db, accountData },
-        deps,
-      ),
-    ).resolves.toEqual({ type: "resolved", items: [], truncated: false });
+    await expect(getDevelopmentBrainItems({ actor, accountData }, deps)).resolves.toEqual({
+      type: "resolved",
+      items: [],
+      truncated: false,
+    });
     expect(deps.listActive).toHaveBeenCalledWith(accountData, "account-1");
-  });
-
-  it("本人を解決できなければAccountDataを参照しない", async () => {
-    const deps = dependencies();
-    deps.createSession.mockResolvedValue({ type: "unauthenticated", reason: "invalid" } as never);
-
-    await expect(
-      getDevelopmentBrainItems(
-        { idToken: undefined, lineLoginChannelId: "channel", db, accountData },
-        deps,
-      ),
-    ).resolves.toEqual({ type: "unauthenticated", reason: "invalid" });
-    expect(deps.listActive).not.toHaveBeenCalled();
   });
 });
 
 describe("getDevelopmentBrainVector", () => {
   it("本人の対応表を使ってVectorize実体と許可済みmetadataだけを返す", async () => {
-    const createSession = vi.fn().mockResolvedValue({
-      type: "resolved",
-      session: { accountId: "account-1", role: "user" },
-    });
     const findEntry = vi
       .fn()
       .mockResolvedValue({ vectorId: "private-vector-id", itemRevision: 12 });
@@ -70,14 +52,12 @@ describe("getDevelopmentBrainVector", () => {
     await expect(
       getDevelopmentBrainVector(
         {
-          idToken: "token",
-          lineLoginChannelId: "channel",
-          db,
+          actor,
           accountData,
           vectorIndex,
           brainItemId: "brain-1",
         },
-        { createSession, findEntry, getByIds, now },
+        { findEntry, getByIds, now },
       ),
     ).resolves.toEqual({
       type: "resolved",
@@ -103,18 +83,12 @@ describe("getDevelopmentBrainVector", () => {
     await expect(
       getDevelopmentBrainVector(
         {
-          idToken: "token",
-          lineLoginChannelId: "channel",
-          db,
+          actor,
           accountData,
           vectorIndex,
           brainItemId: "brain-1",
         },
         {
-          createSession: vi.fn().mockResolvedValue({
-            type: "resolved",
-            session: { accountId: "account-1", role: "user" },
-          }),
           findEntry: vi.fn().mockResolvedValue(undefined),
           getByIds,
           now: () => new Date("2026-08-10T00:00:00Z"),

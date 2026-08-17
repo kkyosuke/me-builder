@@ -8,6 +8,30 @@ const { resetDevelopmentAccountData } = vi.hoisted(() => ({
   resetDevelopmentAccountData: vi.fn(),
 }));
 vi.mock("../logic/dev-account-data-reset", () => ({ resetDevelopmentAccountData }));
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      c.set("authenticatedActor", {
+        accountId: "account-1",
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      });
+      await next();
+    },
+  };
+});
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
@@ -59,7 +83,7 @@ describe("DELETE /api/dev/account-data", () => {
     });
     expect(resetDevelopmentAccountData).toHaveBeenCalledWith(
       expect.objectContaining({
-        idToken: "dummy.id.token",
+        actor: expect.objectContaining({ accountId: "account-1" }),
         accountData: dummyAccountData,
         conversationCoordinator: dummyCoordinator,
       }),

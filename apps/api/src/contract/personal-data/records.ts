@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { ServiceUnavailableErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
+import {
+  ServiceUnavailableErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.trim(), v.nonEmpty());
 const ChoiceSchema = v.object({ id: NonEmptyStringSchema, label: NonEmptyStringSchema });
@@ -45,6 +50,7 @@ export const InvalidPersonalDataMutationSchema = v.object({
 
 const personalDataErrors = {
   ...authenticatedErrors,
+  ...currentTermsPolicyError,
   404: jsonResponse("本人が所有する有効な原本がない", PersonalDataRecordNotFoundSchema),
   503: jsonResponse("AccountData bindingが設定されていない", ServiceUnavailableErrorSchema),
 };
@@ -57,6 +63,7 @@ export const personalDataRecordsRoute = describeRoute({
   responses: {
     200: jsonResponse("現在有効な本人入力", PersonalDataRecordsResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     503: jsonResponse("AccountData bindingが設定されていない", ServiceUnavailableErrorSchema),
   },
 } satisfies DescribeRouteOptions);

@@ -1,6 +1,7 @@
 import { D1 } from "@me-builder/lib";
 import type { Context, MiddlewareHandler } from "hono";
 import * as v from "valibot";
+import { isDevelopmentEnvironment } from "../config";
 import {
   ServiceUnavailableErrorSchema,
   TermsAcceptanceRequiredErrorSchema,
@@ -41,3 +42,12 @@ export function createCurrentTermsPolicyMiddleware(
 }
 
 export const requireCurrentTerms = createCurrentTermsPolicyMiddleware();
+
+/** Productionでは開発用routeの存在自体を公開しない。 */
+export const requireDevelopmentEnvironment: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const environment = c.env?.ENVIRONMENT?.trim();
+  if (!environment || !isDevelopmentEnvironment(environment)) {
+    return c.json({ error: "Not Found" } as const, 404);
+  }
+  return next();
+};
