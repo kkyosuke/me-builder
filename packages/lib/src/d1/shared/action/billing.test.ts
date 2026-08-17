@@ -45,6 +45,102 @@ async function account(db: SharedD1Client, providerAccountId: string) {
 }
 
 describe("billing projection", () => {
+  it("past_dueを最初の失敗から7日だけ維持し、再通知で延長せず回復時に解除する", async () => {
+    const db = createTestDb();
+    const owner = await account(db, "U_payment_grace");
+    await linkBillingCustomer(db, { accountId: owner.id, providerCustomerId: "cus_1" });
+    await applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_before_upgrade",
+        type: "customer.subscription.updated",
+        objectId: "sub_1",
+        createdAt: new Date("2026-08-01T00:00:00Z"),
+      },
+      subscription: { ...subscription, priceId: "price_lite" },
+      planCode: "lite",
+    });
+    const failed = {
+      ...subscription,
+      status: "past_due" as const,
+      currentPeriodEnd: "2026-10-01T00:00:00.000Z",
+    };
+    await applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_payment_failed_first",
+        type: "invoice.payment_failed",
+        objectId: "in_1",
+        createdAt: new Date("2026-08-02T00:00:00Z"),
+      },
+      subscription: failed,
+      planCode: "full",
+    });
+    await applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_payment_failed_retry",
+        type: "invoice.payment_failed",
+        objectId: "in_1",
+        createdAt: new Date("2026-08-08T00:00:00Z"),
+      },
+      subscription: failed,
+      planCode: "full",
+    });
+    const provider = new D1AccountPlanAssignmentProvider(db);
+    await expect(
+      provider.findCurrent(owner.id, new Date("2026-08-08T23:59:59Z")),
+    ).resolves.toMatchObject({ plan: "lite", availableUntil: "2026-08-09T00:00:00.000Z" });
+    await expect(
+      provider.findCurrent(owner.id, new Date("2026-08-09T00:00:00Z")),
+    ).resolves.toMatchObject({ plan: "free" });
+
+    await applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_payment_recovered",
+        type: "invoice.paid",
+        objectId: "in_1",
+        createdAt: new Date("2026-08-09T01:00:00Z"),
+      },
+      subscription: { ...failed, status: "active" },
+      planCode: "full",
+    });
+    await expect(
+      provider.findCurrent(owner.id, new Date("2026-08-09T01:00:01Z")),
+    ).resolves.toMatchObject({ plan: "full" });
+    await expect(db.query.billingSubscriptionProjections.findFirst()).resolves.toMatchObject({
+      paymentFailureStartedAt: null,
+    });
+  });
+
+  it.each(["unpaid", "paused", "canceled"] as const)(
+    "%sは期間が残っていてもFreeへ戻す",
+    async (status) => {
+      const db = createTestDb();
+      const owner = await account(db, `U_${status}`);
+      await linkBillingCustomer(db, { accountId: owner.id, providerCustomerId: "cus_1" });
+      await applyBillingProjection(db, {
+        accountId: owner.id,
+        event: {
+          id: `evt_${status}`,
+          type: "customer.subscription.updated",
+          objectId: "sub_1",
+          createdAt: new Date("2026-08-02T00:00:00Z"),
+        },
+        subscription: { ...subscription, status },
+        planCode: "full",
+      });
+
+      await expect(
+        new D1AccountPlanAssignmentProvider(db).findCurrent(
+          owner.id,
+          new Date("2026-08-03T00:00:00Z"),
+        ),
+      ).resolves.toMatchObject({ plan: "free" });
+    },
+  );
+
   it("trial開始をAccountへ一度だけ記録し、終了後も利用済みと判定する", async () => {
     const db = createTestDb();
     const owner = await account(db, "U_trial_once");

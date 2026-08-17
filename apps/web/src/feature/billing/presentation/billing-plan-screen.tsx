@@ -13,6 +13,7 @@ export function BillingPlanScreen({
   completionMessage,
   onBack,
   onCheckout,
+  onManageSubscription,
   onRetry,
 }: {
   plans: AsyncState<readonly BillingPlan[]>;
@@ -21,6 +22,7 @@ export function BillingPlanScreen({
   completionMessage: string | null;
   onBack: () => void;
   onCheckout: (plan: PaidPlanCode, interval: BillingInterval) => void;
+  onManageSubscription: () => void;
   onRetry: () => void;
 }) {
   const [interval, setInterval] = useState<BillingInterval>("month");
@@ -102,15 +104,31 @@ export function BillingPlanScreen({
               ファミリーの利用権と個人契約は併用できません。個人契約を購入するには、先にファミリー席から退出してください。
             </p>
           </section>
-        ) : paidSubscription ? (
-          <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
-            <h2 className="font-bold">現在の契約があります</h2>
-            <p className="mt-2 text-sm">
-              二重購入を防ぐため、新しい購入は開始できません。プロフィールの「契約を管理」から支払方法、請求履歴、解約を確認してください。
-            </p>
-          </section>
         ) : (
           <>
+            {paidSubscription && (
+              <section className="mt-6 rounded-2xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
+                <h2 className="font-bold">現在の契約があります</h2>
+                <p className="mt-2 text-sm">
+                  下の一覧から変更先を選べます。支払方法、請求履歴、解約予約と再開は契約管理から確認できます。
+                </p>
+                <button
+                  type="button"
+                  disabled={checkoutState.status === "loading"}
+                  onClick={onManageSubscription}
+                  className="mt-4 min-h-12 rounded-xl bg-sky-800 px-5 font-bold text-white disabled:cursor-wait disabled:opacity-60"
+                >
+                  {checkoutState.status === "loading"
+                    ? "Stripeを開いています..."
+                    : "支払方法・解約・請求履歴を管理"}
+                </button>
+                {checkoutState.status === "error" && (
+                  <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
+                    {checkoutState.message}
+                  </p>
+                )}
+              </section>
+            )}
             <fieldset className="mt-8">
               <legend className="text-sm font-bold">支払い間隔</legend>
               <div className="mt-3 grid grid-cols-2 rounded-xl bg-slate-200 p-1 dark:bg-slate-800">
@@ -234,7 +252,7 @@ export function BillingPlanScreen({
                 aria-hidden="true"
               />
               <h2 id="checkout-confirmation-title" className="text-xl font-bold">
-                申込み内容の確認
+                {paidSubscription ? "変更内容の確認" : "申込み内容の確認"}
               </h2>
             </div>
             <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
@@ -292,7 +310,9 @@ export function BillingPlanScreen({
                 <ExternalLink className="size-4" aria-hidden="true" />
                 {checkoutState.status === "loading"
                   ? "Stripeを開いています..."
-                  : "Stripeで購入手続きへ"}
+                  : paidSubscription
+                    ? "Stripeで変更内容を確認"
+                    : "Stripeで購入手続きへ"}
               </button>
               <button
                 type="button"

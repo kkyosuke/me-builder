@@ -26,10 +26,10 @@
 
 | 資源 | 識別方法 | 同期内容 |
 | --- | --- | --- |
-| Product | 固定Product IDと`managed_by` metadata | Lite、Full、ファミリーパック |
+| Product | 固定Product IDと`managed_by` metadata | Plan変更を期間末予約できる共通の有料プランProduct |
 | Price | 固定`lookup_key`と`managed_by` metadata | 各Productの月額・年額、JPY、税込 |
 | Webhook endpoint | URLまたは`managed_by` metadata | 課金projectionが受け付けるeventだけ |
-| Customer Portal configuration | `managed_by` metadata | 支払方法、請求履歴、期間末解約 |
+| Customer Portal configuration | `managed_by` metadata | 支払方法、請求履歴、プラン変更、期間末解約・再開 |
 | Cloudflare secret | Worker名と環境 | Stripe key、Webhook secret、Price→Plan map |
 
 Priceの`lookup_key`は次の形式で固定します。
@@ -38,7 +38,7 @@ Priceの`lookup_key`は次の形式で固定します。
 me_builder_<lite|full|family>_<monthly|yearly>
 ```
 
-金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Customer PortalからのPlan変更は、日割りと適用時期を決める`SUB-A-015`が完了するまで無効にします。
+金額はこの文書へ重複して持たず、料金SSoTと`STRIPE_BILLING_CATALOG`を同じ変更で更新します。Stripeが期間末downgradeを同一Product内のPrice間だけに制限するため、Lite、Full、ファミリーパックの6 Priceは共通Productへ所属させ、Price metadataからPlanへ変換します。旧Plan別ProductのPrice IDは既存契約がなくなるまで`BILLING_PRICE_PLAN_MAP`へ残します。Customer Portalは現在の6 Priceだけを変更先に許可し、upgradeは`always_invoice`で日割り差額を即時請求します。金額減少と年額から月額への短縮は`decreasing_item_amount` / `shortening_interval`条件で期間末へ予約し、trial中の変更は`continue_trial`で残期間を維持します。同一または上位Planの月額から年額への変更は、変更日を新しい年額期間の開始日にする`billing_cycle_anchor=now`専用設定を使います。この専用設定には`decreasing_item_amount`を含む期間末予約条件を設定せず、年額の月換算額が下がる場合も即時変更を妨げないようにします。それ以外は現在の請求期間を維持する標準設定を使い、アプリで選んだ変更先をPortalの確定画面へdeep linkします。支払方法・解約用の管理Portalではプラン変更を無効にし、この請求ルールを迂回できないようにします。
 
 ## 3. 実行前提
 
@@ -127,6 +127,8 @@ bun scripts/setup-stripe-billing.ts preview --stripe-only
 | `STRIPE_SECRET_KEY` | Webhook署名検証、管理用再照合、後続Checkout API | QueueからStripeの現在状態を再取得 |
 | `STRIPE_WEBHOOK_SECRET` | `Stripe-Signature`検証 | 不要 |
 | `STRIPE_PORTAL_CONFIGURATION_ID` | 管理対象のCustomer Portal設定をSession作成時に指定 | 不要 |
+| `STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID` | 現在の請求期間を維持する変更確認用Portal設定 | 不要 |
+| `STRIPE_PORTAL_RESET_CONFIGURATION_ID` | 月額から年額へのupgradeで請求期間を変更日にリセットするPortal設定 | 不要 |
 | `BILLING_PRICE_PLAN_MAP` | 後続Checkout API用 | Price IDをprovider非依存Planへ変換 |
 | `BILLING_LOOKUP_KEY_MAP` | CheckoutでPlanと請求間隔を許可済みlookup keyへ変換 | いいえ |
 | `BILLING_PROJECTION_STALE_AFTER_SECONDS` | 監視でprojection遅延と判定する猶予秒数（既定900） | いいえ |

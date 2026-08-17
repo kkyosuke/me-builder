@@ -92,7 +92,7 @@ describe("billing lifecycle E2E foundation", () => {
     await expect(run(4)).resolves.toBe("applied");
     await expect(
       assignments.findCurrent(owner.account.id, new Date("2026-08-05T00:00:00Z")),
-    ).resolves.toMatchObject({ plan: "free", source: "free" });
+    ).resolves.toMatchObject({ plan: "full", source: "subscription" });
     current = { ...current, status: "active" };
     await expect(run(5)).resolves.toBe("applied");
     current = { ...current, priceId: "price-lite", cancelAtPeriodEnd: true };

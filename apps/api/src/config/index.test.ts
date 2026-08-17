@@ -26,6 +26,8 @@ describe("getConfig & ConfigSchema", () => {
       LINE_CHANNEL_SECRET: "preview-channel-secret",
       WEB_ORIGIN: "https://stg.kagami.kyosuke.dev",
       STRIPE_PORTAL_CONFIGURATION_ID: "bpc_managed",
+      STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID: "bpc_plan_change",
+      STRIPE_PORTAL_RESET_CONFIGURATION_ID: "bpc_reset",
     });
     expect(conf.environment).toBe("preview");
     expect(conf.baseDomain).toBe("stg.kagami.kyosuke.dev");
@@ -35,6 +37,8 @@ describe("getConfig & ConfigSchema", () => {
     expect(conf.lineChannelSecret).toBe("preview-channel-secret");
     expect(conf.webOrigin).toBe("https://stg.kagami.kyosuke.dev");
     expect(conf.stripePortalConfigurationId).toBe("bpc_managed");
+    expect(conf.stripePortalPlanChangeConfigurationId).toBe("bpc_plan_change");
+    expect(conf.stripePortalResetConfigurationId).toBe("bpc_reset");
   });
 
   it("WEB_ORIGIN が未設定の場合は undefined になりワイルドカードへ補完されないこと", () => {

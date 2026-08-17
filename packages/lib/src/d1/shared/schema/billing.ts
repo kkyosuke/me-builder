@@ -43,6 +43,10 @@ export const billingSubscriptionProjections = sqliteTable(
       .notNull()
       .default(false),
     trialEnd: integer("trial_end", { mode: "timestamp" }),
+    paymentFailureStartedAt: integer("payment_failure_started_at", { mode: "timestamp" }),
+    paymentFailurePlanCode: text("payment_failure_plan_code", {
+      enum: ["free", "lite", "full", "family"],
+    }),
     providerCreatedAt: integer("provider_created_at", { mode: "timestamp" }).notNull(),
     lastEventCreatedAt: integer("last_event_created_at", { mode: "timestamp" }).notNull(),
     lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }).notNull(),

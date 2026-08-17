@@ -6,4 +6,7 @@ export const STRIPE_BILLING_EVENT_TYPES = [
   "customer.subscription.trial_will_end",
   "invoice.paid",
   "invoice.payment_failed",
+  "charge.refunded",
+  "charge.dispute.created",
+  "charge.dispute.closed",
 ] as const;

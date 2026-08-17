@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it, vi } from "vitest";
 import {
   createBillingCheckoutSession,
+  createBillingPlanChangeSession,
   createBillingPortalSession,
   getBillingCheckoutSessionStatus,
   getBillingTrialEligibility,
@@ -380,6 +381,88 @@ describe("billing sessions", () => {
     ).resolves.toEqual({ type: "unavailable", reason: "family_seat_active" });
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["lite", "month", "lite", "year", "now"],
+    ["lite", "month", "full", "year", "now"],
+    ["family", "year", "lite", "month", "unchanged"],
+  ] as const)(
+    "%s/%sから%s/%sへの変更にbilling cycle policy %sを使う",
+    async (currentPlan, currentInterval, targetPlan, targetInterval, expectedAnchor) => {
+      const { db, owner, createSession } = await setup();
+      await D1.shared.action.billing.linkBillingCustomer(db, {
+        accountId: owner.id,
+        providerCustomerId: "cus_change",
+      });
+      await D1.shared.action.billing.applyBillingProjection(db, {
+        accountId: owner.id,
+        event: {
+          id: "evt_change_source",
+          type: "customer.subscription.created",
+          objectId: "sub_change",
+          createdAt: new Date("2026-08-01T00:00:00Z"),
+        },
+        subscription: {
+          id: "sub_change",
+          customerId: "cus_change",
+          status: "active",
+          priceId: "price_current",
+          currentPeriodStart: "2026-08-01T00:00:00.000Z",
+          currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+          cancelAtPeriodEnd: false,
+          trialEnd: null,
+          createdAt: "2026-08-01T00:00:00.000Z",
+        },
+        planCode: currentPlan,
+      });
+      const createPortalSession = vi.fn().mockResolvedValue({
+        url: "https://billing.stripe.test/change",
+      });
+      const provider = new billing.FakeBillingProvider({
+        retrieveSubscription: async () => ({
+          id: "sub_change",
+          itemId: "si_change",
+          customerId: "cus_change",
+          status: "active",
+          priceId: "price_current",
+          interval: currentInterval,
+          currentPeriodStart: "2026-08-01T00:00:00.000Z",
+          currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+          cancelAtPeriodEnd: false,
+          trialEnd: null,
+          createdAt: "2026-08-01T00:00:00.000Z",
+        }),
+        findPriceIdByLookupKey: async () => "price_target",
+        createPortalSession,
+      });
+
+      await expect(
+        createBillingPlanChangeSession({
+          idToken: "token",
+          lineLoginChannelId: "channel",
+          db,
+          provider,
+          webOrigin: "https://app.example.test",
+          createSession,
+          plan: targetPlan,
+          interval: targetInterval,
+          lookupKeyMap: { [`${targetPlan}.${targetInterval}`]: "target_lookup" },
+          portalPlanChangeAvailable: true,
+          portalResetAvailable: true,
+        }),
+      ).resolves.toEqual({ type: "created", url: "https://billing.stripe.test/change" });
+      expect(createPortalSession).toHaveBeenCalledWith({
+        customerId: "cus_change",
+        returnUrl: "https://app.example.test/profile/billing?billing=portal-return",
+        planChange: {
+          subscriptionId: "sub_change",
+          itemId: "si_change",
+          targetPriceId: "price_target",
+          billingCycleAnchor: expectedAnchor,
+        },
+      });
+    },
+  );
 
   it("creates a portal only for the authenticated Account customer", async () => {
     const { db, owner, createSession } = await setup();

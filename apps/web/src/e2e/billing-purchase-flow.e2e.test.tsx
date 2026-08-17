@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   fetchEntitlement: vi.fn(),
   acquireIdToken: vi.fn(),
   fetchTrialEligibility: vi.fn(),
+  createPortal: vi.fn(),
+  createPlanChange: vi.fn(),
 }));
 
 vi.mock("../feature/billing/infrastructure/billing-api", () => ({
@@ -18,6 +20,8 @@ vi.mock("../feature/billing/infrastructure/billing-api", () => ({
   createCheckoutSession: mocks.createCheckout,
   verifyCheckoutSessionCompletion: mocks.verifyCheckout,
   fetchBillingTrialEligibility: mocks.fetchTrialEligibility,
+  createCustomerPortalSession: mocks.createPortal,
+  createPlanChangeSession: mocks.createPlanChange,
 }));
 vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
   fetchProfileEntitlement: mocks.fetchEntitlement,
@@ -75,6 +79,8 @@ describe("billing purchase user journey", () => {
     mocks.verifyCheckout.mockReset().mockResolvedValue(undefined);
     mocks.fetchEntitlement.mockReset().mockResolvedValue(entitlement("free"));
     mocks.fetchTrialEligibility.mockReset().mockResolvedValue(true);
+    mocks.createPortal.mockReset().mockResolvedValue("https://billing.stripe.test/portal");
+    mocks.createPlanChange.mockReset().mockResolvedValue("https://billing.stripe.test/plan-change");
   });
   afterEach(cleanup);
 
@@ -159,5 +165,26 @@ describe("billing purchase user journey", () => {
 
     expect(await screen.findAllByText(/購入結果を確認できませんでした/)).toHaveLength(2);
     expect(mocks.fetchEntitlement).not.toHaveBeenCalled();
+  });
+
+  it("契約中は選択した変更内容をStripe Portalで確認する", async () => {
+    mocks.fetchEntitlement.mockResolvedValue(entitlement("subscription"));
+    const navigate = vi.fn();
+    render(<BillingPlanApplication onBack={vi.fn()} navigateToCheckout={navigate} />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: "年額" }));
+    fireEvent.click(screen.getByRole("button", { name: "Liteを選ぶ" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stripeで変更内容を確認" }));
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith("https://billing.stripe.test/plan-change"),
+    );
+    expect(mocks.createPlanChange).toHaveBeenCalledWith(
+      undefined,
+      "id-token",
+      { plan: "lite", interval: "year" },
+      expect.any(AbortSignal),
+    );
+    expect(mocks.createCheckout).not.toHaveBeenCalled();
   });
 });

@@ -57,6 +57,7 @@ describe("BillingPlanScreen", () => {
         completionMessage={null}
         onBack={vi.fn()}
         onCheckout={onCheckout}
+        onManageSubscription={vi.fn()}
         onRetry={vi.fn()}
       />,
     );
@@ -81,6 +82,7 @@ describe("BillingPlanScreen", () => {
         completionMessage={null}
         onBack={vi.fn()}
         onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
         onRetry={onRetry}
       />,
     );
@@ -102,6 +104,7 @@ describe("BillingPlanScreen", () => {
         completionMessage={null}
         onBack={vi.fn()}
         onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
         onRetry={vi.fn()}
       />,
     );
@@ -123,6 +126,7 @@ describe("BillingPlanScreen", () => {
         completionMessage={null}
         onBack={vi.fn()}
         onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
         onRetry={vi.fn()}
       />,
     );

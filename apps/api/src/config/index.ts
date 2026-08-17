@@ -115,6 +115,11 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     stripeSecretKey: getEnv("STRIPE_SECRET_KEY", env),
     stripeWebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", env),
     stripePortalConfigurationId: getEnv("STRIPE_PORTAL_CONFIGURATION_ID", env),
+    stripePortalPlanChangeConfigurationId: getEnv(
+      "STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID",
+      env,
+    ),
+    stripePortalResetConfigurationId: getEnv("STRIPE_PORTAL_RESET_CONFIGURATION_ID", env),
     billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
     billingLookupKeyMap: parseBillingLookupKeyMap(getEnv("BILLING_LOOKUP_KEY_MAP", env)),
     billingProjectionStaleAfterSeconds: Number(

@@ -100,7 +100,7 @@ Webの`/profile/family`は、支払者には4つの固定席と招待リンク�
 
 ## 4. 状態の変換
 
-有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`などの猶予期間は商取引条件確定後の状態遷移で扱い、未知statusや未知Priceは有料権限を付与しません。契約終了後は既存データを削除せずFreeへ戻します。
+有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`は最初の失敗eventから7日間か契約期間末の早い方まで支払失敗前のPlanを維持し、失敗したupgrade先の権限は付与しません。回復時に失敗開始日時と退避したPlanを消し、支払成功後のPlanへ収束します。猶予を過ぎた`past_due`と`unpaid`、`paused`、`canceled`、未知status、未知Priceは有料権限を付与しません。契約終了、返金、chargebackで既存データを削除せずFreeへ戻します。
 
 ## 5. Webhookと収束
 

@@ -22,6 +22,7 @@ import {
   billingCheckoutSessionRoute,
   billingCheckoutSessionStatusRoute,
   billingPlanCatalogRoute,
+  billingPlanChangeSessionRoute,
   billingPortalSessionRoute,
   billingTrialEligibilityRoute,
 } from "./contract/billing/sessions";
@@ -116,6 +117,7 @@ import {
   getBillingPlanCatalog,
   getBillingTrialEligibilityResponse,
   postBillingCheckoutSession,
+  postBillingPlanChangeSession,
   postBillingPortalSession,
   postStripeWebhook,
 } from "./controller/billing";
@@ -278,6 +280,11 @@ app.get(
   getBillingTrialEligibilityResponse,
 );
 app.post("/api/billing/checkout-sessions", billingCheckoutSessionRoute, postBillingCheckoutSession);
+app.post(
+  "/api/billing/plan-change-sessions",
+  billingPlanChangeSessionRoute,
+  postBillingPlanChangeSession,
+);
 app.get(
   "/api/billing/checkout-sessions/:checkoutSessionId",
   billingCheckoutSessionStatusRoute,

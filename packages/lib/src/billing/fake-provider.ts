@@ -47,6 +47,12 @@ export class FakeBillingProvider implements BillingProvider {
   async createPortalSession(input: {
     customerId: string;
     returnUrl: string;
+    planChange?: {
+      subscriptionId: string;
+      itemId: string;
+      targetPriceId: string;
+      billingCycleAnchor: "unchanged" | "now";
+    };
   }): Promise<{ url: string }> {
     if (this.handlers.createPortalSession) return this.handlers.createPortalSession(input);
     return { url: input.returnUrl };

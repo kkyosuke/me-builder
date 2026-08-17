@@ -25,7 +25,10 @@ type SessionFailure =
         | "existing_subscription"
         | "family_seat_active"
         | "checkout_in_progress"
-        | "customer_not_found";
+        | "customer_not_found"
+        | "same_plan"
+        | "subscription_not_found"
+        | "configuration_missing";
     };
 
 export type CheckoutSessionStatusResult =
@@ -197,6 +200,74 @@ export async function createBillingPortalSession(
   const portal = await params.provider.createPortalSession({
     customerId: customer.providerCustomerId,
     returnUrl: new URL("/profile?billing=portal-return", origin).toString(),
+  });
+  return { type: "created", url: portal.url };
+}
+
+export async function createBillingPlanChangeSession(
+  params: BaseParams & {
+    plan: "lite" | "full" | "family";
+    interval: "month" | "year";
+    lookupKeyMap: Readonly<Record<string, string>>;
+    portalPlanChangeAvailable: boolean;
+    portalResetAvailable: boolean;
+  },
+): Promise<SessionFailure | { type: "created"; url: string }> {
+  const session = await (params.createSession ?? createLiffSession)({
+    idToken: params.idToken,
+    lineLoginChannelId: params.lineLoginChannelId,
+    db: params.db,
+  });
+  if (session.type !== "resolved") return { type: session.type };
+  const accountId = session.session.accountId;
+  const [customer, projection] = await Promise.all([
+    D1.shared.action.billing.findBillingCustomerByAccount(params.db, accountId),
+    D1.shared.action.billing.findBillingProjectionByAccount(params.db, accountId),
+  ]);
+  if (!customer) return { type: "unavailable", reason: "customer_not_found" };
+  if (!projection?.planCode || projection.planCode === "free") {
+    return { type: "unavailable", reason: "subscription_not_found" };
+  }
+  const subscription = await params.provider.retrieveSubscription(
+    projection.providerSubscriptionId,
+  );
+  if (
+    subscription.customerId !== customer.providerCustomerId ||
+    !subscription.itemId ||
+    !subscription.priceId ||
+    !subscription.interval ||
+    isTerminalSubscription(subscription.status)
+  ) {
+    return { type: "unavailable", reason: "subscription_not_found" };
+  }
+  const lookupKey = params.lookupKeyMap[`${params.plan}.${params.interval}`];
+  if (!lookupKey) return { type: "unavailable", reason: "plan_unavailable" };
+  const targetPriceId = await params.provider.findPriceIdByLookupKey(lookupKey);
+  if (!targetPriceId) return { type: "unavailable", reason: "plan_unavailable" };
+  if (targetPriceId === subscription.priceId) {
+    return { type: "unavailable", reason: "same_plan" };
+  }
+  const planRank = { lite: 0, full: 1, family: 2 } as const;
+  const resetsBillingCycle =
+    subscription.interval === "month" &&
+    params.interval === "year" &&
+    planRank[params.plan] >= planRank[projection.planCode];
+  if (!params.portalPlanChangeAvailable) {
+    return { type: "unavailable", reason: "configuration_missing" };
+  }
+  if (resetsBillingCycle && !params.portalResetAvailable) {
+    return { type: "unavailable", reason: "configuration_missing" };
+  }
+  const origin = new URL(params.webOrigin).origin;
+  const portal = await params.provider.createPortalSession({
+    customerId: customer.providerCustomerId,
+    returnUrl: new URL("/profile/billing?billing=portal-return", origin).toString(),
+    planChange: {
+      subscriptionId: subscription.id,
+      itemId: subscription.itemId,
+      targetPriceId,
+      billingCycleAnchor: resetsBillingCycle ? "now" : "unchanged",
+    },
   });
   return { type: "created", url: portal.url };
 }

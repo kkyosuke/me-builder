@@ -120,6 +120,8 @@ if (!stripeOnly) {
     STRIPE_SECRET_KEY: secretKey,
     BILLING_PRICE_PLAN_MAP: pricePlanMap,
     STRIPE_PORTAL_CONFIGURATION_ID: result.portalConfigurationId,
+    STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID: result.portalPlanChangeConfigurationId,
+    STRIPE_PORTAL_RESET_CONFIGURATION_ID: result.portalResetConfigurationId,
     ...(webhookSecret ? { STRIPE_WEBHOOK_SECRET: webhookSecret } : {}),
   });
   await putCloudflareSecrets("apps/worker", {
@@ -141,6 +143,8 @@ console.info(
     updated: result.updated,
     billingPricePlanMap: result.pricePlanMap,
     portalConfigurationId: result.portalConfigurationId,
+    portalPlanChangeConfigurationId: result.portalPlanChangeConfigurationId,
+    portalResetConfigurationId: result.portalResetConfigurationId,
     cloudflareSynced: !stripeOnly,
   }),
 );

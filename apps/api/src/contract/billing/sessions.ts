@@ -57,6 +57,9 @@ export const BillingSessionConflictSchema = v.object({
     "family_seat_active",
     "checkout_in_progress",
     "customer_not_found",
+    "same_plan",
+    "subscription_not_found",
+    "configuration_missing",
   ]),
 });
 
@@ -122,6 +125,23 @@ export const billingPortalSessionRoute = describeRoute({
   responses: {
     201: jsonResponse("短命なStripe Customer Portal URL", BillingSessionResponseSchema),
     409: jsonResponse("Portalを開始できない", BillingSessionConflictSchema),
+    ...authenticatedErrors,
+  },
+} satisfies DescribeRouteOptions);
+
+export const billingPlanChangeSessionRoute = describeRoute({
+  operationId: "createBillingPlanChangeSession",
+  tags: ["Billing"],
+  summary: "選択したPlanへのStripe確認画面を作成する",
+  security: [{ liffIdToken: [] }],
+  requestBody: {
+    required: true,
+    content: { "application/json": { schema: BillingCheckoutRequestSchema } },
+  },
+  responses: {
+    201: jsonResponse("プラン変更確認用の短命なStripe Portal URL", BillingSessionResponseSchema),
+    400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
+    409: jsonResponse("プラン変更を開始できない", BillingSessionConflictSchema),
     ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);

@@ -16,6 +16,8 @@ import {
   billingTrialUsages,
 } from "../schema/billing";
 
+export const BILLING_PAYMENT_FAILURE_GRACE_MS = 7 * 24 * 60 * 60 * 1_000;
+
 export class BillingCustomerOwnershipError extends Error {
   constructor() {
     super("BILLING_CUSTOMER_OWNERSHIP_CONFLICT");
@@ -238,6 +240,18 @@ export async function applyBillingProjection(
     currentPeriodEnd: parseDate(input.subscription.currentPeriodEnd),
     cancelAtPeriodEnd: input.subscription.cancelAtPeriodEnd,
     trialEnd: parseDate(input.subscription.trialEnd),
+    paymentFailureStartedAt:
+      input.subscription.status === "past_due"
+        ? current?.status === "past_due"
+          ? (current.paymentFailureStartedAt ?? input.event.createdAt)
+          : input.event.createdAt
+        : null,
+    paymentFailurePlanCode:
+      input.subscription.status === "past_due"
+        ? current?.status === "past_due"
+          ? (current.paymentFailurePlanCode ?? current.planCode ?? input.planCode)
+          : (current?.planCode ?? input.planCode)
+        : null,
     providerCreatedAt: new Date(input.subscription.createdAt),
     lastEventCreatedAt: input.event.createdAt,
     lastSyncedAt: syncedAt,
@@ -289,23 +303,46 @@ export class D1AccountPlanAssignmentProvider implements AccountPlanAssignmentPro
       return freePlanAssignment(accountId, at);
     }
     const current = rows
-      .filter(
-        (row) => (row.status === "active" || row.status === "trialing") && row.planCode !== null,
-      )
+      .filter((row) => isEntitledBillingProjection(row, at))
       .sort(
         (left, right) =>
           (right.currentPeriodEnd?.getTime() ?? 0) - (left.currentPeriodEnd?.getTime() ?? 0),
       )[0];
-    if (!current?.planCode || !current.currentPeriodStart || !current.currentPeriodEnd) {
+    const entitledPlan =
+      current?.status === "past_due"
+        ? (current.paymentFailurePlanCode ?? current.planCode)
+        : current?.planCode;
+    if (!entitledPlan || !current?.currentPeriodStart || !current.currentPeriodEnd) {
       return freePlanAssignment(accountId, at);
     }
     return {
       accountId,
-      plan: current.planCode,
+      plan: entitledPlan,
       source: "subscription",
       effectiveAt: current.currentPeriodStart.toISOString(),
-      availableUntil: current.currentPeriodEnd.toISOString(),
+      availableUntil:
+        current.status === "past_due" && current.paymentFailureStartedAt
+          ? new Date(
+              Math.min(
+                current.currentPeriodEnd.getTime(),
+                current.paymentFailureStartedAt.getTime() + BILLING_PAYMENT_FAILURE_GRACE_MS,
+              ),
+            ).toISOString()
+          : current.currentPeriodEnd.toISOString(),
       payerAccountId: accountId,
     };
   }
+}
+
+function isEntitledBillingProjection(
+  row: typeof billingSubscriptionProjections.$inferSelect,
+  at: Date,
+): boolean {
+  if (row.planCode === null) return false;
+  if (row.status === "active" || row.status === "trialing") return true;
+  return (
+    row.status === "past_due" &&
+    row.paymentFailureStartedAt !== null &&
+    at.getTime() < row.paymentFailureStartedAt.getTime() + BILLING_PAYMENT_FAILURE_GRACE_MS
+  );
 }
