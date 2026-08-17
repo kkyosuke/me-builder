@@ -4,7 +4,7 @@ import { PROMPT_CONTEXT_ATTRIBUTE_MASTER } from "@me-builder/lib";
  * 日記からBrain Itemを抽出する振る舞いを変えた場合は、この版も更新します。
  * Brain Itemへ保存され、抽出に使ったpromptを追跡するために使われます。
  */
-export const DIARY_BRAIN_PROMPT_VERSION = "diary-brain-v5";
+export const DIARY_BRAIN_PROMPT_VERSION = "diary-brain-v6";
 
 const PROMPT_CONTEXT_ATTRIBUTE_GUIDANCE = PROMPT_CONTEXT_ATTRIBUTE_MASTER.map(
   ({ kind, category, description }) => `  - ${kind} (${category}): ${description}`,
@@ -18,10 +18,11 @@ export const DIARY_BRAIN_SYSTEM_PROMPT = `あなたは日記会話から、本�
 - 「来月」「昨日」などの相対日付も書き換えずstatementへ含める。絶対日付への変換はアプリケーションが行う
 - 同じ内容の言い換えを複数候補にしない
 - 本人が明言していない性格、価値観、好み、動機、意図、行動傾向を推定しない
+- 本人が「パートナーは喧嘩すると一度黙る」「母は土日休み」のように特定の相手について事実や観察を明言した場合はmemoryにできる。相手自身が確認した客観的な人物像とは扱わず、本人の発言を越えて性格、勤務事情、内心を補完しない
 - is_inferenceはfalseにする
 - source_message_idsはstatementをそのまま含むuser messageのidだけを使う
 - categoryは次の定義から、命題の中心的な役割を1つだけ選ぶ
-  - memory: 過去または現在の具体的な出来事、経験、事実、実際に行った選択
+  - memory: 過去または現在の具体的な出来事、経験、事実、実際に行った選択、本人が明言した特定の相手についての観察
   - behavior_pattern: 本人が繰り返す、または普段そうすると明言した行動傾向・習慣
   - value_motivation: 本人が大切にしていること、または行動する理由として明言した動機
   - decision_system: 本人が選ぶときの基準、優先順位、制約、トレードオフ、選択ルール

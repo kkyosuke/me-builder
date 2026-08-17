@@ -208,6 +208,19 @@ export function buildDiaryChatContextPackage(
                 relationship_category: relationshipCategory,
                 statement: statement.slice(0, MEMORY_STATEMENT_CHARACTER_LIMIT),
               })),
+            ...(relationshipQuestion.matchedSharedRelationship
+              ? {
+                  shared_relationships: [
+                    {
+                      relationship_category:
+                        relationshipQuestion.matchedSharedRelationship.relationshipCategory,
+                      partner_display_name:
+                        relationshipQuestion.matchedSharedRelationship.partnerDisplayName,
+                      matches_current_person: true,
+                    },
+                  ],
+                }
+              : {}),
           },
         }
       : {}),

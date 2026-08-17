@@ -48,6 +48,31 @@ describe("diary Brain checkpoint", () => {
     expect(validateDiaryBrainCandidates(raw, messages, ["message-1", "message-2"])).toHaveLength(2);
   });
 
+  it("本人が明言した特定の相手についての観察をMemoryとして受け入れる", () => {
+    const relationshipMessages = [
+      {
+        id: "partner-observation",
+        role: "user" as const,
+        body: "パートナーは喧嘩すると一度黙って考える",
+        sequence: 1,
+      },
+    ];
+    const candidate = {
+      category: "memory",
+      statement: "パートナーは喧嘩すると一度黙って考える",
+      source_message_ids: ["partner-observation"],
+      is_inference: false,
+    } as const;
+
+    expect(
+      validateDiaryBrainCandidates(
+        JSON.stringify({ brain_item_candidates: [candidate] }),
+        relationshipMessages,
+        ["partner-observation"],
+      ),
+    ).toEqual([candidate]);
+  });
+
   it("NFKCと空白の差を正規化して原文にあるstatementを受け入れる", () => {
     const normalizedMessages = [
       {

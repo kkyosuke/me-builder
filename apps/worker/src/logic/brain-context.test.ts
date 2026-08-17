@@ -101,6 +101,32 @@ describe("buildBrainSearchQuery", () => {
     ];
     expect(buildBrainSearchQuery(nameMessage, ["name"])).toBe("明日香さんと今日子さんに会った");
   });
+
+  it("一意に照合した関係人物だけを検索hintへ加える", () => {
+    expect(
+      buildBrainSearchQuery(messages, ["current-2"], new Date(), ["パートナー", "美咲", "美咲"]),
+    ).toBe("落ち着く方法を探したい\n関連人物: パートナー\n関連人物: 美咲");
+  });
+
+  it("長い検索hintがあっても現在発言の末尾を検索文へ残す", () => {
+    const result = buildBrainSearchQuery(
+      [
+        {
+          id: "current",
+          role: "user",
+          body: `${"本".repeat(10_100)}現在発言の末尾`,
+          sequence: 1,
+        },
+      ],
+      ["current"],
+      new Date(),
+      ["相".repeat(20_000)],
+    );
+
+    expect(result).toHaveLength(10_000);
+    expect(result).toContain("現在発言の末尾");
+    expect(result).toContain("関連人物:");
+  });
 });
 
 describe("loadBrainContextMemories", () => {

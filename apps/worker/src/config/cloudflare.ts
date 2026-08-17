@@ -1,5 +1,5 @@
 import { D1, billing } from "@me-builder/lib";
-import type { AccountDataNamespace } from "@me-builder/lib";
+import type { AccountDataNamespace, CompatibilityDataNamespace } from "@me-builder/lib";
 import type {
   BrainVectorSyncQueueMessage,
   ChatTurnQueueMessage,
@@ -15,6 +15,7 @@ export type CloudflareBindings = {
   do: {
     conversation: Env["CONVERSATION_COORDINATOR"];
     accountData?: AccountDataNamespace;
+    compatibilityData?: CompatibilityDataNamespace;
   };
   queue: {
     chatTurn: Queue<ChatTurnQueueMessage> | undefined;
@@ -38,6 +39,7 @@ export function getCloudflareBindings(env: Env): CloudflareBindings {
     do: {
       conversation: env.CONVERSATION_COORDINATOR,
       ...(env.ACCOUNT_DATA ? { accountData: env.ACCOUNT_DATA } : {}),
+      ...(env.COMPATIBILITY_DATA ? { compatibilityData: env.COMPATIBILITY_DATA } : {}),
     },
     queue: {
       chatTurn: env.CHAT_TURN_QUEUE,
