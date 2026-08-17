@@ -165,6 +165,81 @@ describe("billing sessions", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it("削除済みのsandbox Customerを再作成してCheckoutを継続する", async () => {
+    const { db, owner, createSession } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_stale",
+    });
+    const createCustomer = vi.fn().mockResolvedValue({ id: "cus_replacement", deleted: false });
+    const createCheckoutSession = vi.fn().mockResolvedValue({
+      id: "cs_recovered",
+      url: "https://checkout.stripe.test/recovered",
+    });
+    const provider = new billing.FakeBillingProvider({
+      retrieveCustomer: async (customerId) => ({
+        id: customerId,
+        deleted: customerId === "cus_stale",
+      }),
+      createCustomer,
+      createCheckoutSession,
+    });
+
+    await expect(
+      createBillingCheckoutSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        createSession,
+        plan: "lite",
+        interval: "month",
+        lookupKeyMap: { "lite.month": "lite_month" },
+      }),
+    ).resolves.toEqual({
+      type: "created",
+      url: "https://checkout.stripe.test/recovered",
+    });
+    expect(createCustomer).toHaveBeenCalledWith(
+      { accountId: owner.id },
+      `billing-customer-${owner.id}-cus_stale`,
+    );
+    await expect(
+      D1.shared.action.billing.findBillingCustomerByAccount(db, owner.id),
+    ).resolves.toMatchObject({ providerCustomerId: "cus_replacement" });
+  });
+
+  it("別sandbox由来で見つからないCustomerも再作成する", async () => {
+    const { db, owner, createSession } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_missing",
+    });
+    const createCustomer = vi.fn().mockResolvedValue({ id: "cus_current", deleted: false });
+    const provider = new billing.FakeBillingProvider({
+      retrieveCustomer: async () => {
+        throw new billing.BillingProviderError("invalid-request", false, 404);
+      },
+      createCustomer,
+    });
+
+    await expect(
+      createBillingCheckoutSession({
+        idToken: "token",
+        lineLoginChannelId: "channel",
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        createSession,
+        plan: "lite",
+        interval: "month",
+        lookupKeyMap: { "lite.month": "lite_month" },
+      }),
+    ).resolves.toMatchObject({ type: "created" });
+    expect(createCustomer).toHaveBeenCalledOnce();
+  });
+
   it("webhook未反映でもStripeのtrial履歴を再利用不可として扱う", async () => {
     const { db, owner, createSession } = await setup();
     await D1.shared.action.billing.linkBillingCustomer(db, {

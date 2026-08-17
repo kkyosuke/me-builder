@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type BillingPlan, billingPlanPrice, formatBillingAmount } from "./billing-plan";
+import {
+  type BillingPlan,
+  billingPlanAnnualSavings,
+  billingPlanPrice,
+  formatBillingAmount,
+} from "./billing-plan";
 
 const plan: BillingPlan = {
   code: "lite",
@@ -17,5 +22,14 @@ describe("billing plan", () => {
   it("選択した請求間隔の価格を解決する", () => {
     expect(billingPlanPrice(plan, "year").amount).toBe(7_800);
     expect(formatBillingAmount(7_800)).toMatch(/7,800/);
+  });
+
+  it("年額と月額12回の差からお得額を算出する", () => {
+    expect(billingPlanAnnualSavings(plan)).toEqual({
+      amount: 1_560,
+      percentage: 17,
+      monthlyEquivalent: 650,
+      equivalentFreeMonths: 2,
+    });
   });
 });

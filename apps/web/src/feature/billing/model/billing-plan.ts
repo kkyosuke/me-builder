@@ -19,6 +19,20 @@ export function billingPlanPrice(plan: BillingPlan, interval: BillingInterval) {
   return price;
 }
 
+export function billingPlanAnnualSavings(plan: BillingPlan) {
+  const monthly = billingPlanPrice(plan, "month").amount;
+  const yearly = billingPlanPrice(plan, "year").amount;
+  const monthlyAnnualTotal = monthly * 12;
+  const amount = monthlyAnnualTotal - yearly;
+  if (amount <= 0) return null;
+  return {
+    amount,
+    percentage: Math.round((amount / monthlyAnnualTotal) * 100),
+    monthlyEquivalent: Math.round(yearly / 12),
+    equivalentFreeMonths: Math.round(amount / monthly),
+  };
+}
+
 export function formatBillingAmount(amount: number): string {
   return new Intl.NumberFormat("ja-JP", {
     style: "currency",

@@ -67,7 +67,18 @@ export async function createBillingCheckoutSession(
   }
 
   let customer = await D1.shared.action.billing.findBillingCustomerByAccount(params.db, accountId);
-  if (!customer) {
+  if (customer && !(await providerCustomerExists(params.provider, customer.providerCustomerId))) {
+    const staleProviderCustomerId = customer.providerCustomerId;
+    const created = await params.provider.createCustomer(
+      { accountId },
+      `billing-customer-${accountId}-${staleProviderCustomerId}`,
+    );
+    customer = await D1.shared.action.billing.replaceBillingCustomer(params.db, {
+      accountId,
+      expectedProviderCustomerId: staleProviderCustomerId,
+      providerCustomerId: created.id,
+    });
+  } else if (!customer) {
     const created = await params.provider.createCustomer(
       { accountId },
       `billing-customer-${accountId}`,
@@ -117,6 +128,20 @@ export async function createBillingCheckoutSession(
     `billing-checkout-${accountId}-${latestCheckout?.id ?? "initial"}`,
   );
   return { type: "created", url: checkout.url };
+}
+
+async function providerCustomerExists(
+  provider: billing.BillingProvider,
+  providerCustomerId: string,
+): Promise<boolean> {
+  try {
+    return !(await provider.retrieveCustomer(providerCustomerId)).deleted;
+  } catch (error) {
+    if (error instanceof billing.BillingProviderError && error.kind === "invalid-request") {
+      return false;
+    }
+    throw error;
+  }
 }
 
 export async function getBillingCheckoutSessionStatus(

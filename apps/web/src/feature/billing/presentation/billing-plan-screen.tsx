@@ -3,7 +3,12 @@ import { ArrowLeft, Check, ExternalLink, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { AsyncState } from "../../../model/async-state";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
-import { type BillingPlan, billingPlanPrice, formatBillingAmount } from "../model/billing-plan";
+import {
+  type BillingPlan,
+  billingPlanAnnualSavings,
+  billingPlanPrice,
+  formatBillingAmount,
+} from "../model/billing-plan";
 import { expectedTrialEndDate } from "../model/trial";
 
 const planNames = {
@@ -55,6 +60,7 @@ export function BillingPlanScreen({
   const planRank = { free: -1, lite: 0, full: 1, family: 2 } as const;
   const selectedPlanIsDowngrade =
     selected !== null && planRank[selected.code] < planRank[currentPlan];
+  const annualSavings = selected ? billingPlanAnnualSavings(selected) : null;
 
   useEffect(() => {
     backButtonRef.current?.focus();
@@ -229,17 +235,26 @@ export function BillingPlanScreen({
                     {(["month", "year"] as const).map((value) => (
                       <label
                         key={value}
-                        className={`flex min-h-10 cursor-pointer items-center justify-center rounded-lg text-sm font-bold ${interval === value ? "bg-white text-violet-700 shadow-sm dark:bg-slate-700 dark:text-violet-200" : "text-slate-600 dark:text-slate-300"}`}
+                        className={`flex min-h-12 cursor-pointer flex-col items-center justify-center rounded-lg text-sm font-bold ${interval === value ? "bg-white text-violet-700 shadow-sm dark:bg-slate-700 dark:text-violet-200" : "text-slate-600 dark:text-slate-300"}`}
                       >
                         <input
                           type="radio"
                           name="billing-interval"
                           value={value}
+                          aria-label={value === "month" ? "月額" : "年額"}
                           checked={interval === value}
                           onChange={() => setInterval(value)}
                           className="sr-only"
                         />
                         {value === "month" ? "月額" : "年額"}
+                        {value === "year" && annualSavings && (
+                          <span
+                            aria-hidden="true"
+                            className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300"
+                          >
+                            {annualSavings.equivalentFreeMonths}か月分お得
+                          </span>
+                        )}
                       </label>
                     ))}
                   </div>
@@ -264,6 +279,21 @@ export function BillingPlanScreen({
                     <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                       {selected.description}
                     </p>
+
+                    {interval === "year" && annualSavings && (
+                      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+                        <p className="text-sm font-bold">
+                          月額払いより年間{formatBillingAmount(annualSavings.amount)}お得
+                          <span className="ml-1 rounded-full bg-emerald-700 px-2 py-0.5 text-xs text-white">
+                            約{annualSavings.percentage}%OFF
+                          </span>
+                        </p>
+                        <p className="mt-1 text-xs">
+                          月あたり約
+                          {formatBillingAmount(annualSavings.monthlyEquivalent)}で利用できます。
+                        </p>
+                      </div>
+                    )}
 
                     {selected.trialDays && (
                       <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
@@ -333,6 +363,11 @@ export function BillingPlanScreen({
                     {formatBillingAmount(billingPlanPrice(selected, interval).amount)} /
                     {interval === "month" ? "月" : "年"}
                   </p>
+                  {interval === "year" && annualSavings && (
+                    <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                      年間{formatBillingAmount(annualSavings.amount)}お得
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"

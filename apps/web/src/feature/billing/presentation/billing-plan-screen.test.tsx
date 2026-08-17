@@ -92,6 +92,10 @@ describe("BillingPlanScreen", () => {
     fireEvent.click(screen.getByRole("radio", { name: "ノーマル Lite" }));
     fireEvent.click(screen.getByRole("radio", { name: "年額" }));
     expect(screen.getAllByText(/7,800/)).toHaveLength(2);
+    expect(screen.getByText(/月額払いより年間.*1,560.*お得/)).toBeTruthy();
+    expect(screen.getByText("約17%OFF")).toBeTruthy();
+    expect(screen.getByText(/月あたり約.*650.*利用できます/)).toBeTruthy();
+    expect(screen.getByText(/年間.*1,560.*お得/, { selector: "footer p" })).toBeTruthy();
     expect(screen.getByText(/自動更新/)).toBeTruthy();
     expect(screen.getByText(/期間末解約/)).toBeTruthy();
     const purchaseButton = screen.getByRole("button", { name: /プランを変更する/ });
