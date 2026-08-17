@@ -121,6 +121,7 @@ export interface StripeCatalogApi {
 
 export interface StripeBillingCatalogSetupResult {
   pricePlanMap: Readonly<Record<string, StripeCatalogPlan>>;
+  lookupKeyMap: Readonly<Record<string, string>>;
   webhookSecret: string | null;
   portalConfigurationId: string;
   portalPlanChangeConfigurationId: string;
@@ -412,6 +413,11 @@ export async function setupStripeBillingCatalog(input: {
   return {
     pricePlanMap: Object.fromEntries(
       Object.entries(pricePlanMap).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+    lookupKeyMap: Object.fromEntries(
+      STRIPE_BILLING_CATALOG.flatMap((product) =>
+        product.prices.map((price) => [`${product.plan}.${price.interval}`, price.lookupKey]),
+      ),
     ),
     webhookSecret,
     portalConfigurationId,

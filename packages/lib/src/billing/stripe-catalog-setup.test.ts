@@ -260,6 +260,14 @@ describe("setupStripeBillingCatalog", () => {
       price_5: "family",
       price_6: "family",
     });
+    expect(result.lookupKeyMap).toEqual({
+      "lite.month": "me_builder_lite_monthly",
+      "lite.year": "me_builder_lite_yearly",
+      "full.month": "me_builder_full_monthly",
+      "full.year": "me_builder_full_yearly",
+      "family.month": "me_builder_family_monthly",
+      "family.year": "me_builder_family_yearly",
+    });
   });
 
   it("同じ設定で再実行しても商品、Price、Webhook、Portalを増やさない", async () => {

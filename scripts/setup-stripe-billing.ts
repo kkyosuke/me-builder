@@ -114,11 +114,13 @@ const result = await billing.setupStripeBillingCatalog({
 });
 
 const pricePlanMap = JSON.stringify(result.pricePlanMap);
+const lookupKeyMap = JSON.stringify(result.lookupKeyMap);
 if (!stripeOnly) {
   const webhookSecret = result.webhookSecret ?? suppliedWebhookSecret;
   await putCloudflareSecrets("apps/api", {
     STRIPE_SECRET_KEY: secretKey,
     BILLING_PRICE_PLAN_MAP: pricePlanMap,
+    BILLING_LOOKUP_KEY_MAP: lookupKeyMap,
     STRIPE_PORTAL_CONFIGURATION_ID: result.portalConfigurationId,
     STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID: result.portalPlanChangeConfigurationId,
     STRIPE_PORTAL_RESET_CONFIGURATION_ID: result.portalResetConfigurationId,
@@ -142,6 +144,7 @@ console.info(
     created: result.created,
     updated: result.updated,
     billingPricePlanMap: result.pricePlanMap,
+    billingLookupKeyMap: result.lookupKeyMap,
     portalConfigurationId: result.portalConfigurationId,
     portalPlanChangeConfigurationId: result.portalPlanChangeConfigurationId,
     portalResetConfigurationId: result.portalResetConfigurationId,
