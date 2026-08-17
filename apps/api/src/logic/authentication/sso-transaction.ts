@@ -312,18 +312,31 @@ export async function completeSsoCallback<SessionResult>(
     }
 > {
   const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  const callback = callbackContext(transaction);
   if (transaction.purpose === "login") {
-    const account = await input.identityResolver.findAccount({
-      providerKey: identity.providerKey,
-      subject: identity.subject,
-    });
-    if (!account) throw new SsoAuthenticationError("identity_unlinked");
-    const session = await input.sessionIssuer.issue({
-      accountId: account.accountId,
-      authenticatedIdentityId: account.authenticatedIdentityId,
-      authenticationMethod: identity.authenticationMethod,
-      authenticatedAt: identity.authenticatedAt,
-    });
+    let account:
+      | { accountId: string; authenticatedIdentityId: string; role: "user" | "admin" }
+      | undefined;
+    try {
+      account = await input.identityResolver.findAccount({
+        providerKey: identity.providerKey,
+        subject: identity.subject,
+      });
+    } catch (error) {
+      throw new SsoCallbackCompletionError(callback, error);
+    }
+    if (!account) throw new SsoAuthenticationError("identity_unlinked", callback);
+    let session: SessionResult;
+    try {
+      session = await input.sessionIssuer.issue({
+        accountId: account.accountId,
+        authenticatedIdentityId: account.authenticatedIdentityId,
+        authenticationMethod: identity.authenticationMethod,
+        authenticatedAt: identity.authenticatedAt,
+      });
+    } catch (error) {
+      throw new SsoCallbackCompletionError(callback, error);
+    }
     return {
       purpose: "login",
       session,
@@ -332,11 +345,16 @@ export async function completeSsoCallback<SessionResult>(
     };
   }
 
-  const authenticatedIdentityId = await input.identityLinker.link({
-    accountId: transaction.initiatingAccountId,
-    providerKey: identity.providerKey,
-    subject: identity.subject,
-  });
+  let authenticatedIdentityId: string;
+  try {
+    authenticatedIdentityId = await input.identityLinker.link({
+      accountId: transaction.initiatingAccountId,
+      providerKey: identity.providerKey,
+      subject: identity.subject,
+    });
+  } catch (error) {
+    throw new SsoCallbackCompletionError(callback, error);
+  }
   return {
     purpose: "link",
     accountId: transaction.initiatingAccountId,
