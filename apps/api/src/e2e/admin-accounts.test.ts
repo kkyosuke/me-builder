@@ -147,6 +147,7 @@ describe("Admin Account list local E2E", () => {
           iss: "https://access.line.me",
           sub: adminLineId,
           aud: "1234567890",
+          iat: Math.floor(Date.now() / 1_000),
           exp: timestamp + 86_400,
         }),
       ),
