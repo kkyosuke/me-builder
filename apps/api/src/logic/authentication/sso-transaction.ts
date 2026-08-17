@@ -13,12 +13,21 @@ export type SsoVerifiedIdentity = {
   };
 };
 
-export type SsoAuthenticationTransaction = {
+type SsoAuthenticationTransactionBase = {
   nonce: string;
   codeVerifier: string;
   returnTo: string;
   expiresAt: number;
 };
+
+export type SsoAuthenticationTransaction = SsoAuthenticationTransactionBase &
+  (
+    | { purpose: "login" }
+    | {
+        purpose: "link";
+        initiatingAccountId: string;
+      }
+  );
 
 export interface SsoAuthenticationTransactionStore {
   put(state: string, transaction: SsoAuthenticationTransaction, ttlSeconds: number): Promise<void>;
@@ -43,7 +52,8 @@ export type SsoAuthenticationFailure =
   | "invalid_callback"
   | "invalid_return_to"
   | "transaction_expired"
-  | "transaction_missing";
+  | "transaction_missing"
+  | "transaction_purpose_mismatch";
 
 export class SsoAuthenticationError extends Error {
   constructor(readonly reason: SsoAuthenticationFailure) {
@@ -82,6 +92,14 @@ export interface SsoApplicationSessionIssuer<SessionResult> {
   }): Promise<SessionResult>;
 }
 
+export interface SsoIdentityLinker {
+  link(input: {
+    accountId: string;
+    providerKey: "auth0";
+    subject: string;
+  }): Promise<string>;
+}
+
 function secureRandomBytes(size: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(size));
 }
@@ -116,8 +134,10 @@ export function normalizeSsoReturnTo(value: string): string {
   return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
 
-/** state・nonce・PKCEをserver-side transactionへ保存し、Auth0の認可URLを返す。 */
-export async function startSsoAuthentication(input: StartSsoAuthenticationInput): Promise<URL> {
+async function startSsoTransaction(
+  input: StartSsoAuthenticationInput,
+  purpose: { purpose: "login" } | { purpose: "link"; initiatingAccountId: string },
+): Promise<URL> {
   const now = input.now?.() ?? Date.now();
   const random = input.randomBytes ?? secureRandomBytes;
   const state = base64Url(random(RANDOM_VALUE_BYTES));
@@ -133,6 +153,7 @@ export async function startSsoAuthentication(input: StartSsoAuthenticationInput)
   await input.store.put(
     state,
     {
+      ...purpose,
       nonce,
       codeVerifier,
       returnTo: normalizeSsoReturnTo(input.returnTo),
@@ -144,10 +165,25 @@ export async function startSsoAuthentication(input: StartSsoAuthenticationInput)
   return authorizationUrl;
 }
 
-/** callback transactionを一度だけ消費し、検証済みIdentityと復帰pathを返す。 */
-export async function completeSsoAuthentication(
+/** state・nonce・PKCEをlogin transactionへ保存し、Auth0の認可URLを返す。 */
+export async function startSsoAuthentication(input: StartSsoAuthenticationInput): Promise<URL> {
+  return await startSsoTransaction(input, { purpose: "login" });
+}
+
+/** 認証済みAccountを固定したlink transactionを保存し、Auth0の認可URLを返す。 */
+export async function startSsoIdentityLinking(
+  input: StartSsoAuthenticationInput & { initiatingAccountId: string },
+): Promise<URL> {
+  if (!input.initiatingAccountId) throw new SsoAuthenticationError("invalid_callback");
+  return await startSsoTransaction(input, {
+    purpose: "link",
+    initiatingAccountId: input.initiatingAccountId,
+  });
+}
+
+async function consumeAndVerifySsoTransaction(
   input: CompleteSsoAuthenticationInput,
-): Promise<{ identity: SsoVerifiedIdentity; returnTo: string }> {
+): Promise<{ identity: SsoVerifiedIdentity; transaction: SsoAuthenticationTransaction }> {
   if (!input.state || !input.code) throw new SsoAuthenticationError("invalid_callback");
 
   const transaction = await input.store.consume(input.state);
@@ -161,6 +197,17 @@ export async function completeSsoAuthentication(
     codeVerifier: transaction.codeVerifier,
     expectedNonce: transaction.nonce,
   });
+  return { identity, transaction };
+}
+
+/** login callback transactionだけを一度消費し、検証済みIdentityと復帰pathを返す。 */
+export async function completeSsoAuthentication(
+  input: CompleteSsoAuthenticationInput,
+): Promise<{ identity: SsoVerifiedIdentity; returnTo: string }> {
+  const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  if (transaction.purpose !== "login") {
+    throw new SsoAuthenticationError("transaction_purpose_mismatch");
+  }
   return { identity, returnTo: transaction.returnTo };
 }
 
@@ -184,4 +231,52 @@ export async function completeSsoLogin<SessionResult>(
     authenticatedAt: identity.authenticatedAt,
   });
   return { session, returnTo };
+}
+
+/** 開始時のAccountへだけ検証済みAuth0 Identityを追加する。 */
+export async function completeSsoIdentityLinking(
+  input: CompleteSsoAuthenticationInput & { identityLinker: SsoIdentityLinker },
+): Promise<{
+  accountId: string;
+  authenticatedIdentityId: string;
+  authenticationMethod: "sso";
+  authenticatedAt: Date;
+  providerKey: "auth0";
+  returnTo: string;
+}> {
+  const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  if (transaction.purpose !== "link") {
+    throw new SsoAuthenticationError("transaction_purpose_mismatch");
+  }
+  const authenticatedIdentityId = await input.identityLinker.link({
+    accountId: transaction.initiatingAccountId,
+    providerKey: identity.providerKey,
+    subject: identity.subject,
+  });
+  return {
+    accountId: transaction.initiatingAccountId,
+    authenticatedIdentityId,
+    authenticationMethod: identity.authenticationMethod,
+    authenticatedAt: identity.authenticatedAt,
+    providerKey: identity.providerKey,
+    returnTo: transaction.returnTo,
+  };
+}
+
+/** IdPでキャンセルされたlink transactionも一度だけ消費する。 */
+export async function cancelSsoIdentityLinking(input: {
+  state: string;
+  store: SsoAuthenticationTransactionStore;
+  now?: () => number;
+}): Promise<{ returnTo: string }> {
+  if (!input.state) throw new SsoAuthenticationError("invalid_callback");
+  const transaction = await input.store.consume(input.state);
+  if (!transaction) throw new SsoAuthenticationError("transaction_missing");
+  if (transaction.expiresAt <= (input.now?.() ?? Date.now())) {
+    throw new SsoAuthenticationError("transaction_expired");
+  }
+  if (transaction.purpose !== "link") {
+    throw new SsoAuthenticationError("transaction_purpose_mismatch");
+  }
+  return { returnTo: transaction.returnTo };
 }

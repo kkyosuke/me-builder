@@ -5,12 +5,21 @@ import type {
   SsoAuthenticationTransactionStore,
 } from "../../logic/authentication/sso-transaction";
 
-const TransactionSchema = v.object({
+const TransactionEntries = {
   nonce: v.pipe(v.string(), v.nonEmpty()),
   codeVerifier: v.pipe(v.string(), v.nonEmpty()),
   returnTo: v.pipe(v.string(), v.startsWith("/")),
   expiresAt: v.pipe(v.number(), v.safeInteger()),
-});
+};
+
+const TransactionSchema = v.variant("purpose", [
+  v.object({ ...TransactionEntries, purpose: v.literal("login") }),
+  v.object({
+    ...TransactionEntries,
+    purpose: v.literal("link"),
+    initiatingAccountId: v.pipe(v.string(), v.nonEmpty()),
+  }),
+]);
 
 function base64Url(bytes: Uint8Array): string {
   let binary = "";

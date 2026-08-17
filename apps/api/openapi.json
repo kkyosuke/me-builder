@@ -221,6 +221,239 @@
         }
       }
     },
+    "/api/auth/sso/identity": {
+      "get": {
+        "operationId": "getSsoIdentityStatus",
+        "tags": ["Authentication"],
+        "summary": "本人のSSO Identity接続状態を取得する",
+        "security": [
+          {
+            "applicationSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "subjectを含まないSSO接続状態",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "linked": {
+                      "type": "boolean"
+                    },
+                    "canUnlink": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["linked", "canUnlink"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionが無効",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SSOまたはstorage bindingが未設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unlinkSsoIdentity",
+        "tags": ["Authentication"],
+        "summary": "本人のSSO Identityを解除する",
+        "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "解除済み"
+          },
+          "401": {
+            "description": "application sessionが無効",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "最後のログイン方法なので解除不可",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Last login identity cannot be unlinked"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SSOまたはstorage bindingが未設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sso/link": {
+      "post": {
+        "operationId": "startSsoIdentityLink",
+        "tags": ["Authentication"],
+        "summary": "認証済みAccountへのSSO Identity追加を開始する",
+        "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "returnTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "description": "認証後に復元する同一originの相対path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "同じbrowserで開くAuth0認可URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authorizationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": ["authorizationUrl"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionが無効",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SSOまたはstorage bindingが未設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sso/callback": {
+      "get": {
+        "operationId": "completeSsoCallback",
+        "tags": ["Authentication"],
+        "summary": "SSO callbackを一度だけ処理する",
+        "responses": {
+          "302": {
+            "description": "保存済みの同一origin相対pathへredirect"
+          },
+          "503": {
+            "description": "SSOまたはstorage bindingが未設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/liff/exchange": {
       "post": {
         "operationId": "exchangeLiffCredential",

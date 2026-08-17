@@ -46,6 +46,10 @@ type Env = Omit<
   ADMIN_LINE_USER_IDS?: string;
   BASE_URL?: string;
   WEB_ORIGIN?: string;
+  SSO_ROLLOUT_MODE?: string;
+  SSO_ISSUER_URL?: string;
+  SSO_CLIENT_ID?: string;
+  SSO_CLIENT_SECRET?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   PROFILE_SUMMARY_QUEUE?: Queue<ReflectionGenerationQueueMessage>;
   BILLING_QUEUE?: Queue<BillingQueueMessage>;

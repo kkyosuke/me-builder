@@ -289,16 +289,11 @@ flowchart TD
 
 実装と検証はPRへ移し、mainへmerge済みの`AUTH-A-011`が提供するKV bindingへ接続しました。未完了条件はレビューとmergeです。
 
-### AUTH-C-003 既存AccountへSSO Identityを追加する
+### AUTH-C-003 既存AccountへSSO Identityを追加する ([PR #322](https://github.com/kkyosuke/me-builder/pull/322))
 
 依存: `AUTH-C-002`, `AUTH-B-001`
 
-- LIFFまたは既存sessionで認証済みの本人がSSO追加を開始できるAPIと設定画面を追加する
-- SSO側の新しい認証成功と元sessionのAccountを同じ短命transactionで結び、`linkIdentity`を使う
-- emailや表示名の一致でlinkせず、別Accountへ接続済みのIdentityは自動統合しない
-- 成功、キャンセル、再送、別Account、最後のIdentity解除防止をE2E相当testへ含める
-
-完了条件は、既存Account IDと本人データを変えずにSSO Identityを追加でき、別Account同士を自動統合しないことです。
+実装と検証はPRへ移し、`AUTH-A-011`のsession / CSRF基盤へ接続しました。未完了条件は依存PRのmerge、レビュー、mergeです。
 
 ### AUTH-C-004 LIFF内と外部ブラウザの認証入口を切り替える
 

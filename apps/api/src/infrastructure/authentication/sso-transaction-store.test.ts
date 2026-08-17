@@ -20,7 +20,13 @@ describe("createSsoTransactionStore", () => {
 
     await store.put(
       "raw-state",
-      { nonce: "nonce", codeVerifier: "verifier", returnTo: "/", expiresAt: 1_000 },
+      {
+        purpose: "login",
+        nonce: "nonce",
+        codeVerifier: "verifier",
+        returnTo: "/",
+        expiresAt: 1_000,
+      },
       600,
     );
 
@@ -28,6 +34,7 @@ describe("createSsoTransactionStore", () => {
     expect(key).toMatch(/^sso-transaction:[A-Za-z0-9_-]+$/u);
     expect(key).not.toContain("raw-state");
     await expect(store.consume("raw-state")).resolves.toEqual({
+      purpose: "login",
       nonce: "nonce",
       codeVerifier: "verifier",
       returnTo: "/",

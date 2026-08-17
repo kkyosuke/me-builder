@@ -10,6 +10,7 @@ describe("getWebConfig & WebConfigSchema", () => {
     const parsed = v.parse(WebConfigSchema, {});
     expect(parsed.environment).toBeUndefined();
     expect(parsed.liffId).toBeUndefined();
+    expect(parsed.ssoRolloutMode).toBe("disabled");
   });
 
   it("ENVIRONMENT未設定時はNODE_ENVがdevelopmentでも開発環境にしないこと", () => {
@@ -44,5 +45,10 @@ describe("getWebConfig & WebConfigSchema", () => {
 
   it("不正なLIFF IDを画面のビルド・初期化前に拒否すること", () => {
     expect(() => getWebConfig({ LIFF_ID: "invalid" })).toThrow("LIFF_ID");
+  });
+
+  it("SSO段階公開状態をAPIと同じ値で取得すること", () => {
+    expect(getWebConfig({ SSO_ROLLOUT_MODE: "linking" }).ssoRolloutMode).toBe("linking");
+    expect(() => getWebConfig({ SSO_ROLLOUT_MODE: "unknown" })).toThrow();
   });
 });
