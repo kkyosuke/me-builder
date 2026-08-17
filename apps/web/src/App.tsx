@@ -4,9 +4,10 @@ import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
 import { issueRecoveryCode } from "./feature/account-recovery/infrastructure/account-recovery-api";
 import { AccountRecoveryScreen } from "./feature/account-recovery/presentation/account-recovery-screen";
+import { AuthSessionProvider } from "./feature/auth";
 import { createCustomerPortalSession } from "./feature/billing/infrastructure/billing-api";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
-import { LiffSessionProvider, useLiffSession } from "./feature/liff";
+import { useLiffSession } from "./feature/liff";
 import { getLiffIdToken } from "./feature/liff/infrastructure/liff-client";
 import {
   type ResetDevelopmentAccountDataResult,
@@ -621,7 +622,7 @@ function AppContents() {
 
 export function App() {
   return (
-    <LiffSessionProvider>
+    <AuthSessionProvider>
       {resolveRequestedPathname() === "/account-recovery" ? (
         <AccountRecoveryScreen />
       ) : (
@@ -629,6 +630,6 @@ export function App() {
           <AppContents />
         </ServiceTermsGate>
       )}
-    </LiffSessionProvider>
+    </AuthSessionProvider>
   );
 }
