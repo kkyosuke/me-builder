@@ -9,7 +9,7 @@ configure({ asyncUtilTimeout: 5_000 });
 
 const liff = vi.hoisted(() => ({
   initialize: vi.fn(),
-  getIdToken: vi.fn(),
+  readCredential: vi.fn(),
 }));
 
 vi.mock("../config", () => ({
@@ -24,8 +24,8 @@ vi.mock("../feature/legal", () => ({
   ServiceTermsAcceptanceHistory: () => null,
 }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
-  initializeLiff: liff.initialize,
-  getLiffIdToken: liff.getIdToken,
+  initializeLiffForAuthExchange: liff.initialize,
+  readLiffAuthExchangeCredential: liff.readCredential,
 }));
 vi.mock("../feature/profile", () => ({
   ProfileApplication: () => <main aria-label="わたしのまとめ" />,
@@ -51,7 +51,7 @@ describe("subscription entitlement user journey", () => {
       inClient: true,
       profile: { displayName: "テスト" },
     });
-    liff.getIdToken.mockReturnValue("dummy.id.token");
+    liff.readCredential.mockReturnValue("dummy.id.token");
   });
 
   afterEach(() => {

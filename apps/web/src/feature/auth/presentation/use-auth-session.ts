@@ -44,11 +44,7 @@ export function useAuthSessionState() {
       const existing = await fetchAuthSession(config.apiUrl, signal);
       if (existing.authenticated) return applyResponse(existing);
 
-      const exchanged = await establishLiffAuthSession(
-        config.apiUrl,
-        config.liffId,
-        signal,
-      );
+      const exchanged = await establishLiffAuthSession(config.apiUrl, config.liffId, signal);
       if ("redirecting" in exchanged) return { status: "redirecting" };
       return applyResponse(exchanged);
     },
