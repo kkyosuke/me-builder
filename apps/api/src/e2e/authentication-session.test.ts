@@ -358,6 +358,15 @@ describe("application session local D1/KV E2E", () => {
     const sourceSession = await exchange("credential-b");
     const sourceCookie = cookieFrom(sourceSession);
     const { csrfToken } = (await sourceSession.json()) as { csrfToken: string };
+    const timestamp = Math.floor(Date.now() / 1_000);
+    await database
+      .prepare(
+        `INSERT INTO account_identities (
+           id, created_at, updated_at, is_deleted, account_id, provider, provider_account_id
+         ) VALUES (?, ?, ?, 0, 'account-b', 'line_login', ?)`,
+      )
+      .bind("identity-b-other", timestamp, timestamp, "line-subject-b-other")
+      .run();
 
     const credentialId = "recovery-e2e";
     const secret = "recovery-secret";
@@ -402,6 +411,15 @@ describe("application session local D1/KV E2E", () => {
       .bind("line-subject-b")
       .first<{ account_id: string }>();
     expect(transferred?.account_id).toBe("account-a");
+    const untouchedIdentity = await database
+      .prepare(
+        `SELECT account_id
+         FROM account_identities
+         WHERE id = ? AND is_deleted = 0`,
+      )
+      .bind("identity-b-other")
+      .first<{ account_id: string }>();
+    expect(untouchedIdentity?.account_id).toBe("account-b");
 
     const reexchanged = await exchange("credential-b");
     expect(reexchanged.status).toBe(200);

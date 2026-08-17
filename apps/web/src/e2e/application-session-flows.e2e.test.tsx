@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 
 import { currentServiceTerms } from "@me-builder/shared";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, configure, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
+
+// App全体のlazy routeとAPI往復を、E2E並列実行時の負荷でも待ち切る。
+configure({ asyncUtilTimeout: 10_000 });
 
 const liff = vi.hoisted(() => ({
   initialize: vi.fn(),
