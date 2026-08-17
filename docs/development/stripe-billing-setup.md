@@ -116,7 +116,7 @@ bun scripts/setup-stripe-billing.ts preview --stripe-only
 
 ### 3.3 契約ライフサイクルのsandbox確認
 
-通常PRのCIはStripeへ接続しません。実接続の回帰は`scheduled-checks.yml`の手動・定期実行で、`apps/api/scripts/test-billing-lifecycle.ts`からsandbox Test Clockを使って確認します。
+通常PRのCIはStripeへ接続しません。実接続の回帰は`scheduled-checks.yml`の手動・定期実行で、`apps/api/scripts/test-billing-lifecycle.ts`からCheckout Session作成とsandbox Test Clockを使った課金ライフサイクルを確認します。Checkout作成に失敗した場合は、生のStripeレスポンスを出さず、Stripeの固定エラー種別・コード・パラメータ・request IDを`level=error`で記録します。
 
 実行には`dev` GitHub Environmentの`STRIPE_SECRET_KEY`を設定し、先にStripe catalog同期を完了します。E2Eは料金SSoTのLite・Full月額lookup keyを使い、trial、通常更新、Portalによる即時upgrade、APIと同じSubscription Scheduleによる異なるProduct間の期間末downgrade、支払失敗と回復、解約予約・取消・終了を再現します。通常CIでは、同じprojectionに対するWebhook重複、順序逆転、subscription event欠落時のCustomer再照合、最終retryのDLQ遷移をfakeで回帰します。
 

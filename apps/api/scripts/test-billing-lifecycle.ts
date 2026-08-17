@@ -1,6 +1,8 @@
-import { STRIPE_API_VERSION, STRIPE_BILLING_CATALOG } from "@me-builder/lib";
+import { billing } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import Stripe from "stripe";
+
+const { STRIPE_API_VERSION, STRIPE_BILLING_CATALOG } = billing;
 
 const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
 if (!secretKey || !["sk_test_", "rk_test_"].some((prefix) => secretKey.startsWith(prefix))) {
@@ -29,6 +31,7 @@ try {
       resolvePriceId(stripe, "full", "year"),
       resolvePortalConfigurations(stripe),
     ]);
+  await assertCheckoutSession(stripe, litePriceId);
   const customer = await stripe.customers.create({
     test_clock: clock.id,
     metadata: { managed_by: "me-builder-e2e" },
@@ -191,6 +194,7 @@ try {
   logger.info(
     {
       scenarios: [
+        "checkout-session",
         "trial",
         "renewal",
         "upgrade",
@@ -208,6 +212,88 @@ try {
   );
 } finally {
   await stripe.testHelpers.testClocks.del(clock.id);
+}
+
+async function assertCheckoutSession(client: Stripe, priceId: string): Promise<void> {
+  let customerId: string | undefined;
+  try {
+    const customer = await client.customers.create({
+      metadata: { managed_by: "me-builder-e2e", purpose: "checkout-smoke" },
+    });
+    customerId = customer.id;
+    const session = await client.checkout.sessions.create({
+      mode: "subscription",
+      customer: customer.id,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url:
+        "https://example.test/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: "https://example.test/profile/billing?billing=checkout-cancel",
+      client_reference_id: "me-builder-checkout-smoke",
+      metadata: { plan: "lite", interval: "month", managed_by: "me-builder-e2e" },
+      subscription_data: { trial_period_days: 14 },
+    });
+    if (!session.url) throw new Error("Checkout Session URL was missing");
+    await client.checkout.sessions.expire(session.id);
+  } catch (error) {
+    const stripeError = safeStripeErrorFields(error);
+    logger.error(
+      {
+        event: "stripe.sandbox.checkout.failed",
+        service: "api",
+        outcome: "failed",
+        errorCode: "STRIPE_SANDBOX_CHECKOUT_FAILED",
+        ...stripeError,
+      },
+      "Stripe sandbox Checkout Session creation failed",
+    );
+    // Stripe SDK例外のmessage/cause/responseはCIログへ出さない。
+    throw new Error("STRIPE_SANDBOX_CHECKOUT_FAILED");
+  } finally {
+    if (customerId) {
+      try {
+        await client.customers.del(customerId);
+      } catch {
+        logger.warn(
+          {
+            event: "stripe.sandbox.checkout.cleanup.degraded",
+            service: "api",
+            outcome: "degraded",
+            errorCode: "STRIPE_SANDBOX_CHECKOUT_CUSTOMER_CLEANUP_FAILED",
+          },
+          "Stripe sandbox Checkout smoke customer cleanup failed",
+        );
+      }
+    }
+  }
+}
+
+function safeStripeErrorFields(error: unknown): Record<string, string | number> {
+  const candidate = error as {
+    type?: unknown;
+    code?: unknown;
+    param?: unknown;
+    statusCode?: unknown;
+    requestId?: unknown;
+    raw?: { requestId?: unknown };
+  };
+  const safeToken = (value: unknown, pattern: RegExp): string | undefined =>
+    typeof value === "string" && pattern.test(value) ? value : undefined;
+  const stripeErrorType = safeToken(candidate?.type, /^[A-Za-z][A-Za-z0-9]{0,79}$/u);
+  const stripeErrorCode = safeToken(candidate?.code, /^[a-z][a-z0-9_]{0,79}$/u);
+  const stripeErrorParam = safeToken(candidate?.param, /^[A-Za-z0-9_.[\]-]{1,120}$/u);
+  const dependencyRequestId = safeToken(
+    candidate?.requestId ?? candidate?.raw?.requestId,
+    /^req_[A-Za-z0-9]{1,80}$/u,
+  );
+  return {
+    ...(stripeErrorType ? { stripeErrorType } : {}),
+    ...(stripeErrorCode ? { stripeErrorCode } : {}),
+    ...(stripeErrorParam ? { stripeErrorParam } : {}),
+    ...(typeof candidate?.statusCode === "number"
+      ? { dependencyStatus: candidate.statusCode }
+      : {}),
+    ...(dependencyRequestId ? { dependencyRequestId } : {}),
+  };
 }
 
 async function resolvePriceId(
