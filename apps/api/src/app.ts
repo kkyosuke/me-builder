@@ -193,6 +193,7 @@ import {
   getSelfCareContextContents,
   postSelfCareContextConfirmation,
 } from "./controller/self-care-context";
+import { requireAuthentication } from "./middleware/authentication";
 import { operationalHttpPath } from "./operational-http-path";
 import type { AppEnv } from "./types";
 
@@ -292,14 +293,16 @@ app.get(
 );
 app.post("/api/billing/portal-sessions", billingPortalSessionRoute, postBillingPortalSession);
 
-app.get("/api/legal/terms", getServiceTermsRoute, getServiceTermsContents);
+app.get("/api/legal/terms", requireAuthentication, getServiceTermsRoute, getServiceTermsContents);
 app.get(
   "/api/legal/terms/acceptances",
+  requireAuthentication,
   getServiceTermsAcceptanceHistoryRoute,
   getServiceTermsAcceptanceHistoryContents,
 );
 app.put(
   "/api/legal/terms/acceptance",
+  requireAuthentication,
   acceptServiceTermsRoute,
   acceptServiceTermsRequestValidator,
   putServiceTermsAcceptance,

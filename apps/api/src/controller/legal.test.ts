@@ -14,6 +14,24 @@ vi.mock("../logic/service-terms", () => ({
   acceptServiceTerms: vi.fn(),
 }));
 
+vi.mock("../middleware/authentication", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authentication")>();
+  return {
+    ...actual,
+    requireAuthentication: async (
+      c: Parameters<typeof actual.requireAuthentication>[0],
+      next: () => Promise<void>,
+    ) => {
+      c.set("authenticatedActor", {
+        accountId: "account-1",
+        authenticationMethod: "liff",
+        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      });
+      await next();
+    },
+  };
+});
+
 const db = {} as D1Database;
 const document = currentServiceTerms;
 

@@ -2,7 +2,6 @@ import { D1 } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { getConfig } from "../config";
 import {
   AcceptServiceTermsRequestSchema,
   AcceptServiceTermsResponseSchema,
@@ -11,20 +10,19 @@ import {
   ServiceTermsStatusResponseSchema,
   ServiceTermsVersionConflictSchema,
 } from "../contract/legal/terms";
-import { ServiceUnavailableErrorSchema, UnauthorizedErrorSchema } from "../contract/shared/errors";
+import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import {
   acceptServiceTerms,
   getServiceTermsAcceptanceHistory,
   getServiceTermsStatus,
 } from "../logic/service-terms";
+import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
-import { bearerToken } from "./auth";
 
 function params(c: Context<AppEnv>) {
   if (!c.env?.DB) return undefined;
   return {
-    idToken: bearerToken(c.req.header("authorization")),
-    lineLoginChannelId: getConfig(c.env).lineLoginChannelId,
+    actor: authenticatedActor(c),
     db: D1.shared.client.create(c.env.DB),
   };
 }
@@ -39,9 +37,6 @@ export async function getServiceTermsContents(c: Context<AppEnv>): Promise<Respo
   const input = params(c);
   if (!input) return unavailable(c);
   const outcome = await getServiceTermsStatus(input);
-  if (outcome.type !== "resolved") {
-    return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
-  }
   return c.json(
     v.parse(ServiceTermsStatusResponseSchema, {
       document: outcome.document,
@@ -60,9 +55,6 @@ export async function putServiceTermsAcceptance(c: Context<AppEnv>): Promise<Res
     return c.json(v.parse(InvalidServiceTermsRequestSchema, { error: "Invalid request" }), 400);
   }
   const outcome = await acceptServiceTerms({ ...input, version: parsed.output.version });
-  if (outcome.type === "not-configured" || outcome.type === "unauthenticated") {
-    return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
-  }
   if (outcome.type === "version-conflict") {
     return c.json(
       v.parse(ServiceTermsVersionConflictSchema, {
@@ -89,9 +81,6 @@ export async function getServiceTermsAcceptanceHistoryContents(
   const input = params(c);
   if (!input) return unavailable(c);
   const outcome = await getServiceTermsAcceptanceHistory(input);
-  if (outcome.type !== "resolved") {
-    return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
-  }
   return c.json(
     v.parse(ServiceTermsAcceptanceHistoryResponseSchema, {
       acceptances: outcome.acceptances,

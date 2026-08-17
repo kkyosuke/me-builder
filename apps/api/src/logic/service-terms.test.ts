@@ -8,14 +8,14 @@ import {
 } from "./service-terms";
 
 const db = {} as D1.shared.Client;
-const session = {
-  type: "resolved" as const,
-  session: { accountId: "account-1", role: "user" as const },
+const actor = {
+  accountId: "account-1",
+  authenticationMethod: "liff" as const,
+  authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
 };
 
 function dependencies(acceptance?: { acceptedAt: string }) {
   return {
-    createSession: vi.fn().mockResolvedValue(session),
     findAcceptance: vi.fn().mockResolvedValue(
       acceptance
         ? {
@@ -51,10 +51,7 @@ function dependencies(acceptance?: { acceptedAt: string }) {
 describe("service terms", () => {
   it("現在versionが未同意なら本文とrequiredを返す", async () => {
     const deps = dependencies();
-    const result = await getServiceTermsStatus(
-      { idToken: "token", lineLoginChannelId: "channel", db },
-      deps,
-    );
+    const result = await getServiceTermsStatus({ actor, db }, deps);
     expect(result).toMatchObject({
       type: "resolved",
       document: { documentKey: "terms_of_service", version: currentServiceTerms.version },
@@ -64,7 +61,7 @@ describe("service terms", () => {
 
   it("同意済みなら保存済み日時を返す", async () => {
     const result = await getServiceTermsStatus(
-      { idToken: "token", lineLoginChannelId: "channel", db },
+      { actor, db },
       dependencies({ acceptedAt: "2026-08-15T01:23:45.000Z" }),
     );
     expect(result).toMatchObject({
@@ -75,10 +72,7 @@ describe("service terms", () => {
 
   it("表示したversionが古ければ同意を保存しない", async () => {
     const deps = dependencies();
-    const result = await acceptServiceTerms(
-      { idToken: "token", lineLoginChannelId: "channel", db, version: "2026-01-01" },
-      deps,
-    );
+    const result = await acceptServiceTerms({ actor, db, version: "2026-01-01" }, deps);
     expect(result).toEqual({
       type: "version-conflict",
       currentVersion: currentServiceTerms.version,
@@ -90,8 +84,7 @@ describe("service terms", () => {
     const deps = dependencies();
     const result = await acceptServiceTerms(
       {
-        idToken: "token",
-        lineLoginChannelId: "channel",
+        actor,
         db,
         version: currentServiceTerms.version,
       },
@@ -142,10 +135,7 @@ describe("service terms", () => {
       },
     ]);
 
-    const result = await getServiceTermsAcceptanceHistory(
-      { idToken: "token", lineLoginChannelId: "channel", db },
-      deps,
-    );
+    const result = await getServiceTermsAcceptanceHistory({ actor, db }, deps);
 
     expect(result).toMatchObject({
       type: "resolved",
