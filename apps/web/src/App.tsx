@@ -558,6 +558,11 @@ function AppContents() {
         <ProfileMenuButton
           ref={profileButtonRef}
           avatar={avatar}
+          plan={
+            entitlementState.status === "success" && entitlementState.data.status !== "safe-default"
+              ? entitlementState.data.plan
+              : undefined
+          }
           linePictureUrl={linePictureUrl}
           onOpen={openProfile}
           onPreload={preloadProfileSettingsScreen}

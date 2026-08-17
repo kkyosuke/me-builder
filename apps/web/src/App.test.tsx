@@ -11,6 +11,7 @@ import type {
   DiagnosisResult,
 } from "./feature/diagnosis";
 import { diagnosisDetailIdFromHistoryState } from "./feature/diagnosis/model/diagnosis-navigation";
+import type { ProfileEntitlement } from "./feature/profile-settings/model/entitlement";
 import { ProfileSummaryGenerationUnavailableError } from "./feature/profile/model/profile-summary";
 import { OperationError } from "./infrastructure/errors";
 
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   },
   retryAuthSession: vi.fn(),
   fetchAccountProfile: vi.fn(),
+  fetchProfileEntitlement: vi.fn(),
   saveAccountAvatar: vi.fn(),
   deleteAccountAvatar: vi.fn(),
   fetchDiagnosisList: vi.fn(),
@@ -76,6 +78,9 @@ vi.mock("./feature/profile-settings/infrastructure/profile-api", () => ({
   fetchAccountProfile: mocks.fetchAccountProfile,
   saveAccountAvatar: mocks.saveAccountAvatar,
   deleteAccountAvatar: mocks.deleteAccountAvatar,
+}));
+vi.mock("./feature/profile-settings/infrastructure/entitlement-api", () => ({
+  fetchProfileEntitlement: mocks.fetchProfileEntitlement,
 }));
 vi.mock("./feature/profile-settings/infrastructure/development-account-data-api", () => ({
   resetDevelopmentAccountData: mocks.resetDevelopmentAccountData,
@@ -196,6 +201,30 @@ const result: DiagnosisResult = {
   scoring: { scoringVersion: 1, balancedLabel: "中間", parameters: [] },
 };
 
+const profileEntitlement: ProfileEntitlement = {
+  status: "free",
+  plan: "free",
+  source: "free",
+  effectiveAt: "2026-08-01T00:00:00.000Z",
+  availableUntil: null,
+  aiReply: {
+    limit: 10,
+    used: 0,
+    reserved: 0,
+    remaining: 10,
+    periodStartsAt: "2026-08-01T00:00:00.000Z",
+    resetsAt: "2026-09-01T00:00:00.000Z",
+  },
+  profileSummary: {
+    limit: 1,
+    used: 0,
+    reserved: 0,
+    remaining: 1,
+    periodStartsAt: "2026-08-01T00:00:00.000Z",
+    resetsAt: "2026-09-01T00:00:00.000Z",
+  },
+};
+
 function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListItem {
   return {
     id: "diagnosis-1",
@@ -248,6 +277,7 @@ describe("App", () => {
       displayName: "テスト",
       avatar: null,
     });
+    mocks.fetchProfileEntitlement.mockResolvedValue(profileEntitlement);
     mocks.fetchProfileProgression.mockResolvedValue({
       level: 1,
       growthValue: 0,
@@ -443,6 +473,58 @@ describe("App", () => {
     await waitFor(() =>
       expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(linePictureUrl),
     );
+  });
+
+  it("確定した現在Planを右上のプロフィールバッジに表示する", async () => {
+    mocks.fetchProfileEntitlement.mockResolvedValue({
+      ...profileEntitlement,
+      status: "active",
+      plan: "full",
+      source: "subscription",
+    });
+
+    render(<App />);
+
+    const profileButton = screen.getByRole("button", { name: "プロフィールを開く" });
+    await waitFor(() =>
+      expect(
+        [...profileButton.querySelectorAll('[aria-hidden="true"]')].some(
+          (element) => element.textContent === "FULL",
+        ),
+      ).toBe(true),
+    );
+    expect(screen.getByText("現在のプラン: Full")).toBeTruthy();
+  });
+
+  it("Planを確認できないsafe-defaultへ変わったときは既存のバッジを取り除く", async () => {
+    let resolveSafeDefault!: (entitlement: ProfileEntitlement) => void;
+    const safeDefault = new Promise<ProfileEntitlement>((resolve) => {
+      resolveSafeDefault = resolve;
+    });
+    mocks.fetchProfileEntitlement
+      .mockResolvedValueOnce({
+        ...profileEntitlement,
+        status: "active",
+        plan: "full",
+        source: "subscription",
+      })
+      .mockReturnValueOnce(safeDefault);
+    const { rerender } = render(<App />);
+
+    expect(await screen.findByText("現在のプラン: Full")).toBeTruthy();
+
+    mocks.authState = { ...mocks.authState, revision: 2 };
+    rerender(<App />);
+    await waitFor(() => expect(mocks.fetchProfileEntitlement).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      resolveSafeDefault({ ...profileEntitlement, status: "safe-default" });
+      await safeDefault;
+    });
+
+    const profileButton = screen.getByRole("button", { name: "プロフィールを開く" });
+    expect(profileButton.getAttribute("aria-describedby")).toBeNull();
+    expect(screen.queryByText("現在のプラン: Free")).toBeNull();
+    expect(screen.queryByText("現在のプラン: Full")).toBeNull();
   });
 
   it("右上からプロフィールを開き、ライトテーマへ切り替えて保存する", async () => {
