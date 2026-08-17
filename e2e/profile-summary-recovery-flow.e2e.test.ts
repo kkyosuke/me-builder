@@ -130,6 +130,7 @@ describe("Profile Summary Queue recovery E2E", () => {
           iss: "https://access.line.me",
           sub: lineId,
           aud: "1234567890",
+          iat: Math.floor(Date.now() / 1_000),
           exp: timestamp + 86_400,
         }),
       ),

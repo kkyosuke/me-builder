@@ -50,6 +50,7 @@ const validClaims = {
   iss: "https://access.line.me",
   sub: SUB,
   aud: CHANNEL_ID,
+  iat: Math.floor(Date.now() / 1_000),
   exp: 1785000000,
   name: "うつし",
   picture: "https://example.com/picture.jpg",

@@ -138,6 +138,7 @@ function stubLineVerification(): void {
         iss: "https://access.line.me",
         sub: subjects[idToken] ?? "line-unknown",
         aud: lineChannelId,
+        iat: Math.floor(Date.now() / 1_000),
         exp: 4_000_000_000,
       });
     }),
