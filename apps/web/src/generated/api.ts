@@ -1083,7 +1083,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1182,7 +1182,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1252,7 +1252,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1338,7 +1338,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1462,7 +1462,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -1693,7 +1693,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2000,7 +2000,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2371,7 +2371,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2514,7 +2514,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2626,7 +2626,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2753,7 +2753,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -2915,7 +2915,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3004,7 +3004,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3143,7 +3143,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3232,7 +3232,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3345,7 +3345,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3461,7 +3461,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3598,7 +3598,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3710,7 +3710,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3824,7 +3824,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -3933,7 +3933,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4026,7 +4026,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4138,7 +4138,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4268,7 +4268,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4379,7 +4379,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4470,7 +4470,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4585,7 +4585,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4694,7 +4694,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4812,7 +4812,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -4938,7 +4938,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5065,7 +5065,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5209,7 +5209,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5356,7 +5356,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5503,7 +5503,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5646,7 +5646,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5789,7 +5789,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -5930,7 +5930,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6059,7 +6059,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6158,7 +6158,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6244,7 +6244,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6398,7 +6398,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6517,7 +6517,7 @@ export interface operations {
               };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6612,7 +6612,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6736,7 +6736,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6845,7 +6845,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -6968,7 +6968,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7073,7 +7073,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7197,7 +7197,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7366,7 +7366,7 @@ export interface operations {
               };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7457,7 +7457,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7561,7 +7561,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7652,7 +7652,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7746,7 +7746,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7860,7 +7860,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -7988,7 +7988,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8091,7 +8091,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8197,7 +8197,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8338,7 +8338,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8465,7 +8465,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8602,7 +8602,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;
@@ -8735,7 +8735,7 @@ export interface operations {
           };
         };
       };
-      /** @description application sessionまたは旧LIFF credentialを検証できない */
+      /** @description application sessionを検証できない */
       401: {
         headers: {
           [name: string]: unknown;

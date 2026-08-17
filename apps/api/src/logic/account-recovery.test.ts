@@ -3,7 +3,7 @@ import { D1 } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { recoverAccountWithCode } from "./account-recovery";
 
 function createTestDb(): D1.shared.Client {
@@ -59,7 +59,6 @@ describe("account recovery authentication boundary", () => {
       provider: "line_login",
       providerAccountId: "new-line-identity",
     });
-    const invalidateAccountSessions = vi.fn();
     const params = {
       db,
       identity: { subject: "new-line-identity" },
@@ -69,18 +68,36 @@ describe("account recovery authentication boundary", () => {
       now,
     };
 
+    await expect(recoverAccountWithCode(params)).resolves.toMatchObject({
+      type: "recovered",
+      accountId,
+      alreadyRecovered: false,
+    });
     await expect(
-      recoverAccountWithCode(params, { invalidateAccountSessions }),
-    ).resolves.toMatchObject({ type: "recovered", accountId, alreadyRecovered: false });
+      db.query.accounts.findMany({
+        columns: { id: true, sessionVersion: true },
+        where: (table, { inArray }) => inArray(table.id, [accountId, source.account.id]),
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        { id: accountId, sessionVersion: 2 },
+        { id: source.account.id, sessionVersion: 2 },
+      ]),
+    );
     await expect(
-      recoverAccountWithCode(
-        { ...params, sourceAccountId: accountId },
-        { invalidateAccountSessions },
-      ),
+      recoverAccountWithCode({ ...params, sourceAccountId: accountId }),
     ).resolves.toMatchObject({ type: "recovered", accountId, alreadyRecovered: true });
-    expect(invalidateAccountSessions).toHaveBeenNthCalledWith(1, accountId);
-    expect(invalidateAccountSessions).toHaveBeenNthCalledWith(2, source.account.id);
-    expect(invalidateAccountSessions).toHaveBeenCalledTimes(2);
+    await expect(
+      db.query.accounts.findMany({
+        columns: { id: true, sessionVersion: true },
+        where: (table, { inArray }) => inArray(table.id, [accountId, source.account.id]),
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        { id: accountId, sessionVersion: 2 },
+        { id: source.account.id, sessionVersion: 2 },
+      ]),
+    );
   });
 
   it("別Accountに接続済みのIdentityを拒否し、sessionを失効しない", async () => {
@@ -93,22 +110,16 @@ describe("account recovery authentication boundary", () => {
       provider: "line",
       providerAccountId: "other-account-identity",
     });
-    const invalidateAccountSessions = vi.fn();
-
     await expect(
-      recoverAccountWithCode(
-        {
-          db,
-          identity: { subject: "other-account-identity" },
-          sourceAccountId: source.account.id,
-          code,
-          requestKey: "request-key",
-          now,
-        },
-        { invalidateAccountSessions },
-      ),
+      recoverAccountWithCode({
+        db,
+        identity: { subject: "other-account-identity" },
+        sourceAccountId: source.account.id,
+        code,
+        requestKey: "request-key",
+        now,
+      }),
     ).resolves.toEqual({ type: "identity-conflict" });
-    expect(invalidateAccountSessions).not.toHaveBeenCalled();
   });
 
   it("使用済みコードを異なるIdentityでは再利用できない", async () => {
@@ -125,25 +136,20 @@ describe("account recovery authentication boundary", () => {
       requestKey: "first-request",
       now,
     });
-    const invalidateAccountSessions = vi.fn();
     const secondSource = await D1.shared.action.account.upsertIdentity(db, {
       provider: "line_login",
       providerAccountId: "second-new-identity",
     });
 
     await expect(
-      recoverAccountWithCode(
-        {
-          db,
-          identity: { subject: "second-new-identity" },
-          sourceAccountId: secondSource.account.id,
-          code,
-          requestKey: "second-request",
-          now,
-        },
-        { invalidateAccountSessions },
-      ),
+      recoverAccountWithCode({
+        db,
+        identity: { subject: "second-new-identity" },
+        sourceAccountId: secondSource.account.id,
+        code,
+        requestKey: "second-request",
+        now,
+      }),
     ).resolves.toEqual({ type: "invalid-code" });
-    expect(invalidateAccountSessions).not.toHaveBeenCalled();
   });
 });

@@ -64,6 +64,17 @@ describe("account recovery action", () => {
     ).resolves.toEqual([
       expect.objectContaining({ accountId: target.account.id, isDeleted: false }),
     ]);
+    await expect(
+      db.query.accounts.findMany({
+        columns: { id: true, sessionVersion: true },
+        where: (table, { inArray }) => inArray(table.id, [target.account.id, source.account.id]),
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        { id: target.account.id, sessionVersion: 2 },
+        { id: source.account.id, sessionVersion: 2 },
+      ]),
+    );
   });
 
   it("コード発行後に削除されたAccountへIdentityを再接続しない", async () => {

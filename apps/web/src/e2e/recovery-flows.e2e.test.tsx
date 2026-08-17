@@ -28,7 +28,7 @@ vi.mock("../feature/liff/infrastructure/liff-client", () => ({
 const accountProfile = { role: "user", avatar: null };
 const authSession = {
   authenticated: true,
-  profile: { displayName: "テスト" },
+  displayProfile: { displayName: "テスト" },
   role: "user",
   csrfToken: "csrf-test-token",
 };

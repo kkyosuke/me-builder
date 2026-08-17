@@ -26,7 +26,7 @@ describe("establishLiffAuthSession", () => {
     mocks.readCredential.mockReturnValue("secret.id.token");
     mocks.exchangeLiffCredential.mockResolvedValue({
       authenticated: true,
-      profile: { displayName: "テスト" },
+      displayProfile: { displayName: "テスト" },
       role: "user",
       csrfToken: "csrf-token",
     });
@@ -36,14 +36,13 @@ describe("establishLiffAuthSession", () => {
     const signal = new AbortController().signal;
 
     await expect(
-      establishLiffAuthSession("https://api.example.com", "test-liff-id", "/me", signal),
+      establishLiffAuthSession("https://api.example.com", "test-liff-id", signal),
     ).resolves.toMatchObject({ authenticated: true });
 
     expect(mocks.initializeLiffForAuthExchange).toHaveBeenCalledWith("test-liff-id");
     expect(mocks.exchangeLiffCredential).toHaveBeenCalledWith(
       "https://api.example.com",
       "secret.id.token",
-      "/me",
       signal,
     );
   });
@@ -58,8 +57,8 @@ describe("establishLiffAuthSession", () => {
     );
     const signal = new AbortController().signal;
 
-    const first = establishLiffAuthSession(undefined, "test-liff-id", "/me", signal);
-    const second = establishLiffAuthSession(undefined, "test-liff-id", "/me", signal);
+    const first = establishLiffAuthSession(undefined, "test-liff-id", signal);
+    const second = establishLiffAuthSession(undefined, "test-liff-id", signal);
     expect(mocks.initializeLiffForAuthExchange).toHaveBeenCalledTimes(1);
     finishInitialization?.({
       status: "ready",
@@ -74,7 +73,7 @@ describe("establishLiffAuthSession", () => {
     mocks.initializeLiffForAuthExchange.mockResolvedValue({ status: "login-required" });
 
     await expect(
-      establishLiffAuthSession(undefined, "test-liff-id", "/me", new AbortController().signal),
+      establishLiffAuthSession(undefined, "test-liff-id", new AbortController().signal),
     ).resolves.toEqual({ redirecting: true });
     expect(mocks.readCredential).not.toHaveBeenCalled();
     expect(mocks.exchangeLiffCredential).not.toHaveBeenCalled();

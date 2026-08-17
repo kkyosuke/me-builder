@@ -233,7 +233,7 @@ export async function completeAccountRecovery(
     );
   }
   queries.push(
-    // Identity再接続と同じD1 batchでversionを進め、旧sessionを即時失効させる。
+    // Identity再接続と同じD1 batchで復旧先のversionを進め、旧sessionを即時失効させる。
     db
       .update(accounts)
       .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
@@ -268,6 +268,15 @@ export async function completeAccountRecovery(
       createdAt: now,
     }),
   );
+  if (input.sourceAccountId !== credential.accountId) {
+    // Identity移管後も移管元Accountのsessionが残らないよう、同じbatchで失効させる。
+    queries.push(
+      db
+        .update(accounts)
+        .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
+        .where(eq(accounts.id, input.sourceAccountId)),
+    );
+  }
   // Drizzleのbatch tuple型は可変長配列を受けないため、実行境界で共通query型へ狭める。
   await db.batch(queries as [(typeof queries)[number], ...Array<(typeof queries)[number]>]);
   return "recovered";

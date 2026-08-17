@@ -11,14 +11,6 @@ export type VerifiedRecoveryIdentity = Readonly<{
   subject: string;
 }>;
 
-export interface AccountSessionInvalidator {
-  invalidateAccountSessions(accountId: string): Promise<void>;
-}
-
-const pendingSessionInvalidator: AccountSessionInvalidator = {
-  async invalidateAccountSessions() {},
-};
-
 export async function issueAccountRecoveryCode(
   params: BaseParams & { actor: AuthenticatedActor; now?: Date },
 ) {
@@ -60,7 +52,6 @@ export async function recoverAccountWithCode(
     requestKey: string;
     now?: Date;
   },
-  sessionInvalidator: AccountSessionInvalidator = pendingSessionInvalidator,
 ) {
   const now = params.now ?? new Date();
   const identityFingerprint = await sha256Base64Url(params.identity.subject);
@@ -131,14 +122,6 @@ export async function recoverAccountWithCode(
     credentialId,
   );
   const accountId = linked?.accountId ?? credential.accountId;
-  // 冪等な再送より後に発行されたsessionまで失効させない。
-  // Identityを実際に再接続した初回だけ、復旧先と移管元の旧sessionを失効する。
-  if (result === "recovered") {
-    await sessionInvalidator.invalidateAccountSessions(accountId);
-    if (params.sourceAccountId !== accountId) {
-      await sessionInvalidator.invalidateAccountSessions(params.sourceAccountId);
-    }
-  }
   return {
     type: "recovered",
     accountId,
