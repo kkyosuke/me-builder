@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lte, notExists, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import type {
   RevokeSelfCareConfirmationResult,
   SelfCareConfirmation,
@@ -53,48 +53,20 @@ export async function readSelfCareConfirmations(
     })
     .from(selfCareConfirmations)
     .innerJoin(brainItems, eq(brainItems.id, selfCareConfirmations.brainItemId))
-    .where(eq(selfCareConfirmations.accountId, accountId))
-    .orderBy(desc(selfCareConfirmations.updatedAt))
-    .all();
-  const candidateRows = await db
-    .select({
-      brainItemId: brainItems.id,
-      statement: brainItems.statement,
-      attributes: brainItems.attributes,
-      derivation: brainItems.derivation,
-    })
-    .from(brainItems)
     .where(
       and(
-        eq(brainItems.accountId, accountId),
-        inArray(brainItems.category, ["memory", "preference", "behavior_pattern", "current_state"]),
+        eq(selfCareConfirmations.accountId, accountId),
+        eq(selfCareConfirmations.status, "active"),
         eq(brainItems.status, "active"),
         eq(brainItems.isDeleted, false),
         or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
         or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
-        notExists(
-          db
-            .select({ id: selfCareConfirmations.id })
-            .from(selfCareConfirmations)
-            .where(
-              and(
-                eq(selfCareConfirmations.accountId, accountId),
-                eq(selfCareConfirmations.brainItemId, brainItems.id),
-                eq(selfCareConfirmations.status, "active"),
-              ),
-            ),
-        ),
       ),
     )
-    .orderBy(desc(brainItems.updatedAt))
+    .orderBy(desc(selfCareConfirmations.updatedAt))
+    .limit(100)
     .all();
-  return {
-    items: itemRows.map(toModel),
-    candidates: candidateRows
-      .filter(({ attributes, derivation }) => !isInference(attributes, derivation))
-      .map(({ brainItemId, statement }) => ({ brainItemId, statement }))
-      .slice(0, 12),
-  };
+  return { items: itemRows.map(toModel) };
 }
 
 export async function confirmSelfCareContext(
@@ -144,7 +116,7 @@ export async function confirmSelfCareContext(
       ],
       set: { status: "active", confirmedAt: at, updatedAt: at },
     });
-  const confirmed = (await readSelfCareConfirmations(db, accountId)).items.find(
+  const confirmed = (await readSelfCareConfirmations(db, accountId, at)).items.find(
     (candidate) => candidate.brainItemId === brainItemId && candidate.kind === kind,
   );
   if (!confirmed) throw new Error("Self-care confirmation was not persisted");
@@ -157,6 +129,10 @@ export async function revokeSelfCareContext(
   id: string,
   at = new Date(),
 ): Promise<RevokeSelfCareConfirmationResult> {
+  const existing = (await readSelfCareConfirmations(db, accountId, at)).items.find(
+    (candidate) => candidate.id === id,
+  );
+  if (!existing) return { type: "not-found" };
   const updated = await db
     .update(selfCareConfirmations)
     .set({ status: "revoked", updatedAt: at })
@@ -164,10 +140,10 @@ export async function revokeSelfCareContext(
     .returning({ id: selfCareConfirmations.id })
     .get();
   if (!updated) return { type: "not-found" };
-  const item = (await readSelfCareConfirmations(db, accountId)).items.find(
-    (candidate) => candidate.id === id,
-  );
-  return item ? { type: "revoked", item } : { type: "not-found" };
+  return {
+    type: "revoked",
+    item: { ...existing, status: "revoked", updatedAt: at.toISOString() },
+  };
 }
 
 const LIMITS = {

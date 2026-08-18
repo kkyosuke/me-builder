@@ -38,8 +38,7 @@ describe("self-care context entitlement", () => {
 
   it("Freeは確認済み結果を読めるが新しい確認を作らない", async () => {
     execute.mockResolvedValueOnce({
-      items: [{ id: "archived", status: "revoked" }],
-      candidates: [],
+      items: [{ id: "confirmed", status: "active" }],
     });
     await expect(
       getSelfCareContexts({ ...common, planAssignmentProvider: provider("free") }),

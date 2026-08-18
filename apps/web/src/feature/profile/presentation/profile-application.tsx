@@ -72,7 +72,6 @@ export default function ProfileApplication() {
         pendingId={selfCare.pendingId}
         operationError={selfCare.operationError}
         onRetry={() => void selfCare.reload()}
-        onConfirm={(brainItemId, kind) => void selfCare.confirm(brainItemId, kind)}
         onRevoke={(id) => void selfCare.revoke(id)}
       />
       <CompatibilityShareContentSection latestProfileSummaryVersionId={latestVersionId} />

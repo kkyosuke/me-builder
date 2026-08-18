@@ -2,17 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
 import {
-  confirmSelfCareContext,
   fetchSelfCareContexts,
   revokeSelfCareContext,
 } from "../infrastructure/self-care-context-api";
-import type { SelfCareContextKind, SelfCareContextResult } from "../model/self-care-context";
+import type { SelfCareContextResult } from "../model/self-care-context";
 
 export function useSelfCareContexts() {
   const [state, setState] = useState<AsyncState<SelfCareContextResult>>({ status: "loading" });
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const mutationId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     controller.current?.abort();
@@ -39,6 +39,8 @@ export function useSelfCareContexts() {
 
   const run = useCallback(
     async (id: string, operation: () => Promise<unknown>) => {
+      if (mutationId.current !== null) return;
+      mutationId.current = id;
       setPendingId(id);
       setOperationError(null);
       try {
@@ -49,6 +51,7 @@ export function useSelfCareContexts() {
           error instanceof Error ? error.message : "セルフケア情報を更新できませんでした。",
         );
       } finally {
+        mutationId.current = null;
         setPendingId(null);
       }
     },
@@ -60,8 +63,6 @@ export function useSelfCareContexts() {
     pendingId,
     operationError,
     reload: load,
-    confirm: (brainItemId: string, kind: SelfCareContextKind) =>
-      run(brainItemId, () => confirmSelfCareContext(config.apiUrl, { brainItemId, kind })),
     revoke: (id: string) => run(id, () => revokeSelfCareContext(config.apiUrl, id)),
   };
 }

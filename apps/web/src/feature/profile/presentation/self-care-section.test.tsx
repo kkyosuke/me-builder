@@ -17,7 +17,6 @@ const result: SelfCareContextResult = {
       updatedAt: "2026-08-18T00:00:00.000Z",
     },
   ],
-  candidates: [{ brainItemId: "brain-2", statement: "今週は肩に力が入っている" }],
   canManage: true,
 };
 
@@ -30,7 +29,6 @@ describe("SelfCareSection", () => {
         pendingId={null}
         operationError={null}
         onRetry={vi.fn()}
-        onConfirm={vi.fn()}
         onRevoke={onRevoke}
       />,
     );
@@ -39,21 +37,27 @@ describe("SelfCareSection", () => {
     expect(onRevoke).toHaveBeenCalledWith("self-care-1");
   });
 
-  it("本人が話した候補の意味を選んで確認できる", () => {
-    const onConfirm = vi.fn();
+  it("更新中は別の確認済み情報を含むすべての撤回操作を止める", () => {
+    const firstItem = result.items[0];
+    if (!firstItem) throw new Error("fixture is missing");
     render(
       <SelfCareSection
-        state={{ status: "success", data: result }}
-        pendingId={null}
+        state={{
+          status: "success",
+          data: {
+            ...result,
+            items: [...result.items, { ...firstItem, id: "self-care-2", kind: "did-not-work" }],
+          },
+        }}
+        pendingId="self-care-1"
         operationError={null}
         onRetry={vi.fn()}
-        onConfirm={onConfirm}
         onRevoke={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByText("話したことからセルフケアへ追加"));
-    fireEvent.click(screen.getByRole("button", { name: "最近の状態" }));
-    expect(onConfirm).toHaveBeenCalledWith("brain-2", "recent-state");
+    for (const button of screen.getAllByRole("button", { name: "確認を取り消す" })) {
+      expect(button).toHaveProperty("disabled", true);
+    }
   });
 
   it("Freeでは一般案を使うことを案内し、管理操作を出さない", () => {
@@ -63,11 +67,23 @@ describe("SelfCareSection", () => {
         pendingId={null}
         operationError={null}
         onRetry={vi.fn()}
-        onConfirm={vi.fn()}
         onRevoke={vi.fn()}
       />,
     );
     expect(screen.getByText(/Freeの相談では一般的な案/u)).toBeDefined();
     expect(screen.queryByRole("button", { name: "確認を取り消す" })).toBeNull();
+  });
+
+  it("操作エラーを支援技術へ通知する", () => {
+    render(
+      <SelfCareSection
+        state={{ status: "success", data: result }}
+        pendingId={null}
+        operationError="撤回できませんでした。"
+        onRetry={vi.fn()}
+        onRevoke={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("alert").textContent).toContain("撤回できませんでした");
   });
 });

@@ -13,10 +13,8 @@ const Item = v.object({
   confirmedAt: v.pipe(v.string(), v.isoTimestamp()),
   updatedAt: v.pipe(v.string(), v.isoTimestamp()),
 });
-const Candidate = v.object({ brainItemId: Text, statement: Text });
 export const SelfCareContextListSchema = v.object({
   items: v.array(Item),
-  candidates: v.array(Candidate),
   canManage: v.boolean(),
 });
 export const ConfirmSelfCareContextRequestSchema = v.object({ brainItemId: Text, kind: Kind });

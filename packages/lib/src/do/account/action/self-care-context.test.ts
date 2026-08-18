@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -83,10 +84,7 @@ describe("self-care context", () => {
     const db = createTestDb();
     await addItem(db, { id: "worked", statement: "予定を一つ減らすと少し楽になった" });
     await addItem(db, { id: "inferred", statement: "散歩が合いそう", isInference: true });
-    await expect(readSelfCareConfirmations(db, ACCOUNT_ID, AT)).resolves.toMatchObject({
-      items: [],
-      candidates: [{ brainItemId: "worked", statement: "予定を一つ減らすと少し楽になった" }],
-    });
+    await expect(readSelfCareConfirmations(db, ACCOUNT_ID, AT)).resolves.toEqual({ items: [] });
     await expect(confirmSelfCareContext(db, ACCOUNT_ID, "inferred", "worked", AT)).resolves.toEqual(
       { type: "not-confirmed" },
     );
@@ -99,9 +97,7 @@ describe("self-care context", () => {
     await revokeSelfCareContext(db, ACCOUNT_ID, confirmed.item.id, new Date(AT.getTime() + 1));
     await expect(
       readSelfCareConfirmations(db, ACCOUNT_ID, new Date(AT.getTime() + 2)),
-    ).resolves.toMatchObject({
-      candidates: [{ brainItemId: "worked", statement: "予定を一つ減らすと少し楽になった" }],
-    });
+    ).resolves.toEqual({ items: [] });
     await expect(
       selectSelfCareContextMemories(
         db,
@@ -110,6 +106,24 @@ describe("self-care context", () => {
         new Date(AT.getTime() + 2),
       ),
     ).resolves.toEqual([]);
+  });
+
+  it("削除済みのBrain Item本文を確認済み情報として返さない", async () => {
+    const db = createTestDb();
+    await addItem(db, { id: "deleted", statement: "予定を減らすと楽だった" });
+    await confirmSelfCareContext(db, ACCOUNT_ID, "deleted", "worked", AT);
+    db.update(schema.brainItems)
+      .set({
+        isDeleted: true,
+        deletedAt: new Date(AT.getTime() + 1),
+        updatedAt: new Date(AT.getTime() + 1),
+      })
+      .where(eq(schema.brainItems.id, "deleted"))
+      .run();
+
+    await expect(
+      readSelfCareConfirmations(db, ACCOUNT_ID, new Date(AT.getTime() + 2)),
+    ).resolves.toEqual({ items: [] });
   });
 
   it("Liteは各種1件、Fullは複数履歴と直近30日の状態だけを使う", async () => {

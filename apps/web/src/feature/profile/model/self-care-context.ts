@@ -12,6 +12,5 @@ export type SelfCareContextItem = Readonly<{
 
 export type SelfCareContextResult = Readonly<{
   items: readonly SelfCareContextItem[];
-  candidates: readonly Readonly<{ brainItemId: string; statement: string }>[];
   canManage: boolean;
 }>;
