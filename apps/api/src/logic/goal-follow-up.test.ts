@@ -37,7 +37,10 @@ describe("goal follow-up entitlement", () => {
   });
 
   it("Freeは保存済み状態を読めるが、新しい合意は作らない", async () => {
-    execute.mockResolvedValueOnce({ items: [{ id: "archived", status: "completed" }] });
+    execute.mockResolvedValueOnce({
+      items: [{ id: "archived", status: "completed" }],
+      candidates: [],
+    });
     await expect(
       getGoalFollowUps({ ...common, planAssignmentProvider: provider("free") }),
     ).resolves.toMatchObject({ type: "resolved", canManage: false, activeLimit: null });
@@ -50,6 +53,7 @@ describe("goal follow-up entitlement", () => {
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "feature_unavailable" });
     expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith("account-1", "goalFollowUp.read", at);
   });
 
   it("Liteは同時に1件だけを本人の合意対象にする", async () => {

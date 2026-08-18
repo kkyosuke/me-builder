@@ -84,6 +84,11 @@ describe("goal follow-up", () => {
     await addGoal(db, { id: "confirmed", statement: "来週、上司との面談で希望を伝えたい" });
     await addGoal(db, { id: "inferred", statement: "運動を始めたい", isInference: true });
 
+    await expect(readGoalFollowUps(db, ACCOUNT_ID, AT)).resolves.toMatchObject({
+      items: [],
+      candidates: [{ brainItemId: "confirmed", goal: "来週、上司との面談で希望を伝えたい" }],
+    });
+
     await expect(
       agreeGoalFollowUp(db, ACCOUNT_ID, "inferred", "朝に10分歩く", AT),
     ).resolves.toEqual({ type: "goal-not-confirmed" });
@@ -114,7 +119,11 @@ describe("goal follow-up", () => {
         new Date(AT.getTime() + 2),
       ),
     ).resolves.toMatchObject({ type: "updated", item: { status: "completed" } });
-    expect((await readGoalFollowUps(db, ACCOUNT_ID)).items).toHaveLength(1);
+    const read = await readGoalFollowUps(db, ACCOUNT_ID, new Date(AT.getTime() + 3));
+    expect(read.items).toHaveLength(1);
+    expect(read.candidates).toEqual([
+      { brainItemId: "confirmed", goal: "来週、上司との面談で希望を伝えたい" },
+    ]);
   });
 
   it("Liteは選択中1件、Fullは複数のうち現在の話題に関係する1件だけを使う", async () => {

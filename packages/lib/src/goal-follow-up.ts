@@ -10,7 +10,15 @@ export type GoalFollowUp = Readonly<{
   updatedAt: string;
 }>;
 
-export type GoalFollowUpReadModel = Readonly<{ items: readonly GoalFollowUp[] }>;
+export type GoalFollowUpCandidate = Readonly<{
+  brainItemId: string;
+  goal: string;
+}>;
+
+export type GoalFollowUpReadModel = Readonly<{
+  items: readonly GoalFollowUp[];
+  candidates: readonly GoalFollowUpCandidate[];
+}>;
 
 export type AgreeGoalFollowUpResult =
   | Readonly<{ type: "agreed"; item: GoalFollowUp }>

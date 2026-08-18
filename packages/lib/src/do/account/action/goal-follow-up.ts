@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lte, notExists, or } from "drizzle-orm";
 import type {
   AgreeGoalFollowUpResult,
   GoalFollowUp,
@@ -39,8 +39,9 @@ function isInference(attributes: unknown, derivation: "ai" | "deterministic"): b
 export async function readGoalFollowUps(
   db: AccountDataDatabase,
   accountId: string,
+  at = new Date(),
 ): Promise<GoalFollowUpReadModel> {
-  const rows = await db
+  const itemRows = await db
     .select({
       id: goalFollowUps.id,
       brainItemId: goalFollowUps.brainItemId,
@@ -55,7 +56,44 @@ export async function readGoalFollowUps(
     .where(eq(goalFollowUps.accountId, accountId))
     .orderBy(desc(goalFollowUps.updatedAt))
     .all();
-  return { items: rows.map(toModel) };
+  const candidateRows = await db
+    .select({
+      brainItemId: brainItems.id,
+      goal: brainItems.statement,
+      attributes: brainItems.attributes,
+      derivation: brainItems.derivation,
+    })
+    .from(brainItems)
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.category, "goal"),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+        notExists(
+          db
+            .select({ id: goalFollowUps.id })
+            .from(goalFollowUps)
+            .where(
+              and(
+                eq(goalFollowUps.accountId, accountId),
+                eq(goalFollowUps.brainItemId, brainItems.id),
+                eq(goalFollowUps.status, "active"),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(desc(brainItems.updatedAt))
+    .all();
+  return {
+    items: itemRows.map(toModel),
+    candidates: candidateRows
+      .filter(({ attributes, derivation }) => !isInference(attributes, derivation))
+      .map(({ brainItemId, goal }) => ({ brainItemId, goal })),
+  };
 }
 
 export async function agreeGoalFollowUp(

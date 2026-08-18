@@ -23,7 +23,7 @@ const resolve = async (params: CommonParams) => {
 
 export async function getGoalFollowUps(params: CommonParams) {
   const context = await resolve(params);
-  const model = await context.account.execute("goalFollowUp.read");
+  const model = await context.account.execute("goalFollowUp.read", params.at);
   return {
     type: "resolved" as const,
     ...model,
