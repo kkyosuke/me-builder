@@ -9,6 +9,15 @@ export type ProfileSummaryInsight = Readonly<{
   description: string;
   evidenceCount: number;
   sources: readonly ProfileSummarySource[];
+  selfView?: "not_aligned" | null;
+}>;
+
+export type ProfileSummaryInsightSelfView = Readonly<{
+  profileSummaryVersionId: string;
+  insightKey: string;
+  label: string;
+  description: string;
+  selfView: "not_aligned";
 }>;
 
 export type CompatibilityShareStatement = Readonly<{
@@ -86,6 +95,7 @@ export type ProfileSummaryGenerationContext = Readonly<{
   diaryCount: number;
   latestRecordedAt: Date | null;
   inputSnapshot: ProfileSummaryInputSnapshot;
+  selfViews?: readonly ProfileSummaryInsightSelfView[];
 }>;
 
 export type RequestProfileSummaryGenerationResult =

@@ -106,7 +106,10 @@ describe("fetchProfileSummary", () => {
 
   it.each([
     ["source_record_required", "まとめに使える記録がまだありません。"],
-    ["regeneration_not_required", "新しい情報がないため、再生成は必要ありません。"],
+    [
+      "regeneration_not_required",
+      "再生成には、前回から7日以上の経過と新しい情報の両方が必要です。",
+    ],
   ] as const)("生成できない理由 %s を区別する", async (reason, message) => {
     vi.stubGlobal(
       "fetch",

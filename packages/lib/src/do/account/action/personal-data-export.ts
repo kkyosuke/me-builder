@@ -20,6 +20,7 @@ import { goalFollowUps } from "../schema/goal-follow-up";
 import { personalDataExports } from "../schema/personal-data-export";
 import {
   profileSummaryGenerations,
+  profileSummaryInsightSelfViews,
   profileSummaryShareProjections,
   profileSummaryVersions,
 } from "../schema/profile-summary";
@@ -341,6 +342,14 @@ async function buildPersonalDataArchive(
           .from(profileSummaryShareProjections)
           .where(inArray(profileSummaryShareProjections.profileSummaryVersionId, versionIds))
           .all();
+  const selfViewRows =
+    versionIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(profileSummaryInsightSelfViews)
+          .where(inArray(profileSummaryInsightSelfViews.profileSummaryVersionId, versionIds))
+          .all();
   const weeklyGenerationRows = await db
     .select({ id: weeklyReflectionGenerations.id })
     .from(weeklyReflectionGenerations)
@@ -517,6 +526,13 @@ async function buildPersonalDataArchive(
       sequence: row.sequence,
       generatedAt: row.generatedAt.toISOString(),
       summary: row.summary,
+      insightSelfViews: selfViewRows
+        .filter(({ profileSummaryVersionId }) => profileSummaryVersionId === row.id)
+        .map(({ insightKey, selfView, updatedAt }) => ({
+          insightKey,
+          selfView,
+          updatedAt: updatedAt.toISOString(),
+        })),
     })),
     weeklyReflections: weeklyReflectionRows.map((row) => ({
       id: row.id,

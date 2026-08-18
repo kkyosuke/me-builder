@@ -281,6 +281,7 @@ export async function generateProfileSummary(
         text,
         recorded_at: recordedAt.toISOString(),
       })),
+      self_views: context.selfViews ?? [],
     },
   });
   const responseJsonSchema = toJsonSchema(ResponseSchema) as Record<string, unknown>;

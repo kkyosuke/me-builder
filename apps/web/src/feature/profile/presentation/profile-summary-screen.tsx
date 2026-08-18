@@ -491,12 +491,14 @@ function SummaryContent({
   versioning,
   onSelectVersion,
   onRegenerate,
+  onSetSelfView,
 }: {
   summary: ProfileSummary;
   availableDataCounts: Readonly<{ diagnosis: number; diary: number }>;
   versioning?: ProfileSummaryVersioning;
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
+  onSetSelfView?: (versionId: string, insightKey: string, selfView: "not_aligned" | null) => void;
 }) {
   const renderCard = (selectedVersion: ProfileSummaryVersion | undefined) => {
     const cardSummary = selectedVersion?.summary ?? summary;
@@ -554,6 +556,24 @@ function SummaryContent({
                 ))}
                 <span>{`${insight.evidenceCount}件`}</span>
               </p>
+              {selectedVersion?.isLatest && onSetSelfView && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSetSelfView(
+                      selectedVersion.id,
+                      insight.key,
+                      insight.selfView === "not_aligned" ? null : "not_aligned",
+                    )
+                  }
+                  aria-pressed={insight.selfView === "not_aligned"}
+                  className="mt-3 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-300"
+                >
+                  {insight.selfView === "not_aligned"
+                    ? "自分の見方として記録済み"
+                    : "自分ではそう感じない"}
+                </button>
+              )}
             </li>
           ))}
         </ol>
@@ -823,6 +843,7 @@ export function ProfileSummaryScreen({
   onRetry,
   onSelectVersion,
   onRegenerate,
+  onSetSelfView,
   children,
 }: {
   state: AsyncState<ProfileSummaryResult>;
@@ -834,6 +855,7 @@ export function ProfileSummaryScreen({
   onRetry: () => void;
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
+  onSetSelfView?: (versionId: string, insightKey: string, selfView: "not_aligned" | null) => void;
   children?: ReactNode;
 }) {
   return (
@@ -900,6 +922,7 @@ export function ProfileSummaryScreen({
               {...(versioning ? { versioning } : {})}
               {...(onSelectVersion ? { onSelectVersion } : {})}
               {...(onRegenerate ? { onRegenerate } : {})}
+              {...(onSetSelfView ? { onSetSelfView } : {})}
             />
           ) : (
             <EmptySummary

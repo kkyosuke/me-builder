@@ -4347,6 +4347,16 @@
                                         "type": "string"
                                       },
                                       "minItems": 1
+                                    },
+                                    "selfView": {
+                                      "anyOf": [
+                                        {
+                                          "const": "not_aligned"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     }
                                   },
                                   "required": [
@@ -4354,7 +4364,8 @@
                                     "label",
                                     "description",
                                     "evidenceCount",
-                                    "sources"
+                                    "sources",
+                                    "selfView"
                                   ]
                                 },
                                 "maxItems": 3
@@ -4774,6 +4785,235 @@
                     "reason": {
                       "enum": ["source_record_required", "regeneration_not_required"],
                       "type": "string"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile-summary/insight-self-view": {
+      "put": {
+        "operationId": "setProfileSummaryInsightSelfView",
+        "tags": ["Profile"],
+        "summary": "まとめの見方とは別に本人の見方を保存する",
+        "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "versionId": {
+                    "kind": "schema",
+                    "type": "string",
+                    "expects": "string",
+                    "async": false,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    },
+                    "pipe": [
+                      {
+                        "kind": "schema",
+                        "type": "string",
+                        "expects": "string",
+                        "async": false,
+                        "~standard": {
+                          "version": 1,
+                          "vendor": "valibot"
+                        }
+                      },
+                      {
+                        "kind": "validation",
+                        "type": "non_empty",
+                        "async": false,
+                        "expects": "!0"
+                      }
+                    ]
+                  },
+                  "insightKey": {
+                    "kind": "schema",
+                    "type": "string",
+                    "expects": "string",
+                    "async": false,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    },
+                    "pipe": [
+                      {
+                        "kind": "schema",
+                        "type": "string",
+                        "expects": "string",
+                        "async": false,
+                        "~standard": {
+                          "version": 1,
+                          "vendor": "valibot"
+                        }
+                      },
+                      {
+                        "kind": "validation",
+                        "type": "non_empty",
+                        "async": false,
+                        "expects": "!0"
+                      }
+                    ]
+                  },
+                  "selfView": {
+                    "kind": "schema",
+                    "type": "nullable",
+                    "expects": "(\"not_aligned\" | null)",
+                    "async": false,
+                    "wrapped": {
+                      "kind": "schema",
+                      "type": "literal",
+                      "expects": "\"not_aligned\"",
+                      "async": false,
+                      "literal": "not_aligned",
+                      "~standard": {
+                        "version": 1,
+                        "vendor": "valibot"
+                      }
+                    },
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "本人の見方を保存した",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "const": true
+                    }
+                  },
+                  "required": ["updated"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
                     }
                   },
                   "required": ["error", "reason"]

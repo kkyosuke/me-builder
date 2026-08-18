@@ -17,6 +17,7 @@ import {
   readCompatibilityShareProfile,
   readProfileSummary,
   requestProfileSummaryGeneration,
+  setProfileSummaryInsightSelfView,
 } from "./profile-summary";
 
 function createTestDb(): AccountDataDatabase {
@@ -240,6 +241,13 @@ describe("Profile Summary persistence", () => {
     expect((await readProfileSummary(db, accountId)).versions).toHaveLength(1);
     const generatedVersionId = (await readProfileSummary(db, accountId)).versions[0]?.id;
     expect(generatedVersionId).toBeTruthy();
+    if (!generatedVersionId) throw new Error("generated version was not loaded");
+    await expect(
+      setProfileSummaryInsightSelfView(db, accountId, generatedVersionId, "walking", "not_aligned"),
+    ).resolves.toBe(true);
+    await expect(readProfileSummary(db, accountId)).resolves.toMatchObject({
+      versions: [{ summary: { insights: [{ key: "walking", selfView: "not_aligned" }] } }],
+    });
     await expect(readCompatibilityShareProfile(db, accountId)).resolves.toMatchObject({
       type: "available",
       profile: {
@@ -268,6 +276,11 @@ describe("Profile Summary persistence", () => {
     );
     expect(forced).toMatchObject({ outcome: "created", status: "queued" });
     if (forced.outcome !== "created") throw new Error("forced generation was not created");
+    await expect(
+      loadProfileSummaryGenerationContext(db, accountId, forced.generationId),
+    ).resolves.toMatchObject({
+      selfViews: [{ insightKey: "walking", selfView: "not_aligned" }],
+    });
     await failProfileSummaryGeneration(db, accountId, forced.generationId, "test failure");
     await expect(
       readProfileSummary(db, accountId, new Date("2026-08-09T00:03:30.000Z"), true),

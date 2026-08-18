@@ -166,6 +166,10 @@ export type AccountDataActions = {
     allowUnchangedRegeneration?: boolean,
   ) => Promise<ProfileSummaryReadModel>;
   "profileSummary.readCompatibilityShareProfile": () => Promise<CompatibilityShareProfileReadResult>;
+  "profileSummary.setInsightSelfView": RpcAction<
+    [versionId: string, insightKey: string, selfView: "not_aligned" | null, at?: Date],
+    typeof profileSummary.setProfileSummaryInsightSelfView
+  >;
   "profileSummary.requestGeneration": (
     requestedAt?: Date,
     allowUnchangedRegeneration?: boolean,
