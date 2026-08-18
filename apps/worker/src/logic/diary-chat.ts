@@ -60,6 +60,8 @@ export type SafetyRoute = v.InferOutput<typeof SafetyRouteSchema>;
 export const JAPAN_MENTAL_HEALTH_SUPPORT_URL = "https://www.mhlw.go.jp/mamorouyokokoro/soudan/";
 export const JAPAN_ABUSE_VIOLENCE_SUPPORT_URL = "https://notalone-cao.go.jp/support/";
 
+const JAPAN_IMMINENT_DANGER_GUIDANCE =
+  "今すぐ危険が迫っているなら、安全な場所へ移動して、119（救急・消防）または110（警察）、近くの信頼できる人へ連絡してください。";
 const JAPAN_SELF_HARM_GUIDANCE = `厚生労働省「まもろうよ こころ」の相談窓口: ${JAPAN_MENTAL_HEALTH_SUPPORT_URL}`;
 const JAPAN_ABUSE_VIOLENCE_GUIDANCE = `政府の「あなたはひとりじゃない」制度・相談窓口: ${JAPAN_ABUSE_VIOLENCE_SUPPORT_URL}`;
 
@@ -75,30 +77,26 @@ const routeRank: Record<SafetyRoute, number> = {
 /** モデル呼び出し前の決定的な最低限の安全route。本文を保存・ログ出力しない。 */
 function classifySafetyText(text: string): SafetyRoute {
   const normalized = text.normalize("NFKC").toLowerCase();
-  const contextualSelfHarm =
-    /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺).{0,16}(?:わけではない|とは思っていない|と書いて|という記事|という言葉|と言って|と話して)/u.test(
+  const imminentDanger =
+    /(?:今すぐ|これから).{0,12}(?:死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(normalized) ||
+    /\b(?:i am|i'm).{0,16}(?:going to|about to).{0,16}(?:kill myself|die)|\bright now.{0,16}(?:kill myself|die)\b/u.test(
       normalized,
-    ) ||
-    /(?:友達|友人|家族|知人|相手|彼|彼女|子ども).{0,20}(?:死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(
+    );
+  if (imminentDanger) return "imminent_danger";
+  const nonCurrentOrQuotedSelfHarm =
+    /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺).{0,16}(?:わけではない|とは思っていない|と書いて|という記事|という言葉)/u.test(
       normalized,
     ) ||
     /(?:以前|過去|前は).{0,16}(?:死にたい|消え(?:てしまい)?たい).{0,24}(?:今|現在).{0,12}(?:思っていない|違う|大丈夫)/u.test(
       normalized,
-    ) ||
-    /\b(?:my friend|my family|they|he|she).{0,32}(?:want(?:s|ed)? to die|suicid(?:e|al)|kill (?:themself|himself|herself))\b/u.test(
-      normalized,
     );
-  if (contextualSelfHarm) return "normal";
-  if (
-    /(?:今すぐ|これから).{0,12}(?:死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(normalized) ||
-    /\b(?:i am|i'm).{0,16}(?:going to|about to).{0,16}(?:kill myself|die)|\bright now.{0,16}(?:kill myself|die)\b/u.test(
-      normalized,
-    )
-  )
-    return "imminent_danger";
+  if (nonCurrentOrQuotedSelfHarm) return "normal";
   if (
     /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(normalized) ||
-    /\b(?:i want to die|kill myself|suicidal|self[- ]harm)\b/u.test(normalized)
+    /\b(?:i want to die|kill myself|suicidal|self[- ]harm)\b/u.test(normalized) ||
+    /\b(?:my friend|my family|they|he|she).{0,32}(?:want(?:s|ed)? to die|suicid(?:e|al)|kill (?:themself|himself|herself))\b/u.test(
+      normalized,
+    )
   )
     return "self_harm_possible";
   if (
@@ -189,7 +187,7 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
     route === "imminent_danger" || route === "self_harm_possible" || route === "abuse_or_violence";
   const reply =
     route === "imminent_danger"
-      ? "話してくれてありがとう。今すぐ危険が迫っているなら、安全な場所へ移動して、119（救急・消防）または110（警察）、近くの信頼できる人へ連絡してください。今は安全な場所にいる？"
+      ? `話してくれてありがとう。${JAPAN_IMMINENT_DANGER_GUIDANCE}今は安全な場所にいる？`
       : route === "self_harm_possible"
         ? `話してくれてありがとう。一人で抱えず、近くの信頼できる人や相談窓口へつながってください。\n${JAPAN_SELF_HARM_GUIDANCE}\n今この瞬間、自分を傷つける危険はある？`
         : route === "abuse_or_violence"
@@ -210,14 +208,16 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
  * モデルに相談先を生成させず、運営確認済みの日本向け案内だけを応答へ付加する。
  * fallbackは既に同じ案内を含むため、URLの重複もここで防ぐ。
  */
-function appendJapanSafetyGuidance(response: DiaryChatResponse): DiaryChatResponse {
+export function appendJapanSafetyGuidance(response: DiaryChatResponse): DiaryChatResponse {
   const safetyGuidance =
-    response.safety.route === "self_harm_possible"
-      ? { message: JAPAN_SELF_HARM_GUIDANCE, url: JAPAN_MENTAL_HEALTH_SUPPORT_URL }
-      : response.safety.route === "abuse_or_violence"
-        ? { message: JAPAN_ABUSE_VIOLENCE_GUIDANCE, url: JAPAN_ABUSE_VIOLENCE_SUPPORT_URL }
-        : undefined;
-  if (!safetyGuidance || response.reply.includes(safetyGuidance.url)) return response;
+    response.safety.route === "imminent_danger"
+      ? { message: JAPAN_IMMINENT_DANGER_GUIDANCE, marker: JAPAN_IMMINENT_DANGER_GUIDANCE }
+      : response.safety.route === "self_harm_possible"
+        ? { message: JAPAN_SELF_HARM_GUIDANCE, marker: JAPAN_MENTAL_HEALTH_SUPPORT_URL }
+        : response.safety.route === "abuse_or_violence"
+          ? { message: JAPAN_ABUSE_VIOLENCE_GUIDANCE, marker: JAPAN_ABUSE_VIOLENCE_SUPPORT_URL }
+          : undefined;
+  if (!safetyGuidance || response.reply.includes(safetyGuidance.marker)) return response;
   return {
     ...response,
     reply: `${response.reply}\n${safetyGuidance.message}`,

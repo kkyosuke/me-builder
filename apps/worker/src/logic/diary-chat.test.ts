@@ -3,6 +3,7 @@ import { diaryChatSafetyFixtures } from "../evaluation/diary-chat-safety-fixture
 import {
   JAPAN_ABUSE_VIOLENCE_SUPPORT_URL,
   JAPAN_MENTAL_HEALTH_SUPPORT_URL,
+  appendJapanSafetyGuidance,
   buildDevelopmentBrainUsageMessage,
   buildDiaryChatContextPackage,
   buildSafetyFallback,
@@ -216,6 +217,20 @@ describe("diary chat guardrails", () => {
     const abuseResponse = buildSafetyFallback("abuse_or_violence").reply;
     expect(abuseResponse).toContain(JAPAN_ABUSE_VIOLENCE_SUPPORT_URL);
     expect(abuseResponse).not.toMatch(/119|110/u);
+  });
+
+  it("モデルの差し迫った危険応答にも運営確認済みの119・110案内を必ず付加する", () => {
+    const response = appendJapanSafetyGuidance({
+      mode: "organize",
+      reply: "今いる場所の安全を確認してもいい？",
+      main_question_count: 1,
+      end_session: false,
+      daily_prompt_follow_up: "none",
+      safety: { route: "imminent_danger", restricted_advice: true },
+      used_memory_ids: [],
+    });
+
+    expect(response.reply).toMatch(/119.*110/u);
   });
 
   it("通常時のfallbackへ会話継続だけの質問を付けない", () => {
