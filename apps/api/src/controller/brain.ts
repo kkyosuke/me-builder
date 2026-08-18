@@ -173,6 +173,15 @@ export async function postDevelopmentBrainVectorSyncJobReset(
       404,
     );
   }
+  logger.info(
+    {
+      event: "development.brain-vector-sync-job.reset",
+      outcome: "succeeded",
+      operation: "single",
+      resetCount: 1,
+    },
+    "Development Brain Vector sync job was reset",
+  );
   return c.json(v.parse(ResetDevelopmentBrainVectorSyncJobResponseSchema, { reset: true }));
 }
 
@@ -192,6 +201,15 @@ export async function postDevelopmentBrainVectorSyncJobsResetAll(
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const outcome = await resetAllDevelopmentFailedBrainVectorSyncJobs(params);
+  logger.info(
+    {
+      event: "development.brain-vector-sync-job.reset",
+      outcome: "succeeded",
+      operation: "bulk",
+      resetCount: outcome.resetCount,
+    },
+    "Development Brain Vector sync jobs were reset with the per-request limit",
+  );
   return c.json(
     v.parse(ResetAllDevelopmentBrainVectorSyncJobsResponseSchema, {
       resetCount: outcome.resetCount,
