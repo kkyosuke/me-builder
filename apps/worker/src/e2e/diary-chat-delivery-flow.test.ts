@@ -710,8 +710,14 @@ describe("LINE diary chat delivery E2E", () => {
 
     expect(mockGenerateContent).not.toHaveBeenCalled();
     const deliveredText = mockPushMessage.mock.calls[0]?.[0]?.messages?.[0]?.text;
-    expect(deliveredText).toContain("緊急窓口");
+    expect(deliveredText).toMatch(/119.*110/u);
     expect(deliveredText).not.toContain("AI返信上限");
+    expect(
+      accountDataStore.db
+        .select({ safetyRoute: DO.account.schema.chatTurns.safetyRoute })
+        .from(DO.account.schema.chatTurns)
+        .get(),
+    ).toEqual({ safetyRoute: "imminent_danger" });
   });
 
   it("自然な属性確認を許可済み候補から生成し、Sessionの質問履歴へ記録する", async () => {
