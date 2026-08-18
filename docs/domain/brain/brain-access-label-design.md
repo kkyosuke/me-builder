@@ -114,6 +114,8 @@ Brain Itemの根拠・反証のエッジとConfidenceをどの粒度で開示す
 - 導出されたBrain Itemの`unclassified`は、後述の「確信できない場合」の定義をそのまま適用したものです。本人の確認を経て`work`や`relationship`へ広がります
 - どちらも[プロジェクト概要 §8](../../product/project-overview.md#8-プライバシーと安全性)の「初期状態は非公開とし、外部提供は明示的な同意を必要とする」と整合します
 
+本人についてAIが推定した病気、精神状態、障害、犯罪性、性的指向などの機微な内容も、保存自体は禁止しません。ただし`isInference = true`、機微度`highly_sensitive`、Access Label `unclassified`、外部提供不可を固定し、AIがAccess Labelや外部提供可否を緩和できないようにします。Owner Profile以外の検索、相性共有、ファミリーパック内共有、外部MCPへ提供しません。本人向け日記チャットで利用できる場面は[日記チャット体験設計 §11](../../product/diary-chat-experience.md#11-安全性とプライバシー)を正とします。
+
 ### 入力時
 
 ユーザーに毎回用途を選ばせません。質問、入力チャネル、内容からシステムがAccess Labelを提案します。
@@ -168,6 +170,7 @@ AIがMemoryから要約やDecision Criterionなどを作る場合も情報漏え
 - 拒否ルールは許可ルールより優先する
 - 非公開情報の存在自体を許可されていない接続先へ示さない
 - 派生情報のAccess Policyを元情報より自動的に緩くしない
+- `highly_sensitive`なAI推定を`unclassified`または外部提供不可から自動的に緩和しない
 - 新しいAccess Labelへ既存情報を自動公開しない
 - ラベル変更後の外部アクセスを監査できる
 

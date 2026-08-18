@@ -144,6 +144,10 @@ AccountDataはactive Session境界、未処理Diagnosis projection、未処理Br
 
 consumerはAccountDataで候補時刻、同じ日本日付の時刻計画と配送状態、停止意思、active Session、配送準備後の本人発言を確認します。その日で最初に処理した候補は、明言、本人内実績、18時フォールバックの順で選んだ時刻と選択元を`daily_prompt_schedules`へ固定します。後続候補は現在の選択結果で上書きせず、保存済み計画を再利用します。候補時刻が計画時刻と異なる場合は配送行を作らず終了します。直前の声かけが未回答なら翌日の1回を休み、未回答が3回続いていれば新しい本人発言まで自動休止します。停止発言より後に本人から新しい日記メッセージが届いた場合は停止状態を解除しますが、すでに終端化した当日分を作り直さず、次の送信可能な日から再開します。Queueの配送日が処理時点の日本日付と一致しない場合は期限切れとして送信しません。送信対象の場合は`Asia/Tokyo`の配送日から曜日別の一般文面versionを決め、AccountDataの配送行へ計画時刻とともに固定します。共有D1から現在有効なLINE identityを解決し、Account IDと日本日付から作る決定的なLINE retry keyで文面をPushします。LINE受付後の状態保存に失敗してQueueが再配送されても、同じretry keyと時刻計画、配送行に保存した文面versionを再利用し、送信直前の可否を再評価します。
 
+海外向けにAccountごとのtimezoneを提供する段階では、Account作成時にIANA timezoneを1つ設定し、以後変更しません。既存Accountと値を取得できないAccountは`Asia/Tokyo`へ固定します。Cronは1時間ごとに起動し、各active Accountについて前回のCron区間から今回までに、そのAccountの固定timezone上の候補時刻が到来したかを計算します。現地時刻の時だけを完全一致で比較しないため、UTCとの差が30分または45分のtimezoneも取りこぼしません。
+
+Queue messageとAccountDataの計画・配送状態には、計算に使ったtimezoneと現地日付を固定します。同じAccount、job種別、現地日付の処理済み状態があればスキップし、再配送や同じ日の後続Cronで重複送信しません。timezone変更は提供しないため、変更前後の日付差を埋める再配送や最低実行間隔は設けません。相対日付を解決するときのtimezone固定は[Brain Item生成設計 §7.2](../domain/brain/brain-item-generation-design.md#72-日記からの生成)を正とします。
+
 ```mermaid
 sequenceDiagram
     participant C as Worker Cron
@@ -350,9 +354,9 @@ stateDiagram-v2
 
 ### 4.7 Brain Item関連
 
-`brain_items`は`id`、`account_id`、`category`、根拠をたどれる`statement`、分類固有の`attributes_json`、`derivation`、`status`、有効期間、`stability`、Access Policy、`confidence_json`、lifecycleを持ちます。`confidence_json`自体は必須とし、算出前は`{"state":"uncomputed"}`、後続設計で算出できるようになった後だけ`{"state":"computed","value":...}`を保存します。
+`brain_items`は`id`、`account_id`、`category`、根拠をたどれる`statement`、分類固有の`attributes_json`、`derivation`、`status`、有効期間、`stability`、Access Policy、`confidence_json`、lifecycleを持ちます。`confidence_json`自体は必須とし、算出前は`{"state":"uncomputed"}`、算出後は計算式version、計算時点、傾き、観察量、表示bandを再現できる値を保存します。具体的なshapeはConfidence実装時に確定します。
 
-`brain_item_evidence_edges`はBrain ItemとSource Recordを結び、relation、evidence role、derivation methodを保持します。Evidence edgeは変換処理ではなく、生成後のBrain ItemがどのSource Recordに依存するかを表す関係です。`brain_item_revisions`は置き換え前後を結びます。本人による否定はBrain Itemを`invalidated`にし、訂正は新しいSource Recordと改訂版を作ります。
+`brain_item_evidence_edges`はBrain ItemとSource Recordを結び、relation、evidence role、derivation methodを保持します。Evidence edgeは変換処理ではなく、生成後のBrain ItemがどのSource Recordに依存するかを表す関係です。AIが検出した反対傾向は正式な`contradicts` edgeへ入れず、検出versionとContextを持つ別のシグナルとして保存します。`brain_item_revisions`は置き換え前後を結びます。本人が明言抽出Itemを一意に否定した場合は`invalidated`にし、訂正は新しいSource Recordと改訂版を作ります。AIの観察と本人の見方が異なる場合はどちらも無効化せず、別Itemとして関連づけます。反対傾向シグナルとConfidenceの規則は[根拠・反証・改訂のエッジ設計](../domain/brain/evidence-edge-design.md)を正とします。
 
 Brain Itemを含むAccount所有データのquery境界は、[Accountデータ分離設計](account-data-isolation.md)を正とします。
 
@@ -974,7 +978,8 @@ prompt versionを本番へ出す条件はschema準拠100%、越権した記憶�
 
 ## 15. 後続で決めること
 
-- Confidenceの算出式と検索順位への利用
+- Confidenceの具体的な係数、高・中・低の数値境界と物理schema
+- 推定候補、Context、反対傾向シグナル、Confidence履歴の物理schema
 - 分類固有の`attributes_json` schema
 - Webチャット追加時のstreaming、再接続、Agents SDK採否
 - 多言語の安全分類と地域別支援先データの運用責任者
