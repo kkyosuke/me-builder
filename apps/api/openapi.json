@@ -4740,6 +4740,23 @@
                         ]
                       }
                     },
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "brainItemId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "goal": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["brainItemId", "goal"]
+                      }
+                    },
                     "canManage": {
                       "type": "boolean"
                     },
@@ -4754,7 +4771,7 @@
                       ]
                     }
                   },
-                  "required": ["items", "canManage", "activeLimit"]
+                  "required": ["items", "candidates", "canManage", "activeLimit"]
                 }
               }
             }

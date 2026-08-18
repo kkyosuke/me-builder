@@ -12,8 +12,13 @@ const GoalFollowUpSchema = v.object({
   agreedAt: v.pipe(v.string(), v.isoTimestamp()),
   updatedAt: v.pipe(v.string(), v.isoTimestamp()),
 });
+const GoalFollowUpCandidateSchema = v.object({
+  brainItemId: Text,
+  goal: Text,
+});
 export const GoalFollowUpListSchema = v.object({
   items: v.array(GoalFollowUpSchema),
+  candidates: v.array(GoalFollowUpCandidateSchema),
   canManage: v.boolean(),
   activeLimit: v.nullable(v.literal(1)),
 });

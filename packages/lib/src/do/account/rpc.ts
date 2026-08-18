@@ -219,7 +219,10 @@ export type AccountDataActions = {
     [generationId: string, message: string, failedAt?: Date],
     typeof weeklyReflection.failWeeklyReflectionGeneration
   >;
-  "goalFollowUp.read": RpcAction<[], typeof goalFollowUp.readGoalFollowUps>;
+  "goalFollowUp.read": RpcAction<
+    [at?: Date, includeCandidates?: boolean],
+    typeof goalFollowUp.readGoalFollowUps
+  >;
   "goalFollowUp.agree": RpcAction<
     [brainItemId: string, nextStep: string, at?: Date, activeLimit?: number | null],
     typeof goalFollowUp.agreeGoalFollowUp

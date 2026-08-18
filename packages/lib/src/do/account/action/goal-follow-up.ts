@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, exists, gt, isNull, lte, notExists, or } from "drizzle-orm";
 import type {
   AgreeGoalFollowUpResult,
   GoalFollowUp,
@@ -39,8 +39,10 @@ function isInference(attributes: unknown, derivation: "ai" | "deterministic"): b
 export async function readGoalFollowUps(
   db: AccountDataDatabase,
   accountId: string,
+  at = new Date(),
+  includeCandidates = false,
 ): Promise<GoalFollowUpReadModel> {
-  const rows = await db
+  const itemRows = await db
     .select({
       id: goalFollowUps.id,
       brainItemId: goalFollowUps.brainItemId,
@@ -52,10 +54,59 @@ export async function readGoalFollowUps(
     })
     .from(goalFollowUps)
     .innerJoin(brainItems, eq(brainItems.id, goalFollowUps.brainItemId))
-    .where(eq(goalFollowUps.accountId, accountId))
+    .where(
+      and(
+        eq(goalFollowUps.accountId, accountId),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
     .orderBy(desc(goalFollowUps.updatedAt))
+    .limit(100)
     .all();
-  return { items: rows.map(toModel) };
+  if (!includeCandidates) return { items: itemRows.map(toModel), candidates: [] };
+  const candidateRows = await db
+    .select({
+      brainItemId: brainItems.id,
+      goal: brainItems.statement,
+      attributes: brainItems.attributes,
+      derivation: brainItems.derivation,
+    })
+    .from(brainItems)
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.category, "goal"),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+        notExists(
+          db
+            .select({ id: goalFollowUps.id })
+            .from(goalFollowUps)
+            .where(
+              and(
+                eq(goalFollowUps.accountId, accountId),
+                eq(goalFollowUps.brainItemId, brainItems.id),
+                eq(goalFollowUps.status, "active"),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(desc(brainItems.updatedAt))
+    .limit(100)
+    .all();
+  return {
+    items: itemRows.map(toModel),
+    candidates: candidateRows
+      .filter(({ attributes, derivation }) => !isInference(attributes, derivation))
+      .map(({ brainItemId, goal }) => ({ brainItemId, goal }))
+      .slice(0, 20),
+  };
 }
 
 export async function agreeGoalFollowUp(
@@ -94,7 +145,17 @@ export async function agreeGoalFollowUp(
     const active = await db
       .select({ brainItemId: goalFollowUps.brainItemId })
       .from(goalFollowUps)
-      .where(and(eq(goalFollowUps.accountId, accountId), eq(goalFollowUps.status, "active")))
+      .innerJoin(brainItems, eq(brainItems.id, goalFollowUps.brainItemId))
+      .where(
+        and(
+          eq(goalFollowUps.accountId, accountId),
+          eq(goalFollowUps.status, "active"),
+          eq(brainItems.status, "active"),
+          eq(brainItems.isDeleted, false),
+          or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+          or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+        ),
+      )
       .all();
     if (active.filter((candidate) => candidate.brainItemId !== brainItemId).length >= activeLimit) {
       return { type: "active-limit-reached" };
@@ -116,7 +177,7 @@ export async function agreeGoalFollowUp(
       target: [goalFollowUps.accountId, goalFollowUps.brainItemId],
       set: { nextStep: normalized, status: "active", agreedAt: at, updatedAt: at },
     });
-  const item = (await readGoalFollowUps(db, accountId)).items.find(
+  const item = (await readGoalFollowUps(db, accountId, at)).items.find(
     (candidate) => candidate.brainItemId === brainItemId,
   );
   if (!item) throw new Error("Goal follow-up was not persisted");
@@ -137,7 +198,17 @@ export async function updateGoalFollowUp(
     const active = await db
       .select({ id: goalFollowUps.id })
       .from(goalFollowUps)
-      .where(and(eq(goalFollowUps.accountId, accountId), eq(goalFollowUps.status, "active")))
+      .innerJoin(brainItems, eq(brainItems.id, goalFollowUps.brainItemId))
+      .where(
+        and(
+          eq(goalFollowUps.accountId, accountId),
+          eq(goalFollowUps.status, "active"),
+          eq(brainItems.status, "active"),
+          eq(brainItems.isDeleted, false),
+          or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+          or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+        ),
+      )
       .all();
     if (active.filter((candidate) => candidate.id !== id).length >= activeLimit) {
       return { type: "active-limit-reached" };
@@ -150,11 +221,31 @@ export async function updateGoalFollowUp(
       ...(nextStep ? { nextStep } : {}),
       updatedAt: at,
     })
-    .where(and(eq(goalFollowUps.id, id), eq(goalFollowUps.accountId, accountId)))
+    .where(
+      and(
+        eq(goalFollowUps.id, id),
+        eq(goalFollowUps.accountId, accountId),
+        exists(
+          db
+            .select({ id: brainItems.id })
+            .from(brainItems)
+            .where(
+              and(
+                eq(brainItems.id, goalFollowUps.brainItemId),
+                eq(brainItems.accountId, accountId),
+                eq(brainItems.status, "active"),
+                eq(brainItems.isDeleted, false),
+                or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+                or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+              ),
+            ),
+        ),
+      ),
+    )
     .returning({ id: goalFollowUps.id })
     .get();
   if (!updated) return { type: "not-found" };
-  const item = (await readGoalFollowUps(db, accountId)).items.find(
+  const item = (await readGoalFollowUps(db, accountId, at)).items.find(
     (candidate) => candidate.id === id,
   );
   if (!item) return { type: "not-found" };

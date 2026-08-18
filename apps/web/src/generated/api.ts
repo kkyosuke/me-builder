@@ -3817,6 +3817,10 @@ export interface operations {
               /** Format: date-time */
               updatedAt: string;
             }[];
+            candidates: {
+              brainItemId: string;
+              goal: string;
+            }[];
             canManage: boolean;
             activeLimit: 1 | null;
           };

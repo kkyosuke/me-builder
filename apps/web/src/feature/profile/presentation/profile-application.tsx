@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { CompatibilityShareContentSection } from "../../compatibility";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
+import { GoalFollowUpSection } from "./goal-follow-up-section";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
+import { useGoalFollowUps } from "./use-goal-follow-ups";
 import { useProfileProgression } from "./use-profile-progression";
 import { useProfileSummary } from "./use-profile-summary";
 import { useWeeklyReflection } from "./use-weekly-reflection";
@@ -11,6 +13,7 @@ export default function ProfileApplication() {
   const summary = useProfileSummary();
   const progression = useProfileProgression();
   const weeklyReflection = useWeeklyReflection();
+  const goalFollowUps = useGoalFollowUps();
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const result = summary.state.status === "success" ? summary.state.data : null;
   const selectedVersion = result
@@ -52,6 +55,14 @@ export default function ProfileApplication() {
       <WeeklyReflectionSection
         state={weeklyReflection.state}
         onGenerate={() => void weeklyReflection.generate()}
+      />
+      <GoalFollowUpSection
+        state={goalFollowUps.state}
+        pendingId={goalFollowUps.pendingId}
+        operationError={goalFollowUps.operationError}
+        onRetry={() => void goalFollowUps.reload()}
+        onAgree={(brainItemId, nextStep) => void goalFollowUps.agree(brainItemId, nextStep)}
+        onUpdate={(id, input) => void goalFollowUps.update(id, input)}
       />
       <CompatibilityShareContentSection latestProfileSummaryVersionId={latestVersionId} />
     </ProfileSummaryScreen>

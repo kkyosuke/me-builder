@@ -439,8 +439,12 @@ const actions = {
       message,
       at,
     ),
-  "goalFollowUp.read": (db: DO.account.Database, accountId: string) =>
-    DO.account.action.goalFollowUp.readGoalFollowUps(db, accountId),
+  "goalFollowUp.read": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+    includeCandidates?: boolean,
+  ) => DO.account.action.goalFollowUp.readGoalFollowUps(db, accountId, at, includeCandidates),
   "goalFollowUp.agree": (
     db: DO.account.Database,
     accountId: string,

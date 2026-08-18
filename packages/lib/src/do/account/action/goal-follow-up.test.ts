@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -84,6 +85,11 @@ describe("goal follow-up", () => {
     await addGoal(db, { id: "confirmed", statement: "来週、上司との面談で希望を伝えたい" });
     await addGoal(db, { id: "inferred", statement: "運動を始めたい", isInference: true });
 
+    await expect(readGoalFollowUps(db, ACCOUNT_ID, AT, true)).resolves.toMatchObject({
+      items: [],
+      candidates: [{ brainItemId: "confirmed", goal: "来週、上司との面談で希望を伝えたい" }],
+    });
+
     await expect(
       agreeGoalFollowUp(db, ACCOUNT_ID, "inferred", "朝に10分歩く", AT),
     ).resolves.toEqual({ type: "goal-not-confirmed" });
@@ -114,7 +120,51 @@ describe("goal follow-up", () => {
         new Date(AT.getTime() + 2),
       ),
     ).resolves.toMatchObject({ type: "updated", item: { status: "completed" } });
-    expect((await readGoalFollowUps(db, ACCOUNT_ID)).items).toHaveLength(1);
+    const read = await readGoalFollowUps(db, ACCOUNT_ID, new Date(AT.getTime() + 3), true);
+    expect(read.items).toHaveLength(1);
+    expect(read.candidates).toEqual([
+      { brainItemId: "confirmed", goal: "来週、上司との面談で希望を伝えたい" },
+    ]);
+  });
+
+  it("候補を要求しない読取ではGoal本文を返さず、削除済みのGoalは保存済み状態にも返さない", async () => {
+    const db = createTestDb();
+    await addGoal(db, { id: "private-goal", statement: "週末に散歩したい" });
+    const agreed = await agreeGoalFollowUp(
+      db,
+      ACCOUNT_ID,
+      "private-goal",
+      "土曜の朝に靴を出す",
+      AT,
+    );
+    expect(agreed).toMatchObject({ type: "agreed" });
+
+    await expect(readGoalFollowUps(db, ACCOUNT_ID, AT)).resolves.toMatchObject({
+      items: [{ goal: "週末に散歩したい" }],
+      candidates: [],
+    });
+
+    db.update(schema.brainItems)
+      .set({
+        isDeleted: true,
+        deletedAt: new Date(AT.getTime() + 1),
+        updatedAt: new Date(AT.getTime() + 1),
+      })
+      .where(eq(schema.brainItems.id, "private-goal"))
+      .run();
+    if (agreed.type !== "agreed") throw new Error("goal agreement failed");
+    await expect(
+      updateGoalFollowUp(
+        db,
+        ACCOUNT_ID,
+        agreed.item.id,
+        { status: "completed" },
+        new Date(AT.getTime() + 2),
+      ),
+    ).resolves.toEqual({ type: "not-found" });
+    await expect(
+      readGoalFollowUps(db, ACCOUNT_ID, new Date(AT.getTime() + 2), true),
+    ).resolves.toEqual({ items: [], candidates: [] });
   });
 
   it("Liteは選択中1件、Fullは複数のうち現在の話題に関係する1件だけを使う", async () => {
