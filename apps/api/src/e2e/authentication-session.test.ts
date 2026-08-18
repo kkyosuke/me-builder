@@ -242,6 +242,42 @@ describe("application session local D1/KV E2E", () => {
     expect((await getSession(cookie)).status).toBe(401);
   });
 
+  it("SSO rollout停止中もLIFF交換と既存application sessionを継続する", async () => {
+    const exchanged = await exchange("credential-a");
+    const cookie = cookieFrom(exchanged);
+    const session = await getSession(cookie);
+    expect(session.status).toBe(200);
+    const { csrfToken } = (await session.json()) as { csrfToken: string };
+    const disabledBindings = {
+      ...bindings(),
+      SSO_ROLLOUT_MODE: "disabled",
+      SSO_ROLLOUT_PERCENT: "0",
+    };
+
+    const login = await app.request(
+      "/api/auth/sso/login",
+      { method: "POST", headers: { Origin: webOrigin } },
+      disabledBindings,
+    );
+    const linking = await app.request(
+      "/api/auth/sso/link",
+      {
+        method: "POST",
+        headers: {
+          Cookie: cookie,
+          Origin: webOrigin,
+          "X-CSRF-Token": csrfToken,
+        },
+      },
+      disabledBindings,
+    );
+
+    expect(login.status).toBe(503);
+    expect(linking.status).toBe(503);
+    expect((await getSession(cookie)).status).toBe(200);
+    expect((await exchange("credential-b", cookie)).status).toBe(200);
+  });
+
   it("IdP拒否、絶対・idle期限切れ、D1 version失効を拒否する", async () => {
     const rejected = await exchange("invalid-credential");
     expect(rejected.status).toBe(401);

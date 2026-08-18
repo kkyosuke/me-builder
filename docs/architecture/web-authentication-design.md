@@ -378,6 +378,8 @@ Auth0の`sub`はAuth0 user profileの`user_id`に由来するため、email、�
 
 SSO開始時に256 bit以上の暗号学的乱数から`state`、`nonce`、PKCE `code_verifier`を生成し、`code_challenge_method=S256`を指定します。これらと許可済み相対pathの`returnTo`は、10分で失効するserver-side認証transactionへ保存し、一度だけ消費します。callback URLやtransaction参照へ`returnTo`、subject、Account IDを直接含めません。
 
+transaction payloadはOAuth stateのSHA-256 hashをkeyとして短命KVへ保存し、10分のTTLで物理削除します。callbackでは共有D1へstate hashだけのconsume claimを単一の`INSERT ... ON CONFLICT DO NOTHING RETURNING`で作成し、claimを取得した1件だけがKV payloadを削除して処理します。これにより、同じstateのcallbackが同時実行されてもprovider交換とsession発行へ進むのは1件だけです。consume claimは個人識別子やnonce、PKCE verifierを持たず、期限後に削除します。
+
 callbackでは、Auth0のOIDC discovery documentから得たissuer、authorization endpoint、token endpoint、JWKS URIを利用します。ID tokenはRS256署名、`iss`の完全一致、`aud`のClient ID一致、`exp`と`iat`、transactionの`nonce`完全一致を検証します。JWKSは`kid`で選び、未知の`kid`だけを契機に再取得します。検証失敗時はIdentity解決とapplication session発行へ進みません。
 
 ### 9.3 環境とURL

@@ -182,7 +182,7 @@ describe("SSO identity controller", () => {
     expect(response.headers.get("set-cookie")).toContain("Secure");
     expect(response.headers.get("set-cookie")).toContain("SameSite=Lax");
     expect(response.headers.get("set-cookie")).toContain("Path=/");
-    expect(mocks.createStore).toHaveBeenCalledWith(env.SESSION_STORE);
+    expect(mocks.createStore).toHaveBeenCalledWith({ db: true }, env.SESSION_STORE);
     expect(mocks.startLinking).toHaveBeenCalledWith(
       expect.objectContaining({
         traceId: "00000000-0000-4000-8000-000000000001",
@@ -320,6 +320,25 @@ describe("SSO identity controller", () => {
     );
   });
 
+  it("disabledではSSO loginとIdentity追加を開始しない", async () => {
+    const disabledEnv = { ...env, SSO_ROLLOUT_MODE: "disabled" };
+    const login = await testApp("/api/auth/sso/login", postSsoLogin).request(
+      "https://api.example.com/api/auth/sso/login",
+      { method: "POST" },
+      disabledEnv,
+    );
+    const linking = await testApp("/api/auth/sso/link", postSsoIdentityLink).request(
+      "https://api.example.com/api/auth/sso/link",
+      { method: "POST" },
+      disabledEnv,
+    );
+
+    expect(login.status).toBe(503);
+    expect(linking.status).toBe(503);
+    expect(mocks.startLogin).not.toHaveBeenCalled();
+    expect(mocks.startLinking).not.toHaveBeenCalled();
+  });
+
   it("login callbackで共通application sessionをcookieへ設定して固定pathへ復帰する", async () => {
     mocks.completeCallback.mockResolvedValue({
       purpose: "login",
@@ -348,6 +367,40 @@ describe("SSO identity controller", () => {
       }),
     );
     expect(response.headers.get("set-cookie")).toContain("__Host-me_builder_session=sso-session");
+  });
+
+  it("session issuer障害ではapplication session cookieを発行しない", async () => {
+    mocks.issueSession.mockResolvedValue(undefined);
+    mocks.completeCallback.mockImplementation(
+      async (input: {
+        sessionIssuer: {
+          issue(actor: {
+            accountId: string;
+            authenticatedIdentityId: string;
+            authenticationMethod: "sso";
+            authenticatedAt: Date;
+          }): Promise<unknown>;
+        };
+      }) => {
+        await input.sessionIssuer.issue({
+          accountId: "account-at-start",
+          authenticatedIdentityId: "identity-auth0",
+          authenticationMethod: "sso",
+          authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+        });
+        throw new Error("callback must not complete");
+      },
+    );
+
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=login&code=code",
+      { headers: { Cookie: "__Host-me_builder_sso_callback_state=login" } },
+      { ...env, SSO_ROLLOUT_MODE: "linked-login" },
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("https://stg.example.com/profile?sso=error");
+    expect(response.headers.get("set-cookie")).not.toContain("__Host-me_builder_session=");
   });
 
   it("認可endpoint障害はtrace付きで記録して503へ縮退する", async () => {

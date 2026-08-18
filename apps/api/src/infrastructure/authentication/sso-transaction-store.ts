@@ -1,4 +1,5 @@
 import type { KVNamespace } from "@cloudflare/workers-types";
+import { D1 } from "@me-builder/lib";
 import * as v from "valibot";
 import type {
   SsoAuthenticationTransaction,
@@ -30,23 +31,40 @@ function base64Url(bytes: Uint8Array): string {
 
 async function transactionKey(state: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(state));
-  return `sso-transaction:${base64Url(new Uint8Array(digest))}`;
+  return base64Url(new Uint8Array(digest));
 }
 
-/** callback URLのstateをKV keyへ直接残さず、短命transactionを保存する。 */
-export function createSsoTransactionStore(kv: KVNamespace): SsoAuthenticationTransactionStore {
+const MINIMUM_CLAIM_TTL_MS = 60 * 1000;
+
+/** payloadはKV TTLで短命化し、D1の一意claimを得たcallbackだけが消費する。 */
+export function createSsoTransactionStore(
+  db: D1.shared.Client,
+  kv: KVNamespace,
+): SsoAuthenticationTransactionStore {
   return {
     async put(state, transaction, ttlSeconds) {
-      await kv.put(await transactionKey(state), JSON.stringify(transaction), {
+      await kv.put(`sso-transaction:${await transactionKey(state)}`, JSON.stringify(transaction), {
         expirationTtl: ttlSeconds,
       });
     },
     async consume(state): Promise<SsoAuthenticationTransaction | undefined> {
-      const key = await transactionKey(state);
+      const stateHash = await transactionKey(state);
+      const key = `sso-transaction:${stateHash}`;
       const stored = await kv.get(key, "json");
-      await kv.delete(key);
       const parsed = v.safeParse(TransactionSchema, stored);
-      return parsed.success ? parsed.output : undefined;
+      if (!parsed.success) return undefined;
+      const now = Date.now();
+      const claimed = await D1.shared.action.ssoAuthentication.claimSsoAuthenticationTransaction(
+        db,
+        {
+          stateHash,
+          expiresAt: Math.max(parsed.output.expiresAt, now + MINIMUM_CLAIM_TTL_MS),
+          removeExpiredBefore: now,
+        },
+      );
+      if (!claimed) return undefined;
+      await kv.delete(key);
+      return parsed.output;
     },
   };
 }

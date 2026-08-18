@@ -127,6 +127,13 @@
       "when": 1786928737708,
       "tag": "0017_true_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1787020751555,
+      "tag": "0018_cold_rockslide",
+      "breakpoints": true
     }
   ]
 }

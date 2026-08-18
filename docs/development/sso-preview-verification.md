@@ -40,7 +40,7 @@ deploy前にリポジトリrootで次を実行します。
 task ci
 ```
 
-CIでは、state、nonce、PKCE、return path、Identity link、最後のIdentity解除拒否、LIFF／SSO入口選択、session revisionによるcache破棄を確認します。実IdP、実cookie、実端末の確認は次節の手動検証で補います。
+CIでは、state、nonce、PKCE、return path、同時callbackの一度きりconsume、期限切れ、email claimを使わないIdentity解決、最後のIdentity解除拒否、LIFF／SSO入口選択、session revisionによるcache破棄、rollout停止／0%再開、session issuer障害を確認します。実IdP、実cookie、実端末の確認は次節の手動検証で補います。
 
 デプロイ済み環境のCookie／Origin／CSRF検査、短命LIFF credentialを使うrotation／logout、2 Account・2タブ、KV／D1障害の共通手順は[LIFF交換・アプリケーションセッション境界検証Runbook](application-session-boundary-verification.md)を正とします。SSO Preview検証の前に同RunbookのPreview境界検査を完了します。
 
@@ -63,14 +63,15 @@ CIでは、state、nonce、PKCE、return path、Identity link、最後のIdentit
 
 | ID | 条件 | 期待結果 |
 | --- | --- | --- |
-| P-N01 | 未linkのSSO Identity | Accountを自動作成・推測せず拒否する |
-| P-N02 | transaction期限切れ／callback再送 | sessionを発行せず安全なエラー画面へ戻す |
+| P-N01 | 既存Accountと同じemailを返す未linkのSSO Identity | emailではAccountを統合・推測せず`identity_unlinked`として拒否する |
+| P-N02 | 同じstateのcallback同時実行／再送、transaction期限切れ | provider交換とsession発行は最大1件とし、他は安全なエラー画面へ戻す |
 | P-N03 | IdPで拒否またはキャンセル | transactionをconsumeし、要求画面にキャンセル結果を表示する |
 | P-N04 | LIFF初期化失敗 | SSOへ自動fallbackせず、再試行か外部ブラウザ利用を案内する |
 | P-N05 | CSRF token欠落・不一致 | mutationを拒否し、既存sessionとデータを変更しない |
 | P-N06 | logout後の戻る操作 | 認証済み画面やcacheを再表示せず、再認証を要求する |
 | P-N07 | Account復旧完了、Identity解除、Account停止後の旧session | KVの削除反映を待たず旧sessionを拒否し、前Accountの内容を返さない |
 | P-N08 | SSO設定／transaction store欠落 | SSO endpointだけが503になり、LIFF交換は継続する |
+| P-N09 | callback URLを開始元と別ブラウザprofileで開く | callback cookie不一致としてtransactionを処理せず、開始元以外へsessionを発行しない |
 
 ## 6. 運用ログの確認
 

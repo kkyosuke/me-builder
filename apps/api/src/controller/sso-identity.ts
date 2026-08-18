@@ -77,6 +77,7 @@ function configured(c: Context<AppEnv>) {
     !configuration.ssoClientSecret ||
     !configuration.ssoCallbackUrl ||
     !configuration.webOrigin ||
+    !c.env?.DB ||
     !c.env?.SESSION_STORE
   ) {
     return undefined;
@@ -84,7 +85,7 @@ function configured(c: Context<AppEnv>) {
   return {
     configuration,
     secureCallback: new URL(configuration.ssoCallbackUrl).protocol === "https:",
-    store: createSsoTransactionStore(c.env.SESSION_STORE),
+    store: createSsoTransactionStore(D1.shared.client.create(c.env.DB), c.env.SESSION_STORE),
     client: createAuth0SsoClient({
       issuerUrl: configuration.ssoIssuerUrl,
       clientId: configuration.ssoClientId,

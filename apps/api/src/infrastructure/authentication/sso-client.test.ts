@@ -113,7 +113,7 @@ describe("createAuth0SsoClient", () => {
     ).resolves.toBeInstanceOf(URL);
   });
 
-  it("RS256署名・issuer・audience・nonceを検証してAuth0 identityへ変換する", async () => {
+  it("email claimをAccount照合へ渡さずAuth0 subjectだけをIdentityへ変換する", async () => {
     const { publicKey, privateKey } = await generateKeyPair("RS256");
     const publicJwk = await exportJWK(publicKey);
     const issuedAtSeconds = Date.parse("2026-08-16T00:00:00.000Z") / 1000;
@@ -121,6 +121,8 @@ describe("createAuth0SsoClient", () => {
       nonce: "expected-nonce",
       name: "Kagami User",
       picture: "https://images.example.com/user.png",
+      email: "same-address@example.test",
+      email_verified: true,
     })
       .setProtectedHeader({ alg: "RS256", kid: "test-key" })
       .setIssuer(configuration.issuerUrl)

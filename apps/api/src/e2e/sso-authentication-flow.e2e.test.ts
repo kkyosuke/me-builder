@@ -181,4 +181,86 @@ describe("SSO authentication E2E", () => {
     ).resolves.toMatchObject({ session: { cookie: "opaque-session" } });
     expect(sessionIssuer.issue).toHaveBeenCalledTimes(1);
   });
+
+  it("同じemailを持つ既存Accountがあっても別subjectのIdentityを統合しない", async () => {
+    const store = memoryStore();
+    const client = {
+      ...auth0Fixture(),
+      async exchangeAuthorizationCode() {
+        return {
+          providerKey: "auth0" as const,
+          subject: "auth0|different-subject",
+          authenticationMethod: "sso" as const,
+          authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+          displayProfile: { displayName: "same-address@example.test" },
+          email: "same-address@example.test",
+        };
+      },
+    };
+    const state = await startFlow(store, client);
+    const findAccount = vi.fn(async (identity: { providerKey: string; subject: string }) =>
+      "email" in identity
+        ? {
+            accountId: "existing-same-email-account",
+            authenticatedIdentityId: "different-identity",
+            role: "user" as const,
+          }
+        : undefined,
+    );
+    const sessionIssuer = { issue: vi.fn() };
+
+    await expect(
+      completeSsoLogin({
+        state,
+        code: "authorization-code",
+        store,
+        client,
+        identityResolver: { findAccount },
+        rolloutAuthorizer: createSsoRolloutAuthorizer(100),
+        sessionIssuer,
+        now: () => 2_000,
+      }),
+    ).rejects.toMatchObject({ reason: "identity_unlinked" });
+    expect(findAccount).toHaveBeenCalledWith({
+      providerKey: "auth0",
+      subject: "auth0|different-subject",
+    });
+    expect(sessionIssuer.issue).not.toHaveBeenCalled();
+  });
+
+  it("session issuer障害ではcallbackを完了せずtransaction再送も拒否する", async () => {
+    const store = memoryStore();
+    const client = auth0Fixture();
+    const state = await startFlow(store, client);
+    const input = {
+      state,
+      code: "authorization-code",
+      store,
+      client,
+      identityResolver: {
+        findAccount: vi.fn(async () => ({
+          accountId: "known-user",
+          authenticatedIdentityId: "identity-auth0-user",
+          role: "user" as const,
+        })),
+      },
+      rolloutAuthorizer: createSsoRolloutAuthorizer(100),
+      sessionIssuer: {
+        issue: vi.fn(async () => {
+          throw new Error("issuer unavailable");
+        }),
+      },
+      now: () => 2_000,
+    };
+
+    await expect(completeSsoLogin(input)).rejects.toMatchObject({
+      callback: {
+        returnTo: "/compatibility/invitations/invite-fixture",
+        traceId: "00000000-0000-4000-8000-000000000099",
+      },
+    });
+    await expect(completeSsoLogin(input)).rejects.toEqual(
+      new SsoAuthenticationError("transaction_missing"),
+    );
+  });
 });
