@@ -34,7 +34,7 @@ describe("getProfileEntitlement", () => {
   });
 
   it.each([
-    ["free", "free", 20, 4],
+    ["free", "free", 60, 4],
     ["lite", "subscription", 150, 4],
     ["full", "subscription", 600, 4],
     ["family", "family-seat", 600, 4],

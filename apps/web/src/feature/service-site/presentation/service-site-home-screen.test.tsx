@@ -46,10 +46,14 @@ describe("ServiceSiteHomeScreen", () => {
         name: "Free、Lite、Full、ファミリーパックの機能比較",
       }),
     ).toBeTruthy();
-    const summaryRow = screen.getByRole("row", { name: /わたしのまとめ/u });
-    expect(within(summaryRow).getAllByText("月4回まで※")).toHaveLength(3);
-    expect(within(summaryRow).getByText("1人あたり月4回まで※")).toBeTruthy();
+    expect(screen.queryByRole("row", { name: /わたしのまとめ/u })).toBeNull();
+    expect(screen.queryByRole("row", { name: /基本の相性シート/u })).toBeNull();
+    expect(screen.queryByRole("row", { name: /2人の継続的な振り返り/u })).toBeNull();
+    const aiReplyRow = screen.getByRole("row", { name: /AI返信/u });
+    expect(within(aiReplyRow).getByText("月60回")).toBeTruthy();
+    expect(screen.getByText(/わたしのまとめは全Plan共通で月4回まで/u)).toBeTruthy();
     expect(screen.getByText(/いずれの生成条件も満たさない場合は回数を消費せず/u)).toBeTruthy();
+    expect(screen.getByText(/AIが生成して正常に届けた回答を1回として数えます/u)).toBeTruthy();
     expect(screen.getAllByText("提供準備中")).toHaveLength(6);
     expect(screen.getByText(/現在は購入できません/u)).toBeTruthy();
   });

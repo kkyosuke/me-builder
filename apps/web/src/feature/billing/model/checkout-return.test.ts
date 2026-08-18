@@ -11,10 +11,10 @@ const entitlement = (source: ProfileEntitlement["source"]): ProfileEntitlement =
   effectiveAt: "2026-08-16T00:00:00.000Z",
   availableUntil: source === "subscription" ? "2026-09-16T00:00:00.000Z" : null,
   aiReply: {
-    limit: 20,
+    limit: source === "subscription" ? 150 : 60,
     used: 0,
     reserved: 0,
-    remaining: 20,
+    remaining: source === "subscription" ? 150 : 60,
     periodStartsAt: "2026-08-16T00:00:00.000Z",
     resetsAt: "2026-09-16T00:00:00.000Z",
   },

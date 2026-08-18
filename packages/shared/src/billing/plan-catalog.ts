@@ -6,6 +6,14 @@ export type PublicPlanCode = (typeof publicPlanCodes)[number];
 /** Planの価値差には使わない、全Account共通のまとめ生成月次運用上限。 */
 export const PROFILE_SUMMARY_MONTHLY_LIMIT = 4;
 
+/** 公開料金表とEntitlementが共有する、PlanごとのAI返信月次上限。 */
+export const AI_REPLY_MONTHLY_LIMITS = {
+  free: 60,
+  lite: 150,
+  full: 600,
+  family: 600,
+} as const satisfies Readonly<Record<PublicPlanCode, number>>;
+
 export const billingIntervals = ["month", "year"] as const;
 export type BillingInterval = (typeof billingIntervals)[number];
 
@@ -29,7 +37,11 @@ export const publicFreePlan = {
   code: "free",
   name: "Free",
   description: "記録、診断、最初の自己理解を自分のペースで続けるプラン",
-  highlights: ["LINEの日記と公開中の診断", "わたしのまとめ", "基本の相性シート"],
+  highlights: [
+    `AI返信 月${AI_REPLY_MONTHLY_LIMITS.free}回`,
+    "AIによる意味検索 直近30日",
+    "一般的なセルフケア案内",
+  ],
 } as const;
 
 export type PublicPlanFeature = Readonly<{
@@ -40,25 +52,13 @@ export type PublicPlanFeature = Readonly<{
 /** 公開料金表で表示する、Planごとの主要機能比較。 */
 export const publicPlanFeatures = [
   {
-    label: "LINEの日記保存",
-    plans: { free: "利用可能", lite: "利用可能", full: "利用可能", family: "1人ずつ利用可能" },
-  },
-  {
-    label: "公開中の診断と基本結果",
-    plans: { free: "利用可能", lite: "利用可能", full: "利用可能", family: "1人ずつ利用可能" },
-  },
-  {
-    label: "わたしのまとめ",
-    plans: {
-      free: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
-      lite: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
-      full: `月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
-      family: `1人あたり月${PROFILE_SUMMARY_MONTHLY_LIMIT}回まで※`,
-    },
-  },
-  {
     label: "AI返信",
-    plans: { free: "月20回", lite: "月150回", full: "月600回", family: "1人あたり月600回" },
+    plans: {
+      free: `月${AI_REPLY_MONTHLY_LIMITS.free}回`,
+      lite: `月${AI_REPLY_MONTHLY_LIMITS.lite}回`,
+      full: `月${AI_REPLY_MONTHLY_LIMITS.full}回`,
+      family: `1人あたり月${AI_REPLY_MONTHLY_LIMITS.family}回`,
+    },
   },
   {
     label: "今週の振り返り",
@@ -89,14 +89,6 @@ export const publicPlanFeatures = [
       full: "過去の対処と最近の状態を参照",
       family: "Fullと同じ",
     },
-  },
-  {
-    label: "基本の相性シート",
-    plans: { free: "利用可能", lite: "利用可能", full: "利用可能", family: "利用可能" },
-  },
-  {
-    label: "2人の継続的な振り返り",
-    plans: { free: "—", lite: "同時に1関係", full: "同時に5関係", family: "パック内＋1人5関係" },
   },
   {
     label: "利用できるAccount数",
