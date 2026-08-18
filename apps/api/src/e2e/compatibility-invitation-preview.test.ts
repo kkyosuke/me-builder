@@ -21,6 +21,11 @@ const e2eTimeoutMs = 30_000;
 const participants = {
   inviter: { accountId: "account-inviter-e2e", lineId: "line-inviter-e2e", name: "あおい" },
   recipient: { accountId: "account-recipient-e2e", lineId: "line-recipient-e2e", name: "はる" },
+  thirdParty: {
+    accountId: "account-third-party-e2e",
+    lineId: "line-third-party-e2e",
+    name: "そら",
+  },
 } as const;
 
 let miniflare: Miniflare;
@@ -245,6 +250,7 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
     stores = {
       inviter: createAccountDataTestStore(),
       recipient: createAccountDataTestStore(),
+      thirdParty: createAccountDataTestStore(),
     };
     const shared = D1.shared.client.create(database);
     await Promise.all(Object.values(stores).map((store) => store.syncCatalogFrom(shared)));
@@ -272,6 +278,11 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       recipient: (
         await sessionFixture.issue(participants.recipient.accountId, {
           displayName: participants.recipient.name,
+        })
+      ).headers,
+      thirdParty: (
+        await sessionFixture.issue(participants.thirdParty.accountId, {
+          displayName: participants.thirdParty.name,
         })
       ).headers,
     };
@@ -614,6 +625,18 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           ],
         });
       }
+
+      const thirdPartyDetail = await app.request(
+        `/api/compatibility/relationships/${relationshipId}`,
+        { headers: sessionHeaders.thirdParty },
+        env(),
+      );
+      expect(thirdPartyDetail.status).toBe(404);
+      expect(thirdPartyDetail.headers.get("Cache-Control")).toBe("no-store");
+      expect(await thirdPartyDetail.json()).toEqual({
+        error: "Compatibility relationship unavailable",
+        reason: "relationship_unavailable",
+      });
 
       const endResponse = await app.request(
         `/api/compatibility/relationships/${relationshipId}`,
