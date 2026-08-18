@@ -117,6 +117,31 @@ describe("BillingPlanScreen", () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
+  it("safe defaultをFree契約と表示せず、再確認まで購入を止める", () => {
+    const onRetry = vi.fn();
+    render(
+      <BillingPlanScreen
+        plans={{ status: "success", data: plans }}
+        entitlement={{
+          status: "success",
+          data: { ...free, status: "safe-default" },
+        }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.getByText("契約状態を確認中")).toBeTruthy();
+    expect(screen.getByText(/Free契約へ変更されたことを示す表示ではありません/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /プランを変更する/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "契約状態を再確認" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
   it("表示時に閉じるボタンへフォーカスし、ファミリー参加中は購入操作を表示しない", () => {
     render(
       <BillingPlanScreen

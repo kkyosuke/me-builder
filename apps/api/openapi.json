@@ -83,6 +83,72 @@
         }
       }
     },
+    "/api/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "tags": ["System"],
+        "summary": "API Serverが依存先を含めて受付可能か取得する",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API Serverはリクエストを受付可能",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ready"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["status", "timestamp"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API Serverはリクエストを受付不能",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "unavailable"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["status", "timestamp"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/observability/web-errors": {
       "post": {
         "operationId": "reportWebClientError",

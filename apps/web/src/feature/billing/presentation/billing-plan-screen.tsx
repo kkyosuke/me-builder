@@ -59,6 +59,8 @@ export function BillingPlanScreen({
   const paidSubscription =
     entitlement.status === "success" && entitlement.data.source === "subscription";
   const familySeat = entitlement.status === "success" && entitlement.data.source === "family-seat";
+  const safeDefault =
+    entitlement.status === "success" && entitlement.data.status === "safe-default";
   const currentPlan = entitlement.status === "success" ? entitlement.data.plan : "free";
   const selected =
     plans.status === "success"
@@ -179,7 +181,9 @@ export function BillingPlanScreen({
                 {entitlement.message}
               </p>
             ) : (
-              <p className="mt-0.5 text-lg font-bold">{planNames[entitlement.data.plan]}</p>
+              <p className="mt-0.5 text-lg font-bold">
+                {safeDefault ? "契約状態を確認中" : planNames[entitlement.data.plan]}
+              </p>
             )}
           </div>
           {paidSubscription && (
@@ -193,6 +197,22 @@ export function BillingPlanScreen({
             </button>
           )}
         </section>
+
+        {safeDefault && (
+          <section className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            <h2 className="font-bold">現在の契約状態を確認できません</h2>
+            <output className="mt-2 block text-sm">
+              Free契約へ変更されたことを示す表示ではありません。確認が終わるまで安全側の利用枠を適用し、重複購入を防ぐため購入操作を停止しています。
+            </output>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-3 min-h-10 rounded-lg border border-amber-500 px-4 text-sm font-bold"
+            >
+              契約状態を再確認
+            </button>
+          </section>
+        )}
 
         {familySeat ? (
           <section className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
@@ -385,7 +405,7 @@ export function BillingPlanScreen({
           </section>
         )}
 
-        {selected && !familySeat && entitlement.status === "success" && (
+        {selected && !familySeat && !safeDefault && entitlement.status === "success" && (
           <>
             <div className="h-28" aria-hidden="true" />
             <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-slate-50/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-6">

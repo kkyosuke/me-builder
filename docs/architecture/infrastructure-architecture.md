@@ -218,6 +218,7 @@ PreviewとProductionでは、APIドキュメントを利用者向けAPIとは別
 | `/api/openapi.json` | 必須 | 機械可読なOpenAPI document |
 | `/api/docs`、`/api/docs/*` | 必須 | Swagger UIを提供する場合の画面と配下のアセット |
 | `/api/health` | 不要 | 外形監視と死活確認 |
+| `/api/ready` | 不要 | 共有D1への接続を含む受付可能性の確認 |
 
 ```mermaid
 flowchart LR
@@ -225,8 +226,10 @@ flowchart LR
     Edge -->|/api/openapi.json<br/>/api/docs/*| Access[Cloudflare Access]
     Access -->|許可された開発者| API[API Worker]
     Access -->|未認証・対象外| Deny[拒否]
-    Edge -->|/api/health| API
+    Edge -->|/api/health<br/>/api/ready| API
 ```
+
+`/api/health`はWorkerが応答できることだけを示すliveness、`/api/ready`は共有D1へ問い合わせできることまでを示すreadinessです。readinessが失敗した場合も、外部レスポンスには依存先名や例外詳細を含めず、`503`と固定状態だけを返します。
 
 AccessのAllow policyは、IdPが検証した個別メールアドレスまたは開発者グループを対象にし、`Everyone`を指定しません。対象外の主体はAccessのdeny-by-defaultで拒否します。PreviewとProductionはホスト名が異なるため環境ごとにApplicationを持ちますが、同じアクセス境界を適用します。
 

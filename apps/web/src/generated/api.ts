@@ -21,6 +21,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ready": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** API Serverが依存先を含めて受付可能か取得する */
+    get: operations["getReadiness"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/observability/web-errors": {
     parameters: {
       query?: never;
@@ -1214,6 +1231,57 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Internal Server Error";
+          };
+        };
+      };
+    };
+  };
+  getReadiness: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description API Serverはリクエストを受付可能 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            status: "ready";
+            /** Format: date-time */
+            timestamp: string;
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description API Serverはリクエストを受付不能 */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            status: "unavailable";
+            /** Format: date-time */
+            timestamp: string;
           };
         };
       };

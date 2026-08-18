@@ -69,6 +69,8 @@ Durable Object class migrationは、DO内SQLiteのSQL migrationではありま�
 
 破壊的変更は少なくとも「追加」「移行」「削除」の3段階へ分け、各段階を独立した本番リリースとして完了させます。
 
+CIは既存migrationで審査済みのtable再構築だけをallowlistで固定し、新しい`DROP TABLE`、`DROP COLUMN`、`RENAME TABLE`、`RENAME COLUMN`を検知した場合に失敗します。Contract段階の削除を追加するときは、この節の完了条件を満たした証跡とともにallowlistの変更をレビューし、SQLだけで検査を迂回しません。
+
 ### 4.1 Expand: 追加する
 
 既存コードがそのまま動く追加的なschema変更だけを先に適用します。新しいtableやindex、nullable column、既定値を持つcolumnなどを追加し、既存のcolumn、table、constraintの意味は変えません。
