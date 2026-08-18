@@ -42,19 +42,22 @@ task ci
 
 CIでは、state、nonce、PKCE、return path、Identity link、最後のIdentity解除拒否、LIFF／SSO入口選択、session revisionによるcache破棄を確認します。実IdP、実cookie、実端末の確認は次節の手動検証で補います。
 
+デプロイ済み環境のCookie／Origin／CSRF検査、短命LIFF credentialを使うrotation／logout、2 Account・2タブ、KV／D1障害の共通手順は[LIFF交換・アプリケーションセッション境界検証Runbook](application-session-boundary-verification.md)を正とします。SSO Preview検証の前に同RunbookのPreview境界検査を完了します。
+
 ## 4. 成功経路
 
 `linking`でIdentityを追加した後、`linked-login`へ変更して新しい外部ブラウザprofileで検証します。各行は独立した操作として実施します。
 
 | ID | 入口 | 操作 | 期待結果 |
 | --- | --- | --- | --- |
-| P-S01 | LIFF実端末 | 本人画面を開く | LIFF Identityでsessionが更新され、要求画面へ到達する |
+| P-S01 | LIFF実端末 | 本人画面を開き、再訪後にlogoutする | LIFF Identityでsessionが発行・再利用され、logout後は旧画面を表示しない |
 | P-S02 | 外部ブラウザ | SSO link済みAccountで開く | Auth0を経由し、同じ相対pathへ復帰する |
 | P-S03 | 診断直接リンク | 未認証profileで結果URLを開く | SSO後に同じ診断結果へ復帰する |
 | P-S04 | 相性招待 | 招待URLを未認証profileで開く | secretをURL以外へ複製せず、SSO後に招待画面へ復帰する |
 | P-S05 | 管理者URL | 管理者Accountで開く | SSO後に管理者画面へ復帰し、一般AccountはAPIで拒否される |
 | P-S06 | 同一Account | LIFFとSSOを順に使う | 同じプロフィール、診断、相性データへ到達する |
-| P-S07 | Account切替 | SSO cookieの後に別AccountのLIFFを開く | session revisionが変わり、前Accountの画面cacheと履歴を再利用しない |
+| P-S07 | 2 Account・2タブ | Account Aを2タブで開き、一方をAccount BのLIFFへ切り替える | Aの両sessionが401になり、Bの画面だけを表示して前Accountのcacheと履歴を再利用しない |
+| P-S08 | 外部ブラウザ | session発行後に再訪し、logoutして戻る | cookieでsessionを再利用し、logout後は旧画面を表示せず再認証を案内する |
 
 ## 5. 失敗・境界経路
 
@@ -66,7 +69,7 @@ CIでは、state、nonce、PKCE、return path、Identity link、最後のIdentit
 | P-N04 | LIFF初期化失敗 | SSOへ自動fallbackせず、再試行か外部ブラウザ利用を案内する |
 | P-N05 | CSRF token欠落・不一致 | mutationを拒否し、既存sessionとデータを変更しない |
 | P-N06 | logout後の戻る操作 | 認証済み画面やcacheを再表示せず、再認証を要求する |
-| P-N07 | Account復旧完了後の旧session | 旧sessionを拒否し、新sessionだけを受け入れる |
+| P-N07 | Account復旧完了、Identity解除、Account停止後の旧session | KVの削除反映を待たず旧sessionを拒否し、前Accountの内容を返さない |
 | P-N08 | SSO設定／transaction store欠落 | SSO endpointだけが503になり、LIFF交換は継続する |
 
 ## 6. 運用ログの確認
@@ -78,6 +81,7 @@ Cloudflare Logsでは、対象時間帯と次の固定eventだけで集計しま
 - `sso.callback.cancelled`: 利用者キャンセルを失敗率から分離できる
 - `sso.callback.failed`: `errorCode`と工程で失敗件数を集計できる
 - application session基盤の発行・失効event: SSO callback後のsession結果を同じ`traceId`で確認できる
+- application session境界の障害ログは[境界検証Runbook §6](application-session-boundary-verification.md#6-kvd1障害時)の固定分類と照合する
 
 ログ、スクリーンショット、PR、チケットにはOAuth `state`、認可code、token、Cookie、Auth0 subject、Account ID、メールアドレス、招待secret、個人内容を残しません。trace ID、時刻、deploy commit、シナリオID、HTTP status、固定event／error codeだけを証跡に使います。
 
@@ -100,6 +104,7 @@ deploy: <commit SHA>
 scenario: P-S01
 time: <UTC timestamp>
 result: pass | fail
+client: LIFF | external-browser | automated-probe
 traceId: <application-generated trace ID or none>
 event/status: <fixed event name or HTTP status>
 note: <固定分類だけ。画面内容やprovider応答は記載しない>

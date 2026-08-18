@@ -65,4 +65,31 @@ describe("KvApplicationSessionStore", () => {
     await expect(store.get("legacy-reference")).resolves.toBeUndefined();
     expect(namespace.delete).toHaveBeenCalledWith("session:v2:legacy-reference");
   });
+
+  it.each([
+    ["get", "SESSION_STORE_READ_FAILED", "authentication.session.store.read"],
+    ["put", "SESSION_STORE_WRITE_FAILED", "authentication.session.store.write"],
+    ["delete", "SESSION_STORE_DELETE_FAILED", "authentication.session.store.delete"],
+  ] as const)("KV %s障害を安全な運用分類へ変換する", async (operation, code, stage) => {
+    const namespace = {
+      get: vi.fn().mockRejectedValue(new Error("secret provider response")),
+      put: vi.fn().mockRejectedValue(new Error("secret provider response")),
+      delete: vi.fn().mockRejectedValue(new Error("secret provider response")),
+    } as unknown as KVNamespace;
+    const store = new KvApplicationSessionStore(namespace);
+    const request =
+      operation === "get"
+        ? store.get("reference")
+        : operation === "put"
+          ? store.put("reference", record, 60)
+          : store.delete("reference");
+
+    await expect(request).rejects.toMatchObject({
+      code,
+      category: "dependency",
+      stage,
+      retryable: true,
+      dependency: "cloudflare-kv",
+    });
+  });
 });

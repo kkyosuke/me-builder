@@ -77,6 +77,7 @@
 | [本番データベースマイグレーション運用](../docs/development/production-migration-operations.md) | 本番D1とDurable Objectのforward-only、expand-contract、適用順序、障害時の復旧方針 |
 | [Web認証・SSO実装残タスク](../docs/development/web-authentication-remaining-tasks.md) | API共通認証、Web／LIFF移行、SSO追加を番号付きPRへ分けた依存順、完了条件、リリースゲート |
 | [アプリケーションセッション実装契約](../docs/development/application-session-contract.md) | session store、期限、同時session、rotation、logout、D1 versionによる即時失効 |
+| [LIFF交換・アプリケーションセッション境界検証Runbook](../docs/development/application-session-boundary-verification.md) | デプロイ後のCookie／Origin／CSRF検査、実端末・2 Account／2タブ・障害時の検証、証跡形式 |
 | [SSO Preview検証Runbook](../docs/development/sso-preview-verification.md) | LIFF／SSOのPreview成功・失敗シナリオ、切り戻し、証跡、完了判定 |
 | [SSO Production段階公開Runbook](../docs/development/sso-production-rollout.md) | Productionへの段階公開phase、監視ゲート、即時停止、再開、完了判定 |
 | [サブスクリプション実装残タスク](../docs/development/subscription-remaining-tasks.md) | AccountとPlanを紐づける決済系列と、紐付け後の利用権限・機能系列に分けた番号付きPR単位の残作業 |

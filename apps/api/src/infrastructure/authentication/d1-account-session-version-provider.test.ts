@@ -30,4 +30,38 @@ describe("D1AccountSessionVersionProvider", () => {
     await expect(provider.invalidateAccountSessions("account-1")).resolves.toBeUndefined();
     await expect(provider.current("account-1")).resolves.toBe(3);
   });
+
+  it("D1障害を安全な運用分類へ変換する", async () => {
+    const readProvider = new D1AccountSessionVersionProvider({
+      query: {
+        accounts: {
+          findFirst: async () => {
+            throw new Error("secret D1 response");
+          },
+        },
+      },
+    } as unknown as D1.shared.Client);
+
+    await expect(readProvider.current("account-1")).rejects.toMatchObject({
+      code: "SESSION_VERSION_READ_FAILED",
+      category: "dependency",
+      stage: "authentication.session.version.read",
+      retryable: true,
+      dependency: "cloudflare-d1",
+    });
+
+    const invalidationProvider = new D1AccountSessionVersionProvider({
+      update: () => {
+        throw new Error("secret D1 response");
+      },
+    } as unknown as D1.shared.Client);
+
+    await expect(invalidationProvider.invalidate("account-1")).rejects.toMatchObject({
+      code: "SESSION_VERSION_INVALIDATION_FAILED",
+      category: "dependency",
+      stage: "authentication.session.version.invalidate",
+      retryable: true,
+      dependency: "cloudflare-d1",
+    });
+  });
 });

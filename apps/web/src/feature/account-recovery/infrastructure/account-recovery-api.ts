@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import { OperationError, ValidationError } from "../../../infrastructure/errors";
 import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
+import { authSessionRuntime } from "../../auth/infrastructure/auth-session-runtime";
 
 const RecoveryCodeSchema = v.object({
   code: v.pipe(v.string(), v.nonEmpty()),
@@ -66,6 +67,8 @@ export async function completeRecovery(apiUrl: string | undefined, code: string)
       { code: "ACCOUNT_RECOVERY_COMPLETE_FAILED", status: response.status },
     );
   }
+  // 復旧元・復旧先の旧sessionはサーバー側ですでに失効しているため、他タブも直ちに隠す。
+  authSessionRuntime.notifyExternalSessionChange();
   try {
     return v.parse(RecoveryCompleteSchema, await response.json());
   } catch (cause) {
