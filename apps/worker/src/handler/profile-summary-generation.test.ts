@@ -179,6 +179,28 @@ describe("processProfileSummaryGenerationMessage", () => {
     );
   });
 
+  it("危険な断定を含む生成結果を保存せず再試行する", async () => {
+    generateProfileSummary.mockResolvedValue({
+      type: "failed",
+      reason: "insight_unsafe_assertion",
+    });
+    const message = createMessage();
+
+    await processProfileSummaryGenerationMessage(message, cf, workerConfig);
+
+    expect(
+      execute.mock.calls.some(([, operation]) => operation === "profileSummary.completeGeneration"),
+    ).toBe(false);
+    expect(message.retry).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: "PROFILE_SUMMARY_INSIGHT_UNSAFE_ASSERTION",
+        stage: "ai.generate",
+      }),
+      expect.any(String),
+    );
+  });
+
   it("設定不足で生成できない場合はQueueの試行を使い切らずに失敗を確定する", async () => {
     generateProfileSummary.mockResolvedValue({ type: "failed", reason: "ai_credentials_missing" });
     const message = createMessage();

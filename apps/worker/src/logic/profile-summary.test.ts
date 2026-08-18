@@ -1,6 +1,7 @@
 import type { ProfileSummaryEvidence, ProfileSummaryGenerationContext } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerConfig } from "../config";
+import { profileSummaryQualityFixtures } from "../evaluation/profile-summary-quality-fixtures";
 import { generateProfileSummary, validateGeneratedProfileSummary } from "./profile-summary";
 
 const { generateStructuredResponse } = vi.hoisted(() => ({
@@ -65,6 +66,11 @@ function generatedWithShare({
 }
 
 describe("validateGeneratedProfileSummary", () => {
+  it.each(profileSummaryQualityFixtures)("品質fixture $idを公開境界で検証する", (fixture) => {
+    const result = validateGeneratedProfileSummary(fixture.output, fixture.evidence);
+    expect(result.type === "valid" ? "valid" : result.reason).toBe(fixture.expected);
+  });
+
   it("提示した診断・日記の根拠IDを表示用の種別と件数へ変換する", () => {
     expect(
       validateGeneratedProfileSummary(

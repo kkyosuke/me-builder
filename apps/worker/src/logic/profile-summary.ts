@@ -59,6 +59,8 @@ const SAFE_COMPATIBILITY_SHARE_STATEMENT =
 const FORBIDDEN_COMPATIBILITY_SHARE_DETAIL =
   /[0-9０-９]|[「」『』“”"]|(?:今日|昨日|一昨日|明日|先週|今週|来週|先月|今月|来月|去年|今年|来年)|(?:[\p{Script=Han}\p{Script=Katakana}ー]{1,}(?:さん|氏|ちゃん|くん|先生))|(?:[\p{Script=Han}\p{Script=Katakana}ー]{2,}(?:都|道|府|県|市|区|町|村|駅|空港|公園|店舗|ホテル|学校|大学|病院|会社))|(?:健康|病気|病名|診断|治療|療養|服薬|薬|通院|入院|退院|症状|障害|うつ|鬱|パニック|不眠|自傷|自殺)|(?:日記|LINE|会話(?:本文|の引用)|相手|あなた|すべき|してほしい|して欲しい|得意|苦手|性格|能力|優秀)/u;
 const EVIDENCE_EXCERPT_LENGTH = 20;
+const UNSAFE_PROFILE_SUMMARY_ASSERTION =
+  /(?:あなたは.{0,20}(?:うつ病|鬱病|発達障害|精神疾患|病気)(?:です|でしょう|に違いありません))|(?:(?:必ず|絶対に).{0,40}(?:失敗します|成功します|病気になります|自傷します))|(?:医師|専門家).{0,12}(?:不要です|必要ありません)/u;
 
 function normalizeForExcerptComparison(value: string): string {
   return value
@@ -105,7 +107,8 @@ type ProfileSummaryValidationFailureReason =
   | "response_not_json"
   | "response_schema_mismatch"
   | "insight_key_duplicated"
-  | "insight_evidence_invalid";
+  | "insight_evidence_invalid"
+  | "insight_unsafe_assertion";
 
 /** 生成を完了できなかった理由。運用ログのエラーコードへ1対1で対応させる。 */
 export type ProfileSummaryGenerationFailureReason =
@@ -177,6 +180,12 @@ export function validateGeneratedProfileSummary(
   const insights: ProfileSummaryInsight[] = [];
   for (const insight of parsed.output.insights) {
     if (keys.has(insight.key)) return { type: "invalid", reason: "insight_key_duplicated" };
+    if (
+      UNSAFE_PROFILE_SUMMARY_ASSERTION.test(insight.label) ||
+      UNSAFE_PROFILE_SUMMARY_ASSERTION.test(insight.description)
+    ) {
+      return { type: "invalid", reason: "insight_unsafe_assertion" };
+    }
     keys.add(insight.key);
     const ids = [...new Set(insight.evidence_ids)];
     if (ids.length !== insight.evidence_ids.length || ids.some((id) => !evidenceById.has(id))) {
