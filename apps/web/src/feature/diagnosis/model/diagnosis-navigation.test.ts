@@ -4,6 +4,7 @@ import {
   applySavedProgress,
   createDiagnosisDetailHistoryState,
   diagnosisDetailIdFromHistoryState,
+  diagnosisEntryIdFromPathname,
   diagnosisResultIdFromPathname,
   isDiagnosisResultPathname,
   resolveDiagnosisDestination,
@@ -49,6 +50,18 @@ describe("diagnosisResultIdFromPathname", () => {
     expect(diagnosisResultIdFromPathname("/diagnosis")).toBeNull();
     expect(diagnosisResultIdFromPathname("/diagnosis/%E0%A4%A/answers")).toBeNull();
     expect(isDiagnosisResultPathname("/diagnosis/%E0%A4%A/answers")).toBe(true);
+  });
+});
+
+describe("diagnosisEntryIdFromPathname", () => {
+  it("対象診断の直接URLからDiagnosis IDを復元する", () => {
+    expect(diagnosisEntryIdFromPathname("/diagnosis/value%2Fwork")).toBe("value/work");
+  });
+
+  it("一覧・結果・不正なpercent encodingを診断入口として扱わない", () => {
+    expect(diagnosisEntryIdFromPathname("/diagnosis")).toBeNull();
+    expect(diagnosisEntryIdFromPathname("/diagnosis/diagnosis-1/answers")).toBeNull();
+    expect(diagnosisEntryIdFromPathname("/diagnosis/%E0%A4%A")).toBeNull();
   });
 });
 

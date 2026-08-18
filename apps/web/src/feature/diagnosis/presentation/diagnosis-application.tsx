@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { resolveRequestedPathname } from "../../../infrastructure/requested-pathname";
 import { useProfileProgression } from "../../profile/presentation/use-profile-progression";
 import {
   createDiagnosisDetailHistoryState,
   diagnosisDetailIdFromHistoryState,
+  diagnosisEntryIdFromPathname,
   diagnosisResultIdFromPathname,
   isDiagnosisResultPathname,
 } from "../model/diagnosis-navigation";
@@ -39,8 +41,11 @@ export default function DiagnosisApplication() {
   );
   const listScrollY = useRef<number | null>(null);
   const shouldRestoreListScroll = useRef(false);
-  const isDirectResultPath = isDiagnosisResultPathname(window.location.pathname);
-  const directDiagnosisId = diagnosisResultIdFromPathname(window.location.pathname);
+  const requestedPathname = resolveRequestedPathname();
+  const isDirectResultPath = isDiagnosisResultPathname(requestedPathname);
+  const directDiagnosisId =
+    diagnosisResultIdFromPathname(requestedPathname) ??
+    diagnosisEntryIdFromPathname(requestedPathname);
   const fromProfile = new URLSearchParams(window.location.search).get("from") === "me";
   const directBackHref = fromProfile ? "/me" : "/diagnosis";
   const directBackLabel = fromProfile ? "わたしのまとめへ" : "診断一覧へ";
@@ -66,6 +71,12 @@ export default function DiagnosisApplication() {
   );
 
   const closeDetail = useCallback(() => {
+    if (directDiagnosisId) {
+      detail.close();
+      window.history.replaceState({}, "", directBackHref);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
     if (!directDiagnosisId && listScrollY.current !== null) {
       shouldRestoreListScroll.current = true;
     }
@@ -83,7 +94,7 @@ export default function DiagnosisApplication() {
     isHistoryDetailOpen.current = false;
     openedHistoryDiagnosisId.current = null;
     detail.close();
-  }, [detail.close, directDiagnosisId]);
+  }, [detail.close, directBackHref, directDiagnosisId]);
 
   const deferQuestion = useCallback(
     async (questionId: string) => {
@@ -191,11 +202,11 @@ export default function DiagnosisApplication() {
     />
   );
 
-  if (isDirectResultPath && diagnoses.state.status === "loading") {
-    content = <DiagnosisResultSkeleton />;
+  if (directDiagnosisId && diagnoses.state.status === "loading") {
+    content = isDirectResultPath ? <DiagnosisResultSkeleton /> : <DiagnosisIntroductionSkeleton />;
   }
 
-  if (isDirectResultPath && diagnoses.state.status === "success" && !directDiagnosis) {
+  if (directDiagnosisId && diagnoses.state.status === "success" && !directDiagnosis) {
     content = (
       <DiagnosisGuidance
         kind="invalid-link"

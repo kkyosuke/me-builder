@@ -25,6 +25,16 @@ export function isDiagnosisResultPathname(pathname: string): boolean {
   return /^\/diagnosis\/[^/]+\/answers\/?$/.test(pathname);
 }
 
+export function diagnosisEntryIdFromPathname(pathname: string): string | null {
+  const encodedId = pathname.match(/^\/diagnosis\/([^/]+)\/?$/)?.[1];
+  if (!encodedId) return null;
+  try {
+    return decodeURIComponent(encodedId);
+  } catch {
+    return null;
+  }
+}
+
 export function diagnosisResultIdFromPathname(pathname: string): string | null {
   if (!isDiagnosisResultPathname(pathname)) return null;
   const encodedId = pathname.match(/^\/diagnosis\/([^/]+)\/answers\/?$/)?.[1];

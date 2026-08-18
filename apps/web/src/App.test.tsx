@@ -1425,6 +1425,24 @@ describe("App", () => {
     );
   });
 
+  it("LIFFの対象診断リンクから一覧を経由せず診断入口を開く", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      `/?liff.state=${encodeURIComponent("/diagnosis/diagnosis-1")}`,
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "テスト診断" })).toBeTruthy();
+    expect(screen.getByText(/普段の自分を思い浮かべて/)).toBeTruthy();
+    expect(mocks.fetchDiagnosisDefinition).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "diagnosis-1",
+      expect.any(AbortSignal),
+    );
+  });
+
   it("診断詳細を端末の戻る・進むで開閉し、一覧の状態と位置を復元する", async () => {
     window.history.replaceState({}, "", "/diagnosis?category=partner");
     mocks.fetchDiagnosisList.mockResolvedValue([
