@@ -1,4 +1,4 @@
-import { type AccountDataNamespace, type D1, accountDataFor, billing } from "@me-builder/lib";
+import { type AccountDataNamespace, type D1, accountDataFor } from "@me-builder/lib";
 import {
   type ProfileSummaryGenerationQueueMessage,
   type Queue,
@@ -16,7 +16,7 @@ export type RequestProfileSummaryGenerationOutcome =
     }>
   | Readonly<{
       type: "unavailable";
-      reason: "source_record_required" | "regeneration_not_required" | "limit_reached";
+      reason: "source_record_required" | "regeneration_not_required";
     }>;
 
 type Params = Readonly<{
@@ -26,32 +26,17 @@ type Params = Readonly<{
   queue?: Queue<ProfileSummaryGenerationQueueMessage>;
   at?: Date;
   allowUnchangedRegeneration?: boolean;
-  planAssignmentProvider?: billing.AccountPlanAssignmentProvider;
 }>;
 
 export async function requestProfileSummaryGeneration({
   actor,
-  db,
   accountData,
   queue,
   at = new Date(),
   allowUnchangedRegeneration = false,
-  planAssignmentProvider,
 }: Params): Promise<RequestProfileSummaryGenerationOutcome> {
   if (!accountData || !queue) throw new Error("Profile Summary generation binding is missing");
   const account = accountDataFor(accountData, actor.accountId);
-  const entitlement = await new billing.EntitlementService(
-    new billing.FamilyAwareAccountPlanAssignmentProvider(db, planAssignmentProvider),
-  ).resolve(actor.accountId, at);
-  const period = billing.resolveEntitlementUsagePeriod(entitlement, "profile-summary", at);
-  const usage = await account.execute(
-    "aiUsage.read",
-    "profile-summary",
-    period,
-    entitlement.policy.profileSummary.limit,
-    at,
-  );
-  if (usage.remaining === 0) return { type: "unavailable", reason: "limit_reached" };
   const request = await account.execute(
     "profileSummary.requestGeneration",
     at,

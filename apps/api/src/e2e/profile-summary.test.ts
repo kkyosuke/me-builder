@@ -119,6 +119,7 @@ async function insertSummaryVersions(evidenceSourceRecordId: string): Promise<vo
       accountDataStore.db,
       "account-summary-e2e",
       generatedAt,
+      true,
     );
     if (request.outcome !== "created") throw new Error("summary generation was not created");
     await DO.account.action.profileSummary.completeProfileSummaryGeneration(

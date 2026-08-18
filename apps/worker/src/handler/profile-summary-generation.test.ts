@@ -95,13 +95,6 @@ describe("processProfileSummaryGenerationMessage", () => {
         };
       }
       if (operation === "profileSummary.completeGeneration") return true;
-      if (operation === "profileSummary.readGenerationStatus") return "generating";
-      if (operation === "aiUsage.reserve") {
-        return { outcome: "reserved", reservation: {}, usage: { remaining: 0 } };
-      }
-      if (operation === "aiUsage.commit" || operation === "aiUsage.release") {
-        return { outcome: "committed", reservation: {} };
-      }
       return undefined;
     });
   });
@@ -131,6 +124,9 @@ describe("processProfileSummaryGenerationMessage", () => {
         ],
       }),
     );
+    expect(
+      execute.mock.calls.some(([, operation]) => String(operation).startsWith("aiUsage.")),
+    ).toBe(false);
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
   });
@@ -208,37 +204,9 @@ describe("processProfileSummaryGenerationMessage", () => {
     );
   });
 
-  it("利用上限到達時はQueue直実行でもAIを呼ばず失敗状態を確定する", async () => {
-    execute.mockImplementation(async (_accountId: string, operation: string) => {
-      if (operation === "profileSummary.loadGenerationContext")
-        return { generationId: "generation-1" };
-      if (operation === "aiUsage.reserve") {
-        return { outcome: "limit-reached", reservation: null, usage: { remaining: 0 } };
-      }
-      return undefined;
-    });
-    const message = createMessage();
-
-    await processProfileSummaryGenerationMessage(message, cf, workerConfig);
-
-    expect(generateProfileSummary).not.toHaveBeenCalled();
-    expect(execute).toHaveBeenCalledWith(
-      "account-1",
-      "profileSummary.failGeneration",
-      "generation-1",
-      expect.stringContaining("上限"),
-    );
-    expect(message.ack).toHaveBeenCalledOnce();
-    expect(message.retry).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["completed", "aiUsage.commit"],
-    ["failed", "aiUsage.release"],
-  ] as const)("再送時に%sの生成状態から利用量を収束させる", async (status, operation) => {
+  it("処理対象でない再送は利用量を変更せずackする", async () => {
     execute.mockImplementation(async (_accountId: string, currentOperation: string) => {
       if (currentOperation === "profileSummary.loadGenerationContext") return null;
-      if (currentOperation === "profileSummary.readGenerationStatus") return status;
       return undefined;
     });
     const message = createMessage(2);
@@ -246,7 +214,7 @@ describe("processProfileSummaryGenerationMessage", () => {
     await processProfileSummaryGenerationMessage(message, cf, workerConfig);
 
     expect(generateProfileSummary).not.toHaveBeenCalled();
-    expect(execute).toHaveBeenCalledWith("account-1", operation, "generation-1");
+    expect(execute).toHaveBeenCalledTimes(1);
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
   });

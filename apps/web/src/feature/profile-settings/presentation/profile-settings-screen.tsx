@@ -364,8 +364,7 @@ export function ProfileSettingsScreen({
                   <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900/60">
                     <dt className="text-xs text-slate-500 dark:text-slate-400">まとめ生成</dt>
                     <dd className="text-sm font-bold text-slate-950 dark:text-white">
-                      残り {entitlement.data.profileSummary.remaining} /{" "}
-                      {entitlement.data.profileSummary.limit}
+                      7日経過＋入力更新時
                     </dd>
                   </div>
                 </dl>

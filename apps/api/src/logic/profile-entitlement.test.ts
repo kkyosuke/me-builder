@@ -34,47 +34,38 @@ describe("getProfileEntitlement", () => {
   });
 
   it.each([
-    ["free", "free", 60, 4],
-    ["lite", "subscription", 150, 4],
-    ["full", "subscription", 600, 4],
-    ["family", "family-seat", 600, 4],
-  ] as const)(
-    "%s Planの上限と残量を本人向け契約へ返す",
-    async (plan, source, aiLimit, summaryLimit) => {
-      const provider = new billing.FakeAccountPlanAssignmentProvider([
-        {
-          accountId: "account-1",
-          plan,
-          source,
-          effectiveAt: "2026-08-01T00:00:00.000Z",
-          availableUntil: null,
-          payerAccountId:
-            source === "family-seat" ? "payer-1" : plan === "free" ? null : "account-1",
-        },
-      ]);
-
-      const result = await getProfileEntitlement({
-        actor,
-        db: {} as D1.shared.Client,
-        accountData,
-        planAssignmentProvider: provider,
-        at: new Date("2026-08-15T00:00:00.000Z"),
-      });
-
-      expect(result).toMatchObject({
-        type: "resolved",
+    ["free", "free", 60],
+    ["lite", "subscription", 150],
+    ["full", "subscription", 600],
+    ["family", "family-seat", 600],
+  ] as const)("%s PlanのAI返信上限と残量を本人向け契約へ返す", async (plan, source, aiLimit) => {
+    const provider = new billing.FakeAccountPlanAssignmentProvider([
+      {
+        accountId: "account-1",
         plan,
         source,
-        aiReply: { limit: aiLimit, used: 2, reserved: 1, remaining: aiLimit - 3 },
-        profileSummary: {
-          limit: summaryLimit,
-          used: 2,
-          reserved: 1,
-          remaining: Math.max(0, summaryLimit - 3),
-        },
-      });
-    },
-  );
+        effectiveAt: "2026-08-01T00:00:00.000Z",
+        availableUntil: null,
+        payerAccountId: source === "family-seat" ? "payer-1" : plan === "free" ? null : "account-1",
+      },
+    ]);
+
+    const result = await getProfileEntitlement({
+      actor,
+      db: {} as D1.shared.Client,
+      accountData,
+      planAssignmentProvider: provider,
+      at: new Date("2026-08-15T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      type: "resolved",
+      plan,
+      source,
+      aiReply: { limit: aiLimit, used: 2, reserved: 1, remaining: aiLimit - 3 },
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
 
   it("provider障害時は有料権限を推測せずsafe-defaultを表示する", async () => {
     const result = await getProfileEntitlement({

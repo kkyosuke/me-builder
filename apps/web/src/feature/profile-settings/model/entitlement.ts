@@ -14,5 +14,4 @@ export type ProfileEntitlement = Readonly<{
   effectiveAt: string;
   availableUntil: string | null;
   aiReply: ProfileEntitlementUsage;
-  profileSummary: ProfileEntitlementUsage;
 }>;

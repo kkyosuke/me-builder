@@ -215,14 +215,6 @@ const profileEntitlement: ProfileEntitlement = {
     periodStartsAt: "2026-08-01T00:00:00.000Z",
     resetsAt: "2026-09-01T00:00:00.000Z",
   },
-  profileSummary: {
-    limit: 1,
-    used: 0,
-    reserved: 0,
-    remaining: 1,
-    periodStartsAt: "2026-08-01T00:00:00.000Z",
-    resetsAt: "2026-09-01T00:00:00.000Z",
-  },
 };
 
 function diagnosis(overrides: Partial<DiagnosisListItem> = {}): DiagnosisListItem {

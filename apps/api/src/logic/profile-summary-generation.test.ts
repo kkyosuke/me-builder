@@ -21,9 +21,6 @@ describe("requestProfileSummaryGeneration", () => {
     vi.clearAllMocks();
     generationRequest = undefined;
     execute.mockImplementation(async (_accountId: string, operation: string) => {
-      if (operation === "aiUsage.read") {
-        return { limit: 1, reserved: 0, committed: 0, remaining: 1 };
-      }
       if (operation === "profileSummary.requestGeneration") return generationRequest;
       return undefined;
     });
@@ -137,7 +134,7 @@ describe("requestProfileSummaryGeneration", () => {
         queue,
       }),
     ).resolves.toMatchObject({ type: "accepted", status: "queued" });
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("未配送の既存要求を同じgeneration IDでQueueへ再送する", async () => {
@@ -160,30 +157,5 @@ describe("requestProfileSummaryGeneration", () => {
       accountId: "account-1",
       generationId: "generation-1",
     });
-  });
-
-  it("利用上限到達時は直POSTでも生成要求を保存・送信しない", async () => {
-    execute.mockImplementation(async (_accountId: string, operation: string) => {
-      if (operation === "aiUsage.read") {
-        return { limit: 1, reserved: 0, committed: 1, remaining: 0 };
-      }
-      throw new Error(`unexpected operation: ${operation}`);
-    });
-
-    await expect(
-      requestProfileSummaryGeneration({
-        actor,
-        db: {} as D1.shared.Client,
-        accountData,
-        queue,
-      }),
-    ).resolves.toEqual({ type: "unavailable", reason: "limit_reached" });
-    expect(send).not.toHaveBeenCalled();
-    expect(execute).not.toHaveBeenCalledWith(
-      "account-1",
-      "profileSummary.requestGeneration",
-      expect.anything(),
-      expect.anything(),
-    );
   });
 });

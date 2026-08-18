@@ -194,6 +194,8 @@ async function generateShareProfile(
   const request = await DO.account.action.profileSummary.requestProfileSummaryGeneration(
     store.db,
     participant.accountId,
+    new Date(),
+    true,
   );
   if (request.outcome !== "created") throw new Error("profile generation was not created");
   const context = await DO.account.action.profileSummary.loadProfileSummaryGenerationContext(

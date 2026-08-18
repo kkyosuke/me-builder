@@ -59,7 +59,7 @@ export type ProfileSummaryGenerationState = Readonly<{
   message: string | null;
 }>;
 
-export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "format" | "elapsed";
+export type ProfileSummaryRegenerationReason = "diagnosis" | "brain" | "format";
 
 export type ProfileSummaryInputSnapshot = Readonly<{
   diagnosis: Readonly<{ count: number; latestRecordedAt: Date | null }>;

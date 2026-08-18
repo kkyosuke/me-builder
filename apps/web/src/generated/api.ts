@@ -558,7 +558,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 本人のPlanとAI利用上限・残量を取得する */
+    /** 本人のPlanとAI返信の利用上限・残量を取得する */
     get: operations["getProfileEntitlement"];
     put?: never;
     post?: never;
@@ -3824,7 +3824,7 @@ export interface operations {
               /** @enum {string} */
               status: "idle" | "queued" | "generating" | "failed";
               canRegenerate: boolean;
-              reasons: ("diagnosis" | "brain" | "format" | "elapsed")[];
+              reasons: ("diagnosis" | "brain" | "format")[];
               message: string | null;
             };
             diagnosisThemes: {
@@ -3991,7 +3991,7 @@ export interface operations {
             /** @constant */
             error: "Profile summary generation unavailable";
             /** @enum {string} */
-            reason: "source_record_required" | "regeneration_not_required" | "limit_reached";
+            reason: "source_record_required" | "regeneration_not_required";
           };
         };
       };
@@ -4793,16 +4793,6 @@ export interface operations {
             effectiveAt: string;
             availableUntil: string | null;
             aiReply: {
-              limit: number;
-              used: number;
-              reserved: number;
-              remaining: number;
-              /** Format: date-time */
-              periodStartsAt: string;
-              /** Format: date-time */
-              resetsAt: string;
-            };
-            profileSummary: {
               limit: number;
               used: number;
               reserved: number;

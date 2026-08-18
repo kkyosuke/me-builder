@@ -41,7 +41,7 @@ import {
 import { sourceRecords } from "../schema/source";
 
 const PROFILE_SUMMARY_EVIDENCE_LIMIT = 100;
-export const PROFILE_SUMMARY_REGENERATION_INTERVAL_MS = 30 * 24 * 60 * 60 * 1_000;
+export const PROFILE_SUMMARY_REGENERATION_INTERVAL_MS = 7 * 24 * 60 * 60 * 1_000;
 
 async function availableData(db: AccountDataDatabase, accountId: string) {
   const diagnosis = await db
@@ -153,7 +153,6 @@ function regenerationReasons(
       >
     | undefined,
   hasCurrentGenerationOutput: boolean,
-  at: Date,
 ): ProfileSummaryRegenerationReason[] {
   if (!latestVersion) {
     return [
@@ -175,11 +174,19 @@ function regenerationReasons(
     ...(diagnosisChanged ? (["diagnosis"] as const) : []),
     ...(diaryChanged ? (["brain"] as const) : []),
     ...(!hasCurrentGenerationOutput ? (["format"] as const) : []),
-    ...(at.getTime() - latestVersion.generatedAt.getTime() >=
-    PROFILE_SUMMARY_REGENERATION_INTERVAL_MS
-      ? (["elapsed"] as const)
-      : []),
   ];
+}
+
+function canRegenerateProfileSummary(
+  latestVersion: Pick<typeof profileSummaryVersions.$inferSelect, "generatedAt"> | undefined,
+  reasons: readonly ProfileSummaryRegenerationReason[],
+  at: Date,
+): boolean {
+  if (!latestVersion) return reasons.length > 0;
+  return (
+    reasons.length > 0 &&
+    at.getTime() - latestVersion.generatedAt.getTime() >= PROFILE_SUMMARY_REGENERATION_INTERVAL_MS
+  );
 }
 
 export async function readProfileSummary(
@@ -213,7 +220,6 @@ export async function readProfileSummary(
     versionRows[0],
     shareProfile.type === "available" &&
       shareProfile.profile.profileSummaryVersionId === versionRows[0]?.id,
-    at,
   );
   const hasInput = inputSnapshot.diagnosis.count + inputSnapshot.diary.count > 0;
   return {
@@ -228,7 +234,10 @@ export async function readProfileSummary(
     availableDataCounts: counts,
     generation: {
       status,
-      canRegenerate: hasInput && (allowUnchangedRegeneration || reasons.length > 0) && !active,
+      canRegenerate:
+        hasInput &&
+        (allowUnchangedRegeneration || canRegenerateProfileSummary(versionRows[0], reasons, at)) &&
+        !active,
       reasons,
       message: latestGeneration?.status === "failed" ? latestGeneration.failureMessage : null,
     },
@@ -372,15 +381,15 @@ export async function requestProfileSummaryGeneration(
   if (inputSnapshot.diagnosis.count + inputSnapshot.diary.count === 0) {
     return { outcome: "unavailable", reason: "source_record_required" };
   }
+  const reasons = regenerationReasons(
+    inputSnapshot,
+    latestVersion,
+    shareProfile.type === "available" &&
+      shareProfile.profile.profileSummaryVersionId === latestVersion?.id,
+  );
   if (
     !allowUnchangedRegeneration &&
-    regenerationReasons(
-      inputSnapshot,
-      latestVersion,
-      shareProfile.type === "available" &&
-        shareProfile.profile.profileSummaryVersionId === latestVersion?.id,
-      requestedAt,
-    ).length === 0
+    !canRegenerateProfileSummary(latestVersion, reasons, requestedAt)
   ) {
     return { outcome: "unavailable", reason: "regeneration_not_required" };
   }

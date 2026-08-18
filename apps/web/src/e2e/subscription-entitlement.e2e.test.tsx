@@ -82,14 +82,6 @@ describe("subscription entitlement user journey", () => {
             periodStartsAt: "2026-08-01T00:00:00.000Z",
             resetsAt: "2026-09-01T00:00:00.000Z",
           },
-          profileSummary: {
-            limit: 4,
-            used: 1,
-            reserved: 0,
-            remaining: 3,
-            periodStartsAt: "2026-08-01T00:00:00.000Z",
-            resetsAt: "2026-09-01T00:00:00.000Z",
-          },
         });
       }
       throw new Error(`Unexpected E2E request: ${url.pathname}`);
@@ -145,14 +137,6 @@ describe("subscription entitlement user journey", () => {
             used: 0,
             reserved: 0,
             remaining: 60,
-            periodStartsAt: "2026-08-01T00:00:00.000Z",
-            resetsAt: "2026-09-01T00:00:00.000Z",
-          },
-          profileSummary: {
-            limit: 4,
-            used: 0,
-            reserved: 0,
-            remaining: 4,
             periodStartsAt: "2026-08-01T00:00:00.000Z",
             resetsAt: "2026-09-01T00:00:00.000Z",
           },

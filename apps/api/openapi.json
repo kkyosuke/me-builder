@@ -4436,7 +4436,7 @@
                         "reasons": {
                           "type": "array",
                           "items": {
-                            "enum": ["diagnosis", "brain", "format", "elapsed"],
+                            "enum": ["diagnosis", "brain", "format"],
                             "type": "string"
                           }
                         },
@@ -4772,11 +4772,7 @@
                       "const": "Profile summary generation unavailable"
                     },
                     "reason": {
-                      "enum": [
-                        "source_record_required",
-                        "regeneration_not_required",
-                        "limit_reached"
-                      ],
+                      "enum": ["source_record_required", "regeneration_not_required"],
                       "type": "string"
                     }
                   },
@@ -6111,7 +6107,7 @@
       "get": {
         "operationId": "getProfileEntitlement",
         "tags": ["Profile"],
-        "summary": "本人のPlanとAI利用上限・残量を取得する",
+        "summary": "本人のPlanとAI返信の利用上限・残量を取得する",
         "security": [
           {
             "applicationSession": []
@@ -6188,43 +6184,6 @@
                         "periodStartsAt",
                         "resetsAt"
                       ]
-                    },
-                    "profileSummary": {
-                      "type": "object",
-                      "properties": {
-                        "limit": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "used": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "reserved": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "remaining": {
-                          "type": "integer",
-                          "minimum": 0
-                        },
-                        "periodStartsAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "resetsAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "limit",
-                        "used",
-                        "reserved",
-                        "remaining",
-                        "periodStartsAt",
-                        "resetsAt"
-                      ]
                     }
                   },
                   "required": [
@@ -6233,8 +6192,7 @@
                     "source",
                     "effectiveAt",
                     "availableUntil",
-                    "aiReply",
-                    "profileSummary"
+                    "aiReply"
                   ]
                 }
               }

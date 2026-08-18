@@ -56,14 +56,6 @@ const free: ProfileEntitlement = {
     periodStartsAt: "2026-08-16T00:00:00.000Z",
     resetsAt: "2026-09-16T00:00:00.000Z",
   },
-  profileSummary: {
-    limit: 4,
-    used: 0,
-    reserved: 0,
-    remaining: 4,
-    periodStartsAt: "2026-08-16T00:00:00.000Z",
-    resetsAt: "2026-09-16T00:00:00.000Z",
-  },
 };
 
 describe("BillingPlanScreen", () => {

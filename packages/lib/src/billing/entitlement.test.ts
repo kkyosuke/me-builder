@@ -23,13 +23,13 @@ function assignment(plan: PlanCode): AccountPlanAssignment {
 
 describe("EntitlementService", () => {
   it.each([
-    ["free", 60, 4, 30, false, "current-message"],
-    ["lite", 150, 4, 365, true, "session-and-diagnosis"],
-    ["full", 600, 4, null, true, "confirmed-history"],
-    ["family", 600, 4, null, true, "confirmed-history"],
+    ["free", 60, 30, false, "current-message"],
+    ["lite", 150, 365, true, "session-and-diagnosis"],
+    ["full", 600, null, true, "confirmed-history"],
+    ["family", 600, null, true, "confirmed-history"],
   ] as const)(
     "%sの利用可否と上限をprovider非依存の割当から解決する",
-    async (plan, aiLimit, summaryLimit, searchDays, weeklyReflection, relationshipContext) => {
+    async (plan, aiLimit, searchDays, weeklyReflection, relationshipContext) => {
       const service = new EntitlementService(
         new FakeAccountPlanAssignmentProvider([assignment(plan)]),
       );
@@ -43,7 +43,6 @@ describe("EntitlementService", () => {
         grantedByFamily: plan === "family",
         policy: {
           aiReply: { limit: aiLimit },
-          profileSummary: { limit: summaryLimit },
           semanticSearchDays: searchDays,
           relationshipQuestionContext: relationshipContext,
           features: { "weekly-reflection": weeklyReflection },

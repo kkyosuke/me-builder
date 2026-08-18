@@ -51,8 +51,8 @@ describe("ServiceSiteHomeScreen", () => {
     expect(screen.queryByRole("row", { name: /2人の継続的な振り返り/u })).toBeNull();
     const aiReplyRow = screen.getByRole("row", { name: /AI返信/u });
     expect(within(aiReplyRow).getByText("月60回")).toBeTruthy();
-    expect(screen.getByText(/わたしのまとめは全Plan共通で月4回まで/u)).toBeTruthy();
-    expect(screen.getByText(/いずれの生成条件も満たさない場合は回数を消費せず/u)).toBeTruthy();
+    expect(screen.getByText(/前回生成から7日以上経過し、かつ/u)).toBeTruthy();
+    expect(screen.getByText(/月ごとの回数上限はありません/u)).toBeTruthy();
     expect(screen.getByText(/AIが生成して正常に届けた回答を1回として数えます/u)).toBeTruthy();
     expect(screen.getAllByText("提供準備中")).toHaveLength(6);
     expect(screen.getByText(/現在は購入できません/u)).toBeTruthy();

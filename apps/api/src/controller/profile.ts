@@ -207,7 +207,6 @@ export async function postProfileSummaryGeneration(c: Context<AppEnv>): Promise<
     db,
     accountData: c.env.ACCOUNT_DATA,
     queue: c.env.PROFILE_SUMMARY_QUEUE,
-    planAssignmentProvider: planAssignmentProvider(c, db),
     allowUnchangedRegeneration: isDevelopmentEnvironment(currentConfig.environment),
   });
   switch (outcome.type) {
