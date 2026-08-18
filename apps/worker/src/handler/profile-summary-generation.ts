@@ -79,6 +79,12 @@ const GENERATION_FAILURES: Record<
     retryable: true,
     dependency: "google-ai",
   },
+  insight_unsafe_assertion: {
+    code: "PROFILE_SUMMARY_INSIGHT_UNSAFE_ASSERTION",
+    category: "dependency",
+    retryable: true,
+    dependency: "google-ai",
+  },
 };
 
 /**
