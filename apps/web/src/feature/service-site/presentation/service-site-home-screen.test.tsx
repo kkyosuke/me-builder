@@ -57,4 +57,12 @@ describe("ServiceSiteHomeScreen", () => {
     expect(screen.getAllByText("提供準備中")).toHaveLength(6);
     expect(screen.getByText(/現在は購入できません/u)).toBeTruthy();
   });
+
+  it("LINE Account復旧の実装済み範囲と事前コードがない場合の境界を説明する", () => {
+    render(<ServiceSiteHomeScreen />);
+
+    expect(screen.getByText(/事前に発行・保存した一回限りの復旧コード/u)).toBeTruthy();
+    expect(screen.getByText(/コードがない場合は自動復旧できない/u)).toBeTruthy();
+    expect(screen.queryByText(/現在の仕組みでは、Accountを復旧できないことがあります/u)).toBeNull();
+  });
 });

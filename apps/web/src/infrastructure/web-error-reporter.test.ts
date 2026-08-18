@@ -215,6 +215,40 @@ describe("web error reporter", () => {
     expect(body).not.toContain("Stripeの生のエラー");
   });
 
+  it("復旧コードを含む例外からもコードをtelemetry payloadへ送らない", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const reporter = createWebErrorReporter({
+      apiUrl: "https://api.example",
+      release: "abcdef123456",
+      csrfToken: () => "csrf-session-token",
+      fetch,
+      now: () => 1,
+      browserContext: () => ({
+        origin: "https://web.example",
+        pathname: "/account-recovery",
+        online: true,
+      }),
+    });
+    const recoveryCode = "credential-id.recovery-secret-must-not-leak";
+    const error = new TypeError(`Account recovery failed for ${recoveryCode}`);
+    error.stack = `TypeError: ${recoveryCode}\n    at submit (https://web.example/assets/recovery-AbC.js:12:34)`;
+
+    reporter.report({ kind: "unhandled-rejection", error });
+    await Promise.resolve();
+
+    const body = String(fetch.mock.calls[0]?.[1]?.body);
+    expect(JSON.parse(body)).toMatchObject({
+      kind: "unhandled-rejection",
+      route: "/account-recovery",
+      errorType: "TypeError",
+      sourceFile: "recovery-AbC.js",
+    });
+    expect(body).not.toContain(recoveryCode);
+    expect(body).not.toContain("recovery-secret-must-not-leak");
+  });
+
   it("CSRF tokenがない間は送信せず、描画エラーの自サイトframeだけを送る", () => {
     let csrfToken: string | null = null;
     const fetch = vi

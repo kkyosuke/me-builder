@@ -207,6 +207,78 @@ describe("account recovery action", () => {
     ).resolves.toEqual({ sessionVersion: 2 });
   });
 
+  it("2つのIdentityが同じコードを同時消費しても1つだけを原子的に復旧する", async () => {
+    const db = createTestDb();
+    const target = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-old-race",
+    });
+    const browserA = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-new-race-a",
+    });
+    const browserB = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-new-race-b",
+    });
+    await issueAccountRecoveryCredential(db, {
+      id: "credential-race",
+      accountId: target.account.id,
+      secretHash: "secret-hash",
+      expiresAt: new Date("2026-09-01T00:00:00Z"),
+      now: new Date("2026-08-01T00:00:00Z"),
+    });
+    const now = new Date("2026-08-15T00:00:00Z");
+
+    const results = await Promise.all([
+      completeAccountRecovery(db, {
+        credentialId: "credential-race",
+        expectedSecretHash: "secret-hash",
+        newProviderAccountId: "line-new-race-a",
+        sourceAccountId: browserA.account.id,
+        sourceIdentityId: browserA.identity.id,
+        identityFingerprint: "identity-fingerprint-a",
+        now,
+      }),
+      completeAccountRecovery(db, {
+        credentialId: "credential-race",
+        expectedSecretHash: "secret-hash",
+        newProviderAccountId: "line-new-race-b",
+        sourceAccountId: browserB.account.id,
+        sourceIdentityId: browserB.identity.id,
+        identityFingerprint: "identity-fingerprint-b",
+        now,
+      }),
+    ]);
+
+    expect([...results].sort()).toEqual(["invalid", "recovered"]);
+    const activeNewIdentities = await db.query.accountIdentities.findMany({
+      where: (table, { and, eq, inArray }) =>
+        and(
+          inArray(table.providerAccountId, ["line-new-race-a", "line-new-race-b"]),
+          eq(table.accountId, target.account.id),
+          eq(table.isDeleted, false),
+        ),
+    });
+    expect(activeNewIdentities).toHaveLength(1);
+    const accountsAfterRecovery = await db.query.accounts.findMany({
+      columns: { id: true, sessionVersion: true },
+      where: (table, { inArray }) =>
+        inArray(table.id, [target.account.id, browserA.account.id, browserB.account.id]),
+    });
+    expect(accountsAfterRecovery.filter((account) => account.sessionVersion === 2)).toHaveLength(2);
+    expect(await db.query.accountRecoveryAudits.findMany()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: "complete", outcome: "succeeded" }),
+      ]),
+    );
+    expect(
+      (await db.query.accountRecoveryAudits.findMany()).filter(
+        (audit) => audit.action === "complete" && audit.outcome === "succeeded",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("Messaging API側で別Accountに接続済みのLINE Identityを拒否する", async () => {
     const db = createTestDb();
     const target = await upsertIdentity(db, {

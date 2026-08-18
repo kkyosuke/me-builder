@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lte, ne, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 import {
@@ -10,6 +10,14 @@ import {
 export const ACCOUNT_RECOVERY_MAX_FAILED_ATTEMPTS = 5;
 const ACCOUNT_RECOVERY_ATTEMPT_WINDOW_MS = 15 * 60 * 1_000;
 const ACCOUNT_RECOVERY_LOCK_MS = 30 * 60 * 1_000;
+
+function changed(result: unknown): number {
+  return (
+    (result as { meta?: { changes?: number }; changes?: number } | undefined)?.meta?.changes ??
+    (result as { changes?: number } | undefined)?.changes ??
+    0
+  );
+}
 
 export async function issueAccountRecoveryCredential(
   db: SharedD1Client,
@@ -152,7 +160,7 @@ export async function completeAccountRecovery(
   },
 ): Promise<CompleteAccountRecoveryResult> {
   const now = input.now ?? new Date();
-  let credential = await findAccountRecoveryCredential(db, input.credentialId);
+  const credential = await findAccountRecoveryCredential(db, input.credentialId);
   if (
     !credential ||
     credential.secretHash !== input.expectedSecretHash ||
@@ -197,27 +205,46 @@ export async function completeAccountRecovery(
   );
   if (!sourceIdentity) return "invalid";
 
-  await db
+  // request固有tokenでコード消費を先取りし、同じbatch内で勝者だけが後続更新を行う。
+  // claimとconsumeを分けると、同じIdentityからの並行要求が双方とも移管へ進み得る。
+  const claimToken = crypto.randomUUID();
+  const auditOperationId = crypto.randomUUID();
+  const claimMatches = sql`exists (
+    select 1 from ${accountRecoveryCredentials}
+    where ${accountRecoveryCredentials.id} = ${input.credentialId}
+      and ${accountRecoveryCredentials.claimedIdentityHash} = ${claimToken}
+      and ${accountRecoveryCredentials.usedAt} is not null
+  )`;
+  const consume = db
     .update(accountRecoveryCredentials)
-    .set({ claimedIdentityHash: input.identityFingerprint, claimedAt: now })
+    .set({ claimedIdentityHash: claimToken, claimedAt: now, usedAt: now })
     .where(
       and(
         eq(accountRecoveryCredentials.id, input.credentialId),
+        eq(accountRecoveryCredentials.secretHash, input.expectedSecretHash),
+        gt(accountRecoveryCredentials.expiresAt, now),
         isNull(accountRecoveryCredentials.claimedIdentityHash),
         isNull(accountRecoveryCredentials.usedAt),
+        isNull(accountRecoveryCredentials.revokedAt),
       ),
     );
-  credential = await findAccountRecoveryCredential(db, input.credentialId);
-  if (!credential || credential.claimedIdentityHash !== input.identityFingerprint)
-    return "conflict";
 
   const queries = [];
+  queries.push(consume);
   if (sourceIdentity.accountId !== accountId) {
     queries.push(
       db
         .update(accountIdentities)
         .set({ accountId, updatedAt: now })
-        .where(eq(accountIdentities.id, sourceIdentity.id)),
+        .where(
+          and(
+            eq(accountIdentities.id, sourceIdentity.id),
+            eq(accountIdentities.accountId, input.sourceAccountId),
+            eq(accountIdentities.provider, "line_login"),
+            eq(accountIdentities.isDeleted, false),
+            claimMatches,
+          ),
+        ),
     );
   }
   queries.push(
@@ -225,7 +252,7 @@ export async function completeAccountRecovery(
     db
       .update(accounts)
       .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
-      .where(eq(accounts.id, credential.accountId)),
+      .where(and(eq(accounts.id, credential.accountId), claimMatches)),
     db
       .update(accountIdentities)
       .set({ isDeleted: true, deletedAt: now, updatedAt: now })
@@ -235,26 +262,9 @@ export async function completeAccountRecovery(
           inArray(accountIdentities.provider, ["line", "line_login"]),
           ne(accountIdentities.providerAccountId, input.newProviderAccountId),
           eq(accountIdentities.isDeleted, false),
+          claimMatches,
         ),
       ),
-    db
-      .update(accountRecoveryCredentials)
-      .set({ usedAt: now })
-      .where(
-        and(
-          eq(accountRecoveryCredentials.id, input.credentialId),
-          eq(accountRecoveryCredentials.claimedIdentityHash, input.identityFingerprint),
-          isNull(accountRecoveryCredentials.usedAt),
-        ),
-      ),
-    db.insert(accountRecoveryAudits).values({
-      operationId: crypto.randomUUID(),
-      accountId: credential.accountId,
-      action: "complete",
-      outcome: "succeeded",
-      identityFingerprint: input.identityFingerprint,
-      createdAt: now,
-    }),
   );
   if (input.sourceAccountId !== credential.accountId) {
     // Identity移管後も移管元Accountのsessionが残らないよう、同じbatchで失効させる。
@@ -262,10 +272,48 @@ export async function completeAccountRecovery(
       db
         .update(accounts)
         .set({ sessionVersion: sql`${accounts.sessionVersion} + 1`, updatedAt: now })
-        .where(eq(accounts.id, input.sourceAccountId)),
+        .where(and(eq(accounts.id, input.sourceAccountId), claimMatches)),
     );
   }
+  queries.push(
+    db.insert(accountRecoveryAudits).select(
+      db
+        .select({
+          operationId: sql<string>`${auditOperationId}`.as("operation_id"),
+          accountId: accountRecoveryCredentials.accountId,
+          action: sql<"complete">`'complete'`.as("action"),
+          outcome: sql<"succeeded">`'succeeded'`.as("outcome"),
+          reason: sql<string | null>`null`.as("reason"),
+          identityFingerprint: sql<string>`${input.identityFingerprint}`.as("identity_fingerprint"),
+          createdAt: sql<Date>`${accountRecoveryCredentials.claimedAt}`.as("created_at"),
+        })
+        .from(accountRecoveryCredentials)
+        .where(
+          and(
+            eq(accountRecoveryCredentials.id, input.credentialId),
+            eq(accountRecoveryCredentials.claimedIdentityHash, claimToken),
+          ),
+        ),
+    ),
+  );
   // Drizzleのbatch tuple型は可変長配列を受けないため、実行境界で共通query型へ狭める。
-  await db.batch(queries as [(typeof queries)[number], ...Array<(typeof queries)[number]>]);
+  const [consumeResult] = await db.batch(
+    queries as [(typeof queries)[number], ...Array<(typeof queries)[number]>],
+  );
+  if (changed(consumeResult) !== 1) {
+    const current = await findAccountRecoveryCredential(db, input.credentialId);
+    if (!current?.usedAt) return "invalid";
+    const recoveredIdentity = await db.query.accountIdentities.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, input.sourceIdentityId),
+          eq(table.accountId, accountId),
+          eq(table.provider, "line_login"),
+          eq(table.providerAccountId, input.newProviderAccountId),
+          eq(table.isDeleted, false),
+        ),
+    });
+    return recoveredIdentity ? "already-recovered" : "invalid";
+  }
   return "recovered";
 }
