@@ -12,7 +12,7 @@
 
 相性関係は2つのAccountに属するため、片方の`AccountData`へ正本を置きません。推測困難な招待IDから決定的に選ぶ`CompatibilityData` Durable Objectを1関係につき1つ作り、そのprivate SQLiteを招待と同意のSSoTにします。
 
-同意は相手単位の継続同意です。`CompatibilityData`は誰と誰が、いつ共有へ同意したかだけを保存し、共有した表示内容や指紋を保存しません。相性シートは表示時点で双方の`AccountData`から都度組み立てます。
+同意は相手単位の継続同意です。基本の相性シートは表示時点で双方の`AccountData`から都度組み立て、共有した表示文章や生の値を`CompatibilityData`へ保存しません。「2人の継続的な振り返り」を割り当てた関係だけは、前月との差分に必要な最小の表示帯snapshotを期限付きで保存します。
 
 各`AccountData`には、自分の一覧を組み立て、同じ相手との重複関係を防ぐための`compatibility_references`だけを保存します。共有D1には相性関係、表示名、同意、診断結果を保存しません。
 
@@ -46,6 +46,7 @@ flowchart LR
 | 受信者の同意時刻（`accepted_at`） | CompatibilityData SQLite | 受信者の明示的同意を送信者の同意と分ける |
 | 共有用の一人称文章と内部根拠参照 | 各AccountData SQLiteの専用projection | 本人向けまとめや生の根拠を関係データへ複製しない |
 | 生の回答、パラメータ値、表示文章 | 各AccountData SQLiteから都度計算 | 相性関係へ個人データを複製しない |
+| 月次振り返り用の比較snapshot | CompatibilityData SQLite | 双方へ同じ差分を返しつつ、AccountDataの非共有情報を関係データへ複製しない |
 | Accountごとの相性一覧参照 | 各AccountData SQLite | 全Account走査なしで本人の一覧を取得する |
 | Question、Diagnosis、Scoring Config | 共有D1 | 全Account共通の公開catalogである |
 
@@ -83,6 +84,55 @@ erDiagram
 招待確認用RPCは、表示名と期限だけを持つ専用previewを返します。Account ID、同意時刻、内部状態行をpreviewへ含めません。承諾時に重複関係を確認するために使う送信者Account IDは、画面表示用previewとは別の内部contextとして取得します。内部contextはHTTPレスポンスとログへ出しません。
 
 受信者は共有対象を個別に選べません。共有できる対象が0件のまま関係が成立した場合は、シートを組み立てられない準備待ちとして扱い、双方の対象がそろった時点で追加の同意なしにシートを返します。
+
+### 4.1 月次振り返り用の比較snapshot
+
+「2人の継続的な振り返り」の入力は、表示時点で双方へ共有できる相性シートだけに限定します。`CompatibilityData`は月、Diagnosis ID、Parameter ID、比較定義の版、双方の表示帯（低い・中央・高い）、および組み合わせの指紋を保存します。パラメータの生の数値、表示文章、日記、Brain Item、Source Record、共有専用projection、AccountDataの根拠IDは保存しません。
+
+```mermaid
+flowchart LR
+    A[AccountData A\n共有可能な診断projection] --> C[API Server\n現在の共通部分だけを比較]
+    B[AccountData B\n共有可能な診断projection] --> C
+    C --> S[CompatibilityData\n月・軸・表示帯・指紋]
+    S --> D[前月との差分]
+    C --> T[現在の違い・共通点から\n審査済みの話すテーマ]
+    D --> R[双方へ同じ振り返り]
+    T --> R
+```
+
+月keyは`Asia/Tokyo`の`YYYY-MM`とします。割り当て済みの関係で相性シートを取得した時点に、その月のsnapshotを現在共有できる共通部分へ更新します。差分は前月の最後のsnapshotと現在の相性シートを比較して作り、前月のsnapshotがなければ変化を返しません。取得後に回答が更新されても再取得されていない状態は記録せず、月をまたいで取得されなかった期間も推測で補完しません。
+
+話すテーマの文章は保存せず、現在の共有内容と審査済み定型文から都度決定的に組み立てます。双方の表示を一致させるため、参加者の入力順や閲覧者側の並び順ではなく、公開catalogのDiagnosisとParameterの順序で候補を決めます。
+
+snapshotは現在月と前月の2か月分だけを保持し、次の月のsnapshotを保存するときにそれ以前を削除します。関係が`accepted`であり、かつサブスクリプション設計に従う利用権限が割り当てられている場合だけ読み書きします。利用権限を失っている間は保存済みsnapshotを返さず更新もしません。再割り当て時に前月の有効なsnapshotがなければ、その月を新しい基準として扱います。
+
+回答削除などで現在共有できなくなった軸は、過去の表示帯をレスポンスへ戻しません。共有終了時は既存の比較済みテーマと同様に月次snapshotも関係の詳細として削除し、累積値へ変換して残しません。
+
+### 4.2 振り返りの利用権限割り当て
+
+利用できるPlanと関係数は[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md#41-機能一覧)を正とします。`CompatibilityData`は現在の割り当て元Accountだけを関係の状態として持ち、Plan、契約、残り枠を保存しません。各`AccountData`は本人が利用権限を割り当てた関係IDを持ち、本人の同時利用数を直列に予約します。クライアントが送ったPlanや上限値は使わず、API Serverが共通Entitlementから解決した上限だけを予約commandへ渡します。
+
+```mermaid
+sequenceDiagram
+    actor U as 利用権限を持つ本人
+    participant API as API Server
+    participant E as Entitlement
+    participant A as 本人のAccountData
+    participant C as CompatibilityData
+    U->>API: この関係へ割り当てる
+    API->>E: 現在の利用権限と上限を解決
+    API->>C: 成立中の参加者か確認
+    API->>A: 関係枠を予約
+    A-->>API: 予約済み / 上限到達
+    API->>C: 本人を割り当て元として設定
+    alt 設定に失敗
+        API->>A: 予約を補償解除
+    end
+```
+
+同じ関係に割り当て元は1 Accountだけとし、先に成立した割り当てを別の参加者が暗黙に上書きしません。解除は割り当て元本人だけが行えます。割り当て元のPlan終了、ファミリー席の終了、または上限低下を読み取り時に検出した場合は振り返りを返さず、安全側に停止します。`CompatibilityData`と`AccountData`をまたぐ途中失敗は冪等な再実行と補償解除で収束させ、片方に古い予約が残っても振り返りを誤って有効化しません。
+
+ファミリーパック参加者間の枠は、両者が同じactiveなパックに属することを課金境界で確認した場合だけ内部関係として扱います。Relationship Categoryが`family`であることだけを根拠にせず、パック外の関係は外部関係の上限へ数えます。
 
 ## 5. AccountDataの一覧参照
 
