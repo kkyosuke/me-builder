@@ -16,11 +16,13 @@ const statusLabels: Record<GoalFollowUpStatus, string> = {
 function FollowUpCard({
   item,
   pending,
+  disabled,
   canManage,
   onUpdate,
 }: {
   item: GoalFollowUpItem;
   pending: boolean;
+  disabled: boolean;
   canManage: boolean;
   onUpdate: (input: Readonly<{ status?: GoalFollowUpStatus; nextStep?: string }>) => void;
 }) {
@@ -40,7 +42,7 @@ function FollowUpCard({
           <input
             value={nextStep}
             maxLength={500}
-            disabled={pending}
+            disabled={disabled}
             onChange={(event) => setNextStep(event.currentTarget.value)}
             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
@@ -52,7 +54,7 @@ function FollowUpCard({
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={pending || !nextStep.trim() || nextStep.trim() === item.nextStep}
+            disabled={disabled || !nextStep.trim() || nextStep.trim() === item.nextStep}
             onClick={() => onUpdate({ nextStep: nextStep.trim() })}
             className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium disabled:opacity-50 dark:border-slate-700"
           >
@@ -65,7 +67,7 @@ function FollowUpCard({
           </button>
           <button
             type="button"
-            disabled={pending}
+            disabled={disabled}
             onClick={() => onUpdate({ status: "completed" })}
             className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
           >
@@ -73,7 +75,7 @@ function FollowUpCard({
           </button>
           <button
             type="button"
-            disabled={pending}
+            disabled={disabled}
             onClick={() => onUpdate({ status: "stopped" })}
             className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium disabled:opacity-50 dark:border-slate-700"
           >
@@ -88,10 +90,12 @@ function FollowUpCard({
 function CandidateCard({
   candidate,
   pending,
+  disabled,
   onAgree,
 }: {
   candidate: GoalFollowUpResult["candidates"][number];
   pending: boolean;
+  disabled: boolean;
   onAgree: (nextStep: string) => void;
 }) {
   const [nextStep, setNextStep] = useState("");
@@ -103,7 +107,7 @@ function CandidateCard({
         <input
           value={nextStep}
           maxLength={500}
-          disabled={pending}
+          disabled={disabled}
           placeholder="例: 明日の朝、5分だけ始める"
           onChange={(event) => setNextStep(event.currentTarget.value)}
           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
@@ -111,7 +115,7 @@ function CandidateCard({
       </label>
       <button
         type="button"
-        disabled={pending || !nextStep.trim()}
+        disabled={disabled || !nextStep.trim()}
         onClick={() => onAgree(nextStep.trim())}
         className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
       >
@@ -167,7 +171,8 @@ export function GoalFollowUpSection({
     );
   }
   const activeItems = state.data.items.filter(({ status }) => status === "active");
-  const pastItems = state.data.items.filter(({ status }) => status !== "active");
+  const pastItems = state.data.items.filter(({ status }) => status !== "active").slice(0, 20);
+  const busy = pendingId !== null;
   const limitReached =
     state.data.activeLimit !== null && activeItems.length >= state.data.activeLimit;
   return (
@@ -181,7 +186,11 @@ export function GoalFollowUpSection({
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
         自分で選んだ小さな一歩を、次の会話で自然に振り返れます。
       </p>
-      {operationError ? <p className="mt-3 text-sm text-rose-600">{operationError}</p> : null}
+      {operationError ? (
+        <p role="alert" className="mt-3 text-sm text-rose-600">
+          {operationError}
+        </p>
+      ) : null}
       {activeItems.length > 0 ? (
         <div className="mt-3 space-y-3">
           {activeItems.map((item) => (
@@ -189,6 +198,7 @@ export function GoalFollowUpSection({
               key={item.id}
               item={item}
               pending={pendingId === item.id}
+              disabled={busy}
               canManage={state.data.canManage}
               onUpdate={(input) => onUpdate(item.id, input)}
             />
@@ -207,6 +217,7 @@ export function GoalFollowUpSection({
               key={candidate.brainItemId}
               candidate={candidate}
               pending={pendingId === candidate.brainItemId}
+              disabled={busy}
               onAgree={(nextStep) => onAgree(candidate.brainItemId, nextStep)}
             />
           ))}
@@ -234,6 +245,7 @@ export function GoalFollowUpSection({
                 key={item.id}
                 item={item}
                 pending={false}
+                disabled={false}
                 canManage={state.data.canManage}
                 onUpdate={() => undefined}
               />

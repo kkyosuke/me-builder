@@ -13,6 +13,7 @@ export function useGoalFollowUps() {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const mutationId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     controller.current?.abort();
@@ -39,6 +40,8 @@ export function useGoalFollowUps() {
 
   const run = useCallback(
     async (id: string, operation: () => Promise<unknown>) => {
+      if (mutationId.current !== null) return;
+      mutationId.current = id;
       setPendingId(id);
       setOperationError(null);
       try {
@@ -49,6 +52,7 @@ export function useGoalFollowUps() {
           error instanceof Error ? error.message : "行動のフォローアップを更新できませんでした。",
         );
       } finally {
+        mutationId.current = null;
         setPendingId(null);
       }
     },

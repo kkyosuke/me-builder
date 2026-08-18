@@ -170,8 +170,12 @@ export const profileSummaryActions = {
       message,
       failedAt,
     ),
-  "goalFollowUp.read": (db: DO.account.Database, accountId: string, at?: Date) =>
-    DO.account.action.goalFollowUp.readGoalFollowUps(db, accountId, at),
+  "goalFollowUp.read": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+    includeCandidates?: boolean,
+  ) => DO.account.action.goalFollowUp.readGoalFollowUps(db, accountId, at, includeCandidates),
   "goalFollowUp.agree": (
     db: DO.account.Database,
     accountId: string,

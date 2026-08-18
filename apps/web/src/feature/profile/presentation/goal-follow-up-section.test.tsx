@@ -80,4 +80,37 @@ describe("GoalFollowUpSection", () => {
     expect(screen.getByText(/新しいフォローアップと変更はLite以上/u)).toBeDefined();
     expect(screen.queryByRole("button", { name: "完了" })).toBeNull();
   });
+
+  it("更新中は別のGoal候補を含むすべての変更操作を止める", () => {
+    render(
+      <GoalFollowUpSection
+        state={{ status: "success", data: result }}
+        pendingId="follow-1"
+        operationError={null}
+        onRetry={vi.fn()}
+        onAgree={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "完了" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "この行動を続ける" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  it("操作エラーを支援技術へ通知する", () => {
+    render(
+      <GoalFollowUpSection
+        state={{ status: "success", data: result }}
+        pendingId={null}
+        operationError="更新できませんでした。"
+        onRetry={vi.fn()}
+        onAgree={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("alert").textContent).toContain("更新できませんでした");
+  });
 });
