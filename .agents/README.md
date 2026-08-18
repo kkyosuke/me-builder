@@ -73,6 +73,7 @@
 | [相性API契約](../docs/development/compatibility-api.md) | Web UIとAPI Server間の相性APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
 | [サービス利用規約の公開運用](../docs/development/service-terms-release.md) | 規約versionの追加、再同意要否の確認、本文hash検証、Preview確認、forward-onlyな訂正手順 |
+| [サービス利用規約・同意残タスク](../docs/development/service-terms-remaining-tasks.md) | 規約同意の実環境横断検証、改定告知、未同意時のデータ保護操作、法務確認の未完了事項 |
 | [アプリケーション運用ログ方針](../docs/development/operational-logging.md) | 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方 |
 | [本番データベースマイグレーション運用](../docs/development/production-migration-operations.md) | 本番D1とDurable Objectのforward-only、expand-contract、適用順序、障害時の復旧方針 |
 | [Web認証・SSO実装残タスク](../docs/development/web-authentication-remaining-tasks.md) | API共通認証、Web／LIFF移行、SSO追加を番号付きPRへ分けた依存順、完了条件、リリースゲート |

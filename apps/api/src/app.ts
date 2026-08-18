@@ -302,6 +302,7 @@ app.get("/api/health", (c) => {
 app.post(
   "/api/observability/web-errors",
   requireAuthentication,
+  requireCurrentTerms,
   webClientErrorReportRoute,
   postWebClientError,
 );
@@ -356,6 +357,7 @@ app.get("/api/billing/plans", billingPlanCatalogRoute, getBillingPlanCatalog);
 app.get(
   "/api/billing/trial-eligibility",
   requireAuthentication,
+  requireCurrentTerms,
   billingTrialEligibilityRoute,
   getBillingTrialEligibilityResponse,
 );
@@ -376,6 +378,7 @@ app.post(
 app.get(
   "/api/billing/checkout-sessions/:checkoutSessionId",
   requireAuthentication,
+  requireCurrentTerms,
   billingCheckoutSessionStatusRoute,
   getBillingCheckoutSession,
 );

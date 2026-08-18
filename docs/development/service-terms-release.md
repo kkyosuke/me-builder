@@ -64,6 +64,8 @@ task terms:verify
 - 重要改定が1件以上あり、最新の同意必須versionを解決できること
 - 全公開済みversionの本文と運用属性が固定hashから変更されていないこと
 
+PreviewとProductionのCDは、外部resourceの変更やデプロイより前に`task terms:verify`を独立したrelease gateとして実行します。不一致時は後続stepへ進みません。`task ci`にも同じ検証を含めますが、Preview CDは全CIを実行しないため、このgateを省略できません。
+
 ## 4. Previewとレビュー
 
 Previewでは、初回利用者と既存利用者の両方で確認します。
@@ -79,3 +81,5 @@ PRでは変更理由、`requiresReacceptance`の判断根拠、Preview確認結�
 ## 5. 公開後の訂正
 
 公開後に誤りが見つかった場合は、[版管理規則](../product/service-terms-consent-experience.md#3-規約の版管理)に従い、一覧の末尾へ訂正版を追加します。訂正版も通常の公開フローを通し、再同意要否を改めて確認します。
+
+実環境でだけ確認できる事項と、法務・プロダクト判断を待つ事項は[サービス利用規約・同意残タスク](service-terms-remaining-tasks.md)で管理します。

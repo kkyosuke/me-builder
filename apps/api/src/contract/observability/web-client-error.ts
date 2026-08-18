@@ -7,7 +7,7 @@ import {
 } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors } from "../shared/errors";
+import { authenticatedErrors, currentTermsPolicyError } from "../shared/errors";
 
 const webClientErrorReportEntries = {
   schemaVersion: v.literal(1),
@@ -96,5 +96,6 @@ export const webClientErrorReportRoute = describeRoute({
     413: { description: "request bodyが上限を超えている" },
     429: { description: "ブラウザエラー受付の流量上限を超えた" },
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
