@@ -81,6 +81,7 @@
 | [LIFF交換・アプリケーションセッション境界検証Runbook](../docs/development/application-session-boundary-verification.md) | デプロイ後のCookie／Origin／CSRF検査、実端末・2 Account／2タブ・障害時の検証、証跡形式 |
 | [SSO Preview検証Runbook](../docs/development/sso-preview-verification.md) | LIFF／SSOのPreview成功・失敗シナリオ、切り戻し、証跡、完了判定 |
 | [SSO Production段階公開Runbook](../docs/development/sso-production-rollout.md) | Productionへの段階公開phase、監視ゲート、即時停止、再開、完了判定 |
+| [MCP実装残タスク](../docs/development/mcp-remaining-tasks.md) | Phase 2のMCP提供前に決める認可・同意・監査・解除と、501公開境界、実装順 |
 | [サブスクリプション実装残タスク](../docs/development/subscription-remaining-tasks.md) | AccountとPlanを紐づける決済系列と、紐付け後の利用権限・機能系列に分けた番号付きPR単位の残作業 |
 | [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |
