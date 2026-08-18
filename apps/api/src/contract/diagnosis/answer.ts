@@ -3,6 +3,7 @@ import * as v from "valibot";
 import {
   AccountNotFoundErrorSchema,
   authenticatedErrors,
+  csrfValidationError,
   currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
@@ -61,6 +62,7 @@ export const saveDiagnosisAnswerRoute = describeRoute({
   },
   responses: {
     200: jsonResponse("保存済み回答と現在の進捗", SaveDiagnosisAnswerResponseSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
     400: jsonResponse("リクエストJSONが不正", InvalidRequestErrorSchema),

@@ -6,7 +6,7 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { Hono } from "hono";
-import { openAPIRouteHandler } from "hono-openapi";
+import { generateSpecs } from "hono-openapi";
 import { cors } from "hono/cors";
 import * as v from "valibot";
 import { getConfig } from "./config";
@@ -38,6 +38,7 @@ import {
   billingPortalSessionRoute,
   billingTrialEligibilityRoute,
 } from "./contract/billing/sessions";
+import { stripeWebhookRoute } from "./contract/billing/webhook";
 import { developmentBrainItemsRoute, developmentBrainVectorRoute } from "./contract/brain/dev-list";
 import {
   developmentFailedBrainVectorSyncJobsRoute,
@@ -73,12 +74,14 @@ import {
   leaveFamilyPackRoute,
   removeFamilyMemberRoute,
 } from "./contract/family/seats";
+import { HealthResponseSchema, healthRoute } from "./contract/health";
 import {
   acceptServiceTermsRequestValidator,
   acceptServiceTermsRoute,
   getServiceTermsAcceptanceHistoryRoute,
   getServiceTermsRoute,
 } from "./contract/legal/terms";
+import { lineWebhookRoute } from "./contract/line/webhook";
 import { webClientErrorReportRoute } from "./contract/observability/web-client-error";
 import { openApiOptions } from "./contract/openapi";
 import {
@@ -114,6 +117,10 @@ import {
   weeklyReflectionGenerationRoute,
   weeklyReflectionRoute,
 } from "./contract/profile/weekly-reflection";
+import {
+  type RuntimeContractDocument,
+  assertRuntimeResponseContract,
+} from "./contract/runtime-response";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
 import {
   postAccountRecoveryCode,
@@ -229,6 +236,13 @@ import { operationalHttpPath } from "./operational-http-path";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
+let openApiDocumentPromise: ReturnType<typeof generateSpecs> | undefined;
+
+export function generateOpenApiDocument() {
+  openApiDocumentPromise ??= generateSpecs(app, openApiOptions);
+  return openApiDocumentPromise;
+}
+
 const webCors = cors({
   origin: (origin, c) => (origin === getConfig(c.env).webOrigin ? origin : undefined),
   allowHeaders: ["Content-Type", "X-CSRF-Token"],
@@ -239,6 +253,18 @@ app.use("*", async (c, next) => {
   const origin = c.req.header("Origin");
   if (!origin || origin !== getConfig(c.env).webOrigin) return next();
   return webCors(c, next);
+});
+
+app.use("/api/*", async (c, next) => {
+  await next();
+  const routePath = c.req.routePath;
+  if (routePath === "/api/openapi.json" || routePath === "/api/*") return;
+  assertRuntimeResponseContract(
+    (await generateOpenApiDocument()) as RuntimeContractDocument,
+    c.req.method,
+    routePath,
+    c.res,
+  );
 });
 
 // 例外の分類はここでしか作れないが、最終statusを知るのはmiddlewareなので、
@@ -290,13 +316,15 @@ app.use("*", async (c, next) => {
   else logger.warn(fields, description);
 });
 
-app.get("/api/health", (c) => {
+app.get("/api/health", healthRoute, (c) => {
   const currentConfig = getConfig(c.env);
-  return c.json({
-    status: "ok",
-    environment: currentConfig.environment,
-    timestamp: new Date().toISOString(),
-  });
+  return c.json(
+    v.parse(HealthResponseSchema, {
+      status: "ok",
+      environment: currentConfig.environment,
+      timestamp: new Date().toISOString(),
+    }),
+  );
 });
 
 app.post(
@@ -305,7 +333,7 @@ app.post(
   webClientErrorReportRoute,
   postWebClientError,
 );
-app.post("/api/line/webhook", postLineWebhook);
+app.post("/api/line/webhook", lineWebhookRoute, postLineWebhook);
 app.get(
   "/api/auth/sso/identity",
   getSsoIdentityStatusRoute,
@@ -326,7 +354,7 @@ app.post(
 );
 app.post("/api/auth/sso/login", startSsoLoginRoute, postSsoLogin);
 app.get("/api/auth/sso/callback", completeSsoCallbackRoute, getSsoCallback);
-app.post("/api/billing/webhook", postStripeWebhook);
+app.post("/api/billing/webhook", stripeWebhookRoute, postStripeWebhook);
 app.post(
   "/api/auth/liff/exchange",
   liffAuthenticationExchangeRoute,
@@ -800,7 +828,7 @@ app.delete(
 );
 
 // Web UIの型生成にも使う、機械可読なAPI契約。
-app.get("/api/openapi.json", openAPIRouteHandler(app, openApiOptions));
+app.get("/api/openapi.json", async (c) => c.json(await generateOpenApiDocument()));
 
 app.get("/", (c) => c.text("me-builder API Server running!"));
 

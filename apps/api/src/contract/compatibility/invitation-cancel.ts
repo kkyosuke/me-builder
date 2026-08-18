@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
+import {
+  authenticatedErrors,
+  csrfValidationError,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 export const compatibilityInvitationCancelRoute = describeRoute({
   operationId: "cancelCompatibilityInvitation",
@@ -9,6 +14,7 @@ export const compatibilityInvitationCancelRoute = describeRoute({
   security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     204: { description: "招待を取り消した" },
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
     404: jsonResponse(

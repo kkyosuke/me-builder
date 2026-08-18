@@ -18,10 +18,71 @@
         "in": "header",
         "name": "X-CSRF-Token",
         "description": "application sessionによる状態変更requestで要求するCSRF token"
+      },
+      "lineWebhookSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-line-signature",
+        "description": "LINEチャネルシークレットで検証するHMAC-SHA256署名"
+      },
+      "stripeWebhookSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "stripe-signature",
+        "description": "Stripe Webhook endpoint secretで検証する署名"
       }
     }
   },
   "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": ["System"],
+        "summary": "API Serverの死活状態を取得する",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API Serverの死活状態",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    },
+                    "environment": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["status", "environment", "timestamp"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/observability/web-errors": {
       "post": {
         "operationId": "reportWebClientError",
@@ -187,7 +248,20 @@
             }
           },
           "403": {
-            "description": "許可済みWeb Originではない"
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
           },
           "404": {
             "description": "対応するAccountが存在しない",
@@ -249,6 +323,86 @@
         }
       }
     },
+    "/api/line/webhook": {
+      "post": {
+        "operationId": "receiveLineWebhook",
+        "tags": ["LINE"],
+        "summary": "LINE署名を検証してWebhook eventを受理する",
+        "security": [
+          {
+            "lineWebhookSignature": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "署名検証済みWebhook eventの受理結果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    },
+                    "queued": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": ["status", "queued", "id"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "LINE署名がない、無効、または検証設定がない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/sso/identity": {
       "get": {
         "operationId": "getSsoIdentityStatus",
@@ -288,6 +442,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
                     }
                   },
                   "required": ["error"]
@@ -343,6 +513,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "409": {
             "description": "最後のログイン方法なので解除不可",
             "content": {
@@ -352,6 +538,22 @@
                   "properties": {
                     "error": {
                       "const": "Last login identity cannot be unlinked"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
                     }
                   },
                   "required": ["error"]
@@ -435,6 +637,38 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "503": {
             "description": "SSOまたはstorage bindingが未設定",
             "content": {
@@ -459,6 +693,7 @@
         "operationId": "startSsoLogin",
         "tags": ["Authentication"],
         "summary": "外部ブラウザのSSOログインを開始する",
+        "security": [],
         "parameters": [
           {
             "name": "returnTo",
@@ -489,6 +724,22 @@
               }
             }
           },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "503": {
             "description": "SSOまたはstorage bindingが未設定",
             "content": {
@@ -513,12 +764,121 @@
         "operationId": "completeSsoCallback",
         "tags": ["Authentication"],
         "summary": "SSO callbackを一度だけ処理する",
+        "security": [],
         "responses": {
           "302": {
             "description": "保存済みの同一origin相対pathへredirect"
           },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "503": {
             "description": "SSOまたはstorage bindingが未設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billing/webhook": {
+      "post": {
+        "operationId": "receiveStripeWebhook",
+        "tags": ["Billing"],
+        "summary": "Stripe署名を検証して課金Webhook eventを受理する",
+        "security": [
+          {
+            "stripeWebhookSignature": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "署名検証済みWebhook eventの受理結果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    },
+                    "queued": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["status", "queued"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Stripe署名またはpayloadが無効",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid webhook"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "StripeまたはQueue設定がない",
             "content": {
               "application/json": {
                 "schema": {
@@ -541,6 +901,7 @@
         "operationId": "exchangeLiffCredential",
         "tags": ["Authentication"],
         "summary": "検証済みLIFF credentialをprovider非依存sessionへ交換する",
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -1034,6 +1395,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -1252,6 +1629,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -1355,6 +1748,7 @@
         "operationId": "getBillingPlanCatalog",
         "tags": ["Billing"],
         "summary": "現在購入できる有料Planと税込価格を取得する",
+        "security": [],
         "responses": {
           "200": {
             "description": "公開可能なPlan catalog",
@@ -1428,6 +1822,22 @@
                     }
                   },
                   "required": ["plans"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
                 }
               }
             }
@@ -1637,6 +2047,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -1835,6 +2261,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -2095,6 +2537,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -2341,6 +2799,22 @@
               }
             }
           },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "503": {
             "description": "D1 bindingが設定されていない",
             "content": {
@@ -2441,6 +2915,22 @@
               }
             }
           },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "503": {
             "description": "D1 bindingが設定されていない",
             "content": {
@@ -2532,6 +3022,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "409": {
             "description": "表示後に規約versionが更新された",
             "content": {
@@ -2548,6 +3054,22 @@
                     }
                   },
                   "required": ["error", "currentVersion"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
                 }
               }
             }
@@ -4147,6 +4669,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -4584,6 +5122,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -4967,6 +5521,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -5179,6 +5749,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -6129,6 +6715,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -6322,6 +6924,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -6712,6 +7330,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "本人が所有する有効な原本がない",
             "content": {
@@ -6852,6 +7486,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -7218,6 +7868,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -7403,6 +8069,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -9093,6 +9775,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountが存在しない",
             "content": {
@@ -9351,7 +10049,8 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "properties": {},
+                  "required": []
                 }
               }
             }
@@ -10005,6 +10704,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "招待または対応するAccountを利用できない",
             "content": {
@@ -10172,6 +10887,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -10725,6 +11456,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -11561,6 +12308,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "相性関係または対応するAccountを利用できない",
             "content": {
@@ -11882,6 +12645,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "開発環境ではない、または対応するAccountがない",
             "content": {
@@ -12005,6 +12784,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -13500,6 +14295,22 @@
               }
             }
           },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "404": {
             "description": "対応するAccountがない、またはDiagnosisが公開されていない",
             "content": {
@@ -13714,6 +14525,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -13953,6 +14780,22 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]

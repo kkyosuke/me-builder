@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
+import {
+  authenticatedErrors,
+  csrfValidationError,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const Text = v.pipe(v.string(), v.trim(), v.nonEmpty());
 const Kind = v.picklist(["worked", "did-not-work", "recent-state"]);
@@ -63,7 +68,11 @@ export const selfCareContextConfirmationRoute = describeRoute({
       },
     },
   },
-  responses: { 200: jsonResponse("確認結果", SelfCareContextMutationSchema), ...errors },
+  responses: {
+    200: jsonResponse("確認結果", SelfCareContextMutationSchema),
+    ...csrfValidationError,
+    ...errors,
+  },
 } satisfies DescribeRouteOptions);
 
 export const selfCareContextRevocationRoute = describeRoute({
@@ -71,5 +80,9 @@ export const selfCareContextRevocationRoute = describeRoute({
   tags: ["Profile"],
   summary: "本人が確認を撤回する",
   security: [{ applicationSession: [], csrfToken: [] }],
-  responses: { 200: jsonResponse("撤回結果", SelfCareContextMutationSchema), ...errors },
+  responses: {
+    200: jsonResponse("撤回結果", SelfCareContextMutationSchema),
+    ...csrfValidationError,
+    ...errors,
+  },
 } satisfies DescribeRouteOptions);

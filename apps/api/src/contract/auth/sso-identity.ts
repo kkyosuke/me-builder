@@ -3,6 +3,8 @@ import * as v from "valibot";
 import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
+  csrfValidationError,
+  internalServerError,
   jsonResponse,
 } from "../shared/errors";
 
@@ -31,6 +33,7 @@ const returnToParameter = {
 const commonErrors = {
   401: jsonResponse("application sessionが無効", UnauthorizedErrorSchema),
   503: jsonResponse("SSOまたはstorage bindingが未設定", ServiceUnavailableErrorSchema),
+  ...internalServerError,
 };
 
 export const getSsoIdentityStatusRoute = describeRoute({
@@ -52,6 +55,7 @@ export const startSsoIdentityLinkRoute = describeRoute({
   parameters: [returnToParameter],
   responses: {
     200: jsonResponse("同じbrowserで開くAuth0認可URL", SsoAuthorizationUrlSchema),
+    ...csrfValidationError,
     ...commonErrors,
   },
 } satisfies DescribeRouteOptions);
@@ -60,10 +64,12 @@ export const startSsoLoginRoute = describeRoute({
   operationId: "startSsoLogin",
   tags: ["Authentication"],
   summary: "外部ブラウザのSSOログインを開始する",
+  security: [],
   parameters: [returnToParameter],
   responses: {
     200: jsonResponse("同じbrowserで開くAuth0認可URL", SsoAuthorizationUrlSchema),
     503: jsonResponse("SSOまたはstorage bindingが未設定", ServiceUnavailableErrorSchema),
+    ...internalServerError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -71,9 +77,11 @@ export const completeSsoCallbackRoute = describeRoute({
   operationId: "completeSsoCallback",
   tags: ["Authentication"],
   summary: "SSO callbackを一度だけ処理する",
+  security: [],
   responses: {
     302: { description: "保存済みの同一origin相対pathへredirect" },
     503: jsonResponse("SSOまたはstorage bindingが未設定", ServiceUnavailableErrorSchema),
+    ...internalServerError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -85,6 +93,7 @@ export const unlinkSsoIdentityRoute = describeRoute({
   responses: {
     204: { description: "解除済み" },
     409: jsonResponse("最後のログイン方法なので解除不可", LastIdentityConflictSchema),
+    ...csrfValidationError,
     ...commonErrors,
   },
 } satisfies DescribeRouteOptions);

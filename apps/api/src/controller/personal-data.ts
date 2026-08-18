@@ -2,6 +2,7 @@ import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
 import {
+  PersonalDataExportArchiveSchema,
   PersonalDataExportExpiredSchema,
   PersonalDataExportNotFoundSchema,
   PersonalDataExportNotReadySchema,
@@ -148,7 +149,13 @@ export async function postPersonalDataExport(c: Context<AppEnv>): Promise<Respon
   if (!deps) return unavailable(c);
   const outcome = await requestPersonalDataExport(deps);
   c.header("Cache-Control", "no-store");
-  return c.json({ ...exportResponse(outcome.result.export), outcome: outcome.result.outcome }, 202);
+  return c.json(
+    v.parse(PersonalDataExportResponseSchema, {
+      ...exportResponse(outcome.result.export),
+      outcome: outcome.result.outcome,
+    }),
+    202,
+  );
 }
 
 export async function getPersonalDataExportStatus(c: Context<AppEnv>): Promise<Response> {
@@ -191,12 +198,15 @@ export async function downloadPersonalDataExportContents(c: Context<AppEnv>): Pr
       409,
     );
   }
-  return new Response(JSON.stringify(outcome.result.archive), {
-    headers: {
-      "Cache-Control": "private, no-store",
-      "Content-Disposition": `attachment; filename="me-builder-personal-data-${exportId}.json"`,
-      "Content-Type": "application/json; charset=utf-8",
-      Expires: new Date(outcome.result.expiresAt).toUTCString(),
+  return new Response(
+    JSON.stringify(v.parse(PersonalDataExportArchiveSchema, outcome.result.archive)),
+    {
+      headers: {
+        "Cache-Control": "private, no-store",
+        "Content-Disposition": `attachment; filename="me-builder-personal-data-${exportId}.json"`,
+        "Content-Type": "application/json; charset=utf-8",
+        Expires: new Date(outcome.result.expiresAt).toUTCString(),
+      },
     },
-  });
+  );
 }

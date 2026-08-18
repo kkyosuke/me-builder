@@ -3,6 +3,7 @@ import * as v from "valibot";
 import {
   AccountNotFoundErrorSchema,
   authenticatedErrors,
+  csrfValidationError,
   currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
@@ -37,6 +38,7 @@ export const resetDevelopmentAccountDataRoute = describeRoute({
       "削除した本人のAccountData件数とVector削除予定件数",
       ResetDevelopmentAccountDataResponseSchema,
     ),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
     404: jsonResponse("開発環境ではない、または対応するAccountがない", ResetNotFoundErrorSchema),

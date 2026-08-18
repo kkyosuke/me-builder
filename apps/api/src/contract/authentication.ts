@@ -25,6 +25,7 @@ export const liffAuthenticationExchangeRoute = describeRoute({
   operationId: "exchangeLiffCredential",
   tags: ["Authentication"],
   summary: "検証済みLIFF credentialをprovider非依存sessionへ交換する",
+  security: [],
   requestBody: {
     required: true,
     content: { "application/json": { schema: LiffAuthenticationExchangeRequestSchema } },

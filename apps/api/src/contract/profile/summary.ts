@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
+import {
+  authenticatedErrors,
+  csrfValidationError,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
@@ -118,6 +123,7 @@ export const profileSummaryGenerationRoute = describeRoute({
       "記録不足、再生成不要、または利用上限",
       ProfileSummaryGenerationUnavailableSchema,
     ),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
   },

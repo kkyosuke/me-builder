@@ -3,6 +3,7 @@ import * as v from "valibot";
 import {
   AccountNotFoundErrorSchema,
   authenticatedErrors,
+  csrfValidationError,
   currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
@@ -34,8 +35,8 @@ export const ResetAllDevelopmentBrainVectorSyncJobsResponseSchema = v.object({
   resetCount: CountSchema,
 });
 
-const DevelopmentRouteNotFoundErrorSchema = v.object({ error: v.literal("Not Found") });
-const FailedJobNotFoundErrorSchema = v.object({
+export const DevelopmentRouteNotFoundErrorSchema = v.object({ error: v.literal("Not Found") });
+export const FailedJobNotFoundErrorSchema = v.object({
   error: v.literal("Failed vector sync job not found"),
 });
 const DevelopmentOrAccountNotFoundSchema = v.union([
@@ -74,6 +75,7 @@ export const resetDevelopmentBrainVectorSyncJobRoute = describeRoute({
   security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     200: jsonResponse("reset結果", ResetDevelopmentBrainVectorSyncJobResponseSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
     404: jsonResponse(
@@ -90,6 +92,7 @@ export const resetAllDevelopmentBrainVectorSyncJobsRoute = describeRoute({
   security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     200: jsonResponse("resetしたjob件数", ResetAllDevelopmentBrainVectorSyncJobsResponseSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
     404: jsonResponse(

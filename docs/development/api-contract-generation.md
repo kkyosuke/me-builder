@@ -60,4 +60,6 @@ task generate:api
 
 API Serverは同じdocumentを`GET /api/openapi.json`でも提供します。PreviewとProductionでの公開範囲は[インフラ・システム構成のAPIドキュメント用Cloudflare Access境界](../architecture/infrastructure-architecture.md#61-apiドキュメントのcloudflare-access境界)に従います。リポジトリ内の生成処理は`apps/api/openapi.json`を直接入力とするため、Cloudflare Accessには依存しません。
 
-`task ci`とGitHub Actionsは再生成後にGit差分が残らないことを検査するため、contract変更時は生成物も同じcommitへ含めます。
+`task ci`とGitHub Actionsの`check:generated`は、OpenAPI documentとWeb UI用TypeScript型を単一コマンドで再生成し、両方にGit差分が残らないことを検査します。contract変更時は生成物も同じcommitへ含めます。
+
+API contractテストは、Honoへ登録された`/api/*`のruntime route（OpenAPI document自身を除く）とOpenAPIのpath／HTTP methodを双方向比較します。また、全operationで`operationId`、security、response status、schema、content typeを必須検査し、空bodyとbinary responseも表現に応じて検査します。runtimeでも実際に返すstatusとcontent typeを同じOpenAPI documentへ照合します。routeを追加するときはcontract middlewareを同じrouteへ登録し、公開routeを含めてsecurityを明示します。

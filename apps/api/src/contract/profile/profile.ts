@@ -3,6 +3,7 @@ import * as v from "valibot";
 import {
   ServiceUnavailableErrorSchema,
   authenticatedErrors,
+  csrfValidationError,
   currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
@@ -94,6 +95,7 @@ export const putProfileAvatarRoute = describeRoute({
       "対応外形式またはContent-Typeと実データが一致しない",
       UnsupportedAvatarErrorSchema,
     ),
+    ...csrfValidationError,
     422: jsonResponse(
       "画像寸法が取得できない、非正方形、または512pxを超える",
       InvalidAvatarSizeErrorSchema,
@@ -109,6 +111,7 @@ export const deleteProfileAvatarRoute = describeRoute({
   security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     200: jsonResponse("削除後のプロフィール", ProfileResponseSchema),
+    ...csrfValidationError,
     ...profileErrors,
   },
 } satisfies DescribeRouteOptions);

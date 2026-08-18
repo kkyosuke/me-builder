@@ -240,6 +240,9 @@ jobs:
           bun --filter @me-builder/mcp deploy:production
           bun --filter @me-builder/web deploy:production
 
+      - name: Verify API Documentation Access (Production)
+        run: task access:verify:production
+
       # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
       - name: Register LINE Webhook (Production)
         run: |

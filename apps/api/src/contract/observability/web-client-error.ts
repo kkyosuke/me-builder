@@ -7,7 +7,7 @@ import {
 } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors } from "../shared/errors";
+import { ForbiddenErrorSchema, authenticatedErrors, jsonResponse } from "../shared/errors";
 
 const webClientErrorReportEntries = {
   schemaVersion: v.literal(1),
@@ -92,7 +92,7 @@ export const webClientErrorReportRoute = describeRoute({
   responses: {
     204: { description: "ブラウザエラーを受理した" },
     400: { description: "request bodyが固定schemaと一致しない" },
-    403: { description: "許可済みWeb Originではない" },
+    403: jsonResponse("OriginまたはCSRF tokenが一致しない", ForbiddenErrorSchema),
     413: { description: "request bodyが上限を超えている" },
     429: { description: "ブラウザエラー受付の流量上限を超えた" },
     ...authenticatedErrors,

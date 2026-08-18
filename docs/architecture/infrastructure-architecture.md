@@ -234,7 +234,7 @@ AccessのAllow policyは、IdPが検証した個別メールアドレスまた�
 
 Access ApplicationとAllow policyが作成され、許可された開発者と未認証リクエストの両方を確認できるまでは、Swagger UIをPreviewまたはProductionへ公開しません。
 
-Applicationとpolicyは`scripts/setup-api-docs-access.ts`で冪等に作成・更新し、CDでAPI Serverのデプロイ前に適用します。許可対象やAPI token権限などの実行設定は[開発運用ルール](../../.agents/rules/development.md#apiドキュメントのcloudflare-access設定)を正とします。
+Applicationとpolicyは`scripts/setup-api-docs-access.ts`で冪等に作成・更新し、CDでAPI Serverのデプロイ前に適用します。デプロイ後は`scripts/verify-api-docs-access.ts`が未認証requestでOpenAPI documentとSwagger UI用パスを取得できないことを確認し、公開されている場合はCDを失敗させます。許可対象やAPI token権限などの実行設定は[開発運用ルール](../../.agents/rules/development.md#apiドキュメントのcloudflare-access設定)を正とします。
 
 ## 7. 関連ドキュメント
 

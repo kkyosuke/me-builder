@@ -42,6 +42,8 @@
     - `list-metadata-index`が返す`indexType`は、Cloudflare SDKの型宣言が`'string' | 'number' | 'boolean'`であるのに対し、実際のAPIは`String`のように**先頭を大文字にして返します**。比較するときは大文字小文字を無視してください
     - `task access:setup:preview`: プレビュー環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
     - `task access:setup:production`: 本番環境のOpenAPI documentとSwagger UI用パスをCloudflare Accessで保護
+    - `task access:verify:preview`: プレビュー環境のOpenAPI documentを未認証で取得できないことを確認
+    - `task access:verify:production`: 本番環境のOpenAPI documentを未認証で取得できないことを確認
     - `task stripe:setup:preview`: Stripe test modeの商品catalog、Webhook、Customer PortalとCloudflare secretを冪等に同期
     - `task stripe:setup:production`: 明示確認付きでStripe live modeの商品catalog、Webhook、Customer PortalとCloudflare secretを冪等に同期
     - `bun --cwd apps/worker do:generate`: AccountDataのmigrationを`packages/lib/drizzle-do-account/`へ、ConversationCoordinatorとCompatibilityDataのmigrationを`apps/worker/drizzle/<durable-object>/`へ生成
@@ -141,6 +143,7 @@
 
 - **APIドキュメントのCloudflare Access設定**:
   - PreviewとProductionへのデプロイ前に`task access:setup:preview`または`task access:setup:production`を実行し、[インフラ・システム構成](../../docs/architecture/infrastructure-architecture.md#61-apiドキュメントのcloudflare-access境界)で定めたパスだけを保護します。
+  - API Serverのデプロイ後に`task access:verify:preview`または`task access:verify:production`を実行し、未認証requestがOpenAPI documentとSwagger UI用パスを取得できないことを確認します。Cloudflare Accessのlogin redirectまたは明示的な拒否responseを確認できなければデプロイを失敗させます。
   - 許可する開発者メールアドレスはGitHub Environment変数`CLOUDFLARE_ACCESS_ALLOWED_EMAILS`へカンマ区切りで設定します。空、または不正なメールアドレスを含む場合は設定処理とデプロイを失敗させます。
   - `CLOUDFLARE_DEPLOY_API_TOKEN`には、既存のデプロイ権限に加えて`Access: Apps and Policies Write`を付与します。Access APIエラーを警告へ変換せず、保護できない状態でデプロイを続行しません。
   - Access Applicationを作成する前に、Cloudflare DashboardでアカウントのZero Trust organizationを初期化します。organizationの認証ドメインはアカウント全体の設定であり、このデプロイスクリプトの管理対象には含めません。Application作成がError 1010で拒否された場合は、まずこの初期化状態とAPI tokenの権限を確認します。

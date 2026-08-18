@@ -3,6 +3,7 @@ import * as v from "valibot";
 import {
   AccountNotFoundErrorSchema,
   authenticatedErrors,
+  csrfValidationError,
   currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
@@ -35,6 +36,7 @@ export const deferDiagnosisQuestionRoute = describeRoute({
   security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     200: jsonResponse("保存済みの延期操作", DeferDiagnosisQuestionResponseSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
     404: jsonResponse(

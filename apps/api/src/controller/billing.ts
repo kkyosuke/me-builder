@@ -18,6 +18,10 @@ import {
   BillingSessionResponseSchema,
   BillingTrialEligibilityResponseSchema,
 } from "../contract/billing/sessions";
+import {
+  StripeWebhookAcceptedResponseSchema,
+  StripeWebhookInvalidResponseSchema,
+} from "../contract/billing/webhook";
 import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import {
   createBillingCheckoutSession,
@@ -48,13 +52,13 @@ export async function postStripeWebhook(c: Context<AppEnv>): Promise<Response> {
   });
   switch (outcome.type) {
     case "accepted":
-      return c.json({ status: "ok", queued: true });
+      return c.json(v.parse(StripeWebhookAcceptedResponseSchema, { status: "ok", queued: true }));
     case "ignored":
-      return c.json({ status: "ok", queued: false });
+      return c.json(v.parse(StripeWebhookAcceptedResponseSchema, { status: "ok", queued: false }));
     case "invalid-signature":
-      return c.json({ error: "Invalid webhook" }, 400);
+      return c.json(v.parse(StripeWebhookInvalidResponseSchema, { error: "Invalid webhook" }), 400);
     case "not-configured":
-      return c.json({ error: "Service Unavailable" }, 503);
+      return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 }
 

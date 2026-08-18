@@ -147,6 +147,7 @@ describe("POST /api/observability/web-errors", () => {
     const oversized = await request(report({ release: "a".repeat(5_000) }));
 
     expect(invalidOrigin.status).toBe(403);
+    await expect(invalidOrigin.json()).resolves.toEqual({ error: "Forbidden" });
     expect(unknownField.status).toBe(400);
     expect(oversized.status).toBe(413);
   });

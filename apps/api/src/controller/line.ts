@@ -1,6 +1,11 @@
 import { line } from "@me-builder/lib";
 import type { Context } from "hono";
+import * as v from "valibot";
 import { getConfig } from "../config";
+import {
+  LineWebhookAcceptedResponseSchema,
+  LineWebhookUnauthorizedResponseSchema,
+} from "../contract/line/webhook";
 import { receiveLineWebhook } from "../logic/line-webhook";
 import type { AppEnv } from "../types";
 
@@ -49,9 +54,15 @@ export async function postLineWebhook(c: Context<AppEnv>): Promise<Response> {
 
   switch (outcome.type) {
     case "accepted":
-      return c.json({ status: "ok", queued: outcome.queued, id: outcome.id });
+      return c.json(
+        v.parse(LineWebhookAcceptedResponseSchema, {
+          status: "ok",
+          queued: outcome.queued,
+          id: outcome.id,
+        }),
+      );
     case "secret-not-configured":
     case "invalid-signature":
-      return c.json({ error: "Unauthorized" }, 401);
+      return c.json(v.parse(LineWebhookUnauthorizedResponseSchema, { error: "Unauthorized" }), 401);
   }
 }

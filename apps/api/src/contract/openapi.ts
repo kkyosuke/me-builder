@@ -21,6 +21,18 @@ export const openApiOptions = {
           name: "X-CSRF-Token",
           description: "application sessionによる状態変更requestで要求するCSRF token",
         },
+        lineWebhookSignature: {
+          type: "apiKey",
+          in: "header",
+          name: "x-line-signature",
+          description: "LINEチャネルシークレットで検証するHMAC-SHA256署名",
+        },
+        stripeWebhookSignature: {
+          type: "apiKey",
+          in: "header",
+          name: "stripe-signature",
+          description: "Stripe Webhook endpoint secretで検証する署名",
+        },
       },
     },
   },

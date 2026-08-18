@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import * as v from "valibot";
 import { getConfig } from "../config";
 import { WebClientErrorReportSchema } from "../contract/observability/web-client-error";
+import { ForbiddenErrorSchema } from "../contract/shared/errors";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 
@@ -61,7 +62,9 @@ function describeWebClientError(report: WebClientErrorReport): string {
 export async function postWebClientError(c: Context<AppEnv>): Promise<Response> {
   const config = getConfig(c.env);
   const origin = c.req.header("Origin");
-  if (!config.webOrigin || origin !== config.webOrigin) return c.body(null, 403);
+  if (!config.webOrigin || origin !== config.webOrigin) {
+    return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
+  }
 
   const contentLength = Number(c.req.header("Content-Length"));
   if (Number.isFinite(contentLength) && contentLength > MAX_WEB_CLIENT_ERROR_BODY_BYTES) {
