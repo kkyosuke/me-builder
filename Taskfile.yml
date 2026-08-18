@@ -103,6 +103,11 @@ tasks:
     cmds:
       - bun scripts/verify-deployed-auth-boundary.ts production
 
+  service-site:verify:deployed:
+    desc: 'Verify deployed public metadata and private-route search boundaries without JavaScript'
+    cmds:
+      - bun scripts/verify-service-site-deployment.ts
+
   infra:generate:
     desc: 'Generate Wrangler TOML files from committed Pulumi stack outputs'
     cmds:

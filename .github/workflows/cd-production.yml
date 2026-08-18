@@ -209,6 +209,9 @@ jobs:
           bun --filter @me-builder/mcp deploy:production
           bun --filter @me-builder/web deploy:production
 
+      - name: Verify Service Site Metadata and Search Boundaries (Production)
+        run: task service-site:verify:deployed
+
       - name: Verify API Documentation Access (Production)
         run: task access:verify:production
 

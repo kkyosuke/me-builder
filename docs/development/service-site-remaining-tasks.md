@@ -85,14 +85,14 @@ flowchart LR
 
 完了条件は、PreviewのLINE内ブラウザと外部ブラウザで友だち追加から本人確認、規約同意、目的画面への遷移を完了できることです。確認時にLINE user ID、Account ID、認証tokenをログやチケットへ残しません。
 
-### 3.6 検索・共有メタデータをデプロイ環境で確認する
+### 3.6 SNS共有表示をデプロイ環境で確認する
 
-- `/`、`/terms`、`/privacy`、`/contact`の初期HTMLに、画面固有のtitle、description、canonical URL、robotsが含まれることを確認する
-- 本人向けWebアプリと管理者画面のHTTP responseに`X-Robots-Tag: noindex, nofollow`が付くことを確認する
+CDはデプロイ直後に、`/`、`/terms`、`/privacy`、`/contact`の非JavaScript初期HTMLと、本人向けWebアプリ・管理者画面の`X-Robots-Tag: noindex, nofollow`を自動検査します。次の実サービス確認は引き続き必要です。
+
 - SNS共有時にタイトル、説明、共有画像が個人データを含まず表示されることを確認する
 - 正式なプライバシーポリシーと窓口の公開後だけ、対応ページを検索対象へ変更する
 
-完了条件は、JavaScriptを実行しないHTTP取得でも必要なメタデータを確認でき、本人向け画面が検索対象にならないことです。
+完了条件は、主要SNSの実previewで共有表示を確認し、公開ページと検索対象外ページが意図した範囲に分かれていることです。
 
 ### 3.7 モバイル表示、アクセシビリティ、性能を確認する
 

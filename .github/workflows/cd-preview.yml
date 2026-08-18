@@ -182,6 +182,10 @@ jobs:
           bun --filter @me-builder/mcp deploy:preview
           bun --filter @me-builder/web deploy:preview
 
+      - name: Verify Service Site Metadata and Search Boundaries (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task service-site:verify:deployed
+
       - name: Verify API Documentation Access (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: task access:verify:preview
