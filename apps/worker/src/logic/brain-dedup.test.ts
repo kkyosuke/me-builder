@@ -51,7 +51,7 @@ const existing = {
 
 describe("decideDiaryBrainDuplicates", () => {
   it.each(brainDedupEvaluationFixtures)(
-    "評価fixture $idで誤統合を検出する",
+    "評価fixture $idのモデル判定をproduction parserへ適用する",
     async ({
       category,
       candidate: candidateStatement,

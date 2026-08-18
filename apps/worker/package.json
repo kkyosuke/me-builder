@@ -13,6 +13,7 @@
     "test:runtime": "WRANGLER_LOG=none vitest run --config vitest.runtime.config.ts",
     "do:generate": "drizzle-kit generate && drizzle-kit generate --config drizzle.account-data.config.ts && drizzle-kit generate --config drizzle.compatibility-data.config.ts && biome check --write --unsafe drizzle",
     "check:gemini": "bun scripts/check-gemini.ts",
+    "evaluate:brain-dedup": "bun scripts/evaluate-brain-dedup.ts",
     "deploy:preview": "wrangler deploy --env preview",
     "deploy:production": "wrangler deploy --env production"
   },
