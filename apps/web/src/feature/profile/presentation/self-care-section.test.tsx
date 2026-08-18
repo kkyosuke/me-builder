@@ -30,6 +30,7 @@ describe("SelfCareSection", () => {
         operationError={null}
         onRetry={vi.fn()}
         onRevoke={onRevoke}
+        onConsult={vi.fn()}
       />,
     );
     expect(screen.getByText("予定を一つ減らすと少し楽になった")).toBeDefined();
@@ -53,6 +54,7 @@ describe("SelfCareSection", () => {
         operationError={null}
         onRetry={vi.fn()}
         onRevoke={vi.fn()}
+        onConsult={vi.fn()}
       />,
     );
     for (const button of screen.getAllByRole("button", { name: "確認を取り消す" })) {
@@ -68,6 +70,7 @@ describe("SelfCareSection", () => {
         operationError={null}
         onRetry={vi.fn()}
         onRevoke={vi.fn()}
+        onConsult={vi.fn()}
       />,
     );
     expect(screen.getByText(/Freeの相談では一般的な案/u)).toBeDefined();
@@ -82,8 +85,27 @@ describe("SelfCareSection", () => {
         operationError="撤回できませんでした。"
         onRetry={vi.fn()}
         onRevoke={vi.fn()}
+        onConsult={vi.fn()}
       />,
     );
     expect(screen.getByRole("alert").textContent).toContain("撤回できませんでした");
+  });
+
+  it("選んだ相談目的をLINEへ送り、安全切替を事前に案内する", async () => {
+    const onConsult = vi.fn().mockResolvedValue("sent");
+    render(
+      <SelfCareSection
+        state={{ status: "success", data: result }}
+        pendingId={null}
+        operationError={null}
+        onRetry={vi.fn()}
+        onRevoke={vi.fn()}
+        onConsult={onConsult}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "今しんどい。何からすればいい？" }));
+    expect(onConsult).toHaveBeenCalledWith("今しんどい。何からすればいい？");
+    expect(screen.getByText(/緊急性が高い内容では/u)).toBeDefined();
   });
 });

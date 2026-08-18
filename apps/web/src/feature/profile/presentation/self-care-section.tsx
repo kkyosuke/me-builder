@@ -1,4 +1,5 @@
-import { HeartHandshake, LoaderCircle, Undo2 } from "lucide-react";
+import { HeartHandshake, LoaderCircle, MessageCircleHeart, Undo2 } from "lucide-react";
+import { useState } from "react";
 import type { AsyncState } from "../../../model/async-state";
 import type {
   SelfCareContextItem,
@@ -20,6 +21,16 @@ const kindContent: Record<SelfCareContextKind, Readonly<{ heading: string; tone:
     tone: "border-sky-100 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/30",
   },
 };
+
+const consultationPrompts = [
+  "今しんどい。何からすればいい？",
+  "この傾向だと、どんな場面で疲れやすそう？",
+  "最近の記録から、早めのサインを整理したい",
+  "自分に合いそうな休み方を一緒に考えたい",
+  "セルフケアについて自由に相談したい",
+] as const;
+
+export type SelfCareConsultationStartResult = "sent" | "copied" | "unavailable";
 
 function ContextCard({
   item,
@@ -63,13 +74,18 @@ export function SelfCareSection({
   operationError,
   onRetry,
   onRevoke,
+  onConsult,
 }: {
   state: AsyncState<SelfCareContextResult>;
   pendingId: string | null;
   operationError: string | null;
   onRetry: () => void;
   onRevoke: (id: string) => void;
+  onConsult: (prompt: string) => Promise<SelfCareConsultationStartResult>;
 }) {
+  const [consultationStatus, setConsultationStatus] = useState<
+    SelfCareConsultationStartResult | "sending" | null
+  >(null);
   if (state.status === "loading" || state.status === "idle") {
     return (
       <output
@@ -137,6 +153,44 @@ export function SelfCareSection({
           Freeの相談では一般的な案と安全案内を利用します。確認済み情報を使った個別化と撤回はLite以上で利用できます。
         </p>
       ) : null}
+      <section className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900 dark:bg-violet-950/30">
+        <div className="flex items-center gap-2">
+          <MessageCircleHeart className="size-4 text-violet-700 dark:text-violet-300" />
+          <h3 className="text-sm font-semibold">AIに聞く</h3>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+          今の状況を優先して相談します。緊急性が高い内容では、通常の提案を止めて日本国内の案内へ切り替わります。
+        </p>
+        <div className="mt-3 grid gap-2">
+          {consultationPrompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              disabled={consultationStatus === "sending"}
+              onClick={async () => {
+                setConsultationStatus("sending");
+                setConsultationStatus(await onConsult(prompt));
+              }}
+              className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-800 disabled:opacity-50 dark:border-violet-800 dark:bg-slate-900 dark:text-slate-100"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+        {consultationStatus === "sending" ? (
+          <output className="mt-3 block text-xs text-slate-600 dark:text-slate-300">
+            LINEのトークを開いています…
+          </output>
+        ) : consultationStatus === "copied" ? (
+          <output className="mt-3 block text-xs text-slate-600 dark:text-slate-300">
+            相談文をコピーしました。LINEのトークへ貼り付けて送信してください。
+          </output>
+        ) : consultationStatus === "unavailable" ? (
+          <p role="alert" className="mt-3 text-xs text-rose-700 dark:text-rose-300">
+            このブラウザではLINEへ移動できません。LINE内から「わたしのまとめ」を開き直してください。
+          </p>
+        ) : null}
+      </section>
       {olderItems.length > 0 ? (
         <details className="mt-5">
           <summary className="cursor-pointer text-sm font-medium">以前に確認したこと</summary>
