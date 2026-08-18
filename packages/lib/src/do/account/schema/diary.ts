@@ -181,7 +181,16 @@ export const chatTurns = sqliteTable(
       .default("queued"),
     promptVersion: text("prompt_version").notNull(),
     model: text("model").notNull(),
-    // TODO: 安全性経路の監視・監査要件を定義した段階でsafety_routeを追加する。
+    safetyRoute: text("safety_route", {
+      enum: [
+        "normal",
+        "distress",
+        "high_stakes",
+        "abuse_or_violence",
+        "self_harm_possible",
+        "imminent_danger",
+      ],
+    }),
     endSession: integer("end_session", { mode: "boolean" }).notNull().default(false),
     /** 終了後の日次声かけで使える、本文を含まない継続区分。 */
     dailyPromptFollowUp: text("daily_prompt_follow_up", { enum: ["same_day", "next_day"] }),

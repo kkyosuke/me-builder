@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  JAPAN_MENTAL_HEALTH_SUPPORT_URL,
   buildDevelopmentBrainUsageMessage,
   buildDiaryChatContextPackage,
   buildSafetyFallback,
@@ -199,10 +200,18 @@ describe("diary chat guardrails", () => {
       { id: "message-2", role: "user", body: "消えてしまいたい", sequence: 2 },
     ]);
     expect(route).toBe("self_harm_possible");
-    expect(buildSafetyFallback(route)).toMatchObject({
+    const response = buildSafetyFallback(route);
+    expect(response).toMatchObject({
       main_question_count: 1,
       safety: { route: "self_harm_possible", restricted_advice: true },
     });
+    expect(response.reply).toContain(JAPAN_MENTAL_HEALTH_SUPPORT_URL);
+    expect(response.reply).not.toMatch(/119|110/u);
+  });
+
+  it("119と110は差し迫った危険の定型案内だけに含める", () => {
+    expect(buildSafetyFallback("imminent_danger").reply).toMatch(/119.*110/u);
+    expect(buildSafetyFallback("abuse_or_violence").reply).not.toMatch(/119|110/u);
   });
 
   it("通常時のfallbackへ会話継続だけの質問を付けない", () => {

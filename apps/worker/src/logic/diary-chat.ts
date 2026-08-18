@@ -57,6 +57,8 @@ export type DiaryChatResponse = Omit<
   Readonly<{ collection_target?: PromptContextCollectionTarget }>;
 export type SafetyRoute = v.InferOutput<typeof SafetyRouteSchema>;
 
+export const JAPAN_MENTAL_HEALTH_SUPPORT_URL = "https://www.mhlw.go.jp/mamorouyokokoro/";
+
 const routeRank: Record<SafetyRoute, number> = {
   normal: 0,
   distress: 1,
@@ -153,11 +155,13 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
   const requiresSafetyConfirmation =
     route === "imminent_danger" || route === "self_harm_possible" || route === "abuse_or_violence";
   const reply =
-    route === "imminent_danger" || route === "self_harm_possible"
-      ? "話してくれてありがとう。いま一人で抱えず、まず安全な場所へ移動して、近くの信頼できる人や現地の緊急窓口に連絡してね。今この瞬間、自分を傷つける危険はある？"
-      : route === "abuse_or_violence"
-        ? "話してくれてありがとう。あなたの安全が最優先です。危険が迫っているなら安全な場所へ移動し、信頼できる人や現地の緊急窓口へ連絡してください。今は安全な場所にいる？"
-        : "うまく返事をまとめられなかったけれど、書いてくれたことは受け取りました。今日はここに置いておくだけでも大丈夫です。";
+    route === "imminent_danger"
+      ? "話してくれてありがとう。今すぐ危険が迫っているなら、安全な場所へ移動して、119（救急・消防）または110（警察）、近くの信頼できる人へ連絡してください。今は安全な場所にいる？"
+      : route === "self_harm_possible"
+        ? `話してくれてありがとう。一人で抱えず、近くの信頼できる人や、厚生労働省が案内する相談窓口「まもろうよ こころ」へつながってください。${JAPAN_MENTAL_HEALTH_SUPPORT_URL}\n今この瞬間、自分を傷つける危険はある？`
+        : route === "abuse_or_violence"
+          ? `話してくれてありがとう。あなたの安全が最優先です。安全な場所へ移動できるなら移動し、信頼できる人や、厚生労働省が案内する相談窓口へつながってください。${JAPAN_MENTAL_HEALTH_SUPPORT_URL}\n今は安全な場所にいる？`
+          : "うまく返事をまとめられなかったけれど、書いてくれたことは受け取りました。今日はここに置いておくだけでも大丈夫です。";
   return {
     mode: route === "normal" ? "listen" : "organize",
     reply,

@@ -2691,6 +2691,7 @@ export async function saveAssistantResponse(
   input: {
     turnId: string;
     body: string;
+    safetyRoute: (typeof chatTurns.$inferInsert)["safetyRoute"];
     endSession: boolean;
     dailyPromptFollowUp?: DailyPromptFollowUp;
     collectionTarget?: PromptContextCollectionTarget;
@@ -2779,6 +2780,7 @@ export async function saveAssistantResponse(
       .set({
         status: "delivery_pending",
         responseMessageId: messageId,
+        safetyRoute: input.safetyRoute,
         endSession: input.endSession,
         dailyPromptFollowUp: input.dailyPromptFollowUp,
         collectionThemeId: collectionTarget?.themeId,

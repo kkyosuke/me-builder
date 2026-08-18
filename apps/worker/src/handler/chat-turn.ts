@@ -19,6 +19,7 @@ import type { CloudflareBindings, WorkerConfig } from "../config";
 import { createGeminiUsageRecorder } from "../infrastructure/gemini-usage";
 import { loadBrainContextMemories } from "../logic/brain-context";
 import {
+  type SafetyRoute,
   buildDevelopmentBrainUsageMessage,
   classifySafety,
   generateDiaryChatResponse,
@@ -48,6 +49,7 @@ type TerminalDetails = {
   disposition: TerminalDisposition;
   stage: string;
   resultCode?: string;
+  safetyRoute?: SafetyRoute;
   error?: unknown;
 };
 
@@ -97,6 +99,7 @@ function logTerminal(
     disposition: details.disposition,
     stage: details.stage,
     ...(details.resultCode ? { resultCode: details.resultCode } : {}),
+    ...(details.safetyRoute ? { safetyRoute: details.safetyRoute } : {}),
     ...(safeError ?? {}),
     durationMs,
   };
@@ -609,6 +612,7 @@ export async function processChatTurnMessage(
             collectionTarget: undefined,
             brainUsages: [],
             usedBrainItems: [],
+            safetyRoute,
           }
         : undefined;
     const currentUserText = context.messages
@@ -794,6 +798,7 @@ export async function processChatTurnMessage(
             collectionTarget: undefined,
             brainUsages: [],
             usedBrainItems: pendingResponse.usedBrainItems,
+            safetyRoute,
           }
         : await atBoundary(
             () =>
@@ -833,6 +838,7 @@ export async function processChatTurnMessage(
                       : generated.daily_prompt_follow_up,
                   collectionTarget: generated.collection_target,
                   usedBrainItems: usedMemories,
+                  safetyRoute: generated.safety.route,
                   brainUsages: usedMemories.map((memory) => ({
                     brainItemId: memory.brainItemId,
                     sourceRecordIds: memory.evidence.map(({ sourceRecordId }) => sourceRecordId),
@@ -881,6 +887,7 @@ export async function processChatTurnMessage(
           accountDataClient.execute("conversation.saveAssistantResponse", {
             turnId: message.body.turnId,
             body: response.reply,
+            safetyRoute: response.safetyRoute,
             endSession: response.endSession,
             ...(response.dailyPromptFollowUp
               ? { dailyPromptFollowUp: response.dailyPromptFollowUp }
@@ -971,6 +978,7 @@ export async function processChatTurnMessage(
         outcome: "failed",
         disposition: "ack",
         stage: "line.deliver",
+        safetyRoute: response.safetyRoute,
         resultCode:
           delivery.status === "superseded"
             ? "FINAL_DELIVERY_SUPERSEDED"
@@ -1039,6 +1047,7 @@ export async function processChatTurnMessage(
       outcome: completed ? "succeeded" : "degraded",
       disposition: "ack",
       stage: "line.deliver",
+      safetyRoute: response.safetyRoute,
       ...(!completed ? { resultCode: "GENERATION_LEASE_EXPIRED_AFTER_DELIVERY" } : {}),
     });
   } catch (caughtError) {

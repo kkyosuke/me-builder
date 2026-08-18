@@ -115,12 +115,14 @@ describe("Diary conversation persistence flow", () => {
     const responseMessageId = await saveAssistantResponse(db, account.id, {
       turnId: attached.turnId,
       body: "疲れている中でも散歩できたことを記録したよ。今は少し休めそう？",
+      safetyRoute: "normal",
       endSession: true,
     });
     await expect(
       saveAssistantResponse(db, account.id, {
         turnId: attached.turnId,
         body: "再試行で重複保存されてはいけない応答",
+        safetyRoute: "normal",
         endSession: true,
       }),
     ).resolves.toBe(responseMessageId);
@@ -129,6 +131,13 @@ describe("Diary conversation persistence flow", () => {
       endSession: true,
       usedBrainItems: [],
     });
+    expect(
+      db
+        .select({ safetyRoute: schema.chatTurns.safetyRoute })
+        .from(schema.chatTurns)
+        .where(eq(schema.chatTurns.id, attached.turnId))
+        .get(),
+    ).toEqual({ safetyRoute: "normal" });
     await expect(db.select().from(schema.brainItems)).resolves.toHaveLength(0);
     await expect(
       listDueDiaryBrainCheckpointIds(db, account.id, new Date(firstReceivedAt.getTime() - 1)),
@@ -406,6 +415,7 @@ describe("Diary conversation persistence flow", () => {
       saveAssistantResponse(db, account.id, {
         turnId: attached.turnId,
         body: "またあとで聞かせてね。",
+        safetyRoute: "normal",
         endSession: false,
         dailyPromptFollowUp: "same_day",
       }),
@@ -414,6 +424,7 @@ describe("Diary conversation persistence flow", () => {
     await saveAssistantResponse(db, account.id, {
       turnId: attached.turnId,
       body: "またあとで聞かせてね。",
+      safetyRoute: "normal",
       endSession: true,
       dailyPromptFollowUp: "same_day",
     });
@@ -456,6 +467,7 @@ describe("Diary conversation persistence flow", () => {
       await saveAssistantResponse(db, account.id, {
         turnId: turn.turnId,
         body: "自然な確認質問",
+        safetyRoute: "normal",
         endSession: false,
         collectionTarget,
       });
@@ -497,6 +509,7 @@ describe("Diary conversation persistence flow", () => {
       saveAssistantResponse(db, account.id, {
         turnId: thirdTurn.turnId,
         body: "3問目は保存しない",
+        safetyRoute: "normal",
         endSession: false,
         collectionTarget: { themeId: "life_schedule", kind: "recurring_schedule" },
       }),
@@ -524,6 +537,7 @@ describe("Diary conversation persistence flow", () => {
     await saveAssistantResponse(db, account.id, {
       turnId: firstTurn.turnId,
       body: "どんな仕事をしているの？",
+      safetyRoute: "normal",
       endSession: false,
       collectionTarget: { themeId: "life_schedule", kind: "occupation" },
     });
@@ -552,6 +566,7 @@ describe("Diary conversation persistence flow", () => {
       saveAssistantResponse(db, account.id, {
         turnId: secondTurn.turnId,
         body: "一息つきやすいのは夕食後？",
+        safetyRoute: "normal",
         endSession: false,
         collectionTarget: { themeId: "conversation_preference", kind: "rest_window" },
       }),
@@ -1045,6 +1060,7 @@ describe("Diary conversation persistence flow", () => {
     await saveAssistantResponse(db, account.id, {
       turnId: turn.turnId,
       body: "以前と同じように、公園を少し歩く選択肢もありそうです。",
+      safetyRoute: "normal",
       endSession: false,
       brainUsages: [{ brainItemId: "brain-audit-item", sourceRecordIds: [source.sourceRecordId] }],
     });
@@ -1206,6 +1222,7 @@ describe("Diary conversation persistence flow", () => {
     await saveAssistantResponse(db, account.id, {
       turnId: firstTurn.turnId,
       body: "疲れた一日だったんだね。",
+      safetyRoute: "normal",
       endSession: false,
     });
     await expect(
@@ -1395,6 +1412,7 @@ describe("Diary conversation persistence flow", () => {
       await saveAssistantResponse(db, account.id, {
         turnId: turn.turnId,
         body: `応答${index + 1}`,
+        safetyRoute: "normal",
         endSession: false,
       });
     }
@@ -1437,6 +1455,7 @@ describe("Diary conversation persistence flow", () => {
     await saveAssistantResponse(db, account.id, {
       turnId: firstTurn.turnId,
       body: "削除対象の内容を含むassistant応答",
+      safetyRoute: "normal",
       endSession: false,
     });
     const retainedSource = await storeLineTextSource(db, {
@@ -1494,6 +1513,7 @@ describe("Diary conversation persistence flow", () => {
     await saveAssistantResponse(db, account.id, {
       turnId: firstTurn.turnId,
       body: "そういえばどんな仕事してるの？",
+      safetyRoute: "normal",
       endSession: false,
     });
     await markTurnDelivered(db, firstTurn.turnId);
