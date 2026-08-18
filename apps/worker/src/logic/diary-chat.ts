@@ -173,6 +173,24 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
   };
 }
 
+/**
+ * モデルに相談先を生成させず、運営確認済みの日本向け案内だけを応答へ付加する。
+ * fallbackは既に同じ案内を含むため、URLの重複もここで防ぐ。
+ */
+function appendJapanSafetyGuidance(response: DiaryChatResponse): DiaryChatResponse {
+  if (
+    (response.safety.route !== "self_harm_possible" &&
+      response.safety.route !== "abuse_or_violence") ||
+    response.reply.includes(JAPAN_MENTAL_HEALTH_SUPPORT_URL)
+  ) {
+    return response;
+  }
+  return {
+    ...response,
+    reply: `${response.reply}\n厚生労働省が案内する相談窓口「まもろうよ こころ」: ${JAPAN_MENTAL_HEALTH_SUPPORT_URL}`,
+  };
+}
+
 export function buildDiaryChatContextPackage(
   messages: readonly ConversationContextMessage[],
   safetyRoute: SafetyRoute,
@@ -301,7 +319,7 @@ export async function generateDiaryChatResponse(
     const validated = raw
       ? validateDiaryChatResponse(raw, safetyRoute, allowedMemoryIds, collectionCandidates)
       : undefined;
-    if (validated) return validated;
+    if (validated) return appendJapanSafetyGuidance(validated);
   }
   return buildSafetyFallback(safetyRoute);
 }
