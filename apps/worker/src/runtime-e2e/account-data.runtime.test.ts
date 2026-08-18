@@ -259,6 +259,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN daily_prompt_follow_up");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN safety_route");
       state.storage.sql.exec("ALTER TABLE daily_prompt_deliveries DROP COLUMN prompt_strategy");
       state.storage.sql.exec("ALTER TABLE daily_prompt_deliveries DROP COLUMN response_kind");
       state.storage.sql.exec("ALTER TABLE daily_prompt_deliveries DROP COLUMN delivery_local_hour");
@@ -275,6 +276,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE ai_usage_records");
       state.storage.sql.exec("DROP TABLE self_care_confirmations");
       state.storage.sql.exec("DROP TABLE goal_follow_ups");
+      state.storage.sql.exec("DROP TABLE profile_summary_insight_self_views");
       state.storage.sql.exec("DROP TABLE monthly_change_versions");
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
@@ -503,6 +505,7 @@ describe("AccountData Workers runtime E2E", () => {
         "INSERT INTO brain_items (id, created_at, updated_at, is_deleted, account_id, category, statement, attributes_json, derivation, status, stability, sensitivity, externally_shareable, confidence_json) VALUES ('migration-brain', 1, 1, 0, ?, 'memory', '散歩した', '{}', 'ai', 'active', 'stable', 'private', 0, '{}')",
         accountId,
       );
+      state.storage.sql.exec("DROP TABLE profile_summary_insight_self_views");
       state.storage.sql.exec("DROP TABLE profile_summary_share_projections");
       state.storage.sql.exec("DROP TABLE profile_summary_versions");
       state.storage.sql.exec("DROP TABLE profile_summary_generations");
@@ -526,6 +529,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN daily_prompt_follow_up");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN safety_route");
       state.storage.sql.exec("ALTER TABLE brain_item_revisions DROP COLUMN change_kind");
       state.storage.sql.exec("DROP TABLE progression_milestones");
       state.storage.sql.exec("DROP TABLE progression_pending_events");
@@ -617,6 +621,7 @@ describe("AccountData Workers runtime E2E", () => {
 
     await runInDurableObject(stub, async (instance: AccountData, state) => {
       state.storage.sql.exec("PRAGMA foreign_keys=OFF");
+      state.storage.sql.exec("DROP TABLE profile_summary_insight_self_views");
       state.storage.sql.exec("DROP TABLE profile_summary_share_projections");
       state.storage.sql.exec("DROP TABLE profile_summary_versions");
       state.storage.sql.exec(`CREATE TABLE profile_summary_versions (
@@ -666,6 +671,7 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN daily_prompt_follow_up");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_kind");
       state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN collection_theme_id");
+      state.storage.sql.exec("ALTER TABLE chat_turns DROP COLUMN safety_route");
       state.storage.sql.exec("ALTER TABLE brain_item_revisions DROP COLUMN change_kind");
       state.storage.sql.exec("DROP TABLE progression_milestones");
       state.storage.sql.exec("DROP TABLE progression_pending_events");
@@ -713,9 +719,9 @@ describe("AccountData Workers runtime E2E", () => {
         accountId,
         new Date("2026-08-02T00:00:00.000Z"),
       );
-      expect(readModel.generation).toMatchObject({ canRegenerate: true, reasons: ["format"] });
+      expect(readModel.generation).toMatchObject({ canRegenerate: false, reasons: ["format"] });
 
-      const addedAt = new Date("2026-08-03T00:00:00.000Z");
+      const addedAt = new Date("2026-08-09T00:00:00.000Z");
       state.storage.sql.exec(
         "INSERT INTO brain_items (id, created_at, updated_at, is_deleted, account_id, category, statement, attributes_json, derivation, status, stability, sensitivity, externally_shareable, confidence_json) VALUES ('migration-new-diary-brain', ?, ?, 0, ?, 'memory', '移行後に増えた記録', '{}', 'ai', 'active', 'stable', 'private', 0, '{}')",
         addedAt.getTime() / 1_000,

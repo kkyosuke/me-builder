@@ -263,17 +263,12 @@ describe("Profile Summary persistence", () => {
       type: "available",
       profile: { profileSummaryVersionId: generatedVersionId },
     });
-    await expect(
-      readProfileSummary(db, accountId, new Date("2026-08-09T00:03:00.000Z"), true),
-    ).resolves.toMatchObject({
-      generation: { status: "idle", canRegenerate: true, reasons: [] },
+    await insertAdditionalDiary(db, accountId, "self-view", new Date("2026-08-10T00:00:00.000Z"));
+    const regenerationAt = new Date("2026-08-16T00:03:00.000Z");
+    await expect(readProfileSummary(db, accountId, regenerationAt)).resolves.toMatchObject({
+      generation: { status: "idle", canRegenerate: true, reasons: ["brain"] },
     });
-    const forced = await requestProfileSummaryGeneration(
-      db,
-      accountId,
-      new Date("2026-08-09T00:03:00.000Z"),
-      true,
-    );
+    const forced = await requestProfileSummaryGeneration(db, accountId, regenerationAt);
     expect(forced).toMatchObject({ outcome: "created", status: "queued" });
     if (forced.outcome !== "created") throw new Error("forced generation was not created");
     await expect(
@@ -283,15 +278,14 @@ describe("Profile Summary persistence", () => {
     });
     await failProfileSummaryGeneration(db, accountId, forced.generationId, "test failure");
     await expect(
-      readProfileSummary(db, accountId, new Date("2026-08-09T00:03:30.000Z"), true),
+      readProfileSummary(db, accountId, new Date("2026-08-16T00:03:30.000Z")),
     ).resolves.toMatchObject({
       generation: { status: "failed", canRegenerate: true },
     });
     const retried = await requestProfileSummaryGeneration(
       db,
       accountId,
-      new Date("2026-08-09T00:03:30.000Z"),
-      true,
+      new Date("2026-08-16T00:03:30.000Z"),
     );
     expect(retried).toMatchObject({ outcome: "created", status: "queued" });
     if (retried.outcome !== "created") throw new Error("retry generation was not created");
@@ -306,13 +300,13 @@ describe("Profile Summary persistence", () => {
     await expect(
       readProfileSummary(db, accountId, new Date("2026-08-09T00:04:00.000Z")),
     ).resolves.toMatchObject({
-      generation: { canRegenerate: false, reasons: ["format"] },
+      generation: { canRegenerate: false, reasons: ["brain", "format"] },
     });
   });
 
   it("共有できる文章が残らない生成では、前版の共有projectionを最新のまま保つ", async () => {
     const db = createTestDb();
-    const { accountId, recordedAt } = await insertDiaryFixture(db);
+    const { accountId } = await insertDiaryFixture(db);
     const requested = await requestProfileSummaryGeneration(
       db,
       accountId,
@@ -356,17 +350,25 @@ describe("Profile Summary persistence", () => {
     const regenerated = await requestProfileSummaryGeneration(
       db,
       accountId,
-      new Date("2026-08-10T00:01:00.000Z"),
-      true,
+      new Date("2026-08-16T00:01:00.000Z"),
     );
     if (regenerated.outcome !== "created") throw new Error("regeneration was not created");
+    const regeneratedContext = await loadProfileSummaryGenerationContext(
+      db,
+      accountId,
+      regenerated.generationId,
+    );
+    if (!regeneratedContext) throw new Error("regeneration context was not loaded");
     await expect(
       completeProfileSummaryGeneration(db, accountId, {
         ...baseInput,
         generationId: regenerated.generationId,
-        generatedAt: new Date("2026-08-10T00:02:00.000Z"),
+        generatedAt: new Date("2026-08-16T00:02:00.000Z"),
         headline: "共有できる文章が残らなかった版",
-        latestRecordedAt: recordedAt,
+        diagnosisCount: regeneratedContext.diagnosisCount,
+        diaryCount: regeneratedContext.diaryCount,
+        latestRecordedAt: regeneratedContext.latestRecordedAt,
+        inputSnapshot: regeneratedContext.inputSnapshot,
         compatibilityShareStatements: [],
       }),
     ).resolves.toBe(true);
@@ -406,9 +408,6 @@ describe("Profile Summary persistence", () => {
       outcome: "unavailable",
       reason: "source_record_required",
     });
-    await expect(
-      requestProfileSummaryGeneration(db, "account-1", new Date(), true),
-    ).resolves.toEqual({ outcome: "unavailable", reason: "source_record_required" });
   });
 
   it("共有用出力を持たない旧版を現在の生成形式へ更新できる", async () => {

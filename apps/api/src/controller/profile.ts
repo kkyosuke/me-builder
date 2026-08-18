@@ -2,7 +2,6 @@ import { D1, accountDataFor } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { getConfig, isDevelopmentEnvironment } from "../config";
 import { ProfileEntitlementResponseSchema } from "../contract/profile/entitlement";
 import {
   AgreeGoalFollowUpRequestSchema,
@@ -175,11 +174,9 @@ export async function getProfileSummaryContents(c: Context<AppEnv>): Promise<Res
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
 
-  const currentConfig = getConfig(c.env);
   const outcome = await getProfileSummary({
     actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
-    allowUnchangedRegeneration: isDevelopmentEnvironment(currentConfig.environment),
   });
 
   switch (outcome.type) {
@@ -202,14 +199,12 @@ export async function postProfileSummaryGeneration(c: Context<AppEnv>): Promise<
     logger.error({ path: c.req.path }, "Profile Summary generation binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
-  const currentConfig = getConfig(c.env);
   const db = D1.shared.client.create(c.env.DB);
   const outcome = await requestProfileSummaryGeneration({
     actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
     queue: c.env.PROFILE_SUMMARY_QUEUE,
-    allowUnchangedRegeneration: isDevelopmentEnvironment(currentConfig.environment),
   });
   switch (outcome.type) {
     case "accepted":

@@ -86,7 +86,7 @@ describe("decideDiaryBrainDuplicates", () => {
       {
         matchingBrainItemId: "brain-1",
         deduplication: "semantic",
-        dedupPromptVersion: "brain-dedup-v2",
+        dedupPromptVersion: "brain-dedup-v3",
       },
     ]);
     expect(harness.query).toHaveBeenCalledWith(expect.any(Array), {
@@ -180,7 +180,7 @@ describe("decideDiaryBrainDuplicates", () => {
       {
         matchingCandidateIndex: 0,
         deduplication: "semantic",
-        dedupPromptVersion: "brain-dedup-v2",
+        dedupPromptVersion: "brain-dedup-v3",
       },
     ]);
     expect(consolidateDiaryBrainCandidates(candidates, decisions ?? [])).toEqual([
@@ -195,7 +195,7 @@ describe("decideDiaryBrainDuplicates", () => {
           { sourceMessageId: "message-2", statement: "辛い食べ物が苦手" },
         ],
         deduplication: "semantic",
-        dedupPromptVersion: "brain-dedup-v2",
+        dedupPromptVersion: "brain-dedup-v3",
       },
     ]);
     expect(harness.dependencies.generateDecision).toHaveBeenCalledOnce();

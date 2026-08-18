@@ -28,7 +28,6 @@ type Params = {
   actor: AuthenticatedActor;
   accountData?: AccountDataNamespace;
   at?: Date;
-  allowUnchangedRegeneration?: boolean;
 };
 
 type Dependencies = {
@@ -41,7 +40,6 @@ type Dependencies = {
     accountData: AccountDataNamespace | undefined,
     accountId: string,
     at: Date,
-    allowUnchangedRegeneration: boolean,
   ) => Promise<ProfileSummaryReadModel>;
 };
 
@@ -50,24 +48,20 @@ const defaultDependencies: Dependencies = {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
     return accountDataFor(accountData, accountId).execute("diagnosis.getAnsweredSource", at);
   },
-  readProfileSummary: (accountData, accountId, at, allowUnchangedRegeneration) => {
+  readProfileSummary: (accountData, accountId, at) => {
     if (!accountData) throw new Error("ACCOUNT_DATA binding is not configured");
-    return accountDataFor(accountData, accountId).execute(
-      "profileSummary.read",
-      at,
-      allowUnchangedRegeneration,
-    );
+    return accountDataFor(accountData, accountId).execute("profileSummary.read", at);
   },
 };
 
 /** 本人のまとめを返し、実際の診断進捗だけから次の行動を決める。 */
 export async function getProfileSummary(
-  { actor, accountData, at = new Date(), allowUnchangedRegeneration = false }: Params,
+  { actor, accountData, at = new Date() }: Params,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ProfileSummaryOutcome> {
   const [diagnosisSource, readModel] = await Promise.all([
     dependencies.getDiagnosisSource(accountData, actor.accountId, at),
-    dependencies.readProfileSummary(accountData, actor.accountId, at, allowUnchangedRegeneration),
+    dependencies.readProfileSummary(accountData, actor.accountId, at),
   ]);
   const diagnoses = diagnosisSource.diagnoses;
   const hasAnswerableDiagnosis = diagnoses.some(

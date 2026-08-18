@@ -291,18 +291,8 @@ const actions = {
       diagnosisId,
       at,
     ),
-  "profileSummary.read": (
-    db: DO.account.Database,
-    accountId: string,
-    at?: Date,
-    allowUnchangedRegeneration?: boolean,
-  ) =>
-    DO.account.action.profileSummary.readProfileSummary(
-      db,
-      accountId,
-      at,
-      allowUnchangedRegeneration,
-    ),
+  "profileSummary.read": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.profileSummary.readProfileSummary(db, accountId, at),
   "progression.read": (db: DO.account.Database, accountId: string, at?: Date) =>
     DO.account.action.progression.readUtsushiProgression(db, accountId, at),
   "profileSummary.readCompatibilityShareProfile": (db: DO.account.Database, accountId: string) =>
@@ -311,14 +301,7 @@ const actions = {
     db: DO.account.Database,
     accountId: string,
     requestedAt?: Date,
-    allowUnchangedRegeneration?: boolean,
-  ) =>
-    DO.account.action.profileSummary.requestProfileSummaryGeneration(
-      db,
-      accountId,
-      requestedAt,
-      allowUnchangedRegeneration,
-    ),
+  ) => DO.account.action.profileSummary.requestProfileSummaryGeneration(db, accountId, requestedAt),
   "profileSummary.listUndispatchedGenerationIds": (
     db: DO.account.Database,
     accountId: string,

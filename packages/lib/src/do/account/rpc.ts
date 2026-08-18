@@ -161,10 +161,7 @@ export type AccountDataActions = {
     [exportId: string, at?: Date],
     typeof personalDataExport.readPersonalDataArchive
   >;
-  "profileSummary.read": (
-    at?: Date,
-    allowUnchangedRegeneration?: boolean,
-  ) => Promise<ProfileSummaryReadModel>;
+  "profileSummary.read": (at?: Date) => Promise<ProfileSummaryReadModel>;
   "profileSummary.readCompatibilityShareProfile": () => Promise<CompatibilityShareProfileReadResult>;
   "profileSummary.setInsightSelfView": RpcAction<
     [versionId: string, insightKey: string, selfView: "not_aligned" | null, at?: Date],
@@ -172,7 +169,6 @@ export type AccountDataActions = {
   >;
   "profileSummary.requestGeneration": (
     requestedAt?: Date,
-    allowUnchangedRegeneration?: boolean,
   ) => Promise<RequestProfileSummaryGenerationResult>;
   "profileSummary.listUndispatchedGenerationIds": (at?: Date, limit?: number) => Promise<string[]>;
   "profileSummary.markGenerationDispatched": (

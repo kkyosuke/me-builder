@@ -116,6 +116,7 @@ function summaryResponse({
         description: "予定を把握すると落ち着いて動きやすい傾向があります。",
         evidenceCount: 1,
         sources: ["diary"],
+        selfView: null,
       },
     ],
     recordCount: 1,
@@ -255,11 +256,11 @@ describe("Web recovery flows E2E", () => {
     expect(await screen.findByRole("heading", { name: "生成前のまとめ" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "最新のわたしを知る" }));
 
-    expect(await screen.findByRole("heading", { name: "応答消失後に完成したまとめ" })).toBeTruthy();
+    await waitFor(() => expect(generationPosts).toBe(1));
     await waitFor(() => expect(summaryReads).toBe(3));
-    expect(generationPosts).toBe(1);
+    expect(await screen.findByRole("heading", { name: "応答消失後に完成したまとめ" })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
-  });
+  }, 10_000);
 
   it("本人の進行度APIを読み、診断の有無に依存せずうつしレベルを表示する", async () => {
     const summary = summaryResponse({

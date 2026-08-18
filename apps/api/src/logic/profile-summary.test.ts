@@ -54,27 +54,6 @@ describe("getProfileSummary", () => {
       accountData,
       "account-1",
       expect.any(Date),
-      false,
-    );
-  });
-
-  it("開発環境の無変更再生成許可をAccountDataへ渡す", async () => {
-    const deps = dependencies([]);
-
-    await getProfileSummary(
-      {
-        actor,
-        accountData,
-        allowUnchangedRegeneration: true,
-      },
-      deps as never,
-    );
-
-    expect(deps.readProfileSummary).toHaveBeenCalledWith(
-      accountData,
-      "account-1",
-      expect.any(Date),
-      true,
     );
   });
 

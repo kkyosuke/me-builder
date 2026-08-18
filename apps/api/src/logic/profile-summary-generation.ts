@@ -25,7 +25,6 @@ type Params = Readonly<{
   accountData?: AccountDataNamespace;
   queue?: Queue<ProfileSummaryGenerationQueueMessage>;
   at?: Date;
-  allowUnchangedRegeneration?: boolean;
 }>;
 
 export async function requestProfileSummaryGeneration({
@@ -33,15 +32,10 @@ export async function requestProfileSummaryGeneration({
   accountData,
   queue,
   at = new Date(),
-  allowUnchangedRegeneration = false,
 }: Params): Promise<RequestProfileSummaryGenerationOutcome> {
   if (!accountData || !queue) throw new Error("Profile Summary generation binding is missing");
   const account = accountDataFor(accountData, actor.accountId);
-  const request = await account.execute(
-    "profileSummary.requestGeneration",
-    at,
-    allowUnchangedRegeneration,
-  );
+  const request = await account.execute("profileSummary.requestGeneration", at);
   if (request.outcome === "unavailable") return { type: "unavailable", reason: request.reason };
   if (request.needsDispatch) {
     let dispatched = false;

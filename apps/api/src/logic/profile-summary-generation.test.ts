@@ -48,6 +48,11 @@ describe("requestProfileSummaryGeneration", () => {
       generationId: "generation-1",
     });
     expect(JSON.stringify(send.mock.calls)).not.toContain("本文");
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "profileSummary.requestGeneration",
+      expect.any(Date),
+    );
     expect(execute).toHaveBeenLastCalledWith(
       "account-1",
       "profileSummary.markGenerationDispatched",
@@ -73,31 +78,6 @@ describe("requestProfileSummaryGeneration", () => {
       }),
     ).resolves.toMatchObject({ status: "generating", created: false });
     expect(send).not.toHaveBeenCalled();
-  });
-
-  it("開発環境の無変更再生成許可をAccountDataへ渡す", async () => {
-    generationRequest = {
-      outcome: "created",
-      generationId: "generation-dev",
-      status: "queued",
-      needsDispatch: true,
-    };
-
-    await requestProfileSummaryGeneration({
-      actor,
-      db: {} as D1.shared.Client,
-      accountData,
-      queue,
-      at: new Date("2026-08-11T00:00:00.000Z"),
-      allowUnchangedRegeneration: true,
-    });
-
-    expect(execute).toHaveBeenCalledWith(
-      "account-1",
-      "profileSummary.requestGeneration",
-      new Date("2026-08-11T00:00:00.000Z"),
-      true,
-    );
   });
 
   it("AccountDataの再生成不可理由をQueueへ送らず返す", async () => {

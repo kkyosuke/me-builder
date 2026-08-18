@@ -100,25 +100,7 @@ describe("GET /api/profile-summary", () => {
     expect(getProfileSummary).toHaveBeenCalledWith(
       expect.objectContaining({
         actor: expect.objectContaining({ accountId: "account-1" }),
-        allowUnchangedRegeneration: true,
       }),
-    );
-  });
-
-  it("productionでは無変更再生成を許可しない", async () => {
-    outcome({
-      type: "resolved",
-      versions: [],
-      availableDataCounts: { diagnosis: 0, diary: 0 },
-      generation: { status: "idle", canRegenerate: false, reasons: [], message: null },
-      diagnosisThemes: [],
-      nextAction: "chat",
-    });
-
-    await request(true, "production");
-
-    expect(getProfileSummary).toHaveBeenCalledWith(
-      expect.objectContaining({ allowUnchangedRegeneration: false }),
     );
   });
 
@@ -149,20 +131,7 @@ describe("POST /api/profile-summary/generations", () => {
       created: true,
     });
     expect(requestProfileSummaryGeneration).toHaveBeenCalledWith(
-      expect.objectContaining({ allowUnchangedRegeneration: true }),
-    );
-  });
-
-  it("productionでは無変更再生成を許可しない", async () => {
-    requestProfileSummaryGeneration.mockResolvedValue({
-      type: "unavailable",
-      reason: "regeneration_not_required",
-    });
-
-    await generationRequest(true, "production");
-
-    expect(requestProfileSummaryGeneration).toHaveBeenCalledWith(
-      expect.objectContaining({ allowUnchangedRegeneration: false }),
+      expect.objectContaining({ actor: expect.objectContaining({ accountId: "account-1" }) }),
     );
   });
 
