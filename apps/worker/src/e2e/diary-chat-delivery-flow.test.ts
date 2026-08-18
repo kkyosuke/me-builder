@@ -739,7 +739,7 @@ describe("LINE diary chat delivery E2E", () => {
     await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
 
     const deliveredText = mockPushMessage.mock.calls[0]?.[0]?.messages?.[0]?.text;
-    expect(deliveredText).toContain("https://www.mhlw.go.jp/mamorouyokokoro/");
+    expect(deliveredText).toContain("https://www.mhlw.go.jp/mamorouyokokoro/soudan/");
     expect(deliveredText).not.toMatch(/119|110/u);
     expect(
       accountDataStore.db
@@ -747,6 +747,35 @@ describe("LINE diary chat delivery E2E", () => {
         .from(DO.account.schema.chatTurns)
         .get(),
     ).toEqual({ safetyRoute: "self_harm_possible" });
+  });
+
+  it("虐待や暴力の可能性ではモデル応答へ対応窓口一覧を付加し、安全routeを保存する", async () => {
+    const { bindings, queuedTurn } = await ingestDiary("家で殴られていて怖い", "safety-abuse");
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        mode: "organize",
+        reply: "話してくれてありがとう。まず、今いる場所が安全か確認してもいい？",
+        main_question_count: 1,
+        end_session: false,
+        daily_prompt_follow_up: "none",
+        collection_theme_id: "none",
+        collection_kind: "none",
+        safety: { route: "abuse_or_violence", restricted_advice: true },
+        used_memory_ids: [],
+      }),
+    });
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    const deliveredText = mockPushMessage.mock.calls[0]?.[0]?.messages?.[0]?.text;
+    expect(deliveredText).toContain("https://notalone-cao.go.jp/support/");
+    expect(deliveredText).not.toMatch(/119|110/u);
+    expect(
+      accountDataStore.db
+        .select({ safetyRoute: DO.account.schema.chatTurns.safetyRoute })
+        .from(DO.account.schema.chatTurns)
+        .get(),
+    ).toEqual({ safetyRoute: "abuse_or_violence" });
   });
 
   it("自然な属性確認を許可済み候補から生成し、Sessionの質問履歴へ記録する", async () => {
