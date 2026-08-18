@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceSiteHomeScreen } from "./service-site-home-screen";
 
@@ -32,5 +32,29 @@ describe("ServiceSiteHomeScreen", () => {
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
       "https://kagami.example.com/",
     );
+  });
+
+  it("Freeを含む料金プランと利用できる機能を表示する", () => {
+    render(<ServiceSiteHomeScreen />);
+
+    expect(screen.getByRole("heading", { name: "自分に合う続け方を選べます。" })).toBeTruthy();
+    expect(screen.getByText("￥780")).toBeTruthy();
+    expect(screen.getByText("￥1,480")).toBeTruthy();
+    expect(screen.getByText("￥2,980")).toBeTruthy();
+    expect(
+      screen.getByRole("table", {
+        name: "Free、Lite、Full、ファミリーパックの機能比較",
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("row", { name: /わたしのまとめ/u })).toBeNull();
+    expect(screen.queryByRole("row", { name: /基本の相性シート/u })).toBeNull();
+    expect(screen.queryByRole("row", { name: /2人の継続的な振り返り/u })).toBeNull();
+    const aiReplyRow = screen.getByRole("row", { name: /AI返信/u });
+    expect(within(aiReplyRow).getByText("月60回")).toBeTruthy();
+    expect(screen.getByText(/わたしのまとめは全Plan共通で月4回まで/u)).toBeTruthy();
+    expect(screen.getByText(/いずれの生成条件も満たさない場合は回数を消費せず/u)).toBeTruthy();
+    expect(screen.getByText(/AIが生成して正常に届けた回答を1回として数えます/u)).toBeTruthy();
+    expect(screen.getAllByText("提供準備中")).toHaveLength(6);
+    expect(screen.getByText(/現在は購入できません/u)).toBeTruthy();
   });
 });

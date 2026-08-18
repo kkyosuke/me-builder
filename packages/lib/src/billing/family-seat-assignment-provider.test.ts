@@ -68,7 +68,7 @@ describe("FamilySeatAccountPlanAssignmentProvider", () => {
         payerAccountId: payer,
         policy: {
           aiReply: { limit: 600 },
-          profileSummary: { limit: 12 },
+          profileSummary: { limit: 4 },
           relationshipQuestionContext: "confirmed-history",
         },
       });

@@ -83,10 +83,10 @@ describe("subscription entitlement user journey", () => {
             resetsAt: "2026-09-01T00:00:00.000Z",
           },
           profileSummary: {
-            limit: 12,
+            limit: 4,
             used: 1,
             reserved: 0,
-            remaining: 11,
+            remaining: 3,
             periodStartsAt: "2026-08-01T00:00:00.000Z",
             resetsAt: "2026-09-01T00:00:00.000Z",
           },
@@ -141,20 +141,20 @@ describe("subscription entitlement user journey", () => {
           effectiveAt: "2026-08-01T00:00:00.000Z",
           availableUntil: null,
           aiReply: {
-            limit: 20,
+            limit: 60,
             used: 0,
             reserved: 0,
-            remaining: 20,
+            remaining: 60,
             periodStartsAt: "2026-08-01T00:00:00.000Z",
             resetsAt: "2026-09-01T00:00:00.000Z",
           },
           profileSummary: {
-            limit: 1,
+            limit: 4,
             used: 0,
             reserved: 0,
-            remaining: 1,
+            remaining: 4,
             periodStartsAt: "2026-08-01T00:00:00.000Z",
-            resetsAt: "2026-10-30T00:00:00.000Z",
+            resetsAt: "2026-09-01T00:00:00.000Z",
           },
         });
       }
