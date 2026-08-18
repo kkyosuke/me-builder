@@ -100,6 +100,20 @@ function classifySafetyText(text: string): SafetyRoute {
       /\b(?:an? article|a book|a movie|the lyrics).{0,48}(?:want to die|kill myself|suicid(?:e|al)|self[- ]harm)\b/gu,
       " ",
     );
+  const actionableAbuse = normalized
+    .replace(
+      /(?:殴られ|暴力|虐待|脅され|殺され).{0,16}(?:てはいない|ていない|ではない|わけではない|受けていない)/gu,
+      " ",
+    )
+    .replace(
+      /(?:記事|本|映画|歌詞).{0,24}(?:殴られ|暴力|虐待|脅され|殺され).{0,24}(?:と書いて|という記事|という言葉|とあって)/gu,
+      " ",
+    )
+    .replace(/\bi (?:am not|was not|wasn't) (?:being )?(?:abused|threatened|hit)\b/gu, " ")
+    .replace(
+      /\b(?:an? article|a book|a movie|the lyrics).{0,48}(?:abused|abuse|hit me|threatened to kill me)\b/gu,
+      " ",
+    );
   const imminentDanger =
     /(?:今すぐ|これから).{0,12}(?:死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(actionable) ||
     /\b(?:i am|i'm).{0,16}(?:going to|about to).{0,16}(?:kill myself|die)|\bright now.{0,16}(?:kill myself|die)\b/u.test(
@@ -115,8 +129,8 @@ function classifySafetyText(text: string): SafetyRoute {
   )
     return "self_harm_possible";
   if (
-    /(?:殴られ|暴力|虐待|脅され|殺され)/u.test(normalized) ||
-    /\b(?:abused|hit me|threatened to kill me)\b/u.test(normalized)
+    /(?:殴られ|暴力|虐待|脅され|殺され)/u.test(actionableAbuse) ||
+    /\b(?:abused|hit me|threatened to kill me)\b/u.test(actionableAbuse)
   )
     return "abuse_or_violence";
   if (/(?:診断|薬|法律|投資|借金).{0,20}(?:決めて|断定|絶対)/u.test(normalized))
