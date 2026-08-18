@@ -84,15 +84,24 @@ export function useAuthSessionState() {
         entry.state,
       );
       if ("redirecting" in exchanged) return { status: "redirecting" };
-      return applyResponse(exchanged);
+      const nextState = applyResponse(exchanged);
+      if (exchanged.authenticated) authSessionRuntime.notifyExternalSessionChange();
+      return nextState;
     },
     [applyResponse],
   );
 
   const refresh = useCallback(
-    async (signal: AbortSignal): Promise<AuthState> => {
+    async (
+      signal: AbortSignal,
+      strategy: "establish" | "existing-session-only" = "establish",
+    ): Promise<AuthState> => {
       if (signal.aborted) throw new DOMException("The operation was aborted", "AbortError");
-      const pending = initializationRef.current ?? establish(signal);
+      const pending =
+        initializationRef.current ??
+        (strategy === "existing-session-only"
+          ? fetchAuthSession(config.apiUrl, signal).then(applyResponse)
+          : establish(signal));
       initializationRef.current = pending;
       try {
         const nextState = await pending;
@@ -107,7 +116,7 @@ export function useAuthSessionState() {
         if (initializationRef.current === pending) initializationRef.current = null;
       }
     },
-    [establish],
+    [applyResponse, establish],
   );
 
   useEffect(() => {
@@ -137,6 +146,14 @@ export function useAuthSessionState() {
       recheckControllerRef.current?.abort();
       recheckControllerRef.current = null;
     };
+  }, [refresh]);
+
+  useEffect(() => {
+    return authSessionRuntime.installExternalSessionChange(() => {
+      // Cookieは同一originのタブ間ですでに共有されている。ここでLIFF交換まで再実行すると、
+      // 各タブが交換完了を再通知し続けるため、現在のapplication session確認だけを行う。
+      void refresh(new AbortController().signal, "existing-session-only");
+    });
   }, [refresh]);
 
   const retry = useCallback(() => {

@@ -1,4 +1,5 @@
 import type { KVNamespace } from "@cloudflare/workers-types";
+import { OperationalError } from "@me-builder/shared";
 import * as v from "valibot";
 import type {
   ApplicationSessionRecord,
@@ -32,7 +33,16 @@ export class KvApplicationSessionStore implements ApplicationSessionStore {
 
   async get(referenceHash: string): Promise<ApplicationSessionRecord | undefined> {
     const storageKey = key(referenceHash);
-    const record = await this.namespace.get<unknown>(storageKey, "json");
+    let record: unknown;
+    try {
+      record = await this.namespace.get<unknown>(storageKey, "json");
+    } catch (error) {
+      throw sessionStoreError(
+        "SESSION_STORE_READ_FAILED",
+        "authentication.session.store.read",
+        error,
+      );
+    }
     if (record === null) return undefined;
     const parsed = v.safeParse(applicationSessionRecordSchema, record);
     if (parsed.success) {
@@ -53,7 +63,7 @@ export class KvApplicationSessionStore implements ApplicationSessionStore {
           : {}),
       };
     }
-    await this.namespace.delete(storageKey);
+    await this.delete(referenceHash);
     return undefined;
   }
 
@@ -62,15 +72,38 @@ export class KvApplicationSessionStore implements ApplicationSessionStore {
     record: ApplicationSessionRecord,
     ttlSeconds: number,
   ): Promise<void> {
-    await this.namespace.put(key(referenceHash), JSON.stringify(record), {
-      // Cloudflare KV rejects expiration TTL values below 60 seconds.
-      expirationTtl: Math.max(60, Math.ceil(ttlSeconds)),
-    });
+    try {
+      await this.namespace.put(key(referenceHash), JSON.stringify(record), {
+        // Cloudflare KV rejects expiration TTL values below 60 seconds.
+        expirationTtl: Math.max(60, Math.ceil(ttlSeconds)),
+      });
+    } catch (error) {
+      throw sessionStoreError(
+        "SESSION_STORE_WRITE_FAILED",
+        "authentication.session.store.write",
+        error,
+      );
+    }
   }
 
   async delete(referenceHash: string): Promise<void> {
-    await this.namespace.delete(key(referenceHash));
+    try {
+      await this.namespace.delete(key(referenceHash));
+    } catch (error) {
+      throw sessionStoreError(
+        "SESSION_STORE_DELETE_FAILED",
+        "authentication.session.store.delete",
+        error,
+      );
+    }
   }
+}
+
+function sessionStoreError(code: string, stage: string, cause: unknown): OperationalError {
+  return new OperationalError(
+    { code, category: "dependency", stage, retryable: true, dependency: "cloudflare-kv" },
+    cause,
+  );
 }
 
 function key(referenceHash: string): string {

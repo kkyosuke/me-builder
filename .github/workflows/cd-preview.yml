@@ -206,6 +206,10 @@ jobs:
         run: |
           bun --cwd apps/web scripts/register-liff.ts preview
 
+      - name: Verify Application Session Boundary (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task auth:verify:deployed-preview
+
       - name: Register LINE Rich Menu (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}
         env:

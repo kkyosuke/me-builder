@@ -3,7 +3,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode, StrictMode, createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
+import {
+  AUTH_SESSION_CHANGE_STORAGE_KEY,
+  authSessionRuntime,
+} from "../infrastructure/auth-session-runtime";
 import { useAuthSessionState } from "./use-auth-session";
 
 const mocks = vi.hoisted(() => ({
@@ -216,6 +219,48 @@ describe("useAuthSessionState", () => {
 
     expect(result.current.state.status).toBe("error");
     expect(authSessionRuntime.csrfToken()).toBeNull();
+  });
+
+  it("別タブのLIFF交換通知ではLIFF交換を再実行せずsessionだけを再確認する", async () => {
+    mocks.detectAuthEntryEnvironment.mockResolvedValue({
+      kind: "liff",
+      state: { status: "ready", inClient: true },
+    });
+    mocks.establishLiffAuthSession.mockResolvedValue(authenticated);
+    const notify = vi.spyOn(authSessionRuntime, "notifyExternalSessionChange");
+    const { result } = renderHook(() => useAuthSessionState());
+    await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
+    expect(result.current.state).toMatchObject({
+      profile: { displayName: "うさぎ" },
+      revision: 1,
+    });
+    expect(mocks.establishLiffAuthSession).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledTimes(1);
+    mocks.establishLiffAuthSession.mockClear();
+    notify.mockClear();
+    mocks.fetchAuthSession.mockResolvedValueOnce({
+      ...authenticated,
+      displayProfile: { displayName: "別Account" },
+      csrfToken: "csrf-token-b",
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: AUTH_SESSION_CHANGE_STORAGE_KEY, newValue: "opaque" }),
+      );
+    });
+
+    await waitFor(() =>
+      expect(result.current.state).toMatchObject({
+        profile: { displayName: "別Account" },
+        revision: 2,
+      }),
+    );
+    expect(authSessionRuntime.csrfToken()).toBe("csrf-token-b");
+    expect(mocks.fetchAuthSession).toHaveBeenCalledTimes(1);
+    expect(mocks.establishLiffAuthSession).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    notify.mockRestore();
   });
 
   it("feature requestのAbortでは再確認を止めず、unmount時に止める", async () => {

@@ -250,5 +250,8 @@ jobs:
         run: |
           bun --cwd apps/web scripts/register-liff.ts production
 
+      - name: Verify Application Session Boundary (Production)
+        run: task auth:verify:deployed-production
+
       - name: Register LINE Rich Menu (Production)
         run: bun run --cwd apps/api register:rich-menu:production
