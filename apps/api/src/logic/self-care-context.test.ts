@@ -37,7 +37,9 @@ describe("self-care context entitlement", () => {
   });
 
   it("Freeは確認済み結果を読めるが新しい確認を作らない", async () => {
-    execute.mockResolvedValueOnce({ items: [{ id: "archived", status: "revoked" }] });
+    execute.mockResolvedValueOnce({
+      items: [{ id: "confirmed", status: "active" }],
+    });
     await expect(
       getSelfCareContexts({ ...common, planAssignmentProvider: provider("free") }),
     ).resolves.toMatchObject({ type: "resolved", canManage: false });
@@ -50,6 +52,7 @@ describe("self-care context entitlement", () => {
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "feature_unavailable" });
     expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith("account-1", "selfCareContext.read", at);
   });
 
   it.each(["lite", "full"] as const)("%sは本人の確認をAccountDataへ保存する", async (plan) => {

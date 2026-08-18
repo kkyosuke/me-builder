@@ -4,6 +4,7 @@ import type {
   SelfCareConfirmation,
   SelfCareConfirmationKind,
   SelfCareConfirmationResult,
+  SelfCareContextReadModel,
 } from "../../../self-care-context";
 import type { AccountDataDatabase } from "../database";
 import { brainItemEvidenceEdges, brainItems } from "../schema/brain";
@@ -35,8 +36,12 @@ const toModel = (row: {
   updatedAt: row.updatedAt.toISOString(),
 });
 
-export async function readSelfCareConfirmations(db: AccountDataDatabase, accountId: string) {
-  const rows = await db
+export async function readSelfCareConfirmations(
+  db: AccountDataDatabase,
+  accountId: string,
+  at = new Date(),
+): Promise<SelfCareContextReadModel> {
+  const itemRows = await db
     .select({
       id: selfCareConfirmations.id,
       brainItemId: selfCareConfirmations.brainItemId,
@@ -48,10 +53,20 @@ export async function readSelfCareConfirmations(db: AccountDataDatabase, account
     })
     .from(selfCareConfirmations)
     .innerJoin(brainItems, eq(brainItems.id, selfCareConfirmations.brainItemId))
-    .where(eq(selfCareConfirmations.accountId, accountId))
+    .where(
+      and(
+        eq(selfCareConfirmations.accountId, accountId),
+        eq(selfCareConfirmations.status, "active"),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
     .orderBy(desc(selfCareConfirmations.updatedAt))
+    .limit(100)
     .all();
-  return { items: rows.map(toModel) };
+  return { items: itemRows.map(toModel) };
 }
 
 export async function confirmSelfCareContext(
@@ -101,7 +116,7 @@ export async function confirmSelfCareContext(
       ],
       set: { status: "active", confirmedAt: at, updatedAt: at },
     });
-  const confirmed = (await readSelfCareConfirmations(db, accountId)).items.find(
+  const confirmed = (await readSelfCareConfirmations(db, accountId, at)).items.find(
     (candidate) => candidate.brainItemId === brainItemId && candidate.kind === kind,
   );
   if (!confirmed) throw new Error("Self-care confirmation was not persisted");
@@ -114,6 +129,10 @@ export async function revokeSelfCareContext(
   id: string,
   at = new Date(),
 ): Promise<RevokeSelfCareConfirmationResult> {
+  const existing = (await readSelfCareConfirmations(db, accountId, at)).items.find(
+    (candidate) => candidate.id === id,
+  );
+  if (!existing) return { type: "not-found" };
   const updated = await db
     .update(selfCareConfirmations)
     .set({ status: "revoked", updatedAt: at })
@@ -121,10 +140,10 @@ export async function revokeSelfCareContext(
     .returning({ id: selfCareConfirmations.id })
     .get();
   if (!updated) return { type: "not-found" };
-  const item = (await readSelfCareConfirmations(db, accountId)).items.find(
-    (candidate) => candidate.id === id,
-  );
-  return item ? { type: "revoked", item } : { type: "not-found" };
+  return {
+    type: "revoked",
+    item: { ...existing, status: "revoked", updatedAt: at.toISOString() },
+  };
 }
 
 const LIMITS = {

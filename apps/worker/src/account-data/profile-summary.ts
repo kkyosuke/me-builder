@@ -208,8 +208,8 @@ export const profileSummaryActions = {
     at?: Date,
   ) =>
     DO.account.action.goalFollowUp.selectGoalFollowUpMemory(db, accountId, mode, currentText, at),
-  "selfCareContext.read": (db: DO.account.Database, accountId: string) =>
-    DO.account.action.selfCareContext.readSelfCareConfirmations(db, accountId),
+  "selfCareContext.read": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.selfCareContext.readSelfCareConfirmations(db, accountId, at),
   "selfCareContext.confirm": (
     db: DO.account.Database,
     accountId: string,
