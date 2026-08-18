@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  closeLiffWindow,
   initializeLiffForAuthExchange,
   openLiffWindow,
   readLiffAuthExchangeCredential,
+  sendLiffTextMessage,
   shareLiffTextMessage,
 } from "./liff-client";
 
@@ -15,6 +17,8 @@ const mockLiff = vi.hoisted(() => ({
   openWindow: vi.fn(),
   isApiAvailable: vi.fn(),
   shareTargetPicker: vi.fn(),
+  sendMessages: vi.fn(),
+  closeWindow: vi.fn(),
 }));
 const loggerWarn = vi.hoisted(() => vi.fn());
 
@@ -140,6 +144,41 @@ describe("shareLiffTextMessage", () => {
 
     expect(shareLiffTextMessage("招待メッセージ")).toBeNull();
     expect(mockLiff.shareTargetPicker).not.toHaveBeenCalled();
+  });
+});
+
+describe("self-care consultation LIFF message", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("LINE内では本人が選んだ相談文だけを現在のトークへ送って戻る", async () => {
+    mockLiff.isInClient.mockReturnValue(true);
+    mockLiff.isApiAvailable.mockReturnValue(true);
+    mockLiff.sendMessages.mockResolvedValue(undefined);
+
+    await expect(sendLiffTextMessage("今しんどい。何からすればいい？")).resolves.toBe(true);
+    expect(mockLiff.sendMessages).toHaveBeenCalledWith([
+      { type: "text", text: "今しんどい。何からすればいい？" },
+    ]);
+    expect(closeLiffWindow()).toBe(true);
+    expect(mockLiff.closeWindow).toHaveBeenCalledOnce();
+  });
+
+  it("外部ブラウザでは送信せず、呼び出し側のcopy案内へ戻す", async () => {
+    mockLiff.isInClient.mockReturnValue(false);
+
+    await expect(sendLiffTextMessage("相談したい")).resolves.toBe(false);
+    expect(mockLiff.sendMessages).not.toHaveBeenCalled();
+    expect(closeLiffWindow()).toBe(false);
+  });
+
+  it("LINE送信に失敗しても本文をlogへ含めない", async () => {
+    mockLiff.isInClient.mockReturnValue(true);
+    mockLiff.isApiAvailable.mockReturnValue(true);
+    mockLiff.sendMessages.mockRejectedValue(new Error("secret consultation body"));
+
+    await expect(sendLiffTextMessage("機微な相談本文")).resolves.toBe(false);
+    expect(JSON.stringify(loggerWarn.mock.calls)).not.toContain("機微な相談本文");
+    expect(JSON.stringify(loggerWarn.mock.calls)).not.toContain("secret consultation body");
   });
 });
 

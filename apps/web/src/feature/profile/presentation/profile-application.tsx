@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CompatibilityShareContentSection } from "../../compatibility";
+import { closeLiffWindow, sendLiffTextMessage } from "../../liff";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import { GoalFollowUpSection } from "./goal-follow-up-section";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
@@ -74,6 +75,19 @@ export default function ProfileApplication() {
         operationError={selfCare.operationError}
         onRetry={() => void selfCare.reload()}
         onRevoke={(id) => void selfCare.revoke(id)}
+        onConsult={async (prompt) => {
+          if (await sendLiffTextMessage(prompt)) {
+            closeLiffWindow();
+            return "sent";
+          }
+          try {
+            if (!navigator.clipboard) return "unavailable";
+            await navigator.clipboard.writeText(prompt);
+            return "copied";
+          } catch {
+            return "unavailable";
+          }
+        }}
       />
       <CompatibilityShareContentSection latestProfileSummaryVersionId={latestVersionId} />
     </ProfileSummaryScreen>
