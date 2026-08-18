@@ -104,6 +104,11 @@ describe("processWeeklyReflectionGenerationMessage", () => {
       "weeklyReflection.completeGeneration",
       expect.objectContaining({ generationId: "weekly-generation-1", model: "gemini-test" }),
     );
+    expect(
+      execute.mock.calls.filter(
+        ([, operation]) => operation === "weeklyReflection.completeGeneration",
+      ),
+    ).toHaveLength(1);
     expect(queueMessage.ack).toHaveBeenCalledOnce();
     expect(queueMessage.retry).not.toHaveBeenCalled();
   });
@@ -156,6 +161,68 @@ describe("processWeeklyReflectionGenerationMessage", () => {
     expect(queueMessage.retry).toHaveBeenCalledOnce();
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({ disposition: "dead-letter" }),
+      expect.any(String),
+    );
+  });
+
+  it("AI設定不足は再配送せず失敗表示を確定してackする", async () => {
+    generateWeeklyReflection.mockResolvedValue({
+      type: "failed",
+      reason: "ai_credentials_missing",
+    });
+    const queueMessage = message();
+
+    await processWeeklyReflectionGenerationMessage(queueMessage, bindings(), workerConfig);
+
+    expect(execute).toHaveBeenCalledWith(
+      "account-1",
+      "weeklyReflection.failGeneration",
+      "weekly-generation-1",
+      expect.any(String),
+    );
+    expect(queueMessage.ack).toHaveBeenCalledOnce();
+    expect(queueMessage.retry).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ disposition: "ack", retryable: false }),
+      expect.any(String),
+    );
+  });
+
+  it("保存時にgenerationが失効していた場合は再試行loopにせずackする", async () => {
+    execute.mockImplementation(async (_accountId: string, operation: string) => {
+      if (operation === "weeklyReflection.loadGenerationContext") {
+        return {
+          generationId: "weekly-generation-1",
+          weekStart: "2026-08-10",
+          evidence: [
+            {
+              id: "diary:source-1",
+              source: "diary",
+              text: "予定を一つ減らした",
+              recordedAt: new Date("2026-08-12T00:00:00.000Z"),
+            },
+          ],
+        };
+      }
+      if (operation === "weeklyReflection.completeGeneration") return false;
+      return undefined;
+    });
+    generateWeeklyReflection.mockResolvedValue({
+      type: "generated",
+      headline: "今週の振り返り",
+      items: [],
+    });
+    const queueMessage = message(2);
+
+    await processWeeklyReflectionGenerationMessage(queueMessage, bindings(), workerConfig);
+
+    expect(queueMessage.ack).toHaveBeenCalledOnce();
+    expect(queueMessage.retry).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: "WEEKLY_REFLECTION_COMPLETION_REJECTED",
+        disposition: "ack",
+      }),
       expect.any(String),
     );
   });
