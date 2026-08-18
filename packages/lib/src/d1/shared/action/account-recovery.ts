@@ -215,6 +215,28 @@ export async function completeAccountRecovery(
       and ${accountRecoveryCredentials.claimedIdentityHash} = ${claimToken}
       and ${accountRecoveryCredentials.usedAt} is not null
   )`;
+  const targetAccountIsActive = sql`exists (
+    select 1 from ${accounts}
+    where ${accounts.id} = ${accountId}
+      and ${accounts.status} = 'active'
+      and ${accounts.isDeleted} = false
+  )`;
+  const sourceIdentityIsEligible = sql`exists (
+    select 1 from ${accountIdentities}
+    where ${accountIdentities.id} = ${input.sourceIdentityId}
+      and ${accountIdentities.accountId} = ${input.sourceAccountId}
+      and ${accountIdentities.provider} = 'line_login'
+      and ${accountIdentities.providerAccountId} = ${input.newProviderAccountId}
+      and ${accountIdentities.isDeleted} = false
+  )`;
+  const hasNoThirdAccountConflict = sql`not exists (
+    select 1 from ${accountIdentities}
+    where ${accountIdentities.provider} in ('line', 'line_login')
+      and ${accountIdentities.providerAccountId} = ${input.newProviderAccountId}
+      and ${accountIdentities.accountId} <> ${accountId}
+      and ${accountIdentities.accountId} <> ${input.sourceAccountId}
+      and ${accountIdentities.isDeleted} = false
+  )`;
   const consume = db
     .update(accountRecoveryCredentials)
     .set({ claimedIdentityHash: claimToken, claimedAt: now, usedAt: now })
@@ -226,6 +248,9 @@ export async function completeAccountRecovery(
         isNull(accountRecoveryCredentials.claimedIdentityHash),
         isNull(accountRecoveryCredentials.usedAt),
         isNull(accountRecoveryCredentials.revokedAt),
+        targetAccountIsActive,
+        sourceIdentityIsEligible,
+        hasNoThirdAccountConflict,
       ),
     );
 
