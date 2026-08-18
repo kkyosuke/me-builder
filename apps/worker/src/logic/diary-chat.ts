@@ -77,25 +77,40 @@ const routeRank: Record<SafetyRoute, number> = {
 /** モデル呼び出し前の決定的な最低限の安全route。本文を保存・ログ出力しない。 */
 function classifySafetyText(text: string): SafetyRoute {
   const normalized = text.normalize("NFKC").toLowerCase();
+  const actionable = normalized
+    .replace(
+      /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺).{0,16}(?:わけではない|とは思っていない)/gu,
+      " ",
+    )
+    .replace(
+      /(?:以前|過去|前は).{0,16}(?:死にたい|消え(?:てしまい)?たい).{0,24}(?:今|現在).{0,12}(?:思っていない|違う|大丈夫)/gu,
+      " ",
+    )
+    .replace(
+      /(?:記事|本|映画|歌詞).{0,24}(?:死にたい|消え(?:てしまい)?たい|自傷|自殺).{0,24}(?:と書いて|という記事|という言葉|とあって)/gu,
+      " ",
+    )
+    .replace(/\bi (?:do not|don't) want to die\b/gu, " ")
+    .replace(/\bi (?:no longer|do not|don't) feel suicidal\b/gu, " ")
+    .replace(
+      /\bi used to (?:want to die|feel suicidal).{0,32}(?:not now|no longer|do not now|don't now)\b/gu,
+      " ",
+    )
+    .replace(
+      /\b(?:an? article|a book|a movie|the lyrics).{0,48}(?:want to die|kill myself|suicid(?:e|al)|self[- ]harm)\b/gu,
+      " ",
+    );
   const imminentDanger =
-    /(?:今すぐ|これから).{0,12}(?:死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(normalized) ||
+    /(?:今すぐ|これから).{0,12}(?:死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(actionable) ||
     /\b(?:i am|i'm).{0,16}(?:going to|about to).{0,16}(?:kill myself|die)|\bright now.{0,16}(?:kill myself|die)\b/u.test(
-      normalized,
+      actionable,
     );
   if (imminentDanger) return "imminent_danger";
-  const nonCurrentOrQuotedSelfHarm =
-    /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺).{0,16}(?:わけではない|とは思っていない|と書いて|という記事|という言葉)/u.test(
-      normalized,
-    ) ||
-    /(?:以前|過去|前は).{0,16}(?:死にたい|消え(?:てしまい)?たい).{0,24}(?:今|現在).{0,12}(?:思っていない|違う|大丈夫)/u.test(
-      normalized,
-    );
-  if (nonCurrentOrQuotedSelfHarm) return "normal";
   if (
-    /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(normalized) ||
-    /\b(?:i want to die|kill myself|suicidal|self[- ]harm)\b/u.test(normalized) ||
+    /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(actionable) ||
+    /\b(?:i want to die|kill myself|suicidal|self[- ]harm)\b/u.test(actionable) ||
     /\b(?:my friend|my family|they|he|she).{0,32}(?:want(?:s|ed)? to die|suicid(?:e|al)|kill (?:themself|himself|herself))\b/u.test(
-      normalized,
+      actionable,
     )
   )
     return "self_harm_possible";
