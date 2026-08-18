@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { app } from "../app";
+import { requireAuthentication } from "../middleware/authentication";
+import {
+  requireAdmin,
+  requireCurrentTerms,
+  requireDevelopmentEnvironment,
+} from "../middleware/authorization";
 
 const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch", "trace"] as const;
 
@@ -67,6 +73,24 @@ function runtimeOperations() {
         .map((route) => `${route.method.toLowerCase()} ${route.path.replace(/:([^/]+)/g, "{$1}")}`),
     ),
   ].sort();
+}
+
+function runtimeHandlersByOperation() {
+  const handlers = new Map<string, Set<(typeof app.routes)[number]["handler"]>>();
+  for (const route of app.routes) {
+    if (
+      route.method === "ALL" ||
+      !route.path.startsWith("/api/") ||
+      route.path === "/api/openapi.json"
+    ) {
+      continue;
+    }
+    const operation = `${route.method.toLowerCase()} ${route.path.replace(/:([^/]+)/g, "{$1}")}`;
+    const operationHandlers = handlers.get(operation) ?? new Set();
+    operationHandlers.add(route.handler);
+    handlers.set(operation, operationHandlers);
+  }
+  return handlers;
 }
 
 describe("GET /api/openapi.json", () => {
@@ -259,14 +283,7 @@ describe("GET /api/openapi.json", () => {
     );
 
     const operationIds = new Set<string>();
-    const publicOperations = new Set([
-      "get /api/health",
-      "get /api/ready",
-      "post /api/auth/liff/exchange",
-      "post /api/auth/sso/login",
-      "get /api/auth/sso/callback",
-      "get /api/billing/plans",
-    ]);
+    const runtimeHandlers = runtimeHandlersByOperation();
     const signedOperations = new Map([
       ["post /api/line/webhook", "lineWebhookSignature"],
       ["post /api/billing/webhook", "stripeWebhookSignature"],
@@ -284,15 +301,24 @@ describe("GET /api/openapi.json", () => {
       expect(operation.summary, `${route} must have summary`).toBeTruthy();
       expect(operation.security, `${route} must explicitly declare security`).toBeDefined();
 
+      const handlers = runtimeHandlers.get(route);
+      expect(handlers, `${route} must be registered at runtime`).toBeDefined();
+      const requiresAuthentication = handlers?.has(requireAuthentication) ?? false;
+      const requiresCurrentTerms = handlers?.has(requireCurrentTerms) ?? false;
+      const requiresAdmin = handlers?.has(requireAdmin) ?? false;
+      const requiresDevelopmentEnvironment = handlers?.has(requireDevelopmentEnvironment) ?? false;
       const signedScheme = signedOperations.get(route);
       if (signedScheme) {
         expect(operation.security).toEqual([{ [signedScheme]: [] }]);
-      } else if (publicOperations.has(route)) {
-        expect(operation.security).toEqual([]);
-      } else {
+        expect(requiresAuthentication, `${route} must not use application-session auth`).toBe(
+          false,
+        );
+      } else if (requiresAuthentication) {
         expect(operation.security).toEqual([
           method === "get" ? { applicationSession: [] } : { applicationSession: [], csrfToken: [] },
         ]);
+      } else {
+        expect(operation.security).toEqual([]);
       }
       for (const requirement of operation.security ?? []) {
         for (const securityScheme of Object.keys(requirement)) {
@@ -303,8 +329,14 @@ describe("GET /api/openapi.json", () => {
         }
       }
 
-      if (path.startsWith("/api/admin/")) expect(operation.tags).toContain("Admin");
-      if (path.startsWith("/api/dev/")) expect(operation.tags).toContain("Development");
+      expect(
+        operation.tags?.includes("Admin") ?? false,
+        `${route} Admin tag must match its runtime authorization middleware`,
+      ).toBe(requiresAdmin);
+      expect(
+        operation.tags?.includes("Development") ?? false,
+        `${route} Development tag must match its runtime environment middleware`,
+      ).toBe(requiresDevelopmentEnvironment);
       if (operation.requestBody) {
         expect(operation.requestBody.required, `${route} request body must be required`).toBe(true);
       }
@@ -315,6 +347,22 @@ describe("GET /api/openapi.json", () => {
         expect(
           responses["403"],
           `${route} must declare its Origin and CSRF validation response`,
+        ).toBeDefined();
+      }
+      expect(
+        Boolean(responses["428"]),
+        `${route} 428 response must match its runtime current-terms middleware`,
+      ).toBe(requiresCurrentTerms);
+      if (requiresAdmin) {
+        expect(
+          responses["403"],
+          `${route} must declare its admin authorization response`,
+        ).toBeDefined();
+      }
+      if (requiresDevelopmentEnvironment) {
+        expect(
+          responses["404"],
+          `${route} must declare its production-hidden response`,
         ).toBeDefined();
       }
       expect(

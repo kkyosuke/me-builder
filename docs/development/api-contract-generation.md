@@ -62,4 +62,6 @@ API Serverは同じdocumentを`GET /api/openapi.json`でも提供します。Pre
 
 `task ci`とGitHub Actionsの`check:generated`は、OpenAPI documentとWeb UI用TypeScript型を単一コマンドで再生成し、両方にGit差分が残らないことを検査します。contract変更時は生成物も同じcommitへ含めます。
 
-API contractテストは、Honoへ登録された`/api/*`のruntime route（OpenAPI document自身を除く）とOpenAPIのpath／HTTP methodを双方向比較します。また、全operationで`operationId`、security、response status、schema、content typeを必須検査し、空bodyとbinary responseも表現に応じて検査します。runtimeでも実際に返すstatusとcontent typeを同じOpenAPI documentへ照合します。routeを追加するときはcontract middlewareを同じrouteへ登録し、公開routeを含めてsecurityを明示します。
+API contractテストは、Honoへ登録された`/api/*`のruntime route（OpenAPI document自身を除く）とOpenAPIのpath／HTTP methodを双方向比較します。また、全operationで`operationId`、security、response status、schema、content typeを必須検査し、空bodyとbinary responseも表現に応じて検査します。runtimeでも実際に返すstatusとcontent typeを同じOpenAPI documentへ照合します。
+
+認証、CSRF、現行規約同意、管理者認可、開発環境限定の境界は、route名から推測しません。Honoへ実際に登録したmiddlewareと、OpenAPIのsecurity、response、`Admin`／`Development` tagを照合します。routeを追加するときはcontract middlewareを同じrouteへ登録し、公開routeを含めてsecurityを明示します。
