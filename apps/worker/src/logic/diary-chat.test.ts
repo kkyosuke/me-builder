@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { diaryChatSafetyFixtures } from "../evaluation/diary-chat-safety-fixtures";
 import {
   JAPAN_ABUSE_VIOLENCE_SUPPORT_URL,
   JAPAN_MENTAL_HEALTH_SUPPORT_URL,
+  appendJapanSafetyGuidance,
   buildDevelopmentBrainUsageMessage,
   buildDiaryChatContextPackage,
   buildSafetyFallback,
@@ -217,6 +219,20 @@ describe("diary chat guardrails", () => {
     expect(abuseResponse).not.toMatch(/119|110/u);
   });
 
+  it("モデルの差し迫った危険応答にも運営確認済みの119・110案内を必ず付加する", () => {
+    const response = appendJapanSafetyGuidance({
+      mode: "organize",
+      reply: "今いる場所の安全を確認してもいい？",
+      main_question_count: 1,
+      end_session: false,
+      daily_prompt_follow_up: "none",
+      safety: { route: "imminent_danger", restricted_advice: true },
+      used_memory_ids: [],
+    });
+
+    expect(response.reply).toMatch(/119.*110/u);
+  });
+
   it("通常時のfallbackへ会話継続だけの質問を付けない", () => {
     expect(buildSafetyFallback("normal")).toMatchObject({
       main_question_count: 0,
@@ -235,6 +251,15 @@ describe("diary chat guardrails", () => {
     ];
     expect(classifySafety(coalesced, ["first", "second"])).toBe("self_harm_possible");
   });
+
+  it.each(diaryChatSafetyFixtures)(
+    "$idを決定的な安全分類の期待routeへ送る",
+    ({ input, expectedPreclassifiedRoute }) => {
+      expect(classifySafety([{ id: "fixture", role: "user", body: input, sequence: 1 }])).toBe(
+        expectedPreclassifiedRoute,
+      );
+    },
+  );
 
   it("再認可済みBrain Itemを推定区分とEvidence付きでContext Packageへ入れる", () => {
     expect(

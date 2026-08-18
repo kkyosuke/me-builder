@@ -60,6 +60,8 @@ export type SafetyRoute = v.InferOutput<typeof SafetyRouteSchema>;
 export const JAPAN_MENTAL_HEALTH_SUPPORT_URL = "https://www.mhlw.go.jp/mamorouyokokoro/soudan/";
 export const JAPAN_ABUSE_VIOLENCE_SUPPORT_URL = "https://notalone-cao.go.jp/support/";
 
+const JAPAN_IMMINENT_DANGER_GUIDANCE =
+  "今すぐ危険が迫っているなら、安全な場所へ移動して、119（救急・消防）または110（警察）、近くの信頼できる人へ連絡してください。";
 const JAPAN_SELF_HARM_GUIDANCE = `厚生労働省「まもろうよ こころ」の相談窓口: ${JAPAN_MENTAL_HEALTH_SUPPORT_URL}`;
 const JAPAN_ABUSE_VIOLENCE_GUIDANCE = `政府の「あなたはひとりじゃない」制度・相談窓口: ${JAPAN_ABUSE_VIOLENCE_SUPPORT_URL}`;
 
@@ -74,11 +76,65 @@ const routeRank: Record<SafetyRoute, number> = {
 
 /** モデル呼び出し前の決定的な最低限の安全route。本文を保存・ログ出力しない。 */
 function classifySafetyText(text: string): SafetyRoute {
-  if (/(今すぐ|これから).{0,12}(死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(text))
-    return "imminent_danger";
-  if (/(死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(text)) return "self_harm_possible";
-  if (/(殴られ|暴力|虐待|脅され|殺され)/u.test(text)) return "abuse_or_violence";
-  if (/(診断|薬|法律|投資|借金).{0,20}(決めて|断定|絶対)/u.test(text)) return "high_stakes";
+  const normalized = text.normalize("NFKC").toLowerCase();
+  const actionable = normalized
+    .replace(
+      /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺).{0,16}(?:わけではない|とは思っていない)/gu,
+      " ",
+    )
+    .replace(
+      /(?:以前|過去|前は).{0,16}(?:死にたい|消え(?:てしまい)?たい).{0,24}(?:今|現在).{0,12}(?:思っていない|違う|大丈夫)/gu,
+      " ",
+    )
+    .replace(
+      /(?:記事|本|映画|歌詞).{0,24}(?:死にたい|消え(?:てしまい)?たい|自傷|自殺).{0,24}(?:と書いて|という記事|という言葉|とあって)/gu,
+      " ",
+    )
+    .replace(/\bi (?:do not|don't) want to die\b/gu, " ")
+    .replace(/\bi (?:no longer|do not|don't) feel suicidal\b/gu, " ")
+    .replace(
+      /\bi used to (?:want to die|feel suicidal).{0,32}(?:not now|no longer|do not now|don't now)\b/gu,
+      " ",
+    )
+    .replace(
+      /\b(?:an? article|a book|a movie|the lyrics).{0,48}(?:want to die|kill myself|suicid(?:e|al)|self[- ]harm)\b/gu,
+      " ",
+    );
+  const actionableAbuse = normalized
+    .replace(
+      /(?:殴られ|暴力|虐待|脅され|殺され).{0,16}(?:てはいない|ていない|ではない|わけではない|受けていない)/gu,
+      " ",
+    )
+    .replace(
+      /(?:記事|本|映画|歌詞).{0,24}(?:殴られ|暴力|虐待|脅され|殺され).{0,24}(?:と書いて|という記事|という言葉|とあって)/gu,
+      " ",
+    )
+    .replace(/\bi (?:am not|was not|wasn't) (?:being )?(?:abused|threatened|hit)\b/gu, " ")
+    .replace(
+      /\b(?:an? article|a book|a movie|the lyrics).{0,48}(?:abused|abuse|hit me|threatened to kill me)\b/gu,
+      " ",
+    );
+  const imminentDanger =
+    /(?:今すぐ|これから).{0,12}(?:死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(actionable) ||
+    /\b(?:i am|i'm).{0,16}(?:going to|about to).{0,16}(?:kill myself|die)|\bright now.{0,16}(?:kill myself|die)\b/u.test(
+      actionable,
+    );
+  if (imminentDanger) return "imminent_danger";
+  if (
+    /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(actionable) ||
+    /\b(?:i want to die|kill myself|suicidal|self[- ]harm)\b/u.test(actionable) ||
+    /\b(?:my friend|my family|they|he|she).{0,32}(?:want(?:s|ed)? to die|suicid(?:e|al)|kill (?:themself|himself|herself))\b/u.test(
+      actionable,
+    )
+  )
+    return "self_harm_possible";
+  if (
+    /(?:殴られ|暴力|虐待|脅され|殺され)/u.test(actionableAbuse) ||
+    /\b(?:abused|hit me|threatened to kill me)\b/u.test(actionableAbuse)
+  )
+    return "abuse_or_violence";
+  if (/(?:診断|薬|法律|投資|借金).{0,20}(?:決めて|断定|絶対)/u.test(normalized))
+    return "high_stakes";
   return "normal";
 }
 
@@ -160,7 +216,7 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
     route === "imminent_danger" || route === "self_harm_possible" || route === "abuse_or_violence";
   const reply =
     route === "imminent_danger"
-      ? "話してくれてありがとう。今すぐ危険が迫っているなら、安全な場所へ移動して、119（救急・消防）または110（警察）、近くの信頼できる人へ連絡してください。今は安全な場所にいる？"
+      ? `話してくれてありがとう。${JAPAN_IMMINENT_DANGER_GUIDANCE}今は安全な場所にいる？`
       : route === "self_harm_possible"
         ? `話してくれてありがとう。一人で抱えず、近くの信頼できる人や相談窓口へつながってください。\n${JAPAN_SELF_HARM_GUIDANCE}\n今この瞬間、自分を傷つける危険はある？`
         : route === "abuse_or_violence"
@@ -181,14 +237,16 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
  * モデルに相談先を生成させず、運営確認済みの日本向け案内だけを応答へ付加する。
  * fallbackは既に同じ案内を含むため、URLの重複もここで防ぐ。
  */
-function appendJapanSafetyGuidance(response: DiaryChatResponse): DiaryChatResponse {
+export function appendJapanSafetyGuidance(response: DiaryChatResponse): DiaryChatResponse {
   const safetyGuidance =
-    response.safety.route === "self_harm_possible"
-      ? { message: JAPAN_SELF_HARM_GUIDANCE, url: JAPAN_MENTAL_HEALTH_SUPPORT_URL }
-      : response.safety.route === "abuse_or_violence"
-        ? { message: JAPAN_ABUSE_VIOLENCE_GUIDANCE, url: JAPAN_ABUSE_VIOLENCE_SUPPORT_URL }
-        : undefined;
-  if (!safetyGuidance || response.reply.includes(safetyGuidance.url)) return response;
+    response.safety.route === "imminent_danger"
+      ? { message: JAPAN_IMMINENT_DANGER_GUIDANCE, marker: JAPAN_IMMINENT_DANGER_GUIDANCE }
+      : response.safety.route === "self_harm_possible"
+        ? { message: JAPAN_SELF_HARM_GUIDANCE, marker: JAPAN_MENTAL_HEALTH_SUPPORT_URL }
+        : response.safety.route === "abuse_or_violence"
+          ? { message: JAPAN_ABUSE_VIOLENCE_GUIDANCE, marker: JAPAN_ABUSE_VIOLENCE_SUPPORT_URL }
+          : undefined;
+  if (!safetyGuidance || response.reply.includes(safetyGuidance.marker)) return response;
   return {
     ...response,
     reply: `${response.reply}\n${safetyGuidance.message}`,
