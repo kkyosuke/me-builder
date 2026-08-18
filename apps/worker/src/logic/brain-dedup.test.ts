@@ -2,6 +2,7 @@ import type { AccountDataNamespace, BrainSemanticDedupCandidate } from "@me-buil
 import { describe, expect, it, vi } from "vitest";
 import type { CloudflareBindings } from "../config";
 import { getWorkerConfig } from "../config";
+import { brainDedupEvaluationFixtures } from "../evaluation/brain-dedup-fixtures";
 import {
   type BrainDedupDependencies,
   type DiaryBrainDedupCandidate,
@@ -49,6 +50,69 @@ const existing = {
 };
 
 describe("decideDiaryBrainDuplicates", () => {
+  it.each(brainDedupEvaluationFixtures)(
+    "評価fixture $idのモデル判定をproduction parserへ適用する",
+    async ({
+      category,
+      candidate: candidateStatement,
+      existing: existingStatement,
+      sameProposition,
+    }) => {
+      const harness = createHarness([
+        {
+          brainItemId: "existing-fixture",
+          category,
+          statement: existingStatement,
+          comparisonText: existingStatement,
+          isInference: false,
+        },
+      ]);
+      harness.dependencies.generateDecision = vi.fn().mockResolvedValue(
+        JSON.stringify({
+          matches: sameProposition
+            ? [
+                {
+                  candidate_index: 0,
+                  existing_brain_item_id: "existing-fixture",
+                  judgment: "same_proposition",
+                },
+              ]
+            : [],
+        }),
+      );
+
+      const decisions = await decideDiaryBrainDuplicates(
+        {
+          candidates: [
+            { category, statement: candidateStatement, sourceMessageIds: ["fixture-message"] },
+          ],
+          messages: [
+            {
+              id: "fixture-message",
+              role: "user",
+              body: candidateStatement,
+              sequence: 1,
+            },
+          ],
+          accountId: "account-1",
+          cf: harness.cf,
+          workerConfig,
+        },
+        harness.dependencies,
+      );
+
+      expect(decisions?.[0]).toEqual(
+        sameProposition
+          ? {
+              matchingBrainItemId: "existing-fixture",
+              deduplication: "semantic",
+              dedupPromptVersion: "brain-dedup-v3",
+            }
+          : { deduplication: "none" },
+      );
+    },
+  );
+
   it("Vector候補を専用AIが同一命題と判定した場合だけsemantic matchを返す", async () => {
     const harness = createHarness([existing]);
     harness.dependencies.generateDecision = vi.fn().mockResolvedValue(

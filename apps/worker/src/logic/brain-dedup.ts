@@ -19,7 +19,11 @@ import {
   embedQuery,
   generateStructuredText,
 } from "../infrastructure/gemini-client";
-import { BRAIN_DEDUP_PROMPT_VERSION, BRAIN_DEDUP_SYSTEM_PROMPT } from "../prompt/brain-dedup";
+import {
+  BRAIN_DEDUP_PROMPT_VERSION,
+  BRAIN_DEDUP_SYSTEM_PROMPT,
+  buildBrainDedupDecisionContents,
+} from "../prompt/brain-dedup";
 
 const VECTOR_CANDIDATE_LIMIT_PER_ITEM = 10;
 
@@ -289,30 +293,36 @@ export async function decideDiaryBrainDuplicates(
   if (unresolvedIndices.length === 0) return decisions;
   if (!apiKey) return decisions;
 
+  const newCandidates = unresolvedIndices.map((candidateIndex) => {
+    const candidate = input.candidates[candidateIndex];
+    const statement = comparisons[candidateIndex];
+    if (!candidate || statement === undefined) {
+      throw new Error("Diary Brain deduplication candidate index is invalid");
+    }
+    return {
+      candidate_index: candidateIndex,
+      category: candidate.category,
+      statement,
+      is_inference: false,
+    };
+  });
   const client = dependencies.createGemini({ googleVertexAiApiKey: apiKey });
   const raw = await dependencies.generateDecision(client, {
     model: input.workerConfig.geminiModel,
-    contents: JSON.stringify({
-      context_package: {
-        new_candidates: unresolvedIndices.map((candidateIndex) => ({
-          candidate_index: candidateIndex,
-          category: input.candidates[candidateIndex]?.category,
-          statement: comparisons[candidateIndex],
-          is_inference: false,
-        })),
-        candidate_targets: input.candidates.map((candidate, candidateIndex) => ({
-          candidate_index: candidateIndex,
-          category: candidate.category,
-          statement: comparisons[candidateIndex],
-          is_inference: false,
-        })),
-        existing_items: eligible.map((item) => ({
-          brain_item_id: item.brainItemId,
-          category: item.category,
-          statement: item.comparisonText,
-          is_inference: item.isInference,
-        })),
-      },
+    contents: buildBrainDedupDecisionContents({
+      newCandidates,
+      candidateTargets: input.candidates.map((candidate, candidateIndex) => ({
+        candidate_index: candidateIndex,
+        category: candidate.category,
+        statement: comparisons[candidateIndex] ?? candidate.statement,
+        is_inference: false,
+      })),
+      existingItems: eligible.map((item) => ({
+        brain_item_id: item.brainItemId,
+        category: item.category,
+        statement: item.comparisonText,
+        is_inference: item.isInference,
+      })),
     }),
     systemInstruction: BRAIN_DEDUP_SYSTEM_PROMPT,
     responseJsonSchema: toJsonSchema(ResponseSchema) as Record<string, unknown>,

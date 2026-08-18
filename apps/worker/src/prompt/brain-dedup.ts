@@ -1,6 +1,35 @@
 /** 意味的重複判定の判断規則を変えた場合は、この版も更新する。 */
 export const BRAIN_DEDUP_PROMPT_VERSION = "brain-dedup-v3";
 
+type BrainDedupPromptCandidate = Readonly<{
+  candidate_index: number;
+  category: string;
+  statement: string;
+  is_inference: boolean;
+}>;
+
+type BrainDedupPromptExistingItem = Readonly<{
+  brain_item_id: string;
+  category: string;
+  statement: string;
+  is_inference: boolean;
+}>;
+
+/** Productionと実モデル評価で同じ入力envelopeを使用する。 */
+export function buildBrainDedupDecisionContents(input: {
+  newCandidates: readonly BrainDedupPromptCandidate[];
+  candidateTargets: readonly BrainDedupPromptCandidate[];
+  existingItems: readonly BrainDedupPromptExistingItem[];
+}): string {
+  return JSON.stringify({
+    context_package: {
+      new_candidates: input.newCandidates,
+      candidate_targets: input.candidateTargets,
+      existing_items: input.existingItems,
+    },
+  });
+}
+
 export const BRAIN_DEDUP_SYSTEM_PROMPT = `あなたは新しいBrain Item候補と既存Brain Itemが、同じ1つの命題を表すか判定します。
 指定されたJSON schema以外は返さないでください。
 
