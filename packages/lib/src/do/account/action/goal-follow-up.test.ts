@@ -231,4 +231,27 @@ describe("goal follow-up", () => {
       updateGoalFollowUp(db, ACCOUNT_ID, first.item.id, { status: "active" }, AT, 1),
     ).resolves.toEqual({ type: "active-limit-reached" });
   });
+
+  it("本人が停止・完了したGoalをAI memoryへ自動で戻さない", async () => {
+    const db = createTestDb();
+    await addGoal(db, { id: "stopped", statement: "週末に散歩を続けたい" });
+    await addGoal(db, { id: "completed", statement: "面談の準備を終えたい" });
+    const stopped = await agreeGoalFollowUp(db, ACCOUNT_ID, "stopped", "靴を出す", AT);
+    const completed = await agreeGoalFollowUp(db, ACCOUNT_ID, "completed", "希望を書く", AT);
+    if (stopped.type !== "agreed" || completed.type !== "agreed") {
+      throw new Error("goal agreement failed");
+    }
+    await updateGoalFollowUp(db, ACCOUNT_ID, stopped.item.id, { status: "stopped" }, AT);
+    await updateGoalFollowUp(db, ACCOUNT_ID, completed.item.id, { status: "completed" }, AT);
+
+    await expect(
+      selectGoalFollowUpMemory(db, ACCOUNT_ID, "relevant-active", "散歩と面談の話", AT),
+    ).resolves.toBeNull();
+    await expect(readGoalFollowUps(db, ACCOUNT_ID, AT, false)).resolves.toMatchObject({
+      items: expect.arrayContaining([
+        expect.objectContaining({ status: "stopped" }),
+        expect.objectContaining({ status: "completed" }),
+      ]),
+    });
+  });
 });
