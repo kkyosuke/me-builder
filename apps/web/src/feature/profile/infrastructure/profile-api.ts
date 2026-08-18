@@ -22,6 +22,7 @@ const SummarySchema = v.object({
         description: v.pipe(v.string(), v.nonEmpty()),
         evidenceCount: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
         sources: v.pipe(v.array(v.picklist(["diagnosis", "diary"])), v.minLength(1)),
+        selfView: v.nullable(v.literal("not_aligned")),
       }),
     ),
     v.maxLength(3),
@@ -122,6 +123,23 @@ export async function fetchProfileSummary(
     },
     summary: latest?.summary ?? null,
   };
+}
+
+export async function setProfileSummaryInsightSelfView(
+  apiUrl: string | undefined,
+  versionId: string,
+  insightKey: string,
+  selfView: "not_aligned" | null,
+): Promise<void> {
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/profile-summary/insight-self-view",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ versionId, insightKey, selfView }),
+    },
+  );
+  if (!response.ok) throw new Error("本人の見方を保存できませんでした。");
 }
 
 export async function requestProfileSummaryGeneration(

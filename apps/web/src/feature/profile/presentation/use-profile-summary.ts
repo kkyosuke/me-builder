@@ -4,6 +4,7 @@ import type { AsyncState } from "../../../model/async-state";
 import {
   fetchProfileSummary,
   requestProfileSummaryGeneration,
+  setProfileSummaryInsightSelfView,
 } from "../infrastructure/profile-api";
 import {
   ProfileSummaryGenerationUnavailableError,
@@ -159,6 +160,14 @@ export function useProfileSummary() {
     }
   }, [load]);
 
+  const setSelfView = useCallback(
+    async (versionId: string, insightKey: string, selfView: "not_aligned" | null) => {
+      await setProfileSummaryInsightSelfView(config.apiUrl, versionId, insightKey, selfView);
+      await load(false);
+    },
+    [load],
+  );
+
   useEffect(() => {
     mounted.current = true;
     let active = true;
@@ -175,5 +184,5 @@ export function useProfileSummary() {
     };
   }, [load]);
 
-  return { state, generationNotice, reload: load, generate };
+  return { state, generationNotice, reload: load, generate, setSelfView };
 }

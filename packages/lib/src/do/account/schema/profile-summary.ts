@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import type { CompatibilityShareStatement, ProfileSummaryContent } from "../../../profile-summary";
 import { accountDataIdentity } from "./identity";
 
@@ -53,6 +60,23 @@ export const profileSummaryVersions = sqliteTable(
   (table) => [
     uniqueIndex("profile_summary_version_sequence_idx").on(table.sequence),
     index("profile_summary_version_generated_idx").on(table.generatedAt),
+  ],
+);
+
+/** AI由来の見方とは別に、本人がその時点でどう捉えたかを保存する。 */
+export const profileSummaryInsightSelfViews = sqliteTable(
+  "profile_summary_insight_self_views",
+  {
+    profileSummaryVersionId: text("profile_summary_version_id")
+      .notNull()
+      .references(() => profileSummaryVersions.id, { onDelete: "cascade" }),
+    insightKey: text("insight_key").notNull(),
+    selfView: text("self_view", { enum: ["not_aligned"] }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.profileSummaryVersionId, table.insightKey] }),
+    index("profile_summary_insight_self_view_updated_idx").on(table.updatedAt),
   ],
 );
 

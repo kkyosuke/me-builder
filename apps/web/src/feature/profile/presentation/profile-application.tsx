@@ -54,6 +54,7 @@ export default function ProfileApplication() {
       {...(versioning ? { versioning } : {})}
       {...(result && result.versions.length > 1 ? { onSelectVersion: setSelectedVersionId } : {})}
       {...(result ? { onRegenerate: () => void summary.generate() } : {})}
+      {...(result ? { onSetSelfView: summary.setSelfView } : {})}
     >
       <WeeklyReflectionSection
         state={weeklyReflection.state}

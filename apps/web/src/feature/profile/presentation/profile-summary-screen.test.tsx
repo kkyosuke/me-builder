@@ -28,6 +28,7 @@ const summary: ProfileSummary = {
       description: "先の段取りが見えると安心して力を発揮できる傾向があります。",
       evidenceCount: 2,
       sources: ["diagnosis", "diary"],
+      selfView: null,
     },
   ],
   recordCount: 2,
@@ -387,6 +388,23 @@ describe("ProfileSummaryScreen", () => {
     expect(screen.getByRole("alert").textContent).toContain("生成に失敗しました");
     fireEvent.click(screen.getByRole("button", { name: "再試行" }));
     expect(onRegenerate).toHaveBeenCalledOnce();
+  });
+
+  it("最新版のInsightへ本人の見方を別データとして記録できる", () => {
+    const onSetSelfView = vi.fn();
+    render(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        versioning={versioning}
+        onRetry={vi.fn()}
+        onSetSelfView={onSetSelfView}
+      />,
+    );
+
+    const button = screen.getAllByRole("button", { name: "自分ではそう感じない" })[0];
+    if (!button) throw new Error("self-view button was not rendered");
+    fireEvent.click(button);
+    expect(onSetSelfView).toHaveBeenCalledWith("version-3", "prepare", "not_aligned");
   });
 
   it("作成中カードへ再生成元の高さを引き継ぐ", () => {

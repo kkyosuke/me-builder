@@ -9,6 +9,7 @@ export type ProfileSummary = Readonly<{
     description: string;
     evidenceCount: number;
     sources: readonly ProfileRecordSource[];
+    selfView: "not_aligned" | null;
   }>[];
   recordCount: number;
   diagnosisCount: number;

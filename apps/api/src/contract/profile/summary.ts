@@ -16,7 +16,16 @@ const ProfileInsightSchema = v.object({
   description: NonEmptyStringSchema,
   evidenceCount: v.pipe(CountSchema, v.minValue(1)),
   sources: v.pipe(v.array(v.picklist(["diagnosis", "diary"])), v.minLength(1)),
+  selfView: v.nullable(v.literal("not_aligned")),
 });
+
+export const ProfileSummaryInsightSelfViewRequestSchema = v.object({
+  versionId: NonEmptyStringSchema,
+  insightKey: NonEmptyStringSchema,
+  selfView: v.nullable(v.literal("not_aligned")),
+});
+
+export const ProfileSummaryInsightSelfViewResponseSchema = v.object({ updated: v.literal(true) });
 
 const ProfileSummarySchema = v.object({
   generatedAt: v.pipe(v.string(), v.isoTimestamp()),
@@ -123,6 +132,23 @@ export const profileSummaryGenerationRoute = describeRoute({
       "記録不足、再生成不要、または利用上限",
       ProfileSummaryGenerationUnavailableSchema,
     ),
+    ...csrfValidationError,
+    ...authenticatedErrors,
+    ...currentTermsPolicyError,
+  },
+} satisfies DescribeRouteOptions);
+
+export const profileSummaryInsightSelfViewRoute = describeRoute({
+  operationId: "setProfileSummaryInsightSelfView",
+  tags: ["Profile"],
+  summary: "まとめの見方とは別に本人の見方を保存する",
+  security: [{ applicationSession: [], csrfToken: [] }],
+  requestBody: {
+    required: true,
+    content: { "application/json": { schema: ProfileSummaryInsightSelfViewRequestSchema } },
+  },
+  responses: {
+    200: jsonResponse("本人の見方を保存した", ProfileSummaryInsightSelfViewResponseSchema),
     ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,

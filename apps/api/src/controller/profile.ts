@@ -1,4 +1,4 @@
-import { D1 } from "@me-builder/lib";
+import { D1, accountDataFor } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
@@ -16,6 +16,8 @@ import { ProfileProgressionResponseSchema } from "../contract/profile/progressio
 import {
   ProfileSummaryGenerationAcceptedSchema,
   ProfileSummaryGenerationUnavailableSchema,
+  ProfileSummaryInsightSelfViewRequestSchema,
+  ProfileSummaryInsightSelfViewResponseSchema,
   ProfileSummaryResponseSchema,
 } from "../contract/profile/summary";
 import {
@@ -221,6 +223,22 @@ export async function postProfileSummaryGeneration(c: Context<AppEnv>): Promise<
         409,
       );
   }
+}
+
+export async function putProfileSummaryInsightSelfView(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.ACCOUNT_DATA) {
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const input = v.parse(ProfileSummaryInsightSelfViewRequestSchema, await c.req.json());
+  const account = accountDataFor(c.env.ACCOUNT_DATA, authenticatedActor(c).accountId);
+  const updated = await account.execute(
+    "profileSummary.setInsightSelfView",
+    input.versionId,
+    input.insightKey,
+    input.selfView,
+  );
+  if (!updated) return c.json({ error: "Not Found" }, 404);
+  return c.json(v.parse(ProfileSummaryInsightSelfViewResponseSchema, { updated: true }));
 }
 
 export async function getWeeklyReflectionContents(c: Context<AppEnv>): Promise<Response> {

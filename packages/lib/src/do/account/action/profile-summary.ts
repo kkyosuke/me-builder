@@ -35,6 +35,7 @@ import {
 } from "../schema/diary";
 import {
   profileSummaryGenerations,
+  profileSummaryInsightSelfViews,
   profileSummaryShareProjections,
   profileSummaryVersions,
 } from "../schema/profile-summary";
@@ -208,6 +209,10 @@ export async function readProfileSummary(
       .get(),
     readCompatibilityShareProfile(db, accountId),
   ]);
+  const selfViewRows = await db.select().from(profileSummaryInsightSelfViews).all();
+  const selfViews = new Map(
+    selfViewRows.map((row) => [`${row.profileSummaryVersionId}:${row.insightKey}`, row.selfView]),
+  );
   const active = latestGeneration?.status === "queued" || latestGeneration?.status === "generating";
   const status =
     latestGeneration?.status === "queued" ||
@@ -229,7 +234,13 @@ export async function readProfileSummary(
       generatedAt: version.generatedAt.toISOString(),
       isLatest: index === 0,
       generationMethod: "ai" as const,
-      summary: version.summary,
+      summary: {
+        ...version.summary,
+        insights: version.summary.insights.map((insight) => ({
+          ...insight,
+          selfView: selfViews.get(`${version.id}:${insight.key}`) ?? null,
+        })),
+      },
     })),
     availableDataCounts: counts,
     generation: {
@@ -573,6 +584,19 @@ export async function loadProfileSummaryGenerationContext(
     (latest, item) => (!latest || item.recordedAt > latest ? item.recordedAt : latest),
     null,
   );
+  const latestVersion = await db
+    .select()
+    .from(profileSummaryVersions)
+    .orderBy(desc(profileSummaryVersions.sequence))
+    .limit(1)
+    .get();
+  const selfViewRows = latestVersion
+    ? await db
+        .select()
+        .from(profileSummaryInsightSelfViews)
+        .where(eq(profileSummaryInsightSelfViews.profileSummaryVersionId, latestVersion.id))
+        .all()
+    : [];
   return {
     generationId,
     evidence,
@@ -580,7 +604,70 @@ export async function loadProfileSummaryGenerationContext(
     diaryCount: counts.diary,
     latestRecordedAt,
     inputSnapshot,
+    selfViews: selfViewRows.flatMap((row) => {
+      const insight = latestVersion?.summary.insights.find(({ key }) => key === row.insightKey);
+      return insight
+        ? [
+            {
+              profileSummaryVersionId: row.profileSummaryVersionId,
+              insightKey: row.insightKey,
+              label: insight.label,
+              description: insight.description,
+              selfView: row.selfView,
+            },
+          ]
+        : [];
+    }),
   };
+}
+
+export async function setProfileSummaryInsightSelfView(
+  db: AccountDataDatabase,
+  accountId: string,
+  versionId: string,
+  insightKey: string,
+  selfView: "not_aligned" | null,
+  at = new Date(),
+): Promise<boolean> {
+  const version = await db
+    .select({ summary: profileSummaryVersions.summary })
+    .from(profileSummaryVersions)
+    .innerJoin(
+      profileSummaryGenerations,
+      eq(profileSummaryVersions.generationId, profileSummaryGenerations.id),
+    )
+    .where(
+      and(
+        eq(profileSummaryVersions.id, versionId),
+        eq(profileSummaryGenerations.accountId, accountId),
+      ),
+    )
+    .get();
+  if (!version?.summary.insights.some(({ key }) => key === insightKey)) return false;
+  if (selfView === null) {
+    await db
+      .delete(profileSummaryInsightSelfViews)
+      .where(
+        and(
+          eq(profileSummaryInsightSelfViews.profileSummaryVersionId, versionId),
+          eq(profileSummaryInsightSelfViews.insightKey, insightKey),
+        ),
+      )
+      .run();
+    return true;
+  }
+  await db
+    .insert(profileSummaryInsightSelfViews)
+    .values({ profileSummaryVersionId: versionId, insightKey, selfView, updatedAt: at })
+    .onConflictDoUpdate({
+      target: [
+        profileSummaryInsightSelfViews.profileSummaryVersionId,
+        profileSummaryInsightSelfViews.insightKey,
+      ],
+      set: { selfView, updatedAt: at },
+    })
+    .run();
+  return true;
 }
 
 /** Queue再送時に生成結果と利用量ledgerを同じ最終状態へ収束させるための最小状態読取。 */

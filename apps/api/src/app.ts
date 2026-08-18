@@ -112,7 +112,11 @@ import {
   selfCareContextListRoute,
   selfCareContextRevocationRoute,
 } from "./contract/profile/self-care-context";
-import { profileSummaryGenerationRoute, profileSummaryRoute } from "./contract/profile/summary";
+import {
+  profileSummaryGenerationRoute,
+  profileSummaryInsightSelfViewRoute,
+  profileSummaryRoute,
+} from "./contract/profile/summary";
 import {
   weeklyReflectionGenerationRoute,
   weeklyReflectionRoute,
@@ -207,6 +211,7 @@ import {
   postGoalFollowUpAgreement,
   postProfileSummaryGeneration,
   postWeeklyReflectionGeneration,
+  putProfileSummaryInsightSelfView,
 } from "./controller/profile";
 import {
   deleteProfileAvatarContents,
@@ -479,6 +484,13 @@ app.post(
   requireCurrentTerms,
   profileSummaryGenerationRoute,
   postProfileSummaryGeneration,
+);
+app.put(
+  "/api/profile-summary/insight-self-view",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileSummaryInsightSelfViewRoute,
+  putProfileSummaryInsightSelfView,
 );
 app.get(
   "/api/weekly-reflections",
