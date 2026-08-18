@@ -12,6 +12,22 @@ export const profileSummaryActions = {
     DO.account.action.profileSummary.readProfileSummary(db, accountId, at),
   "profileSummary.readCompatibilityShareProfile": (db: DO.account.Database, accountId: string) =>
     DO.account.action.profileSummary.readCompatibilityShareProfile(db, accountId),
+  "profileSummary.setInsightSelfView": (
+    db: DO.account.Database,
+    accountId: string,
+    versionId: string,
+    insightKey: string,
+    selfView: "not_aligned" | null,
+    at?: Date,
+  ) =>
+    DO.account.action.profileSummary.setProfileSummaryInsightSelfView(
+      db,
+      accountId,
+      versionId,
+      insightKey,
+      selfView,
+      at,
+    ),
   "profileSummary.requestGeneration": (
     db: DO.account.Database,
     accountId: string,

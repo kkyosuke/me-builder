@@ -57,7 +57,11 @@ export type DiaryChatResponse = Omit<
   Readonly<{ collection_target?: PromptContextCollectionTarget }>;
 export type SafetyRoute = v.InferOutput<typeof SafetyRouteSchema>;
 
-export const JAPAN_MENTAL_HEALTH_SUPPORT_URL = "https://www.mhlw.go.jp/mamorouyokokoro/";
+export const JAPAN_MENTAL_HEALTH_SUPPORT_URL = "https://www.mhlw.go.jp/mamorouyokokoro/soudan/";
+export const JAPAN_ABUSE_VIOLENCE_SUPPORT_URL = "https://notalone-cao.go.jp/support/";
+
+const JAPAN_SELF_HARM_GUIDANCE = `厚生労働省「まもろうよ こころ」の相談窓口: ${JAPAN_MENTAL_HEALTH_SUPPORT_URL}`;
+const JAPAN_ABUSE_VIOLENCE_GUIDANCE = `政府の「あなたはひとりじゃない」制度・相談窓口: ${JAPAN_ABUSE_VIOLENCE_SUPPORT_URL}`;
 
 const routeRank: Record<SafetyRoute, number> = {
   normal: 0,
@@ -158,9 +162,9 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
     route === "imminent_danger"
       ? "話してくれてありがとう。今すぐ危険が迫っているなら、安全な場所へ移動して、119（救急・消防）または110（警察）、近くの信頼できる人へ連絡してください。今は安全な場所にいる？"
       : route === "self_harm_possible"
-        ? `話してくれてありがとう。一人で抱えず、近くの信頼できる人や、厚生労働省が案内する相談窓口「まもろうよ こころ」へつながってください。${JAPAN_MENTAL_HEALTH_SUPPORT_URL}\n今この瞬間、自分を傷つける危険はある？`
+        ? `話してくれてありがとう。一人で抱えず、近くの信頼できる人や相談窓口へつながってください。\n${JAPAN_SELF_HARM_GUIDANCE}\n今この瞬間、自分を傷つける危険はある？`
         : route === "abuse_or_violence"
-          ? `話してくれてありがとう。あなたの安全が最優先です。安全な場所へ移動できるなら移動し、信頼できる人や、厚生労働省が案内する相談窓口へつながってください。${JAPAN_MENTAL_HEALTH_SUPPORT_URL}\n今は安全な場所にいる？`
+          ? `話してくれてありがとう。あなたの安全が最優先です。安全な場所へ移動できるなら移動し、信頼できる人や相談窓口へつながってください。\n${JAPAN_ABUSE_VIOLENCE_GUIDANCE}\n今は安全な場所にいる？`
           : "うまく返事をまとめられなかったけれど、書いてくれたことは受け取りました。今日はここに置いておくだけでも大丈夫です。";
   return {
     mode: route === "normal" ? "listen" : "organize",
@@ -170,6 +174,24 @@ export function buildSafetyFallback(route: SafetyRoute): DiaryChatResponse {
     daily_prompt_follow_up: "none",
     safety: { route, restricted_advice: route !== "normal" },
     used_memory_ids: [],
+  };
+}
+
+/**
+ * モデルに相談先を生成させず、運営確認済みの日本向け案内だけを応答へ付加する。
+ * fallbackは既に同じ案内を含むため、URLの重複もここで防ぐ。
+ */
+function appendJapanSafetyGuidance(response: DiaryChatResponse): DiaryChatResponse {
+  const safetyGuidance =
+    response.safety.route === "self_harm_possible"
+      ? { message: JAPAN_SELF_HARM_GUIDANCE, url: JAPAN_MENTAL_HEALTH_SUPPORT_URL }
+      : response.safety.route === "abuse_or_violence"
+        ? { message: JAPAN_ABUSE_VIOLENCE_GUIDANCE, url: JAPAN_ABUSE_VIOLENCE_SUPPORT_URL }
+        : undefined;
+  if (!safetyGuidance || response.reply.includes(safetyGuidance.url)) return response;
+  return {
+    ...response,
+    reply: `${response.reply}\n${safetyGuidance.message}`,
   };
 }
 
@@ -301,7 +323,7 @@ export async function generateDiaryChatResponse(
     const validated = raw
       ? validateDiaryChatResponse(raw, safetyRoute, allowedMemoryIds, collectionCandidates)
       : undefined;
-    if (validated) return validated;
+    if (validated) return appendJapanSafetyGuidance(validated);
   }
   return buildSafetyFallback(safetyRoute);
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  JAPAN_ABUSE_VIOLENCE_SUPPORT_URL,
   JAPAN_MENTAL_HEALTH_SUPPORT_URL,
   buildDevelopmentBrainUsageMessage,
   buildDiaryChatContextPackage,
@@ -211,7 +212,9 @@ describe("diary chat guardrails", () => {
 
   it("119と110は差し迫った危険の定型案内だけに含める", () => {
     expect(buildSafetyFallback("imminent_danger").reply).toMatch(/119.*110/u);
-    expect(buildSafetyFallback("abuse_or_violence").reply).not.toMatch(/119|110/u);
+    const abuseResponse = buildSafetyFallback("abuse_or_violence").reply;
+    expect(abuseResponse).toContain(JAPAN_ABUSE_VIOLENCE_SUPPORT_URL);
+    expect(abuseResponse).not.toMatch(/119|110/u);
   });
 
   it("通常時のfallbackへ会話継続だけの質問を付けない", () => {

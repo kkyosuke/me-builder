@@ -133,7 +133,15 @@ async function insertSummaryVersions(evidenceSourceRecordId: string): Promise<vo
         model: "gemini-test",
         promptVersion: "profile-summary-v1",
         headline: `${sequence}番目のまとめ`,
-        insights: [],
+        insights: [
+          {
+            key: `insight-${sequence}`,
+            label: "記録から見える傾向",
+            description: "振り返る時間を大切にする傾向があります。",
+            evidenceCount: 1,
+            sources: ["diary"],
+          },
+        ],
         compatibilityShareStatements: [
           {
             key: `summary-${sequence}`,
@@ -298,5 +306,59 @@ describe("Profile Summary local D1 E2E", () => {
     const response = await request("/api/profile-summary/generations", "POST");
     expect(response.status).toBe(202);
     expect(await response.json()).toMatchObject({ created: true, status: "queued" });
+  });
+
+  it(`${profileSummaryCases.selfView.id}: ${profileSummaryCases.selfView.name}`, async () => {
+    const evidenceSourceRecordId = await insertDiaryMessage();
+    await insertSummaryVersions(evidenceSourceRecordId);
+    const before = (await (await request()).json()) as {
+      versions: Array<{
+        id: string;
+        isLatest: boolean;
+        summary: { insights: Array<{ key: string; selfView: "not_aligned" | null }> };
+      }>;
+    };
+    const latest = before.versions.find(({ isLatest }) => isLatest);
+    if (!latest) throw new Error("latest summary version was not found");
+
+    const update = await app.request(
+      "/api/profile-summary/insight-self-view",
+      {
+        method: "PUT",
+        headers: { ...sessionHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          versionId: latest.id,
+          insightKey: "insight-3",
+          selfView: "not_aligned",
+        }),
+      },
+      {
+        DB: database,
+        ACCOUNT_DATA: accountDataStore.namespace,
+        PROFILE_SUMMARY_QUEUE: queue,
+        ...sessionFixture.bindings,
+        ENVIRONMENT: "test",
+      },
+    );
+    expect(update.status).toBe(200);
+
+    const after = (await (await request()).json()) as typeof before;
+    expect(after.versions.find(({ isLatest }) => isLatest)?.summary.insights).toEqual([
+      expect.objectContaining({ key: "insight-3", selfView: "not_aligned" }),
+    ]);
+
+    await insertDiaryMessage("self-view-context", new Date("2026-08-10T00:00:00.000Z"));
+    const generation = await request("/api/profile-summary/generations", "POST");
+    expect(generation.status).toBe(202);
+    const accepted = (await generation.json()) as { generationId: string };
+    await expect(
+      DO.account.action.profileSummary.loadProfileSummaryGenerationContext(
+        accountDataStore.db,
+        "account-summary-e2e",
+        accepted.generationId,
+      ),
+    ).resolves.toMatchObject({
+      selfViews: [expect.objectContaining({ insightKey: "insight-3", selfView: "not_aligned" })],
+    });
   });
 });

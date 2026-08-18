@@ -51,4 +51,21 @@ export const profileSummaryCases = {
       body: { status: "queued", created: true },
     },
   },
+  selfView: {
+    id: "SUMMARY-004",
+    name: "本人の見方を版と分離保存し、次回生成の入力へ引き継ぐこと",
+    in: {
+      method: "PUT",
+      path: "/api/profile-summary/insight-self-view",
+      session: "known-token",
+      setup: ["最新版のまとめとinsightを保存", "本人の見方をnot_alignedとして送信"],
+    },
+    out: {
+      status: 200,
+      body: {
+        selfView: "not_aligned",
+        nextGenerationContext: "本人の見方を含む",
+      },
+    },
+  },
 } as const satisfies Readonly<Record<string, E2eCase>>;

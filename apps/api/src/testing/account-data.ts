@@ -297,6 +297,22 @@ const actions = {
     DO.account.action.progression.readUtsushiProgression(db, accountId, at),
   "profileSummary.readCompatibilityShareProfile": (db: DO.account.Database, accountId: string) =>
     DO.account.action.profileSummary.readCompatibilityShareProfile(db, accountId),
+  "profileSummary.setInsightSelfView": (
+    db: DO.account.Database,
+    accountId: string,
+    versionId: string,
+    insightKey: string,
+    selfView: "not_aligned" | null,
+    at?: Date,
+  ) =>
+    DO.account.action.profileSummary.setProfileSummaryInsightSelfView(
+      db,
+      accountId,
+      versionId,
+      insightKey,
+      selfView,
+      at,
+    ),
   "profileSummary.requestGeneration": (
     db: DO.account.Database,
     accountId: string,
