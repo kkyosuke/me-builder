@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CompatibilityShareContentSection } from "../../compatibility";
-import { closeLiffWindow, sendLiffTextMessage } from "../../liff/infrastructure/liff-client";
+import { closeLiffWindow, sendLiffTextMessage } from "../../liff";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import { GoalFollowUpSection } from "./goal-follow-up-section";
 import { ProfileSummaryScreen } from "./profile-summary-screen";

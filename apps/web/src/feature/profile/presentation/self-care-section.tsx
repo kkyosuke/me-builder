@@ -1,5 +1,5 @@
 import { HeartHandshake, LoaderCircle, MessageCircleHeart, Undo2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { AsyncState } from "../../../model/async-state";
 import type {
   SelfCareContextItem,
@@ -86,6 +86,19 @@ export function SelfCareSection({
   const [consultationStatus, setConsultationStatus] = useState<
     SelfCareConsultationStartResult | "sending" | null
   >(null);
+  const consultationPendingRef = useRef(false);
+  const startConsultation = async (prompt: string): Promise<void> => {
+    if (consultationPendingRef.current) return;
+    consultationPendingRef.current = true;
+    setConsultationStatus("sending");
+    try {
+      setConsultationStatus(await onConsult(prompt));
+    } catch {
+      setConsultationStatus("unavailable");
+    } finally {
+      consultationPendingRef.current = false;
+    }
+  };
   if (state.status === "loading" || state.status === "idle") {
     return (
       <output
@@ -167,10 +180,7 @@ export function SelfCareSection({
               key={prompt}
               type="button"
               disabled={consultationStatus === "sending"}
-              onClick={async () => {
-                setConsultationStatus("sending");
-                setConsultationStatus(await onConsult(prompt));
-              }}
+              onClick={() => void startConsultation(prompt)}
               className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-800 disabled:opacity-50 dark:border-violet-800 dark:bg-slate-900 dark:text-slate-100"
             >
               {prompt}
@@ -178,11 +188,24 @@ export function SelfCareSection({
           ))}
         </div>
         {consultationStatus === "sending" ? (
-          <output className="mt-3 block text-xs text-slate-600 dark:text-slate-300">
+          <output
+            aria-live="polite"
+            className="mt-3 block text-xs text-slate-600 dark:text-slate-300"
+          >
             LINEのトークを開いています…
           </output>
+        ) : consultationStatus === "sent" ? (
+          <output
+            aria-live="polite"
+            className="mt-3 block text-xs text-slate-600 dark:text-slate-300"
+          >
+            LINEのトークへ相談文を送信しました。
+          </output>
         ) : consultationStatus === "copied" ? (
-          <output className="mt-3 block text-xs text-slate-600 dark:text-slate-300">
+          <output
+            aria-live="polite"
+            className="mt-3 block text-xs text-slate-600 dark:text-slate-300"
+          >
             相談文をコピーしました。LINEのトークへ貼り付けて送信してください。
           </output>
         ) : consultationStatus === "unavailable" ? (
