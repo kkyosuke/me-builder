@@ -272,6 +272,34 @@ describe("SSO identity controller", () => {
     expect(JSON.stringify(log.mock.calls)).not.toMatch(/sensitive|secret provider/u);
   });
 
+  it("Accountを変えずに拒否した理由を安全な固定結果として記録する", async () => {
+    const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    mocks.completeCallback.mockRejectedValue(
+      new mocks.SsoAuthenticationError("identity_unlinked", {
+        traceId: "trace-unlinked",
+        returnTo: "/profile",
+      }),
+    );
+
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=sensitive-state&code=sensitive-code",
+      { headers: { Cookie: "__Host-me_builder_sso_callback_state=sensitive-state" } },
+      env,
+    );
+
+    expect(response.status).toBe(302);
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "sso.callback.failed",
+        traceId: "trace-unlinked",
+        errorCode: "SSO_CALLBACK_FAILED",
+        resultCode: "SSO_IDENTITY_UNLINKED",
+      }),
+      expect.stringContaining("SSO_CALLBACK_FAILED"),
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/sensitive/u);
+  });
+
   it("code交換のprovider障害を保存済みtraceと復帰先へ関連付ける", async () => {
     const log = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     mocks.completeCallback.mockRejectedValue(
