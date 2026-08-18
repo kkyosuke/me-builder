@@ -92,6 +92,7 @@ export const billingCheckoutSessionStatusRoute = describeRoute({
   responses: {
     200: jsonResponse("本人のCheckout Session状態", BillingCheckoutSessionStatusResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
     404: jsonResponse(
       "Accountまたは本人のCheckout Sessionが存在しない",
       BillingCheckoutSessionNotFoundSchema,
@@ -116,6 +117,7 @@ export const billingTrialEligibilityRoute = describeRoute({
   responses: {
     200: jsonResponse("Account単位のtrial利用可否", BillingTrialEligibilityResponseSchema),
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);
 
