@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { diaryChatSafetyFixtures } from "../evaluation/diary-chat-safety-fixtures";
 import {
   JAPAN_ABUSE_VIOLENCE_SUPPORT_URL,
   JAPAN_MENTAL_HEALTH_SUPPORT_URL,
@@ -235,6 +236,15 @@ describe("diary chat guardrails", () => {
     ];
     expect(classifySafety(coalesced, ["first", "second"])).toBe("self_harm_possible");
   });
+
+  it.each(diaryChatSafetyFixtures)(
+    "$idを決定的な安全分類の期待routeへ送る",
+    ({ input, expectedPreclassifiedRoute }) => {
+      expect(classifySafety([{ id: "fixture", role: "user", body: input, sequence: 1 }])).toBe(
+        expectedPreclassifiedRoute,
+      );
+    },
+  );
 
   it("再認可済みBrain Itemを推定区分とEvidence付きでContext Packageへ入れる", () => {
     expect(

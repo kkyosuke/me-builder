@@ -74,11 +74,40 @@ const routeRank: Record<SafetyRoute, number> = {
 
 /** モデル呼び出し前の決定的な最低限の安全route。本文を保存・ログ出力しない。 */
 function classifySafetyText(text: string): SafetyRoute {
-  if (/(今すぐ|これから).{0,12}(死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(text))
+  const normalized = text.normalize("NFKC").toLowerCase();
+  const contextualSelfHarm =
+    /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺).{0,16}(?:わけではない|とは思っていない|と書いて|という記事|という言葉|と言って|と話して)/u.test(
+      normalized,
+    ) ||
+    /(?:友達|友人|家族|知人|相手|彼|彼女|子ども).{0,20}(?:死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(
+      normalized,
+    ) ||
+    /(?:以前|過去|前は).{0,16}(?:死にたい|消え(?:てしまい)?たい).{0,24}(?:今|現在).{0,12}(?:思っていない|違う|大丈夫)/u.test(
+      normalized,
+    ) ||
+    /\b(?:my friend|my family|they|he|she).{0,32}(?:want(?:s|ed)? to die|suicid(?:e|al)|kill (?:themself|himself|herself))\b/u.test(
+      normalized,
+    );
+  if (contextualSelfHarm) return "normal";
+  if (
+    /(?:今すぐ|これから).{0,12}(?:死ぬ|自殺|殺す)|死ぬ準備|命の危険/u.test(normalized) ||
+    /\b(?:i am|i'm).{0,16}(?:going to|about to).{0,16}(?:kill myself|die)|\bright now.{0,16}(?:kill myself|die)\b/u.test(
+      normalized,
+    )
+  )
     return "imminent_danger";
-  if (/(死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(text)) return "self_harm_possible";
-  if (/(殴られ|暴力|虐待|脅され|殺され)/u.test(text)) return "abuse_or_violence";
-  if (/(診断|薬|法律|投資|借金).{0,20}(決めて|断定|絶対)/u.test(text)) return "high_stakes";
+  if (
+    /(?:死にたい|消え(?:てしまい)?たい|自傷|自殺)/u.test(normalized) ||
+    /\b(?:i want to die|kill myself|suicidal|self[- ]harm)\b/u.test(normalized)
+  )
+    return "self_harm_possible";
+  if (
+    /(?:殴られ|暴力|虐待|脅され|殺され)/u.test(normalized) ||
+    /\b(?:abused|hit me|threatened to kill me)\b/u.test(normalized)
+  )
+    return "abuse_or_violence";
+  if (/(?:診断|薬|法律|投資|借金).{0,20}(?:決めて|断定|絶対)/u.test(normalized))
+    return "high_stakes";
   return "normal";
 }
 

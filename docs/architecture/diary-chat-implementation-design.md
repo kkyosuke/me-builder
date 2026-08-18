@@ -901,7 +901,7 @@ finalまたは失敗案内のretryは90秒で止めます。90秒時点で結果
 
 ## 11. 観測と監査
 
-初期段階で計測するのは各処理段階のlatency、38秒final率、90秒final率、retry、DLQ、DOの`pending_queue`滞留時間、重複抑止、schema違反、Googleレスポンス由来のtoken数、モデル別失敗率です。token数はGoogleの`responseId`単位で共有D1へ保存し、管理者統計では当月分を集計します。安全性経路の集計は、保存する分類と監査要件を決めた後に追加します。
+初期段階で計測するのは各処理段階のlatency、38秒final率、90秒final率、retry、DLQ、DOの`pending_queue`滞留時間、重複抑止、schema違反、Googleレスポンス由来のtoken数、モデル別失敗率です。token数はGoogleの`responseId`単位で共有D1へ保存し、管理者統計では当月分を集計します。安全経路はTurnへ保存した`route`と最終結果を集計し、運用ログでは本文、生成文、Account IDを持たずにroute別件数、失敗率、再試行、処理時間を確認します。
 
 logへ出せる識別子は環境、Queue message ID、Turn ID、Session IDの一方向hash、prompt version、処理段階です。日次の声かけでは、本文を含まない選択結果として時刻帯、声かけ方針、それぞれの選択元（本人の明言、本人内実績、フォールバック）も記録します。Account ID、LINE user ID、reply token、日記本文、Context Package、生成本文、Brain Item本文は出しません。
 
