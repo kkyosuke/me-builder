@@ -9,6 +9,7 @@ import * as schema from "../schema";
 import {
   clearProfileAvatar,
   getProfileAvatar,
+  isProfileAvatarObjectReferenced,
   saveVerifiedDisplayName,
   setProfileAvatar,
 } from "./profile";
@@ -55,6 +56,17 @@ describe("Shared D1 account profile avatar", () => {
       previousObjectKey: avatar.objectKey,
     });
     await expect(getProfileAvatar(db, "account-1")).resolves.toBeNull();
+  });
+
+  it("アバターobjectの参照有無だけを確認する", async () => {
+    const db = createTestDb();
+    await createAccount(db);
+    await setProfileAvatar(db, "account-1", avatar);
+
+    await expect(isProfileAvatarObjectReferenced(db, avatar.objectKey)).resolves.toBe(true);
+    await expect(
+      isProfileAvatarObjectReferenced(db, "accounts/other/profile/avatar/orphan.png"),
+    ).resolves.toBe(false);
   });
 
   it("同じ画像の再保存を変更なしとして扱う", async () => {

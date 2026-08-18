@@ -102,12 +102,17 @@ binding = "DB"
 database_name = "me-builder-db-local"
 database_id = "me-builder-db-local-id"
 
+[[r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-local"
+
 [[vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-local"
 
 [vars]
 ENVIRONMENT = "local"
+AVATAR_CLEANUP_MODE = "dry-run"
 
 [env.local]
 name = "me-builder-worker-local"
@@ -187,12 +192,17 @@ binding = "DB"
 database_name = "me-builder-db-local"
 database_id = "me-builder-db-local-id"
 
+[[env.local.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-local"
+
 [[env.local.vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-local"
 
 [env.local.vars]
 ENVIRONMENT = "local"
+AVATAR_CLEANUP_MODE = "dry-run"
 
 [env.preview]
 name = "me-builder-worker-preview"
@@ -272,12 +282,17 @@ binding = "DB"
 database_name = "me-builder-db-preview"
 database_id = "b61c9de2-4fa3-4644-8f01-f42af513e57a"
 
+[[env.preview.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-preview"
+
 [[env.preview.vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-preview"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
+AVATAR_CLEANUP_MODE = "dry-run"
 
 [env.production]
 name = "me-builder-worker-production"
@@ -357,9 +372,14 @@ binding = "DB"
 database_name = "me-builder-db-production"
 database_id = "6d11180b-3286-4b69-bd63-c7b60d768be1"
 
+[[env.production.r2_buckets]]
+binding = "AVATAR_BUCKET"
+bucket_name = "me-builder-avatar-production"
+
 [[env.production.vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+AVATAR_CLEANUP_MODE = "dry-run"

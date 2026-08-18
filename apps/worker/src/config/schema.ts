@@ -25,6 +25,7 @@ export const WorkerConfigSchema = v.object({
   adminLineUserIds: v.optional(v.array(v.string()), []),
   stripeSecretKey: v.optional(v.string()),
   billingPricePlanMap: v.optional(v.record(v.string(), v.picklist(["lite", "full", "family"])), {}),
+  avatarCleanupMode: v.optional(v.picklist(["dry-run", "delete"]), "dry-run"),
 });
 
 export type WorkerConfig = v.InferOutput<typeof WorkerConfigSchema>;

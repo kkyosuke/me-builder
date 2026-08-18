@@ -104,6 +104,8 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     adminLineUserIds,
     stripeSecretKey: getEnv("STRIPE_SECRET_KEY", env)?.trim() || undefined,
     billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
+    avatarCleanupMode:
+      getEnv("AVATAR_CLEANUP_MODE", env)?.trim() === "delete" ? "delete" : "dry-run",
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);
