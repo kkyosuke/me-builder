@@ -43,15 +43,15 @@ const readModel = {
   },
 };
 
-function provider(plan: "free" | "lite" | "full") {
+function provider(plan: "free" | "lite" | "full" | "family") {
   return new billing.FakeAccountPlanAssignmentProvider([
     {
       accountId: "account-1",
       plan,
-      source: plan === "free" ? "free" : "subscription",
+      source: plan === "free" ? "free" : plan === "family" ? "family-seat" : "subscription",
       effectiveAt: "2026-08-01T00:00:00.000Z",
       availableUntil: null,
-      payerAccountId: plan === "free" ? null : "account-1",
+      payerAccountId: plan === "free" ? null : plan === "family" ? "payer-1" : "account-1",
     },
   ]);
 }
@@ -93,6 +93,7 @@ describe("weekly reflection entitlement", () => {
   it.each([
     ["lite", "brief"],
     ["full", "full"],
+    ["family", "full"],
   ] as const)("%sの月次表示modeをAccountDataへ渡す", async (plan, mode) => {
     execute.mockResolvedValue(readModel);
     await getWeeklyReflections({
