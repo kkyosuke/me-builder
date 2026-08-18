@@ -286,6 +286,10 @@ Brainが判断を求められたときは、次の順序で情報を使います
 
 人は矛盾したValue / MotivationやPreferenceを持ちます。上書きして1つに統合せず、利用場面、時点、確信度、根拠とともに保持します。
 
+同じまたは近いContextで反対傾向が繰り返される場合は一方向のItemのConfidenceへ反映し、仕事と私生活などContextが異なる場合は単純に相殺せず、状況ごとの別Itemとして保持します。過去と現在で傾向が変わった場合も、古いItemを書き換えず時間的な変化として関連づけます。反対傾向の検出、Confidenceへの反映、正式な反証との境界は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)を正とします。
+
+「優柔不断」「二重人格」のような否定的、診断的、または誤解を招く人物評価を分類名やstatementとして自動生成しません。複数の判断基準を同程度に重視している、状況によって異なる傾向が現れる、以前から傾向が変化した、という観察可能な命題へ分けます。
+
 意思決定時の基本的な優先順は次のとおりです。
 
 1. 安全・法令・本人が設定した禁止事項
@@ -311,7 +315,7 @@ Brainが判断を求められたときは、次の順序で情報を使います
 - Expression Style
 - Current State
 
-Identityは基本プロフィール、Capabilityはプロフィール上のスキル、Behavior PatternとRelationship Styleは本人が確認したAI推定として簡易的に扱います。複雑なTrade-offやDecision Policyの自動生成は、十分な根拠情報が集まった後に追加します。
+Identityは基本プロフィール、Capabilityはプロフィール上のスキルとして扱います。Behavior PatternとRelationship Styleを含む本人が明言していないAI推定は、複数の独立観察とContextを保持した仮説として扱います。本人の確認を有効化条件にはしません。複雑なTrade-offやDecision Policyの自動生成は、十分な根拠情報が集まった後に追加します。
 
 ## 9. 今後決めること
 
@@ -319,6 +323,4 @@ Identityは基本プロフィール、Capabilityはプロフィール上のス�
 2. 1つのBrain Itemに複数分類を許すか、主分類を1つにするか
 3. Value / MotivationやDecision Criterionの利用場面別優先度をどう表現するか
 4. Current Stateの有効期限を誰が決めるか
-5. 矛盾したBrain Itemを統合せず提示するUI
-6. Decision Policyを本人が直接編集できるようにするか
-7. AI推定をどの時点でBrain Itemとして有効化するか
+5. Decision Policyを本人が直接編集できるようにするか

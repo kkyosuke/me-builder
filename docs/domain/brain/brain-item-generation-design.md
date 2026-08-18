@@ -277,9 +277,11 @@ AIは会話応答とは独立して、本人が明示した命題を1チェッ�
 
 分類境界は[Brain内部情報の分類](brain-content-taxonomy.md)を正とします。具体的な出来事・経験と、本人が特定の相手について明言した観察は`memory`、本人自身について明示された反復行動は`behavior_pattern`、明示された行動理由は`value_motivation`、選択基準は`decision_system`、具体的な好き嫌いは`preference`、未来の達成意図は`goal`にします。1回の行動だけから反復傾向や動機を推定しません。
 
-`statement`に「今日」「昨日」「来月」「来年」などの相対日付がある場合、AIとAccountDataはBrain Itemの命題を原文のまま保存します。AccountDataは根拠Source Recordの受信日時を基準に`Asia/Tokyo`の絶対日付を決定的に解決し、原文、基準日、timezone、解決対応を`attributes.temporalContext`へ分離して保存します。たとえば2026年8月11日の「来月までに転職先を決めたい」は、`statement`を変えず、`来月 = 2026年9月`を時点情報に持ちます。EvidenceのSource Record原文も変更しません。
+`statement`に「今日」「昨日」「来月」「来年」などの相対日付がある場合、AIとAccountDataはBrain Itemの命題を原文のまま保存します。AccountDataは根拠Source Recordの受信日時と、その時点でAccountへ固定されていたIANA timezoneを基準に絶対日付を決定的に解決し、原文、基準日、timezone、解決対応を`attributes.temporalContext`へ分離して保存します。現在のAccountは`Asia/Tokyo`を固定値として使います。たとえば2026年8月11日の「来月までに転職先を決めたい」は、`statement`を変えず、`来月 = 2026年9月`を時点情報に持ちます。EvidenceのSource Record原文も変更しません。
 
-Vectorizeへ渡すembeddingテキストと検索queryには、原文の後ろへ`時点情報: 来月 = 2026年9月`のような補足だけを追加します。相対日付らしい文字列を単純置換せず、語末、句読点、助詞、数字など日付表現として自然な右境界を持つ場合だけ解決します。そのため「明日香」「今日子」のような固有名詞は時点情報へ変換しません。判定に迷う表現は時点情報を付けない側へ倒し、Brain Itemの原文を壊さないことを優先します。Account単位のtimezoneを持つまでは日本時間を明示的な既定とし、timezone対応は後続課題とします。
+Vectorizeへ渡すembeddingテキストと検索queryには、原文の後ろへ`時点情報: 来月 = 2026年9月`のような補足だけを追加します。相対日付らしい文字列を単純置換せず、語末、句読点、助詞、数字など日付表現として自然な右境界を持つ場合だけ解決します。そのため「明日香」「今日子」のような固有名詞は時点情報へ変換しません。判定に迷う表現は時点情報を付けない側へ倒し、Brain Itemの原文を壊さないことを優先します。
+
+海外提供時はAccount作成時にIANA timezoneを1つ設定し、以後変更しません。timezone変更による過去Itemの再解釈や移行は提供しません。既存Accountとtimezoneを取得できないAccountは`Asia/Tokyo`へ固定し、過去の相対日付は後からAccountの現在値で解釈し直しません。
 
 検証を通過した日記候補は、共通出力へ次のように写します。
 
@@ -359,6 +361,8 @@ AI生成、JSON parse、出力envelope検証が失敗した場合はQueue messag
 
 複数のBrain Itemが対象になり得る場合、否定や修正がどのItemを指すか一意に解決できなければ一括変更しません。対象を1つだけ聞き返すか、Itemごとに本人が選べるUIを使います。
 
+ただし、観察から生成したAI推定Itemに対して本人が「自分ではそう思っていない」「そうありたいとは思っていない」と述べた場合は、元Itemの誤りや否定として扱いません。観察結果を表すItemと、本人の自己認識または自己願望を表すItemを別々に保存して関連づけます。前者は観察された傾向、後者は本人が望む方向または自分についての見方として通常チャットへ渡し、どちらかを正解として統合、無効化、上書きしません。専用の本人確認画面を登録条件にも将来の確定条件にもせず、Source Recordの訂正、削除、撤回は通常のライフサイクルで反映します。
+
 ### 7.5 声かけコンテキストへの拡張
 
 曜日と本人の情報から日々の声かけを個別化する体験は、[日記チャット体験設計 §3](../../product/diary-chat-experience.md#3-日々の入口)を正とします。この用途でも、声かけ専用の原本や巨大なプロフィールItemを作らず、本人が独立して訂正できる命題ごとにBrain Itemを生成します。
@@ -376,6 +380,27 @@ AI生成、JSON parse、出力envelope検証が失敗した場合はQueue messag
 
 職業だけから2件目を作ることは禁止します。構造化属性のschema、保存先、現行実装との差分は[日記チャット実装設計 §4.7](../../architecture/diary-chat-implementation-design.md#47-brain-item関連)を正とします。
 
+### 7.6 本人が明言していないAI推定
+
+本人が明言した命題は1件のEvidenceから非推定Itemとして生成できます。AIが出来事や行動から解釈しただけの命題は、最初の独立観察ではItemを作らず推定候補として保存し、同じまたは近いContextで独立した観察が再度得られたときに低Confidenceの推定Itemとして生成します。同じSessionまたは同じ出来事から得た同方向のEvidenceは、発言数にかかわらず1観察として扱います。
+
+通常のAI推定対象は次の6分類です。
+
+- Value / Motivation
+- Preference
+- Decision System
+- Behavior Pattern
+- Relationship Style
+- Expression Style
+
+Identity、Memory、Goal、Capability、Knowledge / Belief、Current Stateは通常のAI推定対象にせず、本人が明言した内容を保存します。ただし本人について機微な内容を推定した場合は、機微性を理由に別分類へ移さず、分類体系上該当するBrain Itemとして`isInference = true`、`highly_sensitive`で保存できます。この例外は保存を認めるものであり、診断や確定事実として扱う許可ではありません。Access Policyは[Brainのラベル・アクセス制御設計 §6](brain-access-label-design.md#6-ラベル付与)、通常チャットでの利用制限は[日記チャット体験設計 §11](../../product/diary-chat-experience.md#11-安全性とプライバシー)を正とします。
+
+第三者の性格、意図、感情、病気などは推定Itemとして保存しません。本人が第三者について明言した観察は、その第三者の客観的事実ではなく本人がその時点で捉えたMemoryとして扱う既存規則を維持します。
+
+推定候補と推定Itemは、仕事、家族、恋愛、体調、時間帯などのContextをstatementとは別の構造化属性として持ちます。同じContextで傾向が繰り返された場合は、「仕事では判断が早い」のようなContext付きItemを生成できます。現在のContextに合うItemを全体傾向より優先し、Contextが不明な場合だけ全体傾向を使います。
+
+推定Itemのstatementは生成後に書き換えません。支持、反対傾向、新しさによってConfidenceなどの派生値を再計算し、計算履歴を残します。以前と逆の傾向が継続した場合は反対側の新しいItemを作り、時間的な変化として関連づけます。過去Itemは履歴として保持して現在の検索順位を下げ、Contextごとに両方が継続している場合は両方を現在有効として保持します。反対傾向シグナルとConfidenceの規則は[根拠・反証・改訂のエッジ設計](evidence-edge-design.md)を正とします。
+
 ## 8. 重複、Evidence追加、改訂
 
 生成前に、同じAccountのactiveなBrain Itemから同義候補を探します。
@@ -384,7 +409,7 @@ AI生成、JSON parse、出力envelope検証が失敗した場合はQueue messag
 | --- | --- |
 | 同じ命題で新しい根拠が増えた | 新規Itemを作らずEvidenceを追加する |
 | 内容が具体化・修正された | 新しいItemを作りRevisionで結ぶ |
-| 既存Itemを否定する発言がある | 反証edge候補として扱う。自動確定は後続設計 |
+| 既存Itemと逆のEvidenceがある | 正式な反証エッジへせず、反対傾向シグナルとして保存する |
 | 同じtriggerの再配送 | ItemもEvidenceも増やさない |
 | Source Recordが削除・撤回された | Source Recordライフサイクル設計に従って利用停止・再導出する |
 
@@ -421,14 +446,16 @@ AIの意味的重複判定だけで既存Itemを上書きしません。一語�
 - Itemと否定・修正操作の対応づけ
 - 否定による無効化、修正、改訂
 - 本人が明言していない内容をAIが推定する分類
+- AI推定候補、Context付き推定Item、反対傾向シグナルとConfidence再計算
+- 観察結果と本人の自己認識・自己願望を別Itemとして関連づける処理
 - 日記候補の`identity`分類と、声かけ用途の構造化属性
 
 会話チェックポイントから本人が明言した6分類のBrain Itemを最大3件生成し、Evidence付きで保存し、意味的に同じ既存ItemにはEvidenceだけを追加し、active ItemをVectorizeへ同期して通常チャットで利用するところまでを実装しています。相対日付は原文と時点情報を分離して保存し、Vectorize登録と検索queryで併記します。否定・修正・改訂、本人が明言していない内容のAI推定は後続です。
 
 ## 10. 後続で決めること
 
-- Confidenceの具体的な算出方法
+- Confidenceの具体的な係数、高・中・低の数値境界と評価dataset
 - 声かけ用途以外の分類固有`attributes` schema
 - 意味的重複判定の評価dataset、誤統合率の監視、prompt version更新基準
 - 複数Itemを訂正・否定するLINE / Web UI
-- 反証候補を自動的にedgeへする条件
+- 推定候補、Context、Item間の見方、反対傾向シグナルの物理schema
