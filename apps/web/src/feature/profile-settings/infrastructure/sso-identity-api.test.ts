@@ -51,6 +51,9 @@ describe("sso identity api", () => {
 
   it("解除requestへapplication sessionのCSRF tokenを付ける", async () => {
     authSessionRuntime.setCsrfToken("csrf-token");
+    const synchronize = vi
+      .spyOn(authSessionRuntime, "synchronizeAfterSessionChange")
+      .mockResolvedValue();
     const fetcher = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 204 }));
@@ -61,13 +64,16 @@ describe("sso identity api", () => {
     expect(init?.method).toBe("DELETE");
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-token");
     expect(init?.credentials).toBe("include");
+    expect(synchronize).toHaveBeenCalledOnce();
   });
 
   it("最後のIdentity解除拒否を利用者向けerrorへ変換する", async () => {
+    const synchronize = vi.spyOn(authSessionRuntime, "synchronizeAfterSessionChange");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 409 }));
 
     await expect(unlinkSsoIdentity("https://api.example.com")).rejects.toThrow(
       "最後のログイン方法",
     );
+    expect(synchronize).not.toHaveBeenCalled();
   });
 });

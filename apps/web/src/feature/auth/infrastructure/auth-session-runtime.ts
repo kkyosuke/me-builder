@@ -1,4 +1,5 @@
-type RecheckSession = () => Promise<void>;
+type RecheckStrategy = "establish" | "existing-session-only";
+type RecheckSession = (strategy: RecheckStrategy) => Promise<void>;
 
 let csrfToken: string | null = null;
 let recheckSession: RecheckSession | null = null;
@@ -48,7 +49,7 @@ export const authSessionRuntime = {
     window.addEventListener("storage", listener);
     return () => window.removeEventListener("storage", listener);
   },
-  /** Account識別子を保存せず、LIFF交換でcookieが切り替わった事実だけを他タブへ通知する。 */
+  /** Account識別子を保存せず、cookieが切り替わった事実だけを他タブへ通知する。 */
   notifyExternalSessionChange(): void {
     if (typeof window === "undefined") return;
     try {
@@ -59,10 +60,16 @@ export const authSessionRuntime = {
       // Storageが利用できないWebViewでも、交換した現在タブのsession確立は継続する。
     }
   },
+  /** session失効操作後に他タブへ通知し、現在タブはproviderへ遷移せずcookieだけを再確認する。 */
+  async synchronizeAfterSessionChange(): Promise<void> {
+    csrfToken = null;
+    authSessionRuntime.notifyExternalSessionChange();
+    await recheckSession?.("existing-session-only");
+  },
   async recheck(signal: AbortSignal): Promise<void> {
     if (!recheckSession || signal.aborted) return;
     if (!inFlightRecheck) {
-      const pending = recheckSession();
+      const pending = recheckSession("establish");
       inFlightRecheck = pending;
       void pending.then(
         () => {

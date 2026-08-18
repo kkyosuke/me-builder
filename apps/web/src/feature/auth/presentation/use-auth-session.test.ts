@@ -263,6 +263,70 @@ describe("useAuthSessionState", () => {
     notify.mockRestore();
   });
 
+  it("LIFF交換中に別タブ通知を受けても古い交換結果を表示せずsessionを再確認する", async () => {
+    mocks.detectAuthEntryEnvironment.mockResolvedValue({
+      kind: "liff",
+      state: { status: "ready", inClient: true },
+    });
+    let resolveExchange: ((value: typeof authenticated) => void) | undefined;
+    mocks.establishLiffAuthSession.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveExchange = resolve;
+        }),
+    );
+    mocks.fetchAuthSession.mockResolvedValueOnce({
+      ...authenticated,
+      displayProfile: { displayName: "切替後Account" },
+      csrfToken: "csrf-token-after-switch",
+    });
+    const notify = vi.spyOn(authSessionRuntime, "notifyExternalSessionChange");
+    const { result } = renderHook(() => useAuthSessionState());
+    await waitFor(() => expect(resolveExchange).toBeDefined());
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: AUTH_SESSION_CHANGE_STORAGE_KEY, newValue: "opaque" }),
+      );
+    });
+    act(() => resolveExchange?.(authenticated));
+
+    await waitFor(() =>
+      expect(result.current.state).toMatchObject({
+        status: "authenticated",
+        profile: { displayName: "切替後Account" },
+        revision: 1,
+      }),
+    );
+    expect(authSessionRuntime.csrfToken()).toBe("csrf-token-after-switch");
+    expect(mocks.fetchAuthSession).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
+    notify.mockRestore();
+  });
+
+  it("session失効操作後は他タブへ通知して現在タブを既存sessionだけで未認証化する", async () => {
+    const { result } = renderHook(() => useAuthSessionState());
+    await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
+    mocks.fetchAuthSession.mockResolvedValueOnce({
+      authenticated: false,
+      reason: "session-expired",
+    });
+    const notify = vi.spyOn(authSessionRuntime, "notifyExternalSessionChange");
+
+    await act(async () => authSessionRuntime.synchronizeAfterSessionChange());
+
+    expect(result.current.state).toEqual({
+      status: "unauthenticated",
+      reason: "session-expired",
+    });
+    expect(authSessionRuntime.csrfToken()).toBeNull();
+    expect(mocks.fetchAuthSession).toHaveBeenCalledTimes(2);
+    expect(mocks.establishLiffAuthSession).not.toHaveBeenCalled();
+    expect(mocks.establishSsoAuthSession).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledOnce();
+    notify.mockRestore();
+  });
+
   it("feature requestのAbortでは再確認を止めず、unmount時に止める", async () => {
     const { result, unmount } = renderHook(() => useAuthSessionState());
     await waitFor(() => expect(result.current.state.status).toBe("authenticated"));

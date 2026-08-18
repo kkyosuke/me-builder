@@ -46,4 +46,25 @@ describe("account recovery api", () => {
     expect(init?.body).toBe(JSON.stringify({ code: recoveryCode }));
     expect(new Headers(init?.headers).get("Authorization")).toBeNull();
   });
+
+  it("復旧完了時は旧sessionを表示し続けないよう他タブへ通知する", async () => {
+    authSessionRuntime.setCsrfToken("csrf-test-token");
+    const notify = vi.spyOn(authSessionRuntime, "notifyExternalSessionChange");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          status: "recovered",
+          alreadyRecovered: false,
+        }),
+      ),
+    );
+
+    await expect(completeRecovery(undefined, "credential.secret")).resolves.toEqual({
+      status: "recovered",
+      alreadyRecovered: false,
+    });
+
+    expect(notify).toHaveBeenCalledOnce();
+  });
 });
