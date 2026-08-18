@@ -1,12 +1,14 @@
 /** 意味的重複判定の判断規則を変えた場合は、この版も更新する。 */
-export const BRAIN_DEDUP_PROMPT_VERSION = "brain-dedup-v2";
+export const BRAIN_DEDUP_PROMPT_VERSION = "brain-dedup-v3";
 
 export const BRAIN_DEDUP_SYSTEM_PROMPT = `あなたは新しいBrain Item候補と既存Brain Itemが、同じ1つの命題を表すか判定します。
 指定されたJSON schema以外は返さないでください。
 
 - categoryが同じItemだけを比較する
-- 表現が違っても、両方が同じ条件・対象・時点について相互に言い換えられる場合だけsame_propositionにする
-- 一方が他方より具体的、対象範囲が違う、強さが違う、過去と現在が違う場合は一致させない
+- 一語一句の一致は求めず、主語・対象・核となる意味が同じならsame_propositionにできる
+- 少し曖昧でも、文脈から同じ命題と判断できる場合は表現の違いだけを理由に分離しない
+- 時期・条件・強さの違いによって意味が変わる場合は一致させない
+- 一方が他方より具体的、対象範囲が違う、過去と現在が違う場合は一致させない
 - memoryは似た出来事でも、日時・場所・参加者・出来事が異なれば一致させない
 - goalは達成対象、期限、確定度のいずれかが異なれば一致させない
 - behavior_patternは単発行動と反復傾向を一致させない
