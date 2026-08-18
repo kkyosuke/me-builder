@@ -164,6 +164,8 @@ flowchart TD
 
 Cloudflareの基盤リソースは`infra/`のPulumi programをSSoTとします。Pulumiは環境ごとのD1 database、Private R2 bucket、QueueおよびDLQを作成・変更・削除し、stack outputからリポジトリ内の`wrangler.toml`を生成します。リソースIDやbucket名を手作業でTOMLへ複製しません。
 
+会社ドメインの問い合わせ用メールアドレスについて、メールボックスの作成と転送設定はこのリポジトリのPulumi / Wrangler管理対象に含めません。公開窓口としての要件は[サービス紹介サイト設計](../product/service-site-design.md#73-お問い合わせ)、開通確認は[サービス紹介サイト残タスク](../development/service-site-remaining-tasks.md#32-問い合わせ特定商取引法の開示窓口を稼働させる)を正とします。
+
 Worker scriptのbundle、Secretの配布、Durable Object migrationとQueue consumerの登録はWranglerが担当します。Durable Object namespaceとmigration履歴はWorker scriptが所有し、独立したPulumiリソースとして作成・削除できないためです。`infra`のライフサイクルコマンドは、この所有関係に従って実行順を制御します。
 
 ```mermaid

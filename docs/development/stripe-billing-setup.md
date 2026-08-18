@@ -29,7 +29,7 @@
 | Product | Planごとの固定Product IDと`managed_by` metadata | Lite、Full、ファミリーパックを表す3 ProductとTax Code |
 | Price | 固定`lookup_key`と`managed_by` metadata | 各Productの月額・年額、JPY、税込 |
 | Webhook endpoint | URLまたは`managed_by` metadata | 課金projectionが受け付けるeventだけ |
-| Customer Portal configuration | `managed_by` metadata | 支払方法、請求履歴、プラン変更、期間末解約・再開 |
+| Customer Portal configuration | `managed_by` metadata | 支払方法、請求履歴、プラン変更、期間末解約・再開、コード不要ログインページ |
 | Cloudflare secret | Worker名と環境 | Stripe key、Webhook secret、Price→Plan map |
 
 Priceの`lookup_key`は次の形式で固定します。
@@ -43,6 +43,8 @@ me_builder_<lite|full|family>_<monthly|yearly>
 各ProductにはManaged Paymentsの対象となるクラウド型AIサービス（個人利用）のStripe Tax Code `txcd_10105001`を設定します。同期処理は新規Productだけでなく既存の管理対象ProductにもTax Codeを再適用します。サービス内容または対象顧客を変更する場合は、[StripeのManaged Payments適格Tax Code](https://docs.stripe.com/payments/managed-payments/eligibility#product-tax-code-requirements)と実際の提供内容を照合し、本番同期前に区分を再確認します。
 
 下位Planへの変更と年額から月額への変更は、Customer Portal configurationの期間末変更条件を使いません。StripeはPortalによる期間末変更を同一Product間に限定しており、PlanごとにProductを分けたcatalogでは要件を満たせないためです。APIが本人確認済みSubscriptionからSubscription Scheduleを作成し、現在期間の終了時に選択Priceへ切り替えます。支払方法・解約用の管理Portalではプラン変更を無効にし、この請求ルールを迂回できないようにします。
+
+管理Portalだけはコード不要ログインページを有効にし、同期結果の`portalLoginUrl`をAccountへログインできない購入者の解約経路として使います。Plan変更用Portalと請求期間リセット用Portalではログインページを無効にし、公開URLから即時変更用configurationへ入れないようにします。Stripeが管理PortalのログインURLを返さない場合、同期処理は失敗します。
 
 ## 3. 実行前提
 
@@ -161,6 +163,7 @@ Stripe Priceの金額と課金間隔は変更できません。料金SSoTを変�
 - Lite、Full、ファミリーパックの各ProductにTax Codeが設定されている
 - `billingPricePlanMap`に現在の6 Priceと、既存契約が参照する旧Priceが含まれる
 - PreviewのStripe webhookから署名付きeventを送り、Billing Queueへ受理される
+- 出力された`portalLoginUrl`を開き、購入時のメールアドレスへワンタイムパスコードが届き、Accountへログインせずに期間末解約できる
 - 同じコマンドを再実行してProduct、Price、Webhook、Portalの数が増えない
 
 この同期は課金開始の承認ではありません。本番で購入を公開する前に、`SUB-A-001`、Checkout以降の契約ライフサイクル、公開表示、法務・税務、Preview実取引の各ゲートを完了させます。

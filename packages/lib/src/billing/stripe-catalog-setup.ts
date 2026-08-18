@@ -5,7 +5,7 @@ import { STRIPE_BILLING_EVENT_TYPES } from "./stripe-events";
 
 const MANAGED_BY = "me-builder-stripe-catalog";
 const CATALOG_VERSION = "2026-08-18";
-export const PORTAL_CONFIGURATION_VERSION = "2026-08-18-1";
+export const PORTAL_CONFIGURATION_VERSION = "2026-08-19-1";
 export const STRIPE_BILLING_PRODUCT_TAX_CODE = "txcd_10105001";
 
 export type StripeCatalogEnvironment = "preview" | "production";
@@ -68,6 +68,7 @@ export interface CatalogPortalConfiguration {
   id: string;
   active: boolean;
   isDefault: boolean;
+  loginPageUrl: string | null;
   metadata: Readonly<Record<string, string>>;
 }
 
@@ -99,6 +100,7 @@ export interface PortalSpec {
   metadata: Record<string, string>;
   products: readonly { productId: string; priceIds: readonly string[] }[];
   billingCycleAnchor?: "unchanged" | "now";
+  loginPageEnabled?: boolean;
   subscriptionUpdateEnabled?: boolean;
   scheduleChangesAtPeriodEnd?: boolean;
 }
@@ -119,7 +121,7 @@ export interface StripeCatalogApi {
   disableWebhookEndpoint(id: string): Promise<void>;
   listPortalConfigurations(): Promise<readonly CatalogPortalConfiguration[]>;
   createPortalConfiguration(spec: PortalSpec): Promise<CatalogPortalConfiguration>;
-  updatePortalConfiguration(id: string, spec: PortalSpec): Promise<void>;
+  updatePortalConfiguration(id: string, spec: PortalSpec): Promise<CatalogPortalConfiguration>;
   deactivatePortalConfiguration(id: string): Promise<void>;
 }
 
@@ -127,6 +129,7 @@ export interface StripeBillingCatalogSetupResult {
   pricePlanMap: Readonly<Record<string, StripeCatalogPlan>>;
   webhookSecret: string | null;
   portalConfigurationId: string;
+  portalLoginUrl: string;
   portalPlanChangeConfigurationId: string;
   portalResetConfigurationId: string;
   created: readonly string[];
@@ -404,38 +407,41 @@ export async function setupStripeBillingCatalog(input: {
       metadata: portalMetadata(mode),
       products: portalProducts,
       billingCycleAnchor: mode === "reset" ? "now" : "unchanged",
+      loginPageEnabled: mode === "management",
       subscriptionUpdateEnabled: mode !== "management",
       scheduleChangesAtPeriodEnd: false,
     };
-    let portalId: string;
+    let currentPortal: CatalogPortalConfiguration;
     if (portal) {
-      await input.api.updatePortalConfiguration(portal.id, portalSpec);
+      currentPortal = await input.api.updatePortalConfiguration(portal.id, portalSpec);
       updated.push(`customer-portal:${mode}`);
-      portalId = portal.id;
     } else {
-      const createdPortal = await input.api.createPortalConfiguration(portalSpec);
+      currentPortal = await input.api.createPortalConfiguration(portalSpec);
       created.push(`customer-portal:${mode}`);
-      portalId = createdPortal.id;
     }
     for (const previous of modePortals) {
-      if (!previous.active || previous.isDefault || previous.id === portalId) continue;
+      if (!previous.active || previous.isDefault || previous.id === currentPortal.id) continue;
       await input.api.deactivatePortalConfiguration(previous.id);
       updated.push(`customer-portal:${mode}:previous-disabled`);
     }
-    return portalId;
+    return currentPortal;
   };
-  const portalConfigurationId = await upsertPortal("management");
-  const portalPlanChangeConfigurationId = await upsertPortal("standard");
-  const portalResetConfigurationId = await upsertPortal("reset");
+  const managementPortal = await upsertPortal("management");
+  const standardPortal = await upsertPortal("standard");
+  const resetPortal = await upsertPortal("reset");
+  if (!managementPortal.loginPageUrl) {
+    throw new Error("Stripe did not return the enabled Customer Portal login page URL");
+  }
 
   return {
     pricePlanMap: Object.fromEntries(
       Object.entries(pricePlanMap).sort(([left], [right]) => left.localeCompare(right)),
     ),
     webhookSecret,
-    portalConfigurationId,
-    portalPlanChangeConfigurationId,
-    portalResetConfigurationId,
+    portalConfigurationId: managementPortal.id,
+    portalLoginUrl: managementPortal.loginPageUrl,
+    portalPlanChangeConfigurationId: standardPortal.id,
+    portalResetConfigurationId: resetPortal.id,
     created,
     updated,
   };
@@ -461,6 +467,18 @@ function mapPrice(price: Stripe.Price): CatalogPrice {
     taxBehavior: price.tax_behavior,
     lookupKey: price.lookup_key,
     metadata: price.metadata,
+  };
+}
+
+function mapPortalConfiguration(
+  configuration: Stripe.BillingPortal.Configuration,
+): CatalogPortalConfiguration {
+  return {
+    id: configuration.id,
+    active: configuration.active,
+    isDefault: configuration.is_default,
+    loginPageUrl: configuration.login_page.url,
+    metadata: configuration.metadata ?? {},
   };
 }
 
@@ -507,7 +525,7 @@ export const billingPortalConfigurationParams = (
             trial_update_behavior: "continue_trial",
           },
   },
-  login_page: { enabled: false },
+  login_page: { enabled: spec.loginPageEnabled ?? false },
   metadata: spec.metadata,
 });
 
@@ -623,30 +641,22 @@ export function createStripeCatalogApi(secretKey: string): StripeCatalogApi {
     },
     async listPortalConfigurations() {
       return (await all(stripe.billingPortal.configurations.list({ limit: 100 }))).map(
-        (configuration) => ({
-          id: configuration.id,
-          active: configuration.active,
-          isDefault: configuration.is_default,
-          metadata: configuration.metadata ?? {},
-        }),
+        mapPortalConfiguration,
       );
     },
     async createPortalConfiguration(spec) {
       const configuration = await stripe.billingPortal.configurations.create(
         billingPortalConfigurationParams(spec),
       );
-      return {
-        id: configuration.id,
-        active: configuration.active,
-        isDefault: configuration.is_default,
-        metadata: configuration.metadata ?? {},
-      };
+      return mapPortalConfiguration(configuration);
     },
     async updatePortalConfiguration(id, spec) {
-      await stripe.billingPortal.configurations.update(id, {
-        ...billingPortalConfigurationParams(spec),
-        active: true,
-      });
+      return mapPortalConfiguration(
+        await stripe.billingPortal.configurations.update(id, {
+          ...billingPortalConfigurationParams(spec),
+          active: true,
+        }),
+      );
     },
     async deactivatePortalConfiguration(id) {
       await stripe.billingPortal.configurations.update(id, { active: false });

@@ -138,6 +138,9 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
       id: `bpc_${this.portals.length + 1}`,
       active: true,
       isDefault: this.portals.length === 0,
+      loginPageUrl: spec.loginPageEnabled
+        ? `https://billing.stripe.com/p/login/bpc_${this.portals.length + 1}`
+        : null,
       metadata: spec.metadata,
     };
     this.portals.push(portal);
@@ -150,8 +153,20 @@ class FakeStripeCatalogApi implements StripeCatalogApi {
   ) {
     this.assertUniquePortalIntervals(spec);
     this.portals = this.portals.map((portal) =>
-      portal.id === id ? { ...portal, active: true, metadata: spec.metadata } : portal,
+      portal.id === id
+        ? {
+            ...portal,
+            active: true,
+            loginPageUrl: spec.loginPageEnabled
+              ? `https://billing.stripe.com/p/login/${portal.id}`
+              : null,
+            metadata: spec.metadata,
+          }
+        : portal,
     );
+    const updated = this.portals.find((portal) => portal.id === id);
+    if (!updated) throw new Error(`Portal ${id} is missing`);
+    return updated;
   }
 
   async deactivatePortalConfiguration(id: string) {
@@ -200,6 +215,7 @@ describe("setupStripeBillingCatalog", () => {
       enabled: true,
       mode: "at_period_end",
     });
+    expect(params.login_page).toEqual({ enabled: false });
     const reset = billingPortalConfigurationParams({
       webBaseUrl: "https://example.test",
       metadata: { managed_by: "test", portal_mode: "reset" },
@@ -215,9 +231,11 @@ describe("setupStripeBillingCatalog", () => {
       webBaseUrl: "https://example.test",
       metadata: { managed_by: "test", portal_mode: "management" },
       products: [],
+      loginPageEnabled: true,
       subscriptionUpdateEnabled: false,
     });
     expect(management.features.subscription_update).toEqual({ enabled: false });
+    expect(management.login_page).toEqual({ enabled: true });
   });
 
   it("空のStripe環境へPlan別商品、月額・年額Price、Webhook、Portalを再現する", async () => {
@@ -264,6 +282,7 @@ describe("setupStripeBillingCatalog", () => {
     }
     expect(result.webhookSecret).toBe("whsec_fixture");
     expect(result.portalConfigurationId).toBe("bpc_1");
+    expect(result.portalLoginUrl).toBe("https://billing.stripe.com/p/login/bpc_1");
     expect(result.portalPlanChangeConfigurationId).toBe("bpc_2");
     expect(result.portalResetConfigurationId).toBe("bpc_3");
     expect(result.pricePlanMap).toEqual({
@@ -295,18 +314,21 @@ describe("setupStripeBillingCatalog", () => {
         id: "bpc_legacy_management",
         active: true,
         isDefault: true,
+        loginPageUrl: null,
         metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "management" },
       },
       {
         id: "bpc_legacy_standard",
         active: true,
         isDefault: false,
+        loginPageUrl: null,
         metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "standard" },
       },
       {
         id: "bpc_legacy_reset",
         active: true,
         isDefault: false,
+        loginPageUrl: null,
         metadata: { managed_by: "me-builder-stripe-catalog", portal_mode: "reset" },
       },
     );
@@ -318,7 +340,7 @@ describe("setupStripeBillingCatalog", () => {
       api.portals
         .filter(
           (portal) =>
-            portal.active && portal.metadata.portal_configuration_version === "2026-08-18-1",
+            portal.active && portal.metadata.portal_configuration_version === "2026-08-19-1",
         )
         .map((portal) => portal.metadata.portal_mode),
     ).toEqual(["management", "standard", "reset"]);

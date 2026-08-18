@@ -143,6 +143,7 @@ console.info(
     updated: result.updated,
     billingPricePlanMap: result.pricePlanMap,
     portalConfigurationId: result.portalConfigurationId,
+    portalLoginUrl: result.portalLoginUrl,
     portalPlanChangeConfigurationId: result.portalPlanChangeConfigurationId,
     portalResetConfigurationId: result.portalResetConfigurationId,
     cloudflareSynced: !stripeOnly,
