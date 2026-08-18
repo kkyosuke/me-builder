@@ -194,7 +194,6 @@ export async function readProfileSummary(
   db: AccountDataDatabase,
   accountId: string,
   at = new Date(),
-  allowUnchangedRegeneration = false,
 ): Promise<ProfileSummaryReadModel> {
   const [counts, inputSnapshot, versionRows, latestGeneration, shareProfile] = await Promise.all([
     availableData(db, accountId),
@@ -246,9 +245,7 @@ export async function readProfileSummary(
     generation: {
       status,
       canRegenerate:
-        hasInput &&
-        (allowUnchangedRegeneration || canRegenerateProfileSummary(versionRows[0], reasons, at)) &&
-        !active,
+        hasInput && canRegenerateProfileSummary(versionRows[0], reasons, at) && !active,
       reasons,
       message: latestGeneration?.status === "failed" ? latestGeneration.failureMessage : null,
     },
@@ -354,7 +351,6 @@ export async function requestProfileSummaryGeneration(
   db: AccountDataDatabase,
   accountId: string,
   requestedAt = new Date(),
-  allowUnchangedRegeneration = false,
 ): Promise<RequestProfileSummaryGenerationResult> {
   const existing = await db
     .select({
@@ -398,10 +394,7 @@ export async function requestProfileSummaryGeneration(
     shareProfile.type === "available" &&
       shareProfile.profile.profileSummaryVersionId === latestVersion?.id,
   );
-  if (
-    !allowUnchangedRegeneration &&
-    !canRegenerateProfileSummary(latestVersion, reasons, requestedAt)
-  ) {
+  if (!canRegenerateProfileSummary(latestVersion, reasons, requestedAt)) {
     return { outcome: "unavailable", reason: "regeneration_not_required" };
   }
 

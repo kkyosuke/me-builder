@@ -115,11 +115,13 @@ async function insertSummaryVersions(evidenceSourceRecordId: string): Promise<vo
   const firstGeneratedAt = new Date("2026-06-01T00:00:00.000Z").getTime();
   for (const sequence of [1, 2, 3]) {
     const generatedAt = new Date(firstGeneratedAt + (sequence - 1) * intervalMs);
+    if (sequence > 1) {
+      await insertDiaryMessage(`version-${sequence}`, generatedAt);
+    }
     const request = await DO.account.action.profileSummary.requestProfileSummaryGeneration(
       accountDataStore.db,
       "account-summary-e2e",
       generatedAt,
-      true,
     );
     if (request.outcome !== "created") throw new Error("summary generation was not created");
     await DO.account.action.profileSummary.completeProfileSummaryGeneration(
@@ -141,11 +143,14 @@ async function insertSummaryVersions(evidenceSourceRecordId: string): Promise<vo
           },
         ],
         diagnosisCount: 0,
-        diaryCount: 1,
-        latestRecordedAt: new Date(timestamp),
+        diaryCount: sequence,
+        latestRecordedAt: sequence === 1 ? new Date(timestamp) : generatedAt,
         inputSnapshot: {
           diagnosis: { count: 0, latestRecordedAt: null },
-          diary: { count: 1, latestRecordedAt: new Date(timestamp) },
+          diary: {
+            count: sequence,
+            latestRecordedAt: sequence === 1 ? new Date(timestamp) : generatedAt,
+          },
         },
       },
     );
@@ -221,16 +226,16 @@ describe("Profile Summary local D1 E2E", () => {
     expect(body.versions).toHaveLength(3);
     expect(body.versions.filter(({ isLatest }) => isLatest)).toHaveLength(1);
     expect(new Set(body.versions.map(({ summary }) => summary.headline)).size).toBe(3);
-    expect(body.availableDataCounts).toEqual({ diagnosis: 0, diary: 1 });
+    expect(body.availableDataCounts).toEqual({ diagnosis: 0, diary: 3 });
     expect(body.generation).toEqual({
       status: "idle",
-      canRegenerate: true,
+      canRegenerate: false,
       reasons: [],
       message: null,
     });
   });
 
-  it("開発環境では変更がなくても再生成でき、本番では通常判定を維持する", async () => {
+  it("全環境で変更がなければ再生成できない", async () => {
     const evidenceSourceRecordId = await insertDiaryMessage();
     await insertSummaryVersions(evidenceSourceRecordId);
 
@@ -251,12 +256,14 @@ describe("Profile Summary local D1 E2E", () => {
 
     const developmentRead = await request();
     expect((await developmentRead.json()).generation).toMatchObject({
-      canRegenerate: true,
+      canRegenerate: false,
       reasons: [],
     });
     const developmentRequest = await request("/api/profile-summary/generations", "POST");
-    expect(developmentRequest.status).toBe(202);
-    expect(await developmentRequest.json()).toMatchObject({ created: true, status: "queued" });
+    expect(developmentRequest.status).toBe(409);
+    expect(await developmentRequest.json()).toMatchObject({
+      reason: "regeneration_not_required",
+    });
   });
 
   it(`${profileSummaryCases.requestGeneration.id}: ${profileSummaryCases.requestGeneration.name}`, async () => {

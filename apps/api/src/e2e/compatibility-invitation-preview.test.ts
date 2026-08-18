@@ -154,7 +154,9 @@ async function generateShareProfile(
   const participant = participants[role];
   const store = stores[role];
   const suffix = `${role}-${revision}`;
-  const recordedAt = new Date("2026-08-12T00:00:00.000Z");
+  const recordedAt = new Date(
+    revision === "initial" ? "2026-08-12T00:00:00.000Z" : "2026-08-20T00:00:00.000Z",
+  );
   const source = await DO.account.action.diary.storeLineTextSource(store.db, {
     accountId: participant.accountId,
     eventId: `compatibility-profile-${suffix}`,
@@ -194,8 +196,7 @@ async function generateShareProfile(
   const request = await DO.account.action.profileSummary.requestProfileSummaryGeneration(
     store.db,
     participant.accountId,
-    new Date(),
-    true,
+    recordedAt,
   );
   if (request.outcome !== "created") throw new Error("profile generation was not created");
   const context = await DO.account.action.profileSummary.loadProfileSummaryGenerationContext(
@@ -563,8 +564,12 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
         expect(detail.unavailableThemes).toEqual([
           { diagnosisId: "money-values", title: "お金と消費" },
         ]);
-        expect(detail.partner.aboutMe.generatedAt).toBe("2026-08-12T00:00:00.000Z");
-        expect(detail.viewer.aboutMe.generatedAt).toBe("2026-08-12T00:00:00.000Z");
+        expect(detail.partner.aboutMe.generatedAt).toBe(
+          partnerRole === "inviter" ? "2026-08-20T00:00:00.000Z" : "2026-08-12T00:00:00.000Z",
+        );
+        expect(detail.viewer.aboutMe.generatedAt).toBe(
+          role === "inviter" ? "2026-08-20T00:00:00.000Z" : "2026-08-12T00:00:00.000Z",
+        );
         for (const person of [detail.partner, detail.viewer]) {
           expect(person.themes[0]?.diagnosisId).toBe("relationship-priority");
           expect(person.themes[0]?.parameters.map(({ band }) => band).sort()).toEqual([
