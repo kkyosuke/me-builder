@@ -146,7 +146,7 @@ const faqs = [
   {
     question: "LINE Accountを失った場合は？",
     answer:
-      "現在の仕組みでは、Accountを復旧できないことがあります。利用中のLINE Accountを第三者へ利用させないでください。",
+      "有料Planの提供開始後は、利用中のLINE Accountで事前に発行・保存した一回限りの復旧コードがあれば、新しいLINE Accountを同じAccountへ接続できます。コードがない場合は自動復旧できません。解約・問い合わせ方法は、窓口の準備後にお問い合わせページで案内します。",
   },
 ] as const;
 
