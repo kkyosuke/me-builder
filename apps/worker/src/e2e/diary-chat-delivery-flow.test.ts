@@ -749,6 +749,69 @@ describe("LINE diary chat delivery E2E", () => {
     ).toEqual({ safetyRoute: "self_harm_possible" });
   });
 
+  it("モデルの切迫応答にも固定緊急案内を付加し、安全routeを保存する", async () => {
+    const { bindings, queuedTurn } = await ingestDiary(
+      "今すぐ死ぬ準備をしている",
+      "safety-imminent-model",
+    );
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        mode: "organize",
+        reply: "話してくれてありがとう。今いる場所の安全を確認してもいい？",
+        main_question_count: 1,
+        end_session: false,
+        daily_prompt_follow_up: "none",
+        collection_theme_id: "none",
+        collection_kind: "none",
+        safety: { route: "imminent_danger", restricted_advice: true },
+        used_memory_ids: [],
+      }),
+    });
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    const deliveredText = mockPushMessage.mock.calls[0]?.[0]?.messages?.[0]?.text;
+    expect(deliveredText).toMatch(/119.*110/u);
+    expect(
+      accountDataStore.db
+        .select({ safetyRoute: DO.account.schema.chatTurns.safetyRoute })
+        .from(DO.account.schema.chatTurns)
+        .get(),
+    ).toEqual({ safetyRoute: "imminent_danger" });
+  });
+
+  it("第三者の自傷相談でも通常fallbackへ落とさず確認済み相談先を付加する", async () => {
+    const { bindings, queuedTurn } = await ingestDiary(
+      "友達が死にたいと言っている。どう支えればいい？",
+      "safety-third-party",
+    );
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        mode: "organize",
+        reply: "友達のことを心配しているんだね。今すぐの危険があるか確認できそう？",
+        main_question_count: 1,
+        end_session: false,
+        daily_prompt_follow_up: "none",
+        collection_theme_id: "none",
+        collection_kind: "none",
+        safety: { route: "self_harm_possible", restricted_advice: true },
+        used_memory_ids: [],
+      }),
+    });
+
+    await processChatTurnMessage(createQueueMessage(queuedTurn), bindings, workerConfig);
+
+    const deliveredText = mockPushMessage.mock.calls[0]?.[0]?.messages?.[0]?.text;
+    expect(deliveredText).toContain("https://www.mhlw.go.jp/mamorouyokokoro/soudan/");
+    expect(deliveredText).not.toMatch(/119|110/u);
+    expect(
+      accountDataStore.db
+        .select({ safetyRoute: DO.account.schema.chatTurns.safetyRoute })
+        .from(DO.account.schema.chatTurns)
+        .get(),
+    ).toEqual({ safetyRoute: "self_harm_possible" });
+  });
+
   it("虐待や暴力の可能性ではモデル応答へ対応窓口一覧を付加し、安全routeを保存する", async () => {
     const { bindings, queuedTurn } = await ingestDiary("家で殴られていて怖い", "safety-abuse");
     mockGenerateContent.mockResolvedValueOnce({
