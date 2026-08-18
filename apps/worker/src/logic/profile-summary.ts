@@ -59,8 +59,24 @@ const SAFE_COMPATIBILITY_SHARE_STATEMENT =
 const FORBIDDEN_COMPATIBILITY_SHARE_DETAIL =
   /[0-9０-９]|[「」『』“”"]|(?:今日|昨日|一昨日|明日|先週|今週|来週|先月|今月|来月|去年|今年|来年)|(?:[\p{Script=Han}\p{Script=Katakana}ー]{1,}(?:さん|氏|ちゃん|くん|先生))|(?:[\p{Script=Han}\p{Script=Katakana}ー]{2,}(?:都|道|府|県|市|区|町|村|駅|空港|公園|店舗|ホテル|学校|大学|病院|会社))|(?:健康|病気|病名|診断|治療|療養|服薬|薬|通院|入院|退院|症状|障害|うつ|鬱|パニック|不眠|自傷|自殺)|(?:日記|LINE|会話(?:本文|の引用)|相手|あなた|すべき|してほしい|して欲しい|得意|苦手|性格|能力|優秀)/u;
 const EVIDENCE_EXCERPT_LENGTH = 20;
-const UNSAFE_PROFILE_SUMMARY_ASSERTION =
-  /(?:あなたは.{0,20}(?:うつ病|鬱病|発達障害|精神疾患|病気)(?:です|でしょう|に違いありません))|(?:(?:必ず|絶対に).{0,40}(?:失敗します|成功します|病気になります|自傷します))|(?:医師|専門家).{0,12}(?:不要です|必要ありません)/u;
+const MEDICAL_ASSERTION =
+  /(?:うつ病|鬱病|適応障害|発達障害|精神疾患|パニック障害|病気|adhd|asd).{0,12}(?:です|だ|でしょう|に違いない|可能性が高い)/u;
+const CERTAIN_FUTURE_ASSERTION =
+  /(?:必ず|絶対(?:に)?|間違いなく).{0,40}(?:失敗|成功|発症|病気にな|自傷|後悔|破綻)/u;
+const DISCOURAGING_PROFESSIONAL_SUPPORT =
+  /(?:(?:医師|専門家|カウンセラー|病院|受診|相談).{0,20}(?:不要|必要(?:は)?ない|必要ありません|行かなくてよい|頼らなくてよい))|(?:(?:不要|必要(?:は)?ない).{0,20}(?:医師|専門家|カウンセラー|病院|受診|相談))/u;
+
+function containsUnsafeProfileSummaryAssertion(value: string): boolean {
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/[\s\p{P}\p{S}]/gu, "")
+    .toLowerCase();
+  return (
+    MEDICAL_ASSERTION.test(normalized) ||
+    CERTAIN_FUTURE_ASSERTION.test(normalized) ||
+    DISCOURAGING_PROFESSIONAL_SUPPORT.test(normalized)
+  );
+}
 
 function normalizeForExcerptComparison(value: string): string {
   return value
@@ -175,14 +191,17 @@ export function validateGeneratedProfileSummary(
   }
   const parsed = v.safeParse(ResponseSchema, json);
   if (!parsed.success) return { type: "invalid", reason: "response_schema_mismatch" };
+  if (containsUnsafeProfileSummaryAssertion(parsed.output.headline)) {
+    return { type: "invalid", reason: "insight_unsafe_assertion" };
+  }
   const evidenceById = new Map(evidence.map((item) => [item.id, item]));
   const keys = new Set<string>();
   const insights: ProfileSummaryInsight[] = [];
   for (const insight of parsed.output.insights) {
     if (keys.has(insight.key)) return { type: "invalid", reason: "insight_key_duplicated" };
     if (
-      UNSAFE_PROFILE_SUMMARY_ASSERTION.test(insight.label) ||
-      UNSAFE_PROFILE_SUMMARY_ASSERTION.test(insight.description)
+      containsUnsafeProfileSummaryAssertion(insight.label) ||
+      containsUnsafeProfileSummaryAssertion(insight.description)
     ) {
       return { type: "invalid", reason: "insight_unsafe_assertion" };
     }
