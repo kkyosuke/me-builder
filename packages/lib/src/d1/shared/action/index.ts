@@ -9,3 +9,4 @@ export * as common from "./common";
 export * as geminiUsage from "./gemini-usage";
 export * as familySeat from "./family-seat";
 export * as profile from "./profile";
+export * as ssoAuthentication from "./sso-authentication";

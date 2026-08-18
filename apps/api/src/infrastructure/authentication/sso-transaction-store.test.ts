@@ -1,56 +1,74 @@
 import type { KVNamespace } from "@cloudflare/workers-types";
-import { describe, expect, it, vi } from "vitest";
+import type { D1 } from "@me-builder/lib";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ claim: vi.fn() }));
+
+vi.mock("@me-builder/lib", () => ({
+  D1: {
+    shared: {
+      action: {
+        ssoAuthentication: {
+          claimSsoAuthenticationTransaction: mocks.claim,
+        },
+      },
+    },
+  },
+}));
+
 import { createSsoTransactionStore } from "./sso-transaction-store";
 
+const transaction = {
+  purpose: "login" as const,
+  nonce: "nonce",
+  codeVerifier: "verifier",
+  returnTo: "/",
+  expiresAt: Date.now() + 600_000,
+};
+
+function kvFixture(stored: unknown = transaction): KVNamespace {
+  return {
+    put: vi.fn(),
+    get: vi.fn(async () => stored),
+    delete: vi.fn(),
+  } as unknown as KVNamespace;
+}
+
 describe("createSsoTransactionStore", () => {
-  it("stateをhash化したkeyで保存し、読み出し時に先に削除する", async () => {
-    const records = new Map<string, unknown>();
-    const put = vi.fn(async (key: string, value: string) => {
-      records.set(key, JSON.parse(value));
-    });
-    const deleteValue = vi.fn(async (key: string) => {
-      records.delete(key);
-    });
-    const kv = {
-      put,
-      get: vi.fn(async (key: string) => records.get(key) ?? null),
-      delete: deleteValue,
-    } as unknown as KVNamespace;
-    const store = createSsoTransactionStore(kv);
+  beforeEach(() => vi.clearAllMocks());
 
-    await store.put(
-      "raw-state",
-      {
-        purpose: "login",
-        nonce: "nonce",
-        codeVerifier: "verifier",
-        returnTo: "/",
-        expiresAt: 1_000,
-      },
-      600,
+  it("stateをhash化したKV keyへ10分TTL付きでpayloadを保存する", async () => {
+    const kv = kvFixture();
+    const store = createSsoTransactionStore({} as D1.shared.Client, kv);
+
+    await store.put("raw-state", transaction, 600);
+
+    expect(kv.put).toHaveBeenCalledWith(
+      expect.stringMatching(/^sso-transaction:[A-Za-z0-9_-]+$/u),
+      JSON.stringify(transaction),
+      { expirationTtl: 600 },
     );
-
-    const key = put.mock.calls[0]?.[0];
-    expect(key).toMatch(/^sso-transaction:[A-Za-z0-9_-]+$/u);
-    expect(key).not.toContain("raw-state");
-    await expect(store.consume("raw-state")).resolves.toEqual({
-      purpose: "login",
-      nonce: "nonce",
-      codeVerifier: "verifier",
-      returnTo: "/",
-      expiresAt: 1_000,
-    });
-    expect(deleteValue).toHaveBeenCalledWith(key);
-    await expect(store.consume("raw-state")).resolves.toBeUndefined();
+    expect(vi.mocked(kv.put).mock.calls[0]?.[0]).not.toContain("raw-state");
   });
 
-  it("不正な保存値をidentity verificationへ渡さない", async () => {
-    const kv = {
-      put: vi.fn(),
-      get: vi.fn(async () => ({ nonce: "nonce" })),
-      delete: vi.fn(),
-    } as unknown as KVNamespace;
+  it("同時にKVを読めてもD1 claimを得たcallbackだけがpayloadを消費する", async () => {
+    const kv = kvFixture();
+    mocks.claim.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const store = createSsoTransactionStore({} as D1.shared.Client, kv);
 
-    await expect(createSsoTransactionStore(kv).consume("state")).resolves.toBeUndefined();
+    const consumed = await Promise.all([store.consume("state"), store.consume("state")]);
+
+    expect(consumed.filter(Boolean)).toEqual([transaction]);
+    expect(mocks.claim).toHaveBeenCalledTimes(2);
+    expect(kv.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([null, { nonce: "nonce" }])("不正な保存値をclaimせず拒否する: %j", async (stored) => {
+    const kv = kvFixture(stored);
+    await expect(
+      createSsoTransactionStore({} as D1.shared.Client, kv).consume("state"),
+    ).resolves.toBeUndefined();
+    expect(mocks.claim).not.toHaveBeenCalled();
+    expect(kv.delete).not.toHaveBeenCalled();
   });
 });
