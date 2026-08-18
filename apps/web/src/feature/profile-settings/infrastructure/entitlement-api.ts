@@ -22,7 +22,6 @@ const ResponseSchema = v.object({
   effectiveAt: v.pipe(v.string(), v.isoTimestamp()),
   availableUntil: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   aiReply: UsageSchema,
-  profileSummary: UsageSchema,
 }) satisfies v.GenericSchema<ApiResponse>;
 
 export async function fetchProfileEntitlement(

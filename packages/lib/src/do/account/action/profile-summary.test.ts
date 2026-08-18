@@ -434,7 +434,7 @@ describe("Profile Summary persistence", () => {
       },
     });
 
-    const requestedAt = new Date("2026-08-09T00:01:00.000Z");
+    const requestedAt = new Date(generatedAt.getTime() + PROFILE_SUMMARY_REGENERATION_INTERVAL_MS);
     await expect(readProfileSummary(db, accountId, requestedAt)).resolves.toMatchObject({
       generation: { canRegenerate: true, reasons: ["format"] },
     });
@@ -443,7 +443,7 @@ describe("Profile Summary persistence", () => {
     ).resolves.toMatchObject({ outcome: "created", status: "queued" });
   });
 
-  it("最新版の入力snapshotと比較して診断・日記・30日経過を再生成理由にする", async () => {
+  it("入力更新と7日経過の両方を満たした場合だけ再生成できる", async () => {
     const db = createTestDb();
     const { accountId } = await insertDiaryFixture(db);
     const generatedAt = new Date("2026-08-09T00:00:00.000Z");
@@ -481,16 +481,24 @@ describe("Profile Summary persistence", () => {
       requestProfileSummaryGeneration(db, accountId, new Date("2026-08-09T00:01:00.000Z")),
     ).resolves.toEqual({ outcome: "unavailable", reason: "regeneration_not_required" });
 
+    const elapsedAt = new Date(generatedAt.getTime() + PROFILE_SUMMARY_REGENERATION_INTERVAL_MS);
+    await expect(readProfileSummary(db, accountId, elapsedAt)).resolves.toMatchObject({
+      generation: { canRegenerate: false, reasons: [] },
+    });
+
     const addedAt = new Date("2026-08-10T00:00:00.000Z");
     await insertDiagnosisInput(db, accountId, addedAt);
     await insertAdditionalDiary(db, accountId, "second", addedAt);
     await expect(readProfileSummary(db, accountId, addedAt)).resolves.toMatchObject({
-      generation: { canRegenerate: true, reasons: ["diagnosis", "brain"] },
+      generation: { canRegenerate: false, reasons: ["diagnosis", "brain"] },
+    });
+    await expect(requestProfileSummaryGeneration(db, accountId, addedAt)).resolves.toEqual({
+      outcome: "unavailable",
+      reason: "regeneration_not_required",
     });
 
-    const elapsedAt = new Date(generatedAt.getTime() + PROFILE_SUMMARY_REGENERATION_INTERVAL_MS);
     await expect(readProfileSummary(db, accountId, elapsedAt)).resolves.toMatchObject({
-      generation: { canRegenerate: true, reasons: ["diagnosis", "brain", "elapsed"] },
+      generation: { canRegenerate: true, reasons: ["diagnosis", "brain"] },
     });
   });
 });

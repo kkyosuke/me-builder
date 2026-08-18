@@ -3,9 +3,6 @@ export type PaidPlanCode = (typeof paidPlanCodes)[number];
 export const publicPlanCodes = ["free", ...paidPlanCodes] as const;
 export type PublicPlanCode = (typeof publicPlanCodes)[number];
 
-/** Planの価値差には使わない、全Account共通のまとめ生成月次運用上限。 */
-export const PROFILE_SUMMARY_MONTHLY_LIMIT = 4;
-
 /** 公開料金表とEntitlementが共有する、PlanごとのAI返信月次上限。 */
 export const AI_REPLY_MONTHLY_LIMITS = {
   free: 60,

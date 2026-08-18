@@ -51,12 +51,12 @@ function assignment(
 
 describe("Preview Plan assignment verification", () => {
   it.each([
-    ["lite", "subscription", 150, 4],
-    ["full", "subscription", 600, 4],
-    ["family", "family-seat", 600, 4],
+    ["lite", "subscription", 150],
+    ["full", "subscription", 600],
+    ["family", "family-seat", 600],
   ] as const)(
     "fake assignmentを%sへ切り替えると付与元・利用上限を即時検証できる",
-    async (plan, source, aiLimit, summaryLimit) => {
+    async (plan, source, aiLimit) => {
       const provider = new billing.FakeAccountPlanAssignmentProvider([assignment(plan, source)]);
       const { binding } = createAccountData();
 
@@ -78,7 +78,6 @@ describe("Preview Plan assignment verification", () => {
         plan,
         source,
         aiReply: { limit: aiLimit, remaining: aiLimit - 1 },
-        profileSummary: { limit: summaryLimit, remaining: summaryLimit - 1 },
       });
     },
   );

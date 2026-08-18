@@ -40,7 +40,7 @@ const ProfileSummaryVersionSchema = v.object({
 const ProfileSummaryGenerationSchema = v.object({
   status: v.picklist(["idle", "queued", "generating", "failed"]),
   canRegenerate: v.boolean(),
-  reasons: v.array(v.picklist(["diagnosis", "brain", "format", "elapsed"])),
+  reasons: v.array(v.picklist(["diagnosis", "brain", "format"])),
   message: v.nullable(NonEmptyStringSchema),
 });
 
@@ -91,7 +91,7 @@ export const ProfileSummaryGenerationAcceptedSchema = v.object({
 
 export const ProfileSummaryGenerationUnavailableSchema = v.object({
   error: v.literal("Profile summary generation unavailable"),
-  reason: v.picklist(["source_record_required", "regeneration_not_required", "limit_reached"]),
+  reason: v.picklist(["source_record_required", "regeneration_not_required"]),
 });
 
 export const profileSummaryRoute = describeRoute({

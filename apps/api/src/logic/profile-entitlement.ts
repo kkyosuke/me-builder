@@ -29,27 +29,13 @@ export async function getProfileEntitlement({
   ).resolve(actor.accountId, at);
   const account = accountDataFor(accountData, actor.accountId);
   const aiReplyPeriod = billing.resolveEntitlementUsagePeriod(entitlement, "ai-reply", at);
-  const profileSummaryPeriod = billing.resolveEntitlementUsagePeriod(
-    entitlement,
-    "profile-summary",
+  const aiReply = await account.execute(
+    "aiUsage.read",
+    "ai-reply",
+    aiReplyPeriod,
+    entitlement.policy.aiReply.limit,
     at,
   );
-  const [aiReply, profileSummary] = await Promise.all([
-    account.execute(
-      "aiUsage.read",
-      "ai-reply",
-      aiReplyPeriod,
-      entitlement.policy.aiReply.limit,
-      at,
-    ),
-    account.execute(
-      "aiUsage.read",
-      "profile-summary",
-      profileSummaryPeriod,
-      entitlement.policy.profileSummary.limit,
-      at,
-    ),
-  ]);
   return {
     type: "resolved" as const,
     status:
@@ -63,7 +49,6 @@ export async function getProfileEntitlement({
     effectiveAt: entitlement.effectiveAt,
     availableUntil: entitlement.availableUntil,
     aiReply: usageResponse(aiReply),
-    profileSummary: usageResponse(profileSummary),
   };
 }
 

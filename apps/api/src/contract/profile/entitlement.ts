@@ -18,13 +18,12 @@ export const ProfileEntitlementResponseSchema = v.object({
   effectiveAt: v.pipe(v.string(), v.isoTimestamp()),
   availableUntil: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   aiReply: UsageSchema,
-  profileSummary: UsageSchema,
 });
 
 export const profileEntitlementRoute = describeRoute({
   operationId: "getProfileEntitlement",
   tags: ["Profile"],
-  summary: "本人のPlanとAI利用上限・残量を取得する",
+  summary: "本人のPlanとAI返信の利用上限・残量を取得する",
   security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("本人の現在の利用権限", ProfileEntitlementResponseSchema),

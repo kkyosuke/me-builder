@@ -535,7 +535,7 @@ export function ServiceSiteHomeScreen() {
               </table>
             </div>
             <p className="mt-5 text-center text-xs leading-6 text-slate-500 dark:text-slate-400">
-              わたしのまとめは全Plan共通で月4回まで生成できます。診断または日記があり、前回から入力が変わった場合、または前回生成から30日以上経過した場合が対象です。いずれの生成条件も満たさない場合は回数を消費せず、新しい版も生成しません。
+              わたしのまとめは全Plan共通で、前回生成から7日以上経過し、かつ診断または日記等の入力が変わった場合に生成できます。月ごとの回数上限はありません。
             </p>
             <p className="mt-2 text-center text-xs leading-6 text-slate-500 dark:text-slate-400">
               AI返信は、メッセージの送信回数ではなく、AIが生成して正常に届けた回答を1回として数えます。Freeの月60回は、1日2回使う場合の約30日分です。

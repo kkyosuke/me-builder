@@ -4,18 +4,13 @@ import { EntitlementService } from "./entitlement";
 import { resolveEntitlementUsagePeriod } from "./usage-period";
 
 describe("resolveEntitlementUsagePeriod", () => {
-  it("FreeのAI返信とまとめを同じUTC暦月へ解決する", async () => {
+  it("FreeのAI返信をUTC暦月へ解決する", async () => {
     const at = new Date("2026-08-15T12:00:00.000Z");
     const entitlement = await new EntitlementService(
       new FakeAccountPlanAssignmentProvider(),
     ).resolve("account-1", at);
 
     expect(resolveEntitlementUsagePeriod(entitlement, "ai-reply", at)).toEqual({
-      key: "free-month:2026-08",
-      start: new Date("2026-08-01T00:00:00.000Z"),
-      end: new Date("2026-09-01T00:00:00.000Z"),
-    });
-    expect(resolveEntitlementUsagePeriod(entitlement, "profile-summary", at)).toEqual({
       key: "free-month:2026-08",
       start: new Date("2026-08-01T00:00:00.000Z"),
       end: new Date("2026-09-01T00:00:00.000Z"),

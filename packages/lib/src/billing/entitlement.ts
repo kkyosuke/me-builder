@@ -1,4 +1,4 @@
-import { AI_REPLY_MONTHLY_LIMITS, PROFILE_SUMMARY_MONTHLY_LIMIT } from "@me-builder/shared";
+import { AI_REPLY_MONTHLY_LIMITS } from "@me-builder/shared";
 import {
   type AccountPlanAssignment,
   type AccountPlanAssignmentProvider,
@@ -9,7 +9,7 @@ import {
   planCodes,
 } from "./account-plan-assignment";
 
-export { AI_REPLY_MONTHLY_LIMITS, PROFILE_SUMMARY_MONTHLY_LIMIT } from "@me-builder/shared";
+export { AI_REPLY_MONTHLY_LIMITS } from "@me-builder/shared";
 
 export const entitlementFeatures = [
   "weekly-reflection",
@@ -22,10 +22,6 @@ export type EntitlementFeature = (typeof entitlementFeatures)[number];
 
 export type EntitlementPolicy = Readonly<{
   aiReply: Readonly<{ limit: number; period: "assignment-month" }>;
-  profileSummary: Readonly<{
-    limit: number;
-    period: "assignment-month";
-  }>;
   semanticSearchDays: number | null;
   relationshipQuestionContext: "current-message" | "session-and-diagnosis" | "confirmed-history";
   monthlyChange: "none" | "brief" | "full";
@@ -39,7 +35,6 @@ export type EntitlementPolicy = Readonly<{
 const policies = {
   free: {
     aiReply: { limit: AI_REPLY_MONTHLY_LIMITS.free, period: "assignment-month" },
-    profileSummary: { limit: PROFILE_SUMMARY_MONTHLY_LIMIT, period: "assignment-month" },
     semanticSearchDays: 30,
     relationshipQuestionContext: "current-message",
     monthlyChange: "none",
@@ -57,7 +52,6 @@ const policies = {
   },
   lite: {
     aiReply: { limit: AI_REPLY_MONTHLY_LIMITS.lite, period: "assignment-month" },
-    profileSummary: { limit: PROFILE_SUMMARY_MONTHLY_LIMIT, period: "assignment-month" },
     semanticSearchDays: 365,
     relationshipQuestionContext: "session-and-diagnosis",
     monthlyChange: "brief",
@@ -75,7 +69,6 @@ const policies = {
   },
   full: {
     aiReply: { limit: AI_REPLY_MONTHLY_LIMITS.full, period: "assignment-month" },
-    profileSummary: { limit: PROFILE_SUMMARY_MONTHLY_LIMIT, period: "assignment-month" },
     semanticSearchDays: null,
     relationshipQuestionContext: "confirmed-history",
     monthlyChange: "full",
@@ -93,7 +86,6 @@ const policies = {
   },
   family: {
     aiReply: { limit: AI_REPLY_MONTHLY_LIMITS.family, period: "assignment-month" },
-    profileSummary: { limit: PROFILE_SUMMARY_MONTHLY_LIMIT, period: "assignment-month" },
     semanticSearchDays: null,
     relationshipQuestionContext: "confirmed-history",
     monthlyChange: "full",

@@ -65,14 +65,6 @@ const freeEntitlement = {
     periodStartsAt: "2026-08-01T00:00:00.000Z",
     resetsAt: "2026-09-01T00:00:00.000Z",
   },
-  profileSummary: {
-    limit: 0,
-    used: 0,
-    reserved: 0,
-    remaining: 0,
-    periodStartsAt: "2026-08-01T00:00:00.000Z",
-    resetsAt: "2026-09-01T00:00:00.000Z",
-  },
 };
 
 function requestUrl(input: RequestInfo | URL): URL {

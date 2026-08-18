@@ -61,14 +61,6 @@ const entitlement = (source: ProfileEntitlement["source"]): ProfileEntitlement =
     periodStartsAt: "2026-08-16T00:00:00.000Z",
     resetsAt: "2026-09-16T00:00:00.000Z",
   },
-  profileSummary: {
-    limit: source === "subscription" ? 4 : 1,
-    used: 0,
-    reserved: 0,
-    remaining: source === "subscription" ? 4 : 1,
-    periodStartsAt: "2026-08-16T00:00:00.000Z",
-    resetsAt: "2026-09-16T00:00:00.000Z",
-  },
 });
 
 describe("billing purchase user journey", () => {

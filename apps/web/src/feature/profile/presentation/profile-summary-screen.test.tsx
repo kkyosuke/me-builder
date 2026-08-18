@@ -65,7 +65,7 @@ const versioning: ProfileSummaryVersioning = {
   generation: {
     status: "idle",
     canRegenerate: true,
-    reasons: ["diagnosis", "brain", "format", "elapsed"],
+    reasons: ["diagnosis", "brain", "format"],
   },
 };
 
