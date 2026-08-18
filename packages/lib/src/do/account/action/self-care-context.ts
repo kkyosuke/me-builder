@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, notExists, or } from "drizzle-orm";
 import type {
   RevokeSelfCareConfirmationResult,
   SelfCareConfirmation,
   SelfCareConfirmationKind,
   SelfCareConfirmationResult,
+  SelfCareContextReadModel,
 } from "../../../self-care-context";
 import type { AccountDataDatabase } from "../database";
 import { brainItemEvidenceEdges, brainItems } from "../schema/brain";
@@ -35,8 +36,12 @@ const toModel = (row: {
   updatedAt: row.updatedAt.toISOString(),
 });
 
-export async function readSelfCareConfirmations(db: AccountDataDatabase, accountId: string) {
-  const rows = await db
+export async function readSelfCareConfirmations(
+  db: AccountDataDatabase,
+  accountId: string,
+  at = new Date(),
+): Promise<SelfCareContextReadModel> {
+  const itemRows = await db
     .select({
       id: selfCareConfirmations.id,
       brainItemId: selfCareConfirmations.brainItemId,
@@ -51,7 +56,45 @@ export async function readSelfCareConfirmations(db: AccountDataDatabase, account
     .where(eq(selfCareConfirmations.accountId, accountId))
     .orderBy(desc(selfCareConfirmations.updatedAt))
     .all();
-  return { items: rows.map(toModel) };
+  const candidateRows = await db
+    .select({
+      brainItemId: brainItems.id,
+      statement: brainItems.statement,
+      attributes: brainItems.attributes,
+      derivation: brainItems.derivation,
+    })
+    .from(brainItems)
+    .where(
+      and(
+        eq(brainItems.accountId, accountId),
+        inArray(brainItems.category, ["memory", "preference", "behavior_pattern", "current_state"]),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+        notExists(
+          db
+            .select({ id: selfCareConfirmations.id })
+            .from(selfCareConfirmations)
+            .where(
+              and(
+                eq(selfCareConfirmations.accountId, accountId),
+                eq(selfCareConfirmations.brainItemId, brainItems.id),
+                eq(selfCareConfirmations.status, "active"),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(desc(brainItems.updatedAt))
+    .all();
+  return {
+    items: itemRows.map(toModel),
+    candidates: candidateRows
+      .filter(({ attributes, derivation }) => !isInference(attributes, derivation))
+      .map(({ brainItemId, statement }) => ({ brainItemId, statement }))
+      .slice(0, 12),
+  };
 }
 
 export async function confirmSelfCareContext(

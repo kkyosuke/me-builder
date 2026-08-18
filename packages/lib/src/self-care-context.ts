@@ -11,6 +11,16 @@ export type SelfCareConfirmation = Readonly<{
   updatedAt: string;
 }>;
 
+export type SelfCareContextCandidate = Readonly<{
+  brainItemId: string;
+  statement: string;
+}>;
+
+export type SelfCareContextReadModel = Readonly<{
+  items: readonly SelfCareConfirmation[];
+  candidates: readonly SelfCareContextCandidate[];
+}>;
+
 export type SelfCareConfirmationResult =
   | Readonly<{ type: "confirmed"; item: SelfCareConfirmation }>
   | Readonly<{ type: "brain-item-not-found" }>

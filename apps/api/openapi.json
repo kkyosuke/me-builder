@@ -7019,11 +7019,28 @@
                         ]
                       }
                     },
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "brainItemId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "statement": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["brainItemId", "statement"]
+                      }
+                    },
                     "canManage": {
                       "type": "boolean"
                     }
                   },
-                  "required": ["items", "canManage"]
+                  "required": ["items", "candidates", "canManage"]
                 }
               }
             }

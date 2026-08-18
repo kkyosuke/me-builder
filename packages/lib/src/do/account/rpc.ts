@@ -237,7 +237,7 @@ export type AccountDataActions = {
     [mode: "none" | "selected-one" | "relevant-active", currentText: string, at?: Date],
     typeof goalFollowUp.selectGoalFollowUpMemory
   >;
-  "selfCareContext.read": RpcAction<[], typeof selfCareContext.readSelfCareConfirmations>;
+  "selfCareContext.read": RpcAction<[at?: Date], typeof selfCareContext.readSelfCareConfirmations>;
   "selfCareContext.confirm": RpcAction<
     [
       brainItemId: string,

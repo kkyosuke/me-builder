@@ -8,6 +8,7 @@ import { accountSchema as schema } from "../database";
 import { saveBrainItem } from "./brain";
 import {
   confirmSelfCareContext,
+  readSelfCareConfirmations,
   revokeSelfCareContext,
   selectSelfCareContextMemories,
 } from "./self-care-context";
@@ -82,6 +83,10 @@ describe("self-care context", () => {
     const db = createTestDb();
     await addItem(db, { id: "worked", statement: "予定を一つ減らすと少し楽になった" });
     await addItem(db, { id: "inferred", statement: "散歩が合いそう", isInference: true });
+    await expect(readSelfCareConfirmations(db, ACCOUNT_ID, AT)).resolves.toMatchObject({
+      items: [],
+      candidates: [{ brainItemId: "worked", statement: "予定を一つ減らすと少し楽になった" }],
+    });
     await expect(confirmSelfCareContext(db, ACCOUNT_ID, "inferred", "worked", AT)).resolves.toEqual(
       { type: "not-confirmed" },
     );
@@ -92,6 +97,11 @@ describe("self-care context", () => {
       selectSelfCareContextMemories(db, ACCOUNT_ID, "personalized-history", AT),
     ).resolves.toMatchObject([{ brainItemId: "worked", accessLabels: ["self-care-worked"] }]);
     await revokeSelfCareContext(db, ACCOUNT_ID, confirmed.item.id, new Date(AT.getTime() + 1));
+    await expect(
+      readSelfCareConfirmations(db, ACCOUNT_ID, new Date(AT.getTime() + 2)),
+    ).resolves.toMatchObject({
+      candidates: [{ brainItemId: "worked", statement: "予定を一つ減らすと少し楽になった" }],
+    });
     await expect(
       selectSelfCareContextMemories(
         db,

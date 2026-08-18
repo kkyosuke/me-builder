@@ -5171,6 +5171,10 @@ export interface operations {
               /** Format: date-time */
               updatedAt: string;
             }[];
+            candidates: {
+              brainItemId: string;
+              statement: string;
+            }[];
             canManage: boolean;
           };
         };

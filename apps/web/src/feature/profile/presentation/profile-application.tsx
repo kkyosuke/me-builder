@@ -3,9 +3,11 @@ import { CompatibilityShareContentSection } from "../../compatibility";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import { GoalFollowUpSection } from "./goal-follow-up-section";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
+import { SelfCareSection } from "./self-care-section";
 import { useGoalFollowUps } from "./use-goal-follow-ups";
 import { useProfileProgression } from "./use-profile-progression";
 import { useProfileSummary } from "./use-profile-summary";
+import { useSelfCareContexts } from "./use-self-care-contexts";
 import { useWeeklyReflection } from "./use-weekly-reflection";
 import { WeeklyReflectionSection } from "./weekly-reflection-section";
 
@@ -14,6 +16,7 @@ export default function ProfileApplication() {
   const progression = useProfileProgression();
   const weeklyReflection = useWeeklyReflection();
   const goalFollowUps = useGoalFollowUps();
+  const selfCare = useSelfCareContexts();
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const result = summary.state.status === "success" ? summary.state.data : null;
   const selectedVersion = result
@@ -63,6 +66,14 @@ export default function ProfileApplication() {
         onRetry={() => void goalFollowUps.reload()}
         onAgree={(brainItemId, nextStep) => void goalFollowUps.agree(brainItemId, nextStep)}
         onUpdate={(id, input) => void goalFollowUps.update(id, input)}
+      />
+      <SelfCareSection
+        state={selfCare.state}
+        pendingId={selfCare.pendingId}
+        operationError={selfCare.operationError}
+        onRetry={() => void selfCare.reload()}
+        onConfirm={(brainItemId, kind) => void selfCare.confirm(brainItemId, kind)}
+        onRevoke={(id) => void selfCare.revoke(id)}
       />
       <CompatibilityShareContentSection latestProfileSummaryVersionId={latestVersionId} />
     </ProfileSummaryScreen>
