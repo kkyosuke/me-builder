@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
+import {
+  authenticatedErrors,
+  csrfValidationError,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const Text = v.pipe(v.string(), v.trim(), v.nonEmpty());
 const GoalFollowUpSchema = v.object({
@@ -86,7 +91,11 @@ export const goalFollowUpAgreementRoute = describeRoute({
       },
     },
   },
-  responses: { 200: jsonResponse("合意結果", GoalFollowUpMutationSchema), ...errors },
+  responses: {
+    200: jsonResponse("合意結果", GoalFollowUpMutationSchema),
+    ...csrfValidationError,
+    ...errors,
+  },
 } satisfies DescribeRouteOptions);
 
 export const goalFollowUpUpdateRoute = describeRoute({
@@ -109,5 +118,9 @@ export const goalFollowUpUpdateRoute = describeRoute({
       },
     },
   },
-  responses: { 200: jsonResponse("更新結果", GoalFollowUpMutationSchema), ...errors },
+  responses: {
+    200: jsonResponse("更新結果", GoalFollowUpMutationSchema),
+    ...csrfValidationError,
+    ...errors,
+  },
 } satisfies DescribeRouteOptions);

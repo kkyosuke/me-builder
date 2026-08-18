@@ -2,14 +2,77 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { app } from "../app";
 
+const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch", "trace"] as const;
+
+const BODYLESS_RESPONSE_FIXTURES = new Set([
+  "post /api/observability/web-errors 204",
+  "post /api/observability/web-errors 400",
+  "post /api/observability/web-errors 413",
+  "post /api/observability/web-errors 429",
+  "delete /api/auth/sso/identity 204",
+  "get /api/auth/sso/callback 302",
+  "delete /api/auth/session 204",
+  "get /api/profile/avatar 204",
+  "get /api/compatibility/invitations/{relationshipId}/avatar 204",
+  "delete /api/compatibility/invitations/{relationshipId} 204",
+  "delete /api/compatibility/relationships/{relationshipId} 204",
+]);
+
+const NON_JSON_RESPONSE_FIXTURES = new Map([
+  ["get /api/profile/avatar 200", ["image/jpeg", "image/png", "image/webp"]],
+  [
+    "get /api/compatibility/invitations/{relationshipId}/avatar 200",
+    ["image/jpeg", "image/png", "image/webp"],
+  ],
+]);
+
+type SecurityRequirement = Record<string, unknown[]>;
+type OpenApiResponse = {
+  description?: string;
+  content?: Record<string, { schema?: Record<string, unknown> }>;
+};
+type OpenApiOperation = {
+  operationId?: string;
+  tags?: string[];
+  summary?: string;
+  security?: SecurityRequirement[];
+  requestBody?: { required?: boolean };
+  responses?: Record<string, OpenApiResponse>;
+};
+type OpenApiDocument = {
+  openapi: string;
+  paths: Record<string, Partial<Record<(typeof HTTP_METHODS)[number], OpenApiOperation>>>;
+  components: { securitySchemes: Record<string, unknown> };
+};
+
+function operations(document: OpenApiDocument) {
+  return Object.entries(document.paths).flatMap(([path, pathItem]) =>
+    HTTP_METHODS.flatMap((method) => {
+      const operation = pathItem[method];
+      return operation ? [{ method, path, operation }] : [];
+    }),
+  );
+}
+
+function runtimeOperations() {
+  return [
+    ...new Set(
+      app.routes
+        .filter(
+          (route) =>
+            route.method !== "ALL" &&
+            route.path.startsWith("/api/") &&
+            route.path !== "/api/openapi.json",
+        )
+        .map((route) => `${route.method.toLowerCase()} ${route.path.replace(/:([^/]+)/g, "{$1}")}`),
+    ),
+  ].sort();
+}
+
 describe("GET /api/openapi.json", () => {
   it("Web UIが利用するAPI契約をOpenAPI 3.1として公開する", async () => {
     const response = await app.request("/api/openapi.json");
-    const document = (await response.json()) as {
-      openapi: string;
-      paths: Record<string, Record<string, unknown>>;
-      components: { securitySchemes: Record<string, unknown> };
-    };
+    const document = (await response.json()) as OpenApiDocument;
 
     expect(response.status).toBe(200);
     expect(document.openapi).toBe("3.1.0");
@@ -158,7 +221,7 @@ describe("GET /api/openapi.json", () => {
     });
 
     for (const [path, pathItem] of Object.entries(document.paths)) {
-      for (const method of ["get", "post", "put", "patch", "delete"] as const) {
+      for (const method of HTTP_METHODS) {
         const operation = pathItem[method] as
           | { operationId?: string; security?: Array<Record<string, unknown>> }
           | undefined;
@@ -184,5 +247,124 @@ describe("GET /api/openapi.json", () => {
       await readFile(new URL("../../openapi.json", import.meta.url), "utf8"),
     );
     expect(document).toEqual(generatedDocument);
+  });
+
+  it("runtime routeとOpenAPI operationを双方向かつ全契約項目で一致させる", async () => {
+    const response = await app.request("/api/openapi.json");
+    const document = (await response.json()) as OpenApiDocument;
+    const documentedOperations = operations(document);
+
+    expect(documentedOperations.map(({ method, path }) => `${method} ${path}`).sort()).toEqual(
+      runtimeOperations(),
+    );
+
+    const operationIds = new Set<string>();
+    const publicOperations = new Set([
+      "get /api/health",
+      "post /api/auth/liff/exchange",
+      "post /api/auth/sso/login",
+      "get /api/auth/sso/callback",
+      "get /api/billing/plans",
+    ]);
+    const signedOperations = new Map([
+      ["post /api/line/webhook", "lineWebhookSignature"],
+      ["post /api/billing/webhook", "stripeWebhookSignature"],
+    ]);
+
+    for (const { method, path, operation } of documentedOperations) {
+      const route = `${method} ${path}`;
+      expect(operation.operationId, `${route} must have operationId`).toBeTruthy();
+      expect(
+        operationIds.has(operation.operationId as string),
+        `${route} has duplicate operationId`,
+      ).toBe(false);
+      operationIds.add(operation.operationId as string);
+      expect(operation.tags?.length, `${route} must have at least one tag`).toBeGreaterThan(0);
+      expect(operation.summary, `${route} must have summary`).toBeTruthy();
+      expect(operation.security, `${route} must explicitly declare security`).toBeDefined();
+
+      const signedScheme = signedOperations.get(route);
+      if (signedScheme) {
+        expect(operation.security).toEqual([{ [signedScheme]: [] }]);
+      } else if (publicOperations.has(route)) {
+        expect(operation.security).toEqual([]);
+      } else {
+        expect(operation.security).toEqual([
+          method === "get" ? { applicationSession: [] } : { applicationSession: [], csrfToken: [] },
+        ]);
+      }
+      for (const requirement of operation.security ?? []) {
+        for (const securityScheme of Object.keys(requirement)) {
+          expect(
+            document.components.securitySchemes,
+            `${route} references an unknown security scheme`,
+          ).toHaveProperty(securityScheme);
+        }
+      }
+
+      if (path.startsWith("/api/admin/")) expect(operation.tags).toContain("Admin");
+      if (path.startsWith("/api/dev/")) expect(operation.tags).toContain("Development");
+      if (operation.requestBody) {
+        expect(operation.requestBody.required, `${route} request body must be required`).toBe(true);
+      }
+
+      const responses = operation.responses ?? {};
+      expect(Object.keys(responses).length, `${route} must declare responses`).toBeGreaterThan(0);
+      if (operation.security?.some((requirement) => "csrfToken" in requirement)) {
+        expect(
+          responses["403"],
+          `${route} must declare its Origin and CSRF validation response`,
+        ).toBeDefined();
+      }
+      expect(
+        Object.keys(responses).some((status) => /^[23]\d{2}$/.test(status)),
+        `${route} must declare a successful response or redirect`,
+      ).toBe(true);
+      expect(responses["500"], `${route} must declare the global error response`).toBeDefined();
+      for (const [status, documentedResponse] of Object.entries(responses)) {
+        const responseFixture = `${route} ${status}`;
+        expect(status, `${responseFixture} must use an explicit HTTP status`).toMatch(
+          /^[1-5]\d{2}$/,
+        );
+        expect(
+          documentedResponse.description,
+          `${route} ${status} must have description`,
+        ).toBeTruthy();
+        const contentTypes = Object.keys(documentedResponse.content ?? {}).sort();
+        const expectedNonJsonContentTypes = NON_JSON_RESPONSE_FIXTURES.get(responseFixture);
+        if (BODYLESS_RESPONSE_FIXTURES.has(responseFixture)) {
+          expect(contentTypes, `${responseFixture} must have an empty body`).toEqual([]);
+        } else if (expectedNonJsonContentTypes) {
+          expect(contentTypes, `${responseFixture} must declare its binary content types`).toEqual(
+            expectedNonJsonContentTypes,
+          );
+        } else {
+          expect(contentTypes, `${responseFixture} must be an application/json response`).toEqual([
+            "application/json",
+          ]);
+        }
+        for (const [contentType, mediaType] of Object.entries(documentedResponse.content ?? {})) {
+          expect(
+            mediaType.schema,
+            `${route} ${status} ${contentType} must declare schema`,
+          ).toBeDefined();
+        }
+      }
+    }
+
+    for (const path of [
+      "/api/profile/avatar",
+      "/api/compatibility/invitations/{relationshipId}/avatar",
+    ]) {
+      expect(document.paths[path]?.get?.responses?.["200"]?.content).toMatchObject({
+        "image/jpeg": { schema: { type: "string", format: "binary" } },
+        "image/png": { schema: { type: "string", format: "binary" } },
+        "image/webp": { schema: { type: "string", format: "binary" } },
+      });
+    }
+    expect(
+      document.paths["/api/personal-data/exports/{exportId}/download"]?.get?.responses?.["200"]
+        ?.content,
+    ).toHaveProperty("application/json");
   });
 });

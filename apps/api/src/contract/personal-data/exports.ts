@@ -1,8 +1,9 @@
-import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
+import { type DescribeRouteOptions, describeRoute, resolver } from "hono-openapi";
 import * as v from "valibot";
 import {
   ServiceUnavailableErrorSchema,
   authenticatedErrors,
+  csrfValidationError,
   currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
@@ -29,6 +30,7 @@ export const PersonalDataExportNotReadySchema = v.object({
 export const PersonalDataExportExpiredSchema = v.object({
   error: v.literal("Personal data export expired"),
 });
+export const PersonalDataExportArchiveSchema = v.looseObject({});
 
 const exportErrors = {
   ...authenticatedErrors,
@@ -44,6 +46,7 @@ export const requestPersonalDataExportRoute = describeRoute({
   security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     202: jsonResponse("生成要求", PersonalDataExportResponseSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
     503: jsonResponse("AccountData bindingが設定されていない", ServiceUnavailableErrorSchema),
@@ -69,7 +72,7 @@ export const downloadPersonalDataExportRoute = describeRoute({
   responses: {
     200: {
       description: "本人データarchive",
-      content: { "application/json": { schema: { type: "object", additionalProperties: true } } },
+      content: { "application/json": { schema: resolver(PersonalDataExportArchiveSchema) } },
     },
     409: jsonResponse("生成中または生成失敗", PersonalDataExportNotReadySchema),
     410: jsonResponse("download期限切れ", PersonalDataExportExpiredSchema),

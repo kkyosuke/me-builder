@@ -3,6 +3,8 @@ import * as v from "valibot";
 import {
   ServiceUnavailableErrorSchema,
   UnauthorizedErrorSchema,
+  csrfValidationError,
+  internalServerError,
   jsonResponse,
 } from "../shared/errors";
 
@@ -74,6 +76,7 @@ export const acceptServiceTermsRequestValidator = validator(
 const commonErrors = {
   401: jsonResponse("LIFF IDトークンを検証できない", UnauthorizedErrorSchema),
   503: jsonResponse("D1 bindingが設定されていない", ServiceUnavailableErrorSchema),
+  ...internalServerError,
 };
 
 export const getServiceTermsRoute = describeRoute({
@@ -96,6 +99,7 @@ export const acceptServiceTermsRoute = describeRoute({
     200: jsonResponse("保存済みの同意記録", AcceptServiceTermsResponseSchema),
     400: jsonResponse("リクエストJSONが不正", InvalidServiceTermsRequestSchema),
     409: jsonResponse("表示後に規約versionが更新された", ServiceTermsVersionConflictSchema),
+    ...csrfValidationError,
     ...commonErrors,
   },
 } satisfies DescribeRouteOptions);

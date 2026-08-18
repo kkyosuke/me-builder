@@ -3,6 +3,7 @@ import * as v from "valibot";
 import {
   ServiceUnavailableErrorSchema,
   authenticatedErrors,
+  csrfValidationError,
   currentTermsPolicyError,
   jsonResponse,
 } from "../shared/errors";
@@ -105,6 +106,7 @@ export const correctPersonalDataRecordRoute = describeRoute({
     200: jsonResponse("訂正結果", PersonalDataMutationResponseSchema),
     400: jsonResponse("bodyまたは種別が不正", InvalidPersonalDataMutationSchema),
     422: jsonResponse("診断の選択肢が不正", InvalidPersonalDataMutationSchema),
+    ...csrfValidationError,
     ...personalDataErrors,
   },
 } satisfies DescribeRouteOptions);
@@ -116,6 +118,7 @@ export const deletePersonalDataRecordRoute = describeRoute({
   security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     200: jsonResponse("削除受付結果", PersonalDataMutationResponseSchema),
+    ...csrfValidationError,
     ...personalDataErrors,
   },
 } satisfies DescribeRouteOptions);

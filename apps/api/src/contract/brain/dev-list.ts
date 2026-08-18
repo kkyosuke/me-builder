@@ -77,7 +77,7 @@ export const DevelopmentBrainVectorResponseSchema = v.variant("state", [
   }),
 ]);
 
-const DevelopmentRouteNotFoundErrorSchema = v.object({ error: v.literal("Not Found") });
+export const DevelopmentRouteNotFoundErrorSchema = v.object({ error: v.literal("Not Found") });
 
 export const developmentBrainItemsRoute = describeRoute({
   operationId: "getDevelopmentBrainItems",

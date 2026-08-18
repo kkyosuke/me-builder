@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "./shared/errors";
+import {
+  authenticatedErrors,
+  csrfValidationError,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "./shared/errors";
 
 export const AccountRecoveryCodeResponseSchema = v.object({
   code: v.pipe(v.string(), v.nonEmpty()),
@@ -30,6 +35,7 @@ export const accountRecoveryCodeRoute = describeRoute({
   responses: {
     201: jsonResponse("一度だけ表示する復旧コード", AccountRecoveryCodeResponseSchema),
     409: jsonResponse("有料契約がない", AccountRecoveryUnavailableSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
   },
@@ -49,6 +55,7 @@ export const accountRecoveryCompleteRoute = describeRoute({
     400: jsonResponse("復旧コードが不正", AccountRecoveryUnavailableSchema),
     409: jsonResponse("Identityが別Accountに接続済み", AccountRecoveryUnavailableSchema),
     429: jsonResponse("復旧試行が一時的に制限されている", AccountRecoveryUnavailableSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
   },
 } satisfies DescribeRouteOptions);

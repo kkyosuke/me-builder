@@ -4,10 +4,13 @@ import * as v from "valibot";
 import { isDevelopmentEnvironment } from "../config";
 import {
   DevelopmentBrainItemsResponseSchema,
+  DevelopmentRouteNotFoundErrorSchema as DevelopmentBrainRouteNotFoundErrorSchema,
   DevelopmentBrainVectorResponseSchema,
 } from "../contract/brain/dev-list";
 import {
+  DevelopmentRouteNotFoundErrorSchema as DevelopmentBrainVectorRouteNotFoundErrorSchema,
   DevelopmentFailedBrainVectorSyncJobsResponseSchema,
+  FailedJobNotFoundErrorSchema,
   ResetAllDevelopmentBrainVectorSyncJobsResponseSchema,
   ResetDevelopmentBrainVectorSyncJobResponseSchema,
 } from "../contract/brain/dev-vector-sync-jobs";
@@ -26,7 +29,7 @@ import type { AppEnv } from "../types";
 export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Response> {
   const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
   if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
-    return c.json({ error: "Not Found" } as const, 404);
+    return c.json(v.parse(DevelopmentBrainRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
   }
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
     logger.error({ path: c.req.path }, "Brain Item storage binding is not configured");
@@ -73,14 +76,16 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
 export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Response> {
   const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
   if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
-    return c.json({ error: "Not Found" } as const, 404);
+    return c.json(v.parse(DevelopmentBrainRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
   }
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.BRAIN_VECTOR_INDEX) {
     logger.error({ path: c.req.path }, "Brain vector storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const brainItemId = c.req.param("brainItemId");
-  if (!brainItemId) return c.json({ error: "Not Found" } as const, 404);
+  if (!brainItemId) {
+    return c.json(v.parse(DevelopmentBrainRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
+  }
 
   const outcome = await loadDevelopmentBrainVector({
     actor: authenticatedActor(c),
@@ -118,7 +123,12 @@ function failedJobParams(c: Context<AppEnv>) {
 export async function getDevelopmentFailedBrainVectorSyncJobs(
   c: Context<AppEnv>,
 ): Promise<Response> {
-  if (!developmentRouteIsAvailable(c)) return c.json({ error: "Not Found" } as const, 404);
+  if (!developmentRouteIsAvailable(c)) {
+    return c.json(
+      v.parse(DevelopmentBrainVectorRouteNotFoundErrorSchema, { error: "Not Found" }),
+      404,
+    );
+  }
   const params = failedJobParams(c);
   if (!params) {
     logger.error({ path: c.req.path }, "Brain vector sync job storage binding is not configured");
@@ -138,16 +148,31 @@ export async function getDevelopmentFailedBrainVectorSyncJobs(
 export async function postDevelopmentBrainVectorSyncJobReset(
   c: Context<AppEnv>,
 ): Promise<Response> {
-  if (!developmentRouteIsAvailable(c)) return c.json({ error: "Not Found" } as const, 404);
+  if (!developmentRouteIsAvailable(c)) {
+    return c.json(
+      v.parse(DevelopmentBrainVectorRouteNotFoundErrorSchema, { error: "Not Found" }),
+      404,
+    );
+  }
   const params = failedJobParams(c);
   if (!params) {
     logger.error({ path: c.req.path }, "Brain vector sync job storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const jobId = c.req.param("jobId");
-  if (!jobId) return c.json({ error: "Not Found" } as const, 404);
+  if (!jobId) {
+    return c.json(
+      v.parse(DevelopmentBrainVectorRouteNotFoundErrorSchema, { error: "Not Found" }),
+      404,
+    );
+  }
   const outcome = await resetDevelopmentFailedBrainVectorSyncJob({ ...params, jobId });
-  if (!outcome.reset) return c.json({ error: "Failed vector sync job not found" } as const, 404);
+  if (!outcome.reset) {
+    return c.json(
+      v.parse(FailedJobNotFoundErrorSchema, { error: "Failed vector sync job not found" }),
+      404,
+    );
+  }
   return c.json(v.parse(ResetDevelopmentBrainVectorSyncJobResponseSchema, { reset: true }));
 }
 
@@ -155,7 +180,12 @@ export async function postDevelopmentBrainVectorSyncJobReset(
 export async function postDevelopmentBrainVectorSyncJobsResetAll(
   c: Context<AppEnv>,
 ): Promise<Response> {
-  if (!developmentRouteIsAvailable(c)) return c.json({ error: "Not Found" } as const, 404);
+  if (!developmentRouteIsAvailable(c)) {
+    return c.json(
+      v.parse(DevelopmentBrainVectorRouteNotFoundErrorSchema, { error: "Not Found" }),
+      404,
+    );
+  }
   const params = failedJobParams(c);
   if (!params) {
     logger.error({ path: c.req.path }, "Brain vector sync job storage binding is not configured");

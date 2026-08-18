@@ -184,6 +184,16 @@ tasks:
     cmds:
       - bun scripts/setup-api-docs-access.ts production
 
+  access:verify:preview:
+    desc: 'Verify that preview OpenAPI is denied without Cloudflare Access authentication'
+    cmds:
+      - bun scripts/verify-api-docs-access.ts preview
+
+  access:verify:production:
+    desc: 'Verify that production OpenAPI is denied without Cloudflare Access authentication'
+    cmds:
+      - bun scripts/verify-api-docs-access.ts production
+
   stripe:setup:preview:
     desc: 'Synchronize the Stripe test catalog, webhook, portal, and Cloudflare secrets'
     cmds:
@@ -241,6 +251,7 @@ tasks:
       - task: access:setup:preview
       - bun --filter @me-builder/worker deploy:preview
       - bun --filter @me-builder/api deploy:preview
+      - task: access:verify:preview
       - bun --filter @me-builder/mcp deploy:preview
       - bun --filter @me-builder/web deploy:preview
 
@@ -250,5 +261,6 @@ tasks:
       - task: access:setup:production
       - bun --filter @me-builder/worker deploy:production
       - bun --filter @me-builder/api deploy:production
+      - task: access:verify:production
       - bun --filter @me-builder/mcp deploy:production
       - bun --filter @me-builder/web deploy:production

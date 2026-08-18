@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+  "/api/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** API Serverの死活状態を取得する */
+    get: operations["getHealth"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/observability/web-errors": {
     parameters: {
       query?: never;
@@ -15,6 +32,23 @@ export interface paths {
     put?: never;
     /** Web UIの安全化済み未捕捉・操作エラーをWorkers Logsへ記録する */
     post: operations["reportWebClientError"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/line/webhook": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** LINE署名を検証してWebhook eventを受理する */
+    post: operations["receiveLineWebhook"];
     delete?: never;
     options?: never;
     head?: never;
@@ -84,6 +118,23 @@ export interface paths {
     get: operations["completeSsoCallback"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/billing/webhook": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stripe署名を検証して課金Webhook eventを受理する */
+    post: operations["receiveStripeWebhook"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1130,6 +1181,44 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  getHealth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description API Serverの死活状態 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            status: "ok";
+            environment: string;
+            /** Format: date-time */
+            timestamp: string;
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+    };
+  };
   reportWebClientError: {
     parameters: {
       query?: never;
@@ -1238,12 +1327,17 @@ export interface operations {
           };
         };
       };
-      /** @description 許可済みWeb Originではない */
+      /** @description OriginまたはCSRF tokenが一致しない */
       403: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
       };
       /** @description 対応するAccountが存在しない */
       404: {
@@ -1313,6 +1407,62 @@ export interface operations {
       };
     };
   };
+  receiveLineWebhook: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description 署名検証済みWebhook eventの受理結果 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            status: "ok";
+            queued: boolean;
+            /** Format: uuid */
+            id: string;
+          };
+        };
+      };
+      /** @description LINE署名がない、無効、または検証設定がない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+    };
+  };
   getSsoIdentityStatus: {
     parameters: {
       query?: never;
@@ -1343,6 +1493,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
           };
         };
       };
@@ -1388,6 +1550,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 最後のログイン方法なので解除不可 */
       409: {
         headers: {
@@ -1397,6 +1571,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Last login identity cannot be unlinked";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
           };
         };
       };
@@ -1450,6 +1636,30 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
       /** @description SSOまたはstorage bindingが未設定 */
       503: {
         headers: {
@@ -1488,6 +1698,18 @@ export interface operations {
           };
         };
       };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
       /** @description SSOまたはstorage bindingが未設定 */
       503: {
         headers: {
@@ -1518,7 +1740,85 @@ export interface operations {
         };
         content?: never;
       };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
       /** @description SSOまたはstorage bindingが未設定 */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  receiveStripeWebhook: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description 署名検証済みWebhook eventの受理結果 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            status: "ok";
+            queued: boolean;
+          };
+        };
+      };
+      /** @description Stripe署名またはpayloadが無効 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid webhook";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description StripeまたはQueue設定がない */
       503: {
         headers: {
           [name: string]: unknown;
@@ -1838,6 +2138,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -1962,6 +2274,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -2065,6 +2389,18 @@ export interface operations {
                 currency: "JPY";
               }[];
             }[];
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
           };
         };
       };
@@ -2207,6 +2543,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -2330,6 +2678,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -2530,6 +2890,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -2659,6 +3031,18 @@ export interface operations {
           };
         };
       };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
       /** @description D1 bindingが設定されていない */
       503: {
         headers: {
@@ -2711,6 +3095,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
           };
         };
       };
@@ -2783,6 +3179,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 表示後に規約versionが更新された */
       409: {
         headers: {
@@ -2793,6 +3201,18 @@ export interface operations {
             /** @constant */
             error: "Terms version is no longer current";
             currentVersion: string;
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
           };
         };
       };
@@ -3535,6 +3955,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -3760,6 +4192,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -3996,6 +4440,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -4130,6 +4586,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -4673,6 +5141,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -4800,6 +5280,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -5005,6 +5497,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 本人が所有する有効な原本がない */
       404: {
         headers: {
@@ -5117,6 +5621,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -5347,6 +5863,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -5470,6 +5998,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -6594,6 +7134,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountが存在しない */
       404: {
         headers: {
@@ -6762,9 +7314,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": Record<string, never>;
         };
       };
       /** @description application sessionを検証できない */
@@ -7147,6 +7697,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 招待または対応するAccountを利用できない */
       404: {
         headers: {
@@ -7268,6 +7830,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -7605,6 +8179,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -7992,6 +8578,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 相性関係または対応するAccountを利用できない */
       404: {
         headers: {
@@ -8187,6 +8785,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 開発環境ではない、または対応するAccountがない */
       404: {
         headers: {
@@ -8278,6 +8888,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };
@@ -9000,6 +9622,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountがない、またはDiagnosisが公開されていない */
       404: {
         headers: {
@@ -9137,6 +9771,18 @@ export interface operations {
           };
         };
       };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
       /** @description 対応するAccountがない、またはDiagnosisが公開されていない */
       404: {
         headers: {
@@ -9267,6 +9913,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
           };
         };
       };

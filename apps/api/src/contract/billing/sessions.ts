@@ -1,7 +1,13 @@
 import { BILLING_INITIAL_TRIAL_DAYS } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
+import {
+  authenticatedErrors,
+  csrfValidationError,
+  currentTermsPolicyError,
+  internalServerError,
+  jsonResponse,
+} from "../shared/errors";
 
 export const BillingCheckoutRequestSchema = v.object({
   plan: v.picklist(["lite", "full", "family"]),
@@ -79,6 +85,7 @@ export const billingCheckoutSessionRoute = describeRoute({
     201: jsonResponse("短命なStripe Checkout URL", BillingSessionResponseSchema),
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("購入を開始できない", BillingSessionConflictSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
   },
@@ -104,8 +111,10 @@ export const billingPlanCatalogRoute = describeRoute({
   operationId: "getBillingPlanCatalog",
   tags: ["Billing"],
   summary: "現在購入できる有料Planと税込価格を取得する",
+  security: [],
   responses: {
     200: jsonResponse("公開可能なPlan catalog", BillingPlanCatalogResponseSchema),
+    ...internalServerError,
   },
 } satisfies DescribeRouteOptions);
 
@@ -129,6 +138,7 @@ export const billingPortalSessionRoute = describeRoute({
   responses: {
     201: jsonResponse("短命なStripe Customer Portal URL", BillingSessionResponseSchema),
     409: jsonResponse("Portalを開始できない", BillingSessionConflictSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
   },
@@ -150,6 +160,7 @@ export const billingPlanChangeSessionRoute = describeRoute({
     ),
     400: jsonResponse("リクエストが不正", BillingInvalidRequestSchema),
     409: jsonResponse("プラン変更を開始できない", BillingSessionConflictSchema),
+    ...csrfValidationError,
     ...authenticatedErrors,
     ...currentTermsPolicyError,
   },
