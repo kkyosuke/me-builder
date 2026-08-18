@@ -219,7 +219,10 @@ export type AccountDataActions = {
     [generationId: string, message: string, failedAt?: Date],
     typeof weeklyReflection.failWeeklyReflectionGeneration
   >;
-  "goalFollowUp.read": RpcAction<[], typeof goalFollowUp.readGoalFollowUps>;
+  "goalFollowUp.read": RpcAction<
+    [at?: Date, includeCandidates?: boolean],
+    typeof goalFollowUp.readGoalFollowUps
+  >;
   "goalFollowUp.agree": RpcAction<
     [brainItemId: string, nextStep: string, at?: Date, activeLimit?: number | null],
     typeof goalFollowUp.agreeGoalFollowUp
@@ -237,7 +240,7 @@ export type AccountDataActions = {
     [mode: "none" | "selected-one" | "relevant-active", currentText: string, at?: Date],
     typeof goalFollowUp.selectGoalFollowUpMemory
   >;
-  "selfCareContext.read": RpcAction<[], typeof selfCareContext.readSelfCareConfirmations>;
+  "selfCareContext.read": RpcAction<[at?: Date], typeof selfCareContext.readSelfCareConfirmations>;
   "selfCareContext.confirm": RpcAction<
     [
       brainItemId: string,

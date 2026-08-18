@@ -16,6 +16,13 @@ vi.mock("../middleware/authentication", () => ({
   },
   authenticatedActor: (c: Context<AppEnv>) => c.get("authenticatedActor"),
 }));
+vi.mock("../middleware/authorization", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../middleware/authorization")>();
+  return {
+    ...actual,
+    requireCurrentTerms: async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
 
 const allowedOrigin = "https://stg.kagami.example";
 

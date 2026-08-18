@@ -32,6 +32,7 @@ const SHARED_D1_TABLES = [
   "question_choices",
   "question_versions",
   "questions",
+  "sso_authentication_transaction_claims",
 ];
 
 const PERSONAL_CONTENT_TABLES = [

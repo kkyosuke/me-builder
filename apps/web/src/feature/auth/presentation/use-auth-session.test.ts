@@ -3,7 +3,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode, StrictMode, createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
+import {
+  AUTH_SESSION_CHANGE_STORAGE_KEY,
+  authSessionRuntime,
+} from "../infrastructure/auth-session-runtime";
 import { useAuthSessionState } from "./use-auth-session";
 
 const mocks = vi.hoisted(() => ({
@@ -216,6 +219,112 @@ describe("useAuthSessionState", () => {
 
     expect(result.current.state.status).toBe("error");
     expect(authSessionRuntime.csrfToken()).toBeNull();
+  });
+
+  it("別タブのLIFF交換通知ではLIFF交換を再実行せずsessionだけを再確認する", async () => {
+    mocks.detectAuthEntryEnvironment.mockResolvedValue({
+      kind: "liff",
+      state: { status: "ready", inClient: true },
+    });
+    mocks.establishLiffAuthSession.mockResolvedValue(authenticated);
+    const notify = vi.spyOn(authSessionRuntime, "notifyExternalSessionChange");
+    const { result } = renderHook(() => useAuthSessionState());
+    await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
+    expect(result.current.state).toMatchObject({
+      profile: { displayName: "うさぎ" },
+      revision: 1,
+    });
+    expect(mocks.establishLiffAuthSession).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledTimes(1);
+    mocks.establishLiffAuthSession.mockClear();
+    notify.mockClear();
+    mocks.fetchAuthSession.mockResolvedValueOnce({
+      ...authenticated,
+      displayProfile: { displayName: "別Account" },
+      csrfToken: "csrf-token-b",
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: AUTH_SESSION_CHANGE_STORAGE_KEY, newValue: "opaque" }),
+      );
+    });
+
+    await waitFor(() =>
+      expect(result.current.state).toMatchObject({
+        profile: { displayName: "別Account" },
+        revision: 2,
+      }),
+    );
+    expect(authSessionRuntime.csrfToken()).toBe("csrf-token-b");
+    expect(mocks.fetchAuthSession).toHaveBeenCalledTimes(1);
+    expect(mocks.establishLiffAuthSession).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    notify.mockRestore();
+  });
+
+  it("LIFF交換中に別タブ通知を受けても古い交換結果を表示せずsessionを再確認する", async () => {
+    mocks.detectAuthEntryEnvironment.mockResolvedValue({
+      kind: "liff",
+      state: { status: "ready", inClient: true },
+    });
+    let resolveExchange: ((value: typeof authenticated) => void) | undefined;
+    mocks.establishLiffAuthSession.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveExchange = resolve;
+        }),
+    );
+    mocks.fetchAuthSession.mockResolvedValueOnce({
+      ...authenticated,
+      displayProfile: { displayName: "切替後Account" },
+      csrfToken: "csrf-token-after-switch",
+    });
+    const notify = vi.spyOn(authSessionRuntime, "notifyExternalSessionChange");
+    const { result } = renderHook(() => useAuthSessionState());
+    await waitFor(() => expect(resolveExchange).toBeDefined());
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: AUTH_SESSION_CHANGE_STORAGE_KEY, newValue: "opaque" }),
+      );
+    });
+    act(() => resolveExchange?.(authenticated));
+
+    await waitFor(() =>
+      expect(result.current.state).toMatchObject({
+        status: "authenticated",
+        profile: { displayName: "切替後Account" },
+        revision: 1,
+      }),
+    );
+    expect(authSessionRuntime.csrfToken()).toBe("csrf-token-after-switch");
+    expect(mocks.fetchAuthSession).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
+    notify.mockRestore();
+  });
+
+  it("session失効操作後は他タブへ通知して現在タブを既存sessionだけで未認証化する", async () => {
+    const { result } = renderHook(() => useAuthSessionState());
+    await waitFor(() => expect(result.current.state.status).toBe("authenticated"));
+    mocks.fetchAuthSession.mockResolvedValueOnce({
+      authenticated: false,
+      reason: "session-expired",
+    });
+    const notify = vi.spyOn(authSessionRuntime, "notifyExternalSessionChange");
+
+    await act(async () => authSessionRuntime.synchronizeAfterSessionChange());
+
+    expect(result.current.state).toEqual({
+      status: "unauthenticated",
+      reason: "session-expired",
+    });
+    expect(authSessionRuntime.csrfToken()).toBeNull();
+    expect(mocks.fetchAuthSession).toHaveBeenCalledTimes(2);
+    expect(mocks.establishLiffAuthSession).not.toHaveBeenCalled();
+    expect(mocks.establishSsoAuthSession).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledOnce();
+    notify.mockRestore();
   });
 
   it("feature requestのAbortでは再確認を止めず、unmount時に止める", async () => {

@@ -439,8 +439,12 @@ const actions = {
       message,
       at,
     ),
-  "goalFollowUp.read": (db: DO.account.Database, accountId: string) =>
-    DO.account.action.goalFollowUp.readGoalFollowUps(db, accountId),
+  "goalFollowUp.read": (
+    db: DO.account.Database,
+    accountId: string,
+    at?: Date,
+    includeCandidates?: boolean,
+  ) => DO.account.action.goalFollowUp.readGoalFollowUps(db, accountId, at, includeCandidates),
   "goalFollowUp.agree": (
     db: DO.account.Database,
     accountId: string,
@@ -473,8 +477,8 @@ const actions = {
     at?: Date,
   ) =>
     DO.account.action.goalFollowUp.selectGoalFollowUpMemory(db, accountId, mode, currentText, at),
-  "selfCareContext.read": (db: DO.account.Database, accountId: string) =>
-    DO.account.action.selfCareContext.readSelfCareConfirmations(db, accountId),
+  "selfCareContext.read": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.selfCareContext.readSelfCareConfirmations(db, accountId, at),
   "selfCareContext.confirm": (
     db: DO.account.Database,
     accountId: string,

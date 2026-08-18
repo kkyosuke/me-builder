@@ -105,6 +105,10 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # 規約のversion、適用日、本文hashが不整合なら、外部resourceを変更する前に停止する。
+      - name: Verify Service Terms Release Metadata
+        run: task terms:verify
+
       # Stripe同期workflowがCloudflareへ永続化するruntime secretはGitHub側の空値検証では見えない。
       # secret値は取得せずbinding名だけを照合し、課金設定が欠けた状態で本番を更新しない。
       - name: Validate Production Runtime Secret Bindings
@@ -252,6 +256,9 @@ jobs:
       - name: Register LIFF Endpoint (Production)
         run: |
           bun --cwd apps/web scripts/register-liff.ts production
+
+      - name: Verify Application Session Boundary (Production)
+        run: task auth:verify:deployed-production
 
       - name: Register LINE Rich Menu (Production)
         run: bun run --cwd apps/api register:rich-menu:production

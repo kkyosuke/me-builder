@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createSsoRolloutAuthorizer, ssoRolloutBucket } from "./sso-rollout";
 
 describe("SSO production rollout", () => {
-  it("0%では管理者だけ、100%ではlink済み一般Accountも対象にする", async () => {
+  it("0%からの再開では管理者だけ、100%ではlink済み一般Accountも対象にする", async () => {
     const admin = { accountId: "admin-account", role: "admin" as const };
     const user = { accountId: "user-account", role: "user" as const };
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthSessionProvider, useAuthSession } from "../feature/auth";
 import { authSessionRuntime } from "../feature/auth/infrastructure/auth-session-runtime";
@@ -29,12 +29,18 @@ vi.mock("../feature/auth/infrastructure/sso-auth-adapter", async (importOriginal
 }));
 
 function SessionState() {
-  const { state } = useAuthSession();
+  const { state, retry } = useAuthSession();
   return (
     <div>
       <output data-testid="auth-status">{state.status}</output>
       {state.status === "authenticated" ? (
         <output data-testid="auth-profile">{state.profile.displayName}</output>
+      ) : null}
+      {state.status === "error" ? <output data-testid="auth-error">{state.message}</output> : null}
+      {state.status === "error" ? (
+        <button type="button" onClick={() => void retry()}>
+          再試行
+        </button>
       ) : null}
     </div>
   );
@@ -177,6 +183,48 @@ describe("LIFF / SSO entry routing E2E", () => {
 
     expect(await screen.findByText("error")).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(mocks.establishSsoAuthSession).not.toHaveBeenCalled();
+  });
+
+  it("session store障害では旧状態を採用せず、同じ入口の再試行で復帰する", async () => {
+    mocks.initializeLiffForAuthExchange.mockResolvedValue({
+      status: "ready",
+      inClient: false,
+    });
+    let attempts = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = urlOf(input);
+        if (url.pathname !== "/api/auth/session") {
+          throw new Error(`Unexpected E2E request: ${url.pathname}`);
+        }
+        attempts += 1;
+        return attempts === 1
+          ? new Response(null, { status: 503 })
+          : Response.json({
+              authenticated: true,
+              displayProfile: { displayName: "復帰後Account" },
+              role: "user",
+              csrfToken: "csrf-after-retry",
+            });
+      }),
+    );
+
+    render(
+      <AuthSessionProvider>
+        <SessionState />
+      </AuthSessionProvider>,
+    );
+
+    expect(await screen.findByText("error")).toBeTruthy();
+    expect(screen.getByTestId("auth-error").textContent).toContain("HTTP 503");
+    expect(screen.queryByTestId("auth-profile")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+
+    expect(await screen.findByText("復帰後Account")).toBeTruthy();
+    expect(authSessionRuntime.csrfToken()).toBe("csrf-after-retry");
+    expect(attempts).toBe(2);
     expect(mocks.establishSsoAuthSession).not.toHaveBeenCalled();
   });
 });

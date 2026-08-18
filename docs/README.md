@@ -108,10 +108,12 @@ docs/
 - [相性API契約](development/compatibility-api.md) — Web UIとAPI Server間の相性API契約
 - [API契約とクライアント型の生成](development/api-contract-generation.md) — HTTP契約の配置とOpenAPI・Web UI用型の生成運用
 - [サービス利用規約の公開運用](development/service-terms-release.md) — 規約versionの追加、本文hash検証、Preview確認、公開後の訂正手順
+- [サービス利用規約・同意残タスク](development/service-terms-remaining-tasks.md) — 規約同意の実環境横断検証、改定告知、未同意時のデータ保護操作、法務確認の未完了事項
 - [アプリケーション運用ログ方針](development/operational-logging.md) — 一連の処理を追跡し、エラー原因と最終結果を判断できる運用ログの目的と進め方
 - [本番データベースマイグレーション運用](development/production-migration-operations.md) — forward-only、expand-contract、適用順序、D1とDurable Objectの復旧方針
 - [Web認証・SSO実装残タスク](development/web-authentication-remaining-tasks.md) — API共通認証、Web／LIFF移行、SSO追加の番号付きPR、依存順、完了条件
 - [アプリケーションセッション実装契約](development/application-session-contract.md) — session store、期限、同時session、rotation、logout、D1 versionによる即時失効
+- [LIFF交換・アプリケーションセッション境界検証Runbook](development/application-session-boundary-verification.md) — Cookie／Origin／CSRFのデプロイ後検査、実端末・2 Account／2タブ・障害時の検証、証跡形式
 - [SSO Preview検証Runbook](development/sso-preview-verification.md) — LIFF／SSOの成功・失敗経路、機微情報を残さない証跡、SSOだけの切り戻し手順
 - [SSO Production段階公開Runbook](development/sso-production-rollout.md) — 管理者、少数割合、全対象の公開phase、監視ゲート、即時停止・再開手順
 - [Subscription Plan機能のPreview検証](development/subscription-preview-plan-verification.md) — 決済サービスなしでPlan切替、利用上限、本人データ、安全案内、Family境界を確認する手順

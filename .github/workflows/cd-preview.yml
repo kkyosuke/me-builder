@@ -74,6 +74,10 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # 規約のversion、適用日、本文hashが不整合なら、外部resourceを変更する前に停止する。
+      - name: Verify Service Terms Release Metadata
+        run: task terms:verify
+
       # Preview は動作確認用の共有環境なので、E2E の完了を待たずにデプロイする。
       # Pages へ渡す dist だけをここで生成し、全検証は PR の CI に委ねる。
       - name: Build Web Deployment Artifact
@@ -209,6 +213,10 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_LOGIN_CHANNEL_SECRET != '' }}
         run: |
           bun --cwd apps/web scripts/register-liff.ts preview
+
+      - name: Verify Application Session Boundary (Preview)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: task auth:verify:deployed-preview
 
       - name: Register LINE Rich Menu (Preview)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.LINE_CHANNEL_ACCESS_TOKEN != '' }}

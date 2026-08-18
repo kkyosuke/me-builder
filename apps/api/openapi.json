@@ -285,6 +285,25 @@
           "413": {
             "description": "request bodyが上限を超えている"
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "429": {
             "description": "ブラウザエラー受付の流量上限を超えた"
           },
@@ -1910,6 +1929,25 @@
               }
             }
           },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
           "500": {
             "description": "未処理のサーバーエラー",
             "content": {
@@ -2443,6 +2481,25 @@
                     }
                   },
                   "required": ["error"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
                 }
               }
             }
@@ -5294,6 +5351,23 @@
                         ]
                       }
                     },
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "brainItemId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "goal": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["brainItemId", "goal"]
+                      }
+                    },
                     "canManage": {
                       "type": "boolean"
                     },
@@ -5308,7 +5382,7 @@
                       ]
                     }
                   },
-                  "required": ["items", "canManage", "activeLimit"]
+                  "required": ["items", "candidates", "canManage", "activeLimit"]
                 }
               }
             }

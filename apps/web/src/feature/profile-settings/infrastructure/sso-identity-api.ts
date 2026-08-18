@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
+import { authSessionRuntime } from "../../auth/infrastructure/auth-session-runtime";
 
 const SsoIdentityStatusSchema = v.object({
   linked: v.boolean(),
@@ -47,4 +48,5 @@ export async function unlinkSsoIdentity(apiUrl: string | undefined): Promise<voi
         : "SSOの接続を解除できませんでした。",
     );
   }
+  await authSessionRuntime.synchronizeAfterSessionChange();
 }

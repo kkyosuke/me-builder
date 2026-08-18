@@ -111,11 +111,14 @@ function cookieFrom(response: Response): string {
   return setCookie.split(";", 1)[0] ?? "";
 }
 
-async function getSession(cookie: string): Promise<Response> {
+async function getSession(
+  cookie: string,
+  overrides: Partial<ReturnType<typeof bindings>> = {},
+): Promise<Response> {
   return await app.request(
     "/api/auth/session",
     { headers: { Cookie: cookie, Origin: webOrigin } },
-    bindings(),
+    { ...bindings(), ...overrides },
   );
 }
 
@@ -239,6 +242,42 @@ describe("application session local D1/KV E2E", () => {
     expect((await getSession(cookie)).status).toBe(401);
   });
 
+  it("SSO rollout停止中もLIFF交換と既存application sessionを継続する", async () => {
+    const exchanged = await exchange("credential-a");
+    const cookie = cookieFrom(exchanged);
+    const session = await getSession(cookie);
+    expect(session.status).toBe(200);
+    const { csrfToken } = (await session.json()) as { csrfToken: string };
+    const disabledBindings = {
+      ...bindings(),
+      SSO_ROLLOUT_MODE: "disabled",
+      SSO_ROLLOUT_PERCENT: "0",
+    };
+
+    const login = await app.request(
+      "/api/auth/sso/login",
+      { method: "POST", headers: { Origin: webOrigin } },
+      disabledBindings,
+    );
+    const linking = await app.request(
+      "/api/auth/sso/link",
+      {
+        method: "POST",
+        headers: {
+          Cookie: cookie,
+          Origin: webOrigin,
+          "X-CSRF-Token": csrfToken,
+        },
+      },
+      disabledBindings,
+    );
+
+    expect(login.status).toBe(503);
+    expect(linking.status).toBe(503);
+    expect((await getSession(cookie)).status).toBe(200);
+    expect((await exchange("credential-b", cookie)).status).toBe(200);
+  });
+
   it("IdP拒否、絶対・idle期限切れ、D1 version失効を拒否する", async () => {
     const rejected = await exchange("invalid-credential");
     expect(rejected.status).toBe(401);
@@ -334,15 +373,25 @@ describe("application session local D1/KV E2E", () => {
     expect((await getSession(secondCookie)).status).toBe(401);
   });
 
-  it("別AccountのLIFF credential交換時に以前のsessionを破棄する", async () => {
-    const first = await exchange("credential-a");
-    const firstCookie = cookieFrom(first);
-    const second = await exchange("credential-b", firstCookie);
-    const secondCookie = cookieFrom(second);
+  it("2タブの一方で別Accountへ切り替えると両方の旧sessionを拒否する", async () => {
+    const accountATabOne = cookieFrom(await exchange("credential-a"));
+    const accountATabTwo = cookieFrom(await exchange("credential-a"));
+    expect((await getSession(accountATabOne)).status).toBe(200);
+    expect((await getSession(accountATabTwo)).status).toBe(200);
 
-    expect(secondCookie).not.toBe(firstCookie);
-    expect((await getSession(firstCookie)).status).toBe(401);
-    const current = await getSession(secondCookie);
+    const switched = await exchange("credential-b", accountATabTwo);
+    const accountBTabTwo = cookieFrom(switched);
+
+    expect(accountBTabTwo).not.toBe(accountATabTwo);
+    expect((await getSession(accountATabOne)).status).toBe(401);
+    expect((await getSession(accountATabTwo)).status).toBe(401);
+    const staleFeatureRequest = await app.request(
+      "/api/legal/terms",
+      { headers: { Cookie: accountATabOne, Origin: webOrigin } },
+      bindings(),
+    );
+    expect(staleFeatureRequest.status).toBe(401);
+    const current = await getSession(accountBTabTwo);
     expect(current.status).toBe(200);
     expect(await current.json()).toMatchObject({
       displayProfile: {
@@ -350,6 +399,62 @@ describe("application session local D1/KV E2E", () => {
         pictureUrl: "https://example.com/profile-b.jpg",
       },
     });
+  });
+
+  it("Identity解除とAccount停止はKV recordが残っていても旧sessionを即時拒否する", async () => {
+    const identitySession = cookieFrom(await exchange("credential-a"));
+    const identityReference = await sessionReference(identitySession);
+    expect(await sessionStore.get(identityReference)).not.toBeNull();
+
+    await D1.shared.action.account.unlinkIdentity(D1.shared.client.create(database), {
+      accountId: "account-a",
+      identityId: "identity-a",
+    });
+    expect((await getSession(identitySession)).status).toBe(401);
+
+    const stoppedSession = cookieFrom(await exchange("credential-b"));
+    const stoppedReference = await sessionReference(stoppedSession);
+    expect(await sessionStore.get(stoppedReference)).not.toBeNull();
+    await D1.shared.action.account.stopAccount(D1.shared.client.create(database), "account-b");
+    expect((await getSession(stoppedSession)).status).toBe(401);
+  });
+
+  it("KVまたはD1の一時障害時はsessionを採用せず5xxで安全に失敗する", async () => {
+    const cookie = cookieFrom(await exchange("credential-a"));
+    const unavailableKv = {
+      get: async () => {
+        throw new Error("simulated KV failure");
+      },
+    } as unknown as KVNamespace;
+    const kvFailure = await getSession(cookie, { SESSION_STORE: unavailableKv });
+    expect(kvFailure.status).toBe(500);
+    expect(kvFailure.headers.has("Set-Cookie")).toBe(false);
+
+    const unavailableD1 = {
+      prepare() {
+        throw new Error("simulated D1 failure");
+      },
+    } as unknown as D1Database;
+    const d1Failure = await getSession(cookie, { DB: unavailableD1 });
+    expect(d1Failure.status).toBe(500);
+    expect(d1Failure.headers.has("Set-Cookie")).toBe(false);
+
+    const unavailableKvForIssue = {
+      put: async () => {
+        throw new Error("simulated KV write failure");
+      },
+    } as unknown as KVNamespace;
+    const issueFailure = await app.request(
+      "/api/auth/liff/exchange",
+      {
+        method: "POST",
+        headers: { Origin: webOrigin, "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: "credential-a" }),
+      },
+      { ...bindings(), SESSION_STORE: unavailableKvForIssue },
+    );
+    expect(issueFailure.status).toBe(500);
+    expect(issueFailure.headers.has("Set-Cookie")).toBe(false);
   });
 
   it("復旧コードで認証中のLINE Identityを既存Accountへ移し、双方の旧sessionを失効する", async () => {

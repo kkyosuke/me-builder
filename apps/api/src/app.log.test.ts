@@ -117,4 +117,38 @@ describe("HTTPの終端ログ", () => {
     expect(calls[0]?.[1]).toContain("UNEXPECTED_API_ERROR");
     expect(JSON.stringify(calls)).not.toContain(secret);
   });
+
+  it("session KV障害は500でsafe failureし、依存先と再試行可否だけを記録する", async () => {
+    const log = spyOnLogger();
+    const secret = "KV SDK response containing a credential";
+    const res = await app.request(
+      "/api/auth/session",
+      { headers: { Cookie: "__Host-me_builder_session=opaque" } },
+      {
+        ENVIRONMENT: "test",
+        DB: {} as never,
+        SESSION_STORE: {
+          get: async () => {
+            throw new Error(secret);
+          },
+        } as never,
+      },
+    );
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Internal Server Error" });
+    const calls = terminalCalls(log.error);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0]).toMatchObject({
+      event: "http.request.failed",
+      path: "/api/auth/session",
+      status: 500,
+      errorCode: "SESSION_STORE_READ_FAILED",
+      errorCategory: "dependency",
+      stage: "authentication.session.store.read",
+      retryable: true,
+      dependency: "cloudflare-kv",
+    });
+    expect(JSON.stringify(calls)).not.toContain(secret);
+  });
 });

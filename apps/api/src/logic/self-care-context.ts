@@ -25,7 +25,7 @@ export async function getSelfCareContexts(params: Common) {
   const context = await resolve(params);
   return {
     type: "resolved" as const,
-    ...(await context.account.execute("selfCareContext.read")),
+    ...(await context.account.execute("selfCareContext.read", params.at)),
     canManage: context.entitlement.policy.features["personalized-self-care"],
   };
 }

@@ -1360,6 +1360,20 @@ export interface operations {
         };
         content?: never;
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description ブラウザエラー受付の流量上限を超えた */
       429: {
         headers: {
@@ -2440,6 +2454,20 @@ export interface operations {
           };
         };
       };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
       /** @description 未処理のサーバーエラー */
       500: {
         headers: {
@@ -2786,6 +2814,20 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Checkout session not found";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
           };
         };
       };
@@ -4260,6 +4302,10 @@ export interface operations {
               agreedAt: string;
               /** Format: date-time */
               updatedAt: string;
+            }[];
+            candidates: {
+              brainItemId: string;
+              goal: string;
             }[];
             canManage: boolean;
             activeLimit: 1 | null;

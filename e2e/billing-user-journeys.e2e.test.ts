@@ -8,6 +8,7 @@ import { createApplicationSessionFixture } from "../apps/api/src/testing/applica
 import { createLocalD1 } from "../apps/api/src/testing/local-d1";
 import { convergeBillingEvent } from "../apps/worker/src/handler/billing";
 import { D1, billing } from "../packages/lib/src";
+import { logger } from "../packages/shared/src";
 
 const repositoryRoot = path.resolve(__dirname, "..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
@@ -144,6 +145,7 @@ describe("billing user journeys E2E", () => {
   }, 90_000);
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     await localD1.dispose();
   });
@@ -371,6 +373,144 @@ describe("billing user journeys E2E", () => {
         where: (table, { eq }) => eq(table.providerAccountId, "line-attacker"),
       }),
     ).toMatchObject({ accountId: attacker.account.id, isDeleted: false });
+  }, 30_000);
+
+  it("旧コード・期限切れを拒否し、2ブラウザの同時復旧でもAccountとPlanを一方だけへ継続する", async () => {
+    const infoLog = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+    const warnLog = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    const { db, account } = await createPaidAccount();
+    await acceptWebhook(
+      stripeEvent({
+        id: "evt_recovery_race_paid",
+        type: "customer.subscription.created",
+        created: 1_786_723_200,
+      }),
+    );
+    await consumeNextBillingMessage();
+
+    const browserA = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-recovery-browser-a",
+    });
+    const browserB = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "line-recovery-browser-b",
+    });
+    const targetBrowserA = await sessionFixture.issue(account.id);
+    const targetBrowserB = await sessionFixture.issue(account.id);
+    const sourceBrowserA = await sessionFixture.issue(browserA.account.id);
+    const sourceBrowserB = await sessionFixture.issue(browserB.account.id);
+    const bindings = { DB: database, ...sessionFixture.bindings, ENVIRONMENT: "test" };
+
+    const issueCode = async (headers: Record<string, string>) => {
+      const response = await app.request(
+        "/api/account-recovery/codes",
+        { method: "POST", headers },
+        bindings,
+      );
+      expect(response.status).toBe(201);
+      return ((await response.json()) as { code: string }).code;
+    };
+    const recover = async (headers: Record<string, string>, code: string, ip: string) =>
+      await app.request(
+        "/api/account-recovery/complete",
+        {
+          method: "POST",
+          headers: {
+            ...headers,
+            "Content-Type": "application/json",
+            "CF-Connecting-IP": ip,
+          },
+          body: JSON.stringify({ code }),
+        },
+        bindings,
+      );
+    const sessionStatus = async (cookie: string) =>
+      (
+        await app.request(
+          "/api/auth/session",
+          { headers: { Cookie: cookie, Origin: "https://web.example" } },
+          bindings,
+        )
+      ).status;
+
+    const oldCode = await issueCode(targetBrowserA.headers);
+    const expiringCode = await issueCode(targetBrowserB.headers);
+    expect((await recover(sourceBrowserA.headers, oldCode, "203.0.113.20")).status).toBe(400);
+
+    const [expiringCredentialId] = expiringCode.split(".");
+    if (!expiringCredentialId) throw new Error("Expected an expiring recovery credential ID");
+    await database
+      .prepare("UPDATE account_recovery_credentials SET expires_at = ? WHERE id = ?")
+      .bind(Math.floor((Date.now() - 1_000) / 1_000), expiringCredentialId)
+      .run();
+    expect((await recover(sourceBrowserB.headers, expiringCode, "203.0.113.21")).status).toBe(400);
+    const rateLimitRows = await db.query.accountRecoveryRateLimits.findMany();
+    expect(rateLimitRows).toHaveLength(4);
+    expect(rateLimitRows.every((row) => /^[A-Za-z0-9_-]{43}$/.test(row.keyHash))).toBe(true);
+    expect(JSON.stringify(rateLimitRows)).not.toMatch(
+      /203\.0\.113\.(?:20|21)|line-recovery-browser-[ab]/u,
+    );
+
+    const activeCode = await issueCode(targetBrowserA.headers);
+    const [credentialId, secret] = activeCode.split(".");
+    if (!credentialId || !secret) throw new Error("Expected a recovery credential and secret");
+    const storedCredential = await db.query.accountRecoveryCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, credentialId),
+    });
+    expect(storedCredential).toMatchObject({
+      accountId: account.id,
+      usedAt: null,
+      revokedAt: null,
+    });
+    expect(storedCredential?.secretHash).toMatch(/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+    expect(storedCredential?.secretHash).not.toContain(secret);
+    expect(JSON.stringify(storedCredential)).not.toContain(activeCode);
+
+    const responses = await Promise.all([
+      recover(sourceBrowserA.headers, activeCode, "203.0.113.22"),
+      recover(sourceBrowserB.headers, activeCode, "203.0.113.23"),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 400]);
+    const winner = responses.findIndex((response) => response.status === 200);
+    expect(await responses[winner]?.json()).toEqual({
+      status: "recovered",
+      alreadyRecovered: false,
+    });
+
+    expect(await sessionStatus(targetBrowserA.cookie)).toBe(401);
+    expect(await sessionStatus(targetBrowserB.cookie)).toBe(401);
+    const sourceSessions = [sourceBrowserA, sourceBrowserB];
+    expect(await sessionStatus(sourceSessions[winner]?.cookie ?? "")).toBe(401);
+    expect(await sessionStatus(sourceSessions[winner === 0 ? 1 : 0]?.cookie ?? "")).toBe(200);
+
+    const winningIdentity = winner === 0 ? browserA.identity.id : browserB.identity.id;
+    await expect(
+      db.query.accountIdentities.findFirst({
+        where: (table, { eq }) => eq(table.id, winningIdentity),
+      }),
+    ).resolves.toMatchObject({ accountId: account.id, isDeleted: false });
+    await expect(
+      db.query.accounts.findFirst({
+        where: (table, { eq }) => eq(table.id, account.id),
+      }),
+    ).resolves.toMatchObject({ id: account.id, status: "active", isDeleted: false });
+    await expect(
+      new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db).findCurrent(
+        account.id,
+        new Date("2026-08-15T00:00:00Z"),
+      ),
+    ).resolves.toMatchObject({ plan: "full", payerAccountId: account.id });
+
+    const serializedLogs = JSON.stringify([
+      ...infoLog.mock.calls,
+      ...warnLog.mock.calls,
+      ...errorLog.mock.calls,
+    ]);
+    for (const sensitiveValue of [oldCode, expiringCode, activeCode, secret]) {
+      expect(serializedLogs).not.toContain(sensitiveValue);
+    }
   }, 30_000);
 
   it("Customerだけが紐付いたFree利用者には復旧コードを発行しない", async () => {
