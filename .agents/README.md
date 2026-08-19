@@ -87,6 +87,7 @@
 | [MCP実装残タスク](../docs/development/mcp-remaining-tasks.md) | 管理者限定MCPの認可・同意・監査・解除を実装し、501公開境界を解除するまでの依存順と検証 |
 | [マルチモーダル入力実装残タスク](../docs/development/multimodal-input-remaining-tasks.md) | 写真の保存・AI利用を段階公開する依存順、法務・規約gate、将来mediaの分離 |
 | [診断回答形式の実装境界](../docs/development/diagnosis-format-remaining-tasks.md) | 標準2択と例外5段階の形式、score、保存、UI、互換性の確定事項 |
+| [ネイティブアプリ提供境界](../docs/development/native-app-remaining-tasks.md) | iOS・Androidを提供せず、LINEとWebへ機能を分担する確定方針 |
 | [サブスクリプション実装残タスク](../docs/development/subscription-remaining-tasks.md) | AccountとPlanを紐づける決済系列と、紐付け後の利用権限・機能系列に分けた番号付きPR単位の残作業 |
 | [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |

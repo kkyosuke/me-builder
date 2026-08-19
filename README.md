@@ -20,8 +20,10 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 1. LINEの日記とWebの選択式診断で、自分を表すデータを蓄積できること
 2. 蓄積した診断回答と、AIが生成した「わたしのまとめ」を本人が確認できること
 
-本人が入力した診断回答と日記はWebで確認・訂正・削除できます。生データのエクスポートは提供せず、外部連携向けには認証済みAPIで復元不能なBrain特徴メタデータだけを提供します。診断の自由記述・画像回答はV2で提供します。
+診断回答の不変境界と開発用の本人入力検証は、[診断回答形式の実装境界](docs/development/diagnosis-format-remaining-tasks.md)と[開発用本人入力データAPI契約](docs/development/personal-data-api.md)を参照してください。
 
 MCPによる外部AIエージェントとの接続は、初期リリースには含めずPhase 2で提供します。
+
+利用チャネルの確定方針は[プロジェクト概要](docs/product/project-overview.md)を参照してください。
 
 Phaseの構成とPhase 1の利用体験は[プロジェクト概要](docs/product/project-overview.md)を参照してください。

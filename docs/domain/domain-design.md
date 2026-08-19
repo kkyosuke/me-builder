@@ -22,7 +22,7 @@ Diagnosisの詳細な論理モデルは[Phase 1 診断ドメイン設計](../dia
 
 ```mermaid
 flowchart LR
-    UI[LINE / Web / iOS / Android] --> Q[Diagnosis]
+    UI[LINE / Web] --> Q[Diagnosis]
     Q -->|resolve respondent| A[Account]
     Q -->|answers| S[Source]
     EXT[外部サービス] -->|本人の同意| A

@@ -121,6 +121,7 @@ docs/
 - [MCP実装残タスク](development/mcp-remaining-tasks.md) — 管理者限定MCPの認可・同意・監査・解除を実装し、501公開境界を解除するまでの依存順と検証
 - [マルチモーダル入力実装残タスク](development/multimodal-input-remaining-tasks.md) — 写真の保存・AI利用を段階公開する依存順、法務・規約gate、将来mediaの分離
 - [診断回答形式の実装境界](development/diagnosis-format-remaining-tasks.md) — 標準2択と例外5段階の形式、score、保存、UI、互換性の確定事項
+- [ネイティブアプリ提供境界](development/native-app-remaining-tasks.md) — iOS・Androidを提供せず、LINEとWebへ機能を分担する確定方針
 - [Subscription Plan機能のPreview検証](development/subscription-preview-plan-verification.md) — 決済サービスなしでPlan切替、利用上限、本人データ、安全案内、Family境界を確認する手順
 - [SubscriptionのProduction段階公開](development/subscription-production-rollout.md) — 新規購入の段階公開、緊急停止・再開、実取引、30日・90日価格検証の手順
 - [サービス紹介サイト残タスク](development/service-site-remaining-tasks.md) — サービス紹介サイトで未完了の意思決定、法務確認、実環境検証と完了条件
