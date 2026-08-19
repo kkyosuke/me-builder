@@ -19,9 +19,11 @@
 
 ## 2. MVPの残タスク
 
-### 2.1 日記の写真添付を実装する
+### 2.1 【検討必須】日記の写真添付を実装する
 
 現状、imageメッセージは原本保存とAI入力の対象外です。暫定対応として、本人には読み込めない旨を返信します。受付境界の詳細は[日記チャット実装設計 §5.1](../architecture/diary-chat-implementation-design.md#51-受付から原本保存)を正とします。
+
+着手前に、[マルチモーダル入力残タスク](multimodal-input-remaining-tasks.md)の保存、AI送信、第三者情報、moderation、削除・export境界を決定します。未決定の間は、LINEからcontentを取得せず、非テキストmessageをQueue、Source Record、AI入力へ渡しません。
 
 - 写真付きの日記を受け付け、原本を保存する
 - テキストと同様に、受け付けたことが本人へ伝わるようにする
