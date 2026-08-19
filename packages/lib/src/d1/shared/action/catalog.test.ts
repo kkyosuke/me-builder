@@ -1,5 +1,6 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
@@ -98,6 +99,36 @@ describe("findOpenDiagnosisDetail", () => {
         ],
       }),
     });
+  });
+
+  it("未設計の回答形式をpublished catalogから返さない", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "unsupported-format" });
+    await db
+      .update(schema.questionVersions)
+      .set({ format: "free_text" as never })
+      .where(eq(schema.questionVersions.questionId, "unsupported-format-q1"));
+
+    await expect(
+      findOpenDiagnosisDetail(db, "unsupported-format", new Date("2026-08-03T00:00:00Z")),
+    ).rejects.toThrow("Unsupported diagnosis question format in published catalog");
+  });
+
+  it("2択でないsingle choiceをpublished catalogから返さない", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "malformed-single-choice" });
+    await db
+      .delete(schema.questionChoices)
+      .where(
+        and(
+          eq(schema.questionChoices.questionId, "malformed-single-choice-q1"),
+          eq(schema.questionChoices.choiceId, "yes"),
+        ),
+      );
+
+    await expect(
+      findOpenDiagnosisDetail(db, "malformed-single-choice", new Date("2026-08-03T00:00:00Z")),
+    ).rejects.toThrow("Published single-choice diagnosis question must have exactly two choices");
   });
 
   it.each([

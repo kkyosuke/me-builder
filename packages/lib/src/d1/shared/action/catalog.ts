@@ -85,6 +85,7 @@ export async function findOpenDiagnosisDetail(
       questionVersion: diagnosisQuestions.questionVersion,
       text: questionVersions.text,
       hint: questionVersions.hint,
+      format: questionVersions.format,
       choiceId: questionChoices.choiceId,
       choiceLabel: questionChoices.label,
     })
@@ -117,6 +118,9 @@ export async function findOpenDiagnosisDetail(
 
   const questions: DiagnosisDetail["questions"] = [];
   for (const row of rows) {
+    if (row.format !== "single_choice") {
+      throw new Error("Unsupported diagnosis question format in published catalog");
+    }
     const previous = questions.at(-1);
     const choice = {
       choiceId: row.choiceId,
@@ -134,6 +138,9 @@ export async function findOpenDiagnosisDetail(
         choices: [choice],
       });
     }
+  }
+  if (questions.some((question) => question.choices.length !== 2)) {
+    throw new Error("Published single-choice diagnosis question must have exactly two choices");
   }
 
   return {
