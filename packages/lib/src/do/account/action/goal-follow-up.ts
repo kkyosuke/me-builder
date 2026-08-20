@@ -1,4 +1,4 @@
-import { and, desc, eq, exists, gt, isNull, lte, notExists, or } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, inArray, isNull, lte, notExists, or } from "drizzle-orm";
 import type {
   AgreeGoalFollowUpResult,
   GoalFollowUp,
@@ -260,6 +260,53 @@ export async function updateGoalFollowUp(
   );
   if (!item) return { type: "not-found" };
   return { type: "updated", item };
+}
+
+/** Plan適用後のactive上限へ、合意日時が古いGoalから停止して冪等に収束させる。 */
+export async function enforceGoalFollowUpActiveLimit(
+  db: AccountDataDatabase,
+  accountId: string,
+  activeLimit: number | null,
+  at = new Date(),
+): Promise<Readonly<{ stoppedCount: number }>> {
+  if (activeLimit === null) return { stoppedCount: 0 };
+  if (!Number.isSafeInteger(activeLimit) || activeLimit < 0) {
+    throw new Error("Goal follow-up active limit must be a non-negative integer or null");
+  }
+  const active = await db
+    .select({ id: goalFollowUps.id })
+    .from(goalFollowUps)
+    .innerJoin(brainItems, eq(brainItems.id, goalFollowUps.brainItemId))
+    .where(
+      and(
+        eq(goalFollowUps.accountId, accountId),
+        eq(goalFollowUps.status, "active"),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
+    .orderBy(asc(goalFollowUps.agreedAt), asc(goalFollowUps.id))
+    .all();
+  const targets = active.slice(0, Math.max(0, active.length - activeLimit));
+  if (targets.length === 0) return { stoppedCount: 0 };
+  const stopped = await db
+    .update(goalFollowUps)
+    .set({ status: "stopped", updatedAt: at })
+    .where(
+      and(
+        eq(goalFollowUps.accountId, accountId),
+        eq(goalFollowUps.status, "active"),
+        inArray(
+          goalFollowUps.id,
+          targets.map(({ id }) => id),
+        ),
+      ),
+    )
+    .returning({ id: goalFollowUps.id })
+    .all();
+  return { stoppedCount: stopped.length };
 }
 
 function overlapScore(currentText: string, goal: string, nextStep: string): number {

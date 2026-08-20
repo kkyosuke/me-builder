@@ -24,6 +24,13 @@ const resolve = async (params: CommonParams) => {
 export async function getGoalFollowUps(params: CommonParams) {
   const context = await resolve(params);
   const canManage = context.entitlement.policy.features["goal-follow-up"];
+  const activeLimit =
+    context.entitlement.policy.goalFollowUp === "none"
+      ? 0
+      : context.entitlement.policy.goalFollowUp === "selected-one"
+        ? 1
+        : null;
+  await context.account.execute("goalFollowUp.enforceActiveLimit", activeLimit, params.at);
   const model = await context.account.execute("goalFollowUp.read", params.at, canManage);
   return {
     type: "resolved" as const,

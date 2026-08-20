@@ -468,6 +468,13 @@ const actions = {
     at?: Date,
     activeLimit?: number | null,
   ) => DO.account.action.goalFollowUp.updateGoalFollowUp(db, accountId, id, input, at, activeLimit),
+  "goalFollowUp.enforceActiveLimit": (
+    db: DO.account.Database,
+    accountId: string,
+    activeLimit: number | null,
+    at?: Date,
+  ) =>
+    DO.account.action.goalFollowUp.enforceGoalFollowUpActiveLimit(db, accountId, activeLimit, at),
   "goalFollowUp.selectMemory": (
     db: DO.account.Database,
     accountId: string,

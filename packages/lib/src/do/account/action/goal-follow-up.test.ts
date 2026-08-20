@@ -9,6 +9,7 @@ import { accountSchema as schema } from "../database";
 import { saveBrainItem } from "./brain";
 import {
   agreeGoalFollowUp,
+  enforceGoalFollowUpActiveLimit,
   readGoalFollowUps,
   selectGoalFollowUpMemory,
   updateGoalFollowUp,
@@ -260,5 +261,30 @@ describe("goal follow-up", () => {
     await expect(
       updateGoalFollowUp(db, ACCOUNT_ID, completed.item.id, { status: "active" }, AT),
     ).resolves.toEqual({ type: "not-found" });
+  });
+
+  it("Plan適用後は合意が古いGoalから停止して新しいactiveだけを上限内に残す", async () => {
+    const db = createTestDb();
+    await addGoal(db, { id: "oldest", statement: "最初の目標" });
+    await addGoal(db, { id: "middle", statement: "二番目の目標" });
+    await addGoal(db, { id: "newest", statement: "最新の目標" });
+    await agreeGoalFollowUp(db, ACCOUNT_ID, "oldest", "最初の一歩", AT);
+    await agreeGoalFollowUp(db, ACCOUNT_ID, "middle", "二番目の一歩", new Date(AT.getTime() + 1));
+    await agreeGoalFollowUp(db, ACCOUNT_ID, "newest", "最新の一歩", new Date(AT.getTime() + 2));
+
+    await expect(
+      enforceGoalFollowUpActiveLimit(db, ACCOUNT_ID, 1, new Date(AT.getTime() + 3)),
+    ).resolves.toEqual({ stoppedCount: 2 });
+    await expect(
+      enforceGoalFollowUpActiveLimit(db, ACCOUNT_ID, 1, new Date(AT.getTime() + 4)),
+    ).resolves.toEqual({ stoppedCount: 0 });
+    const result = await readGoalFollowUps(db, ACCOUNT_ID, new Date(AT.getTime() + 5));
+    expect(result.items.map(({ brainItemId, status }) => ({ brainItemId, status }))).toEqual(
+      expect.arrayContaining([
+        { brainItemId: "newest", status: "active" },
+        { brainItemId: "middle", status: "stopped" },
+        { brainItemId: "oldest", status: "stopped" },
+      ]),
+    );
   });
 });

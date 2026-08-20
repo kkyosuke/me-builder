@@ -37,7 +37,7 @@ describe("goal follow-up entitlement", () => {
   });
 
   it("Freeは保存済み状態を読めるが、新しい合意は作らない", async () => {
-    execute.mockResolvedValueOnce({
+    execute.mockResolvedValueOnce({ stoppedCount: 0 }).mockResolvedValueOnce({
       items: [{ id: "archived", status: "completed" }],
       candidates: [],
     });
@@ -52,12 +52,19 @@ describe("goal follow-up entitlement", () => {
         planAssignmentProvider: provider("free"),
       }),
     ).resolves.toEqual({ type: "unavailable", reason: "feature_unavailable" });
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(execute).toHaveBeenCalledWith("account-1", "goalFollowUp.read", at, false);
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenNthCalledWith(
+      1,
+      "account-1",
+      "goalFollowUp.enforceActiveLimit",
+      0,
+      at,
+    );
+    expect(execute).toHaveBeenNthCalledWith(2, "account-1", "goalFollowUp.read", at, false);
   });
 
   it("Lite以上だけが本人のGoal候補を取得する", async () => {
-    execute.mockResolvedValueOnce({
+    execute.mockResolvedValueOnce({ stoppedCount: 0 }).mockResolvedValueOnce({
       items: [],
       candidates: [{ brainItemId: "goal-1", goal: "一行書く" }],
     });
@@ -68,7 +75,14 @@ describe("goal follow-up entitlement", () => {
       canManage: true,
       candidates: [{ brainItemId: "goal-1" }],
     });
-    expect(execute).toHaveBeenCalledWith("account-1", "goalFollowUp.read", at, true);
+    expect(execute).toHaveBeenNthCalledWith(
+      1,
+      "account-1",
+      "goalFollowUp.enforceActiveLimit",
+      1,
+      at,
+    );
+    expect(execute).toHaveBeenNthCalledWith(2, "account-1", "goalFollowUp.read", at, true);
   });
 
   it("Liteは同時に1件だけを本人の合意対象にする", async () => {

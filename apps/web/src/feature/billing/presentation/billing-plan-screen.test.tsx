@@ -161,4 +161,61 @@ describe("BillingPlanScreen", () => {
     expect(screen.getByText(/本日開始した場合.*まで無料/)).toBeTruthy();
     expect(screen.getByText(/終了後は.*780.*毎月自動更新/)).toBeTruthy();
   });
+
+  it("Liteへの変更前に古い合意順の停止予定Goalを表示して了承を求める", () => {
+    const onCheckout = vi.fn();
+    render(
+      <BillingPlanScreen
+        plans={{ status: "success", data: plans }}
+        entitlement={{
+          status: "success",
+          data: { ...free, status: "active", plan: "full", source: "subscription" },
+        }}
+        goalFollowUps={{
+          status: "success",
+          data: {
+            canManage: true,
+            activeLimit: null,
+            candidates: [],
+            items: [
+              {
+                id: "newer",
+                brainItemId: "brain-newer",
+                goal: "新しいGoal",
+                nextStep: "新しい一歩",
+                status: "active",
+                agreedAt: "2026-08-02T00:00:00.000Z",
+                updatedAt: "2026-08-02T00:00:00.000Z",
+              },
+              {
+                id: "older",
+                brainItemId: "brain-older",
+                goal: "古いGoal",
+                nextStep: "古い一歩",
+                status: "active",
+                agreedAt: "2026-08-01T00:00:00.000Z",
+                updatedAt: "2026-08-01T00:00:00.000Z",
+              },
+            ],
+          },
+        }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={onCheckout}
+        onManageSubscription={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "ノーマル Lite" }));
+    fireEvent.click(screen.getByRole("button", { name: "期間末の変更を予約" }));
+    expect(screen.getByRole("alertdialog", { name: "停止予定のGoalを確認" })).toBeTruthy();
+    expect(screen.getByText("古いGoal")).toBeTruthy();
+    expect(screen.queryByText("新しいGoal")).toBeNull();
+    expect(onCheckout).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "了承して変更へ進む" }));
+    expect(onCheckout).toHaveBeenCalledWith("lite", "month");
+  });
 });
