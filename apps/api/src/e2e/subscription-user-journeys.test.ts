@@ -9,6 +9,7 @@ import {
   getFamilySeatManagement,
   issueFamilySeatInvitation,
   leaveFamilyPack,
+  removeFamilyMember,
 } from "../logic/family-seat-management";
 import { getPersonalDataFeatures, listPersonalData } from "../logic/personal-data";
 import { getProfileEntitlement } from "../logic/profile-entitlement";
@@ -217,16 +218,26 @@ describe("subscription user journeys", () => {
     expect(JSON.stringify(features)).not.toContain("有料期間中に残した大切な日記");
   });
 
-  it("Family参加者が説明を受けて参加し、退出後も本人の日記を保持する", async () => {
+  it("Familyの4役を分離し、削除・退出後も本人データを保持して相性共有を開始しない", async () => {
     const db = createSharedDb();
     const payerId = await createAccount(db, "family-payer");
     const memberId = await createAccount(db, "family-member");
+    const removedMemberId = await createAccount(db, "family-removed-member");
+    const thirdPartyId = await createAccount(db, "family-third-party");
     const memberData = createAccountDataTestStore();
     memberData.bind(memberId);
+    const removedMemberData = createAccountDataTestStore();
+    removedMemberData.bind(removedMemberId);
     await storeDiary(memberData.db, {
       accountId: memberId,
       eventId: "private-family-diary",
       body: "支払者には共有しない参加者の日記",
+      at: new Date("2026-08-16T00:00:00.000Z"),
+    });
+    await storeDiary(removedMemberData.db, {
+      accountId: removedMemberId,
+      eventId: "private-removed-family-diary",
+      body: "削除後も本人だけが確認できる日記",
       at: new Date("2026-08-16T00:00:00.000Z"),
     });
     await projectPlan(db, {
@@ -243,9 +254,53 @@ describe("subscription user journeys", () => {
       new Date("2026-08-16T00:00:01.000Z"),
     );
 
-    const invitation = await issueFamilySeatInvitation(
+    const removedMemberInvitation = await issueFamilySeatInvitation(
       { actor: actor(payerId), db },
       { now: () => new Date("2026-08-16T00:01:00.000Z") },
+    );
+    if (removedMemberInvitation.type !== "created") {
+      throw new Error("Family invitation for removed member was not created");
+    }
+
+    await expect(
+      acceptFamilyInvitation(
+        {
+          actor: actor(removedMemberId),
+          db,
+          token: removedMemberInvitation.token,
+        },
+        { now: () => new Date("2026-08-16T00:01:30.000Z") },
+      ),
+    ).resolves.toMatchObject({ type: "updated", seat: { role: "member", status: "active" } });
+    await expect(
+      removeFamilyMember(
+        {
+          actor: actor(payerId),
+          db,
+          seatId: removedMemberInvitation.seat.id,
+        },
+        { now: () => new Date("2026-08-16T00:01:45.000Z") },
+      ),
+    ).resolves.toMatchObject({ type: "updated", seat: { status: "removed" } });
+    await expect(
+      new billing.EntitlementService(effectiveAssignments(db)).resolve(
+        removedMemberId,
+        new Date("2026-08-16T00:01:46.000Z"),
+      ),
+    ).resolves.toMatchObject({ plan: "free", source: "free" });
+    await expect(
+      listPersonalData({
+        actor: actor(removedMemberId, "2026-08-16T00:01:46.000Z"),
+        accountData: removedMemberData.namespace,
+      }),
+    ).resolves.toMatchObject({
+      type: "resolved",
+      records: [{ kind: "diary", value: "削除後も本人だけが確認できる日記" }],
+    });
+
+    const invitation = await issueFamilySeatInvitation(
+      { actor: actor(payerId), db },
+      { now: () => new Date("2026-08-16T00:02:00.000Z") },
     );
     if (invitation.type !== "created") throw new Error("Family invitation was not created");
 
@@ -256,7 +311,7 @@ describe("subscription user journeys", () => {
           db,
           token: invitation.token,
         },
-        { now: () => new Date("2026-08-16T00:02:00.000Z") },
+        { now: () => new Date("2026-08-16T00:02:30.000Z") },
       ),
     ).resolves.toMatchObject({ type: "updated", seat: { role: "member", status: "active" } });
 
@@ -285,7 +340,18 @@ describe("subscription user journeys", () => {
       db,
     });
     expect(JSON.stringify(payerView)).not.toContain(memberId);
+    expect(JSON.stringify(payerView)).not.toContain(removedMemberId);
     expect(JSON.stringify(payerView)).not.toContain("支払者には共有しない参加者の日記");
+    expect(JSON.stringify(payerView)).not.toContain("削除後も本人だけが確認できる日記");
+    await expect(getFamilySeatManagement({ actor: actor(thirdPartyId), db })).resolves.toEqual({
+      type: "no-membership",
+    });
+    expect(
+      memberData.raw.prepare("SELECT COUNT(*) AS count FROM compatibility_references").get(),
+    ).toEqual({ count: 0 });
+    expect(
+      removedMemberData.raw.prepare("SELECT COUNT(*) AS count FROM compatibility_references").get(),
+    ).toEqual({ count: 0 });
 
     await expect(
       leaveFamilyPack(

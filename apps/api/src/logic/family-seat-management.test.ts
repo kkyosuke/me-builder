@@ -118,6 +118,60 @@ describe("family seat API authorization", () => {
     ).resolves.toEqual({ type: "token-used" });
   });
 
+  it("同じ招待への同時承諾は1人だけを参加者として確定する", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "concurrent-accept-payer");
+    const firstCandidate = await account(db, "concurrent-accept-first");
+    const secondCandidate = await account(db, "concurrent-accept-second");
+    await D1.shared.action.familySeat.createFamilyPack(db, payer);
+    const issued = await issueFamilySeatInvitation(params(db, payer), at());
+    if (issued.type !== "created") throw new Error("invitation fixture was not created");
+
+    const outcomes = await Promise.all([
+      acceptFamilyInvitation({ ...params(db, firstCandidate), token: issued.token }, at()),
+      acceptFamilyInvitation({ ...params(db, secondCandidate), token: issued.token }, at()),
+    ]);
+
+    expect(outcomes.map(({ type }) => type).sort()).toEqual(["token-used", "updated"]);
+    const activeCandidates = await Promise.all(
+      [firstCandidate, secondCandidate].map((accountId) =>
+        getFamilySeatManagement(params(db, accountId)),
+      ),
+    );
+    expect(activeCandidates.filter(({ type }) => type === "resolved")).toHaveLength(1);
+    expect(activeCandidates.filter(({ type }) => type === "no-membership")).toHaveLength(1);
+  });
+
+  it("支払者の削除と参加者の退出が競合しても席と利用権限を失った状態へ収束する", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "concurrent-leave-payer");
+    const member = await account(db, "concurrent-leave-member");
+    await D1.shared.action.familySeat.createFamilyPack(db, payer);
+    const issued = await issueFamilySeatInvitation(params(db, payer), at());
+    if (issued.type !== "created") throw new Error("invitation fixture was not created");
+    await acceptFamilyInvitation({ ...params(db, member), token: issued.token }, at());
+
+    const outcomes = await Promise.all([
+      removeFamilyMember({ ...params(db, payer), seatId: issued.seat.id }, at()),
+      leaveFamilyPack(params(db, member), at()),
+    ]);
+
+    expect(outcomes.filter(({ type }) => type === "updated")).toHaveLength(1);
+    expect(
+      outcomes.filter(({ type }) => type === "forbidden" || type === "not-found"),
+    ).toHaveLength(1);
+    await expect(getFamilySeatManagement(params(db, member))).resolves.toEqual({
+      type: "no-membership",
+    });
+    await expect(getFamilySeatManagement(params(db, payer))).resolves.toMatchObject({
+      type: "resolved",
+      role: "payer",
+      seats: expect.arrayContaining([
+        expect.objectContaining({ id: issued.seat.id, displayName: null }),
+      ]),
+    });
+  });
+
   it("48時間を過ぎたtokenを失効し、辞退と退出を本人だけに許可する", async () => {
     const db = createTestDb();
     const payer = await account(db, "expiry-payer");
