@@ -21,6 +21,7 @@ const result: GoalFollowUpResult = {
   canManage: true,
   activeLimit: null,
 };
+const goalFollowUpItem = result.items[0] as GoalFollowUpResult["items"][number];
 
 describe("GoalFollowUpSection", () => {
   it("本人が選んだ次の一歩を訂正・完了・停止できる", () => {
@@ -123,8 +124,8 @@ describe("GoalFollowUpSection", () => {
           data: {
             ...result,
             items: [
-              { ...result.items[0], id: "stopped", status: "stopped" },
-              { ...result.items[0], id: "completed", status: "completed" },
+              { ...goalFollowUpItem, id: "stopped", status: "stopped" },
+              { ...goalFollowUpItem, id: "completed", status: "completed" },
             ],
           },
         }}
