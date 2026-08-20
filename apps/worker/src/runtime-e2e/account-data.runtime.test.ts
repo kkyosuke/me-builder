@@ -136,6 +136,7 @@ describe("AccountData Workers runtime E2E", () => {
   it("本人データの全削除後は保存済みの成長カードを返さない", async () => {
     const accountId = crypto.randomUUID();
     const now = Date.now();
+    const nowInSeconds = Math.floor(now / 1_000);
     await env.DB.prepare("INSERT INTO accounts (id, created_at, updated_at) VALUES (?, ?, ?)")
       .bind(accountId, now, now)
       .run();
@@ -148,13 +149,13 @@ describe("AccountData Workers runtime E2E", () => {
           (id, created_at, updated_at, is_deleted, account_id, level,
            collected_pieces_delta, collected_pieces_total, categories_json)
          VALUES ('progression:milestone:v1:runtime-reset:10', ?, ?, 0, ?, 10, 12, 12, '["preference"]')`,
-        now,
-        now,
+        nowInSeconds,
+        nowInSeconds,
         accountId,
       );
     });
     await expect(stub.execute(accountId, "progression.read")).resolves.toMatchObject({
-      milestoneCards: [expect.objectContaining({ level: 10, categories: ["preference"] })],
+      milestoneCards: [expect.objectContaining({ level: 10, collectedPiecesDelta: 12 })],
     });
 
     await expect(

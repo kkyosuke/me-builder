@@ -4,7 +4,7 @@
 
 この文書は、本人がWebで現在有効な診断回答と日記を確認し、原本を訂正または削除するAPI契約を定義します。本人確認、対象範囲、Source Recordの状態遷移、派生物への波及、応答と失敗時の結果を所有します。
 
-Source Recordの不変性、Revision、tombstoneの意味は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)、画面の入口と戻る操作は[プロフィール設定体験設計](../product/profile-settings-experience.md)を正とします。Accountの退会、Identity削除、データエクスポート、送信後10分以内のLINE取り消しは所有しません。
+Source Recordの不変性、Revision、tombstoneの意味は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)、画面の入口と戻る操作は[プロフィール設定体験設計](../product/profile-settings-experience.md)を正とします。Accountの退会、Identity削除、本人データ特徴API、送信後10分以内のLINE取り消しは所有しません。
 
 ## 2. API
 

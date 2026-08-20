@@ -69,7 +69,7 @@ flowchart LR
 - 解約と、現在の契約状態の確認
 - 差し迫った危険がある場合の安全案内
 
-これらの本人データ操作は課金状態から独立して提供し、プラン変更や解約後も利用できます。具体的な対象と処理境界は[本人入力データ訂正・削除API契約](../development/personal-data-api.md)と[本人データエクスポート実装契約](../development/personal-data-export.md)を正とします。
+これらの本人データ操作は課金状態から独立して提供し、プラン変更や解約後も利用できます。具体的な対象と処理境界は[本人入力データ訂正・削除API契約](../development/personal-data-api.md)と[本人データ特徴API実装契約](../development/personal-data-export.md)を正とします。
 
 ### 3.2 診断数ではなく、時間とともに増える価値へ課金する
 

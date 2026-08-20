@@ -262,7 +262,7 @@ Diagnosis domainから作るSource Recordには、少なくとも次の意味を
 - 選択したChoice ID
 - サーバーが回答を受け付けた時点
 
-質問文や選択肢の表示文言は不変なQuestion Versionから復元できます。Source Recordへ同じ文言を独立した正として複製しません。ただしエクスポートや長期保持でDiagnosis domainから独立したスナップショットが必要かは、物理データ設計時に判断します。
+質問文や選択肢の表示文言は不変なQuestion Versionから復元できます。Source Recordへ同じ文言を独立した正として複製しません。長期保持でDiagnosis domainから独立したスナップショットが必要かは、物理データ設計時に判断します。
 
 回答のSource Recordは次の既存ルールに従います。
 

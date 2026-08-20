@@ -85,7 +85,7 @@ docs/
 - [Brain Item生成設計](domain/brain/brain-item-generation-design.md) — Source RecordからBrain Itemを生成する共通入出力、診断と日記の差分、登録タイミング
 - [Brainのラベル・アクセス制御設計](domain/brain/brain-access-label-design.md) — Topic Label、Access Label、Access Profile、MCP提供時の原則
 - [根拠・反証・改訂のエッジ設計](domain/brain/evidence-edge-design.md) — Source RecordとBrain Itemを結ぶエッジ
-- [Source Recordのライフサイクル設計](domain/source/source-record-lifecycle-design.md) — 不変性、訂正、削除、取り消し、撤回、エクスポート
+- [Source Recordのライフサイクル設計](domain/source/source-record-lifecycle-design.md) — 不変性、訂正、削除、取り消し、撤回、APIによる特徴取得
 
 ### システム・デザイン・開発運用を確認する
 
@@ -104,7 +104,7 @@ docs/
 - [診断API契約](development/diagnosis-api.md) — Web UIとAPI Server間の診断API契約
 - [プロフィールAPI契約](development/profile-api.md) — 本人プロフィールとアバター画像の取得・保存・削除API契約
 - [本人入力データ訂正・削除API契約](development/personal-data-api.md) — 診断回答・日記の訂正、削除と派生物への波及契約
-- [本人データエクスポート実装契約](development/personal-data-export.md) — 本人archiveのデータ境界、非同期生成、期限付きdownload契約
+- [本人データ特徴API実装契約](development/personal-data-export.md) — 生データを含めないBrain特徴取得APIの境界
 - [相性API契約](development/compatibility-api.md) — Web UIとAPI Server間の相性API契約
 - [API契約とクライアント型の生成](development/api-contract-generation.md) — HTTP契約の配置とOpenAPI・Web UI用型の生成運用
 - [サービス利用規約の公開運用](development/service-terms-release.md) — 規約versionの追加、本文hash検証、Preview確認、公開後の訂正手順

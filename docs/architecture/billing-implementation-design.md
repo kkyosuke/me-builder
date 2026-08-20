@@ -74,7 +74,7 @@ stateDiagram-v2
 
 ### 3.3 機能境界への接続
 
-AI返信はChat Turn ID、プロフィール要約はGeneration IDをrequest IDとして、Workerが生成前に利用枠を予約します。プロフィール要約のAPIは受付前にも残量を確認しますが、競合を含む最終判定はWorkerのatomicな予約です。上限到達時も入力済みの日記と生成済みのまとめ版は残し、閲覧、本人データの訂正・削除・エクスポート、共有停止を制限しません。切迫した危機表現の固定安全案内はAIを呼ばず、利用枠の予約対象にも含めません。
+AI返信はChat Turn ID、プロフィール要約はGeneration IDをrequest IDとして、Workerが生成前に利用枠を予約します。プロフィール要約のAPIは受付前にも残量を確認しますが、競合を含む最終判定はWorkerのatomicな予約です。上限到達時も入力済みの日記と生成済みのまとめ版は残し、閲覧、本人データの訂正・削除・特徴取得、共有停止を制限しません。切迫した危機表現の固定安全案内はAIを呼ばず、利用枠の予約対象にも含めません。
 
 AI返信の月次枠は、FreeではUTC暦月、契約Planでは`AccountPlanAssignment.effectiveAt`を起点とする月ごとの期間です。プロフィール要約には月次枠を設けず、入力または生成形式の変更と前回生成から7日経過の両方、および処理中の生成要求がないことをAccountDataで判定します。意味検索は共通Entitlementの期間をAccountDataの最終再認可へ渡し、Freeは30日、Liteは365日、Fullとファミリーは期間制限なしで候補を絞ります。
 
@@ -96,7 +96,7 @@ Webの`/profile/family`は、支払者には4つの固定席と招待リンク�
 
 `FamilySeatAccountPlanAssignmentProvider`は共有D1の現在の`active`参加席だけを`family-seat`由来のFamily割当へ変換します。Family policyはFullと同じ機能・利用上限を持ちます。退出、席削除、契約終了後は次の読み取りからFreeを返し、D1取得失敗や未来の開始日時は共通EntitlementがFreeへ安全に縮退させます。
 
-本人データの一覧・訂正・削除・エクスポートは従来どおり認証AccountのAccountDataだけを呼び、family membershipから別Accountのnamespaceを解決しません。Customer Portalは支払者本人の請求情報だけを扱うA系列の境界とし、family APIや参加者画面へPortal URL、Customer ID、Subscription IDを公開しません。運用ログは動的なseat IDをroute patternへ置換し、招待tokenや参加者Account IDを記録しません。
+本人データの一覧・訂正・削除・特徴取得は従来どおり認証AccountのAccountDataだけを呼び、family membershipから別Accountのnamespaceを解決しません。Customer Portalは支払者本人の請求情報だけを扱うA系列の境界とし、family APIや参加者画面へPortal URL、Customer ID、Subscription IDを公開しません。運用ログは動的なseat IDをroute patternへ置換し、招待tokenや参加者Account IDを記録しません。
 
 ## 4. 状態の変換
 
