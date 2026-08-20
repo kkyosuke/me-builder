@@ -21,10 +21,23 @@ function publicDocument(pathname: string): string {
   </head></html>`;
 }
 
-function deployedFetch(options?: { omitCanonicalAt?: string; omitPrivateHeader?: boolean }) {
+const privateRoutes = [
+  "/app",
+  "/diagnosis",
+  "/me",
+  "/compatibility",
+  "/profile",
+  "/admin",
+] as const;
+
+function deployedFetch(options?: {
+  omitCanonicalAt?: string;
+  omitPrivateHeader?: boolean;
+  publicNoindexAt?: string;
+}) {
   return vi.fn<typeof fetch>(async (input) => {
     const url = new URL(input.toString());
-    if (url.pathname === "/app" || url.pathname === "/admin") {
+    if (privateRoutes.some((route) => url.pathname === route)) {
       return new Response("<!doctype html>", {
         headers: {
           "Content-Type": "text/html",
@@ -38,7 +51,14 @@ function deployedFetch(options?: { omitCanonicalAt?: string; omitPrivateHeader?:
       options?.omitCanonicalAt === url.pathname
         ? document.replace(/\s*<link rel="canonical"[^>]+>/u, "")
         : document,
-      { headers: { "Content-Type": "text/html; charset=utf-8" } },
+      {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          ...(options?.publicNoindexAt === url.pathname
+            ? { "X-Robots-Tag": "noindex, nofollow" }
+            : {}),
+        },
+      },
     );
   });
 }
@@ -54,9 +74,15 @@ describe("verifyServiceSiteDeployment", () => {
         attempts: 1,
       }),
     ).resolves.toEqual({
-      checks: ["public-document-metadata", "private-route-noindex-header"],
+      checks: [
+        "public-document-metadata",
+        "public-route-indexable-header",
+        "private-route-noindex-header",
+      ],
     });
-    expect(fetcher).toHaveBeenCalledTimes(Object.keys(serviceSitePageMetadata).length + 2);
+    expect(fetcher).toHaveBeenCalledTimes(
+      Object.keys(serviceSitePageMetadata).length + privateRoutes.length,
+    );
   });
 
   it("画面固有canonicalが欠けたdeployを失敗させる", async () => {
@@ -77,5 +103,15 @@ describe("verifyServiceSiteDeployment", () => {
         attempts: 1,
       }),
     ).rejects.toThrow("Private route is missing an X-Robots-Tag noindex boundary (/app)");
+  });
+
+  it("公開routeへHTTP noindexが付いたdeployを失敗させる", async () => {
+    await expect(
+      verifyServiceSiteDeployment({
+        baseDomain: "https://kagami.example.com",
+        fetcher: deployedFetch({ publicNoindexAt: "/privacy" }),
+        attempts: 1,
+      }),
+    ).rejects.toThrow("Public route has a conflicting X-Robots-Tag boundary (/privacy)");
   });
 });

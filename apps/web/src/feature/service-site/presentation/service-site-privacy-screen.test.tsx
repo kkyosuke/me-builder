@@ -20,6 +20,8 @@ describe("ServiceSitePrivacyScreen", () => {
     expect(screen.getByRole("heading", { name: "3. 外部サービスへの送信" })).toBeTruthy();
     expect(screen.getByText(/Googleのモデル学習には利用しない/u)).toBeTruthy();
     expect(screen.getByText(/広告Cookieやアクセス解析は使用しません/u)).toBeTruthy();
+    expect(screen.getByText(/bundleファイル名と行・列/u)).toBeTruthy();
+    expect(screen.getByText(/自由記述のerror messageとstackは含めません/u)).toBeTruthy();
     expect(screen.getAllByText(/生年月日は取得しません/u).length).toBeGreaterThan(0);
   });
 

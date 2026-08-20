@@ -77,7 +77,7 @@ export const currentPrivacyPolicy: PrivacyPolicyDocument = {
       heading: "7. Cookie、端末保存、アクセス解析",
       paragraphs: [
         "認証とセキュリティに必要なCookie、および表示設定等を端末に保存するlocalStorageだけを使用します。広告Cookieやアクセス解析は使用しません。このため、初期提供ではCookie bannerや分析のopt-inを表示しません。",
-        "ブラウザerror報告には固定error code、画面、時刻だけを含め、Cookie、Account識別子、入力内容は含めません。",
+        "ブラウザerror報告には、固定error code、画面、発生時刻、release、error種別、bundleファイル名と行・列、失敗した操作とHTTP status、online・復旧状態のうち調査に必要な項目だけを含めます。URL query、Cookie、Account識別子、入力内容、自由記述のerror messageとstackは含めません。",
       ],
     },
     {

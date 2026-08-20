@@ -8,7 +8,14 @@ type VerificationInput = Readonly<{
   sleep?: (milliseconds: number) => Promise<void>;
 }>;
 
-const PRIVATE_ROUTES = ["/app", "/admin"] as const;
+const PRIVATE_ROUTES = [
+  "/app",
+  "/diagnosis",
+  "/me",
+  "/compatibility",
+  "/profile",
+  "/admin",
+] as const;
 
 export async function verifyServiceSiteDeployment(
   input: VerificationInput,
@@ -30,7 +37,13 @@ export async function verifyServiceSiteDeployment(
     try {
       await verifyPublicDocuments(fetcher, origin);
       await verifyPrivateRouteHeaders(fetcher, origin);
-      return { checks: ["public-document-metadata", "private-route-noindex-header"] };
+      return {
+        checks: [
+          "public-document-metadata",
+          "public-route-indexable-header",
+          "private-route-noindex-header",
+        ],
+      };
     } catch (error) {
       lastError = error;
       if (attempt < attempts) await sleep(retryIntervalMs);
@@ -45,6 +58,7 @@ async function verifyPublicDocuments(fetcher: typeof fetch, origin: string): Pro
     const url = new URL(metadata.pathname, origin);
     const response = await fetcher(url, { redirect: "error" });
     expectHtmlResponse(response, url);
+    expectPublicRouteHeader(response, url);
     const document = await response.text();
     const canonicalUrl = url.toString();
     const shareImageUrl = new URL("/images/service/banner.jpg", origin).toString();
@@ -70,6 +84,13 @@ async function verifyPublicDocuments(fetcher: typeof fetch, origin: string): Pro
     expectDocumentValue(document, `property="og:url" content="${canonicalUrl}"`, url);
     expectDocumentValue(document, `property="og:image" content="${shareImageUrl}"`, url);
     expectDocumentValue(document, 'name="twitter:card" content="summary_large_image"', url);
+  }
+}
+
+function expectPublicRouteHeader(response: Response, url: URL): void {
+  const robots = (response.headers.get("x-robots-tag") ?? "").toLowerCase();
+  if (robots.includes("noindex") || robots.includes("nofollow")) {
+    throw new Error(`Public route has a conflicting X-Robots-Tag boundary (${url.pathname})`);
   }
 }
 
