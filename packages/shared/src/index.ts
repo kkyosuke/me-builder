@@ -1,6 +1,7 @@
 export * from "./schema/queue";
 export * from "./schema/conversation-coordinator";
 export * from "./legal/service-terms";
+export * from "./legal/privacy-policy";
 export * from "./utils/admin-line-user";
 export * from "./utils/env";
 export * from "./utils/logger";

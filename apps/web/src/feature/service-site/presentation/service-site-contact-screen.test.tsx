@@ -11,23 +11,24 @@ vi.mock("../../../config", () => ({
 afterEach(cleanup);
 
 describe("ServiceSiteContactScreen", () => {
-  it("未確定の窓口を創作せず、受付状態・種別・安全上の注意を示す", () => {
+  it("サービス運用者の有効な窓口、取扱い、安全上の注意を示す", () => {
     render(<ServiceSiteContactScreen />);
 
     expect(screen.getByRole("heading", { level: 1, name: "お問い合わせ" })).toBeTruthy();
-    expect(screen.getByText("窓口準備中")).toBeTruthy();
+    expect(screen.getByText("メール受付")).toBeTruthy();
     expect(
-      screen.getByRole("heading", { name: /この画面からお問い合わせは送信できません/ }),
-    ).toBeTruthy();
+      screen.getByRole("link", { name: "support@kagami.kyosuke.dev" }).getAttribute("href"),
+    ).toBe("mailto:support@kagami.kyosuke.dev");
+    expect(screen.getByText(/サービス運用者だけが確認/u)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "データとプライバシー" })).toBeTruthy();
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
-  it("有効な窓口の公開までは検索対象外にする", () => {
+  it("有効な窓口を検索対象にする", () => {
     render(<ServiceSiteContactScreen />);
 
     expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
-      "noindex,nofollow",
+      "index,follow",
     );
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
       "https://kagami.example.com/contact",

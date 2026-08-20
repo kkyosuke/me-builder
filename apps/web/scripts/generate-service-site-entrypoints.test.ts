@@ -29,25 +29,25 @@ describe("renderServiceSiteDocument", () => {
     expect(result).toContain('rel="canonical" href="https://kagami.example.com/terms"');
   });
 
-  it("準備中のプライバシー画面を初期HTMLから検索対象外にする", () => {
+  it("公開中のプライバシー画面を初期HTMLから検索対象にする", () => {
     const result = renderServiceSiteDocument(
       source,
       serviceSitePageMetadata.privacy,
       "https://kagami.example.com",
     );
 
-    expect(result).toContain('name="robots" content="noindex,nofollow"');
+    expect(result).toContain('name="robots" content="index,follow"');
     expect(result).toContain('rel="canonical" href="https://kagami.example.com/privacy"');
   });
 
-  it("準備中のお問い合わせ画面を初期HTMLから検索対象外にする", () => {
+  it("公開中のお問い合わせ画面を初期HTMLから検索対象にする", () => {
     const result = renderServiceSiteDocument(
       source,
       serviceSitePageMetadata.contact,
       "https://kagami.example.com",
     );
 
-    expect(result).toContain('name="robots" content="noindex,nofollow"');
+    expect(result).toContain('name="robots" content="index,follow"');
     expect(result).toContain('rel="canonical" href="https://kagami.example.com/contact"');
   });
 });

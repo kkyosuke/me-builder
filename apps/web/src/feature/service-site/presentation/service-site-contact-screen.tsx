@@ -1,13 +1,4 @@
-import {
-  ArrowLeft,
-  Bug,
-  CircleAlert,
-  Database,
-  HelpCircle,
-  MailQuestion,
-  Scale,
-  ShieldAlert,
-} from "lucide-react";
+import { ArrowLeft, Bug, HelpCircle, Mail, MailQuestion, Scale, ShieldAlert } from "lucide-react";
 import { DocumentMetadata } from "../../../components/document-metadata";
 import { config } from "../../../config";
 import { serviceSitePageMetadata } from "../model/service-site-page-metadata";
@@ -24,9 +15,9 @@ const contactCategories = [
     description: "画面が開かない、操作を完了できないなどの技術的な問題について",
   },
   {
-    icon: Database,
+    icon: Mail,
     title: "データとプライバシー",
-    description: "データの取扱い、開示・訂正・削除・利用停止の相談について",
+    description: "プライバシーポリシーやデータの取扱いについて",
   },
   {
     icon: Scale,
@@ -77,27 +68,33 @@ export function ServiceSiteContactScreen() {
               <p className="text-sm font-bold tracking-widest text-pink-800 dark:text-pink-300">
                 CONTACT
               </p>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-200">
-                窓口準備中
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900 dark:bg-emerald-400/15 dark:text-emerald-200">
+                メール受付
               </span>
             </div>
             <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">お問い合わせ</h1>
             <p className="mt-5 max-w-2xl leading-8 text-slate-700 dark:text-slate-200">
-              正式な運営者情報と有効な連絡先を確認し、安全に返信できるお問い合わせ窓口を一般公開前に掲載します。
+              サービス運用者がメールで受け付けます。対応はベストエフォートで、営業時間や回答期限は設けていません。
             </p>
           </header>
 
           <section
-            aria-labelledby="contact-unavailable-heading"
-            className="mt-6 flex items-start gap-4 rounded-3xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100"
+            aria-labelledby="contact-email-heading"
+            className="mt-6 flex items-start gap-4 rounded-3xl border border-emerald-300 bg-emerald-50 p-5 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-100"
           >
-            <CircleAlert className="mt-1 size-6 shrink-0" aria-hidden="true" />
+            <Mail className="mt-1 size-6 shrink-0" aria-hidden="true" />
             <div>
-              <h2 id="contact-unavailable-heading" className="font-bold">
-                現在、この画面からお問い合わせは送信できません
+              <h2 id="contact-email-heading" className="font-bold">
+                メールでお問い合わせください
               </h2>
-              <p className="mt-2 text-sm leading-7">
-                届かない仮のメールアドレスや、取扱いの決まっていないフォームを用意せず、窓口と個人情報の利用目的が確定してから受付を開始します。
+              <a
+                href="mailto:support@kagami.kyosuke.dev"
+                className="mt-2 inline-flex min-h-11 items-center font-bold underline underline-offset-4"
+              >
+                support@kagami.kyosuke.dev
+              </a>
+              <p className="text-sm leading-7">
+                メールはサービス運用者だけが確認し、対応に不要となった時点で手動削除します。
               </p>
             </div>
           </section>
@@ -107,7 +104,7 @@ export function ServiceSiteContactScreen() {
               お問い合わせ種別
             </p>
             <h2 id="categories-heading" className="mt-2 text-2xl font-black sm:text-3xl">
-              公開後は、内容に合った窓口へ案内します
+              ご連絡いただける内容
             </h2>
             <div className="mt-7 grid gap-4 sm:grid-cols-2">
               {contactCategories.map((category) => {
@@ -150,15 +147,6 @@ export function ServiceSiteContactScreen() {
                 </li>
               ))}
             </ul>
-          </section>
-
-          <section className="mt-10 rounded-3xl border border-sky-200 bg-sky-50 p-6 dark:border-sky-900 dark:bg-sky-950/30">
-            <h2 className="font-bold text-sky-950 dark:text-sky-100">
-              データ削除など、本人確認が必要な手続きについて
-            </h2>
-            <p className="mt-3 text-sm leading-7 text-sky-900 dark:text-sky-200">
-              公開フォームだけでは完了させず、対象Accountの本人であることを安全な方法で確認してから手続きを進めます。本人確認書類を最初の連絡へ添付しないでください。
-            </p>
           </section>
 
           <nav aria-label="関連する公開情報" className="mt-10 flex flex-col gap-3 sm:flex-row">
