@@ -78,7 +78,7 @@ AI返信はChat Turn ID、プロフィール要約はGeneration IDをrequest ID�
 
 AI返信の月次枠は、FreeではUTC暦月、契約Planでは`AccountPlanAssignment.effectiveAt`を起点とする月ごとの期間です。プロフィール要約には月次枠を設けず、入力または生成形式の変更と前回生成から7日経過の両方、および処理中の生成要求がないことをAccountDataで判定します。意味検索は共通Entitlementの期間をAccountDataの最終再認可へ渡し、Freeは30日、Liteは365日、Fullとファミリーは期間制限なしで候補を絞ります。
 
-本人向けの`GET /api/profile/entitlement`はPlan、付与元、適用開始、利用可能期限と、AI返信・まとめ生成の上限、確定量、予約量、残量、次回更新日時だけを返します。支払者Account IDや決済事業者の識別子は返しません。provider障害時は`safe-default`としてFree権限を表示し、有料権限を推測しません。
+本人向けの`GET /api/profile/entitlement`はPlan、付与元、適用開始、利用可能期限と、AI返信・まとめ生成の上限、確定量、予約量、残量、次回更新日時だけを返します。支払者Account IDや決済事業者の識別子は返しません。provider障害時は`safe-default`としてFree権限を適用し、有料権限を推測しません。WebはFreeへ契約変更されたとは表示せず、契約状態の再確認、問い合わせ、新しい購入の停止を同時に提示します。
 
 ### 3.4 ファミリー席の保存境界
 

@@ -215,6 +215,12 @@ export function BillingPlanScreen({
             >
               契約状態を再確認
             </button>
+            <a
+              href="/contact"
+              className="ml-3 inline-flex min-h-10 items-center rounded-lg px-2 text-sm font-bold underline underline-offset-2"
+            >
+              解決しない場合は問い合わせる
+            </a>
           </section>
         )}
 

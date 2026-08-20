@@ -142,6 +142,43 @@ describe("billing projection", () => {
     },
   );
 
+  it.each([
+    ["trialing", false, "full", "full"],
+    ["active", false, "full", "full"],
+    ["active", true, "full", "full"],
+    ["incomplete", false, "full", "free"],
+    ["incomplete_expired", false, "full", "free"],
+    ["active", false, null, "free"],
+  ] as const)(
+    "status=%s、期間末解約=%s、Plan=%sを期待する%s権限へ変換する",
+    async (status, cancelAtPeriodEnd, planCode, expectedPlan) => {
+      const db = createTestDb();
+      const owner = await account(
+        db,
+        `U_matrix_${status}_${cancelAtPeriodEnd}_${planCode ?? "unknown"}`,
+      );
+      await linkBillingCustomer(db, { accountId: owner.id, providerCustomerId: "cus_1" });
+      await applyBillingProjection(db, {
+        accountId: owner.id,
+        event: {
+          id: `evt_matrix_${status}_${cancelAtPeriodEnd}_${planCode ?? "unknown"}`,
+          type: "customer.subscription.updated",
+          objectId: "sub_1",
+          createdAt: new Date("2026-08-02T00:00:00Z"),
+        },
+        subscription: { ...subscription, status, cancelAtPeriodEnd },
+        planCode,
+      });
+
+      await expect(
+        new D1AccountPlanAssignmentProvider(db).findCurrent(
+          owner.id,
+          new Date("2026-08-03T00:00:00Z"),
+        ),
+      ).resolves.toMatchObject({ plan: expectedPlan });
+    },
+  );
+
   it("trial開始をAccountへ一度だけ記録し、終了後も利用済みと判定する", async () => {
     const db = createTestDb();
     const owner = await account(db, "U_trial_once");

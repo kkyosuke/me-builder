@@ -159,6 +159,9 @@ describe("BillingPlanScreen", () => {
     expect(screen.getByText("契約状態を確認中")).toBeTruthy();
     expect(screen.getByText(/Free契約へ変更されたことを示す表示ではありません/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /プランを変更する/ })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "解決しない場合は問い合わせる" }).getAttribute("href"),
+    ).toBe("/contact");
     fireEvent.click(screen.getByRole("button", { name: "契約状態を再確認" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });

@@ -352,7 +352,8 @@ function billingSubscriptionStatus(status: string): BillingSubscriptionStatus {
     case "paused":
       return status;
     default:
-      throw new BillingProviderError("provider", false);
+      // Stripeがstatusを追加しても、既存の有料projectionを維持せず非権限状態へ閉じる。
+      return "incomplete";
   }
 }
 
