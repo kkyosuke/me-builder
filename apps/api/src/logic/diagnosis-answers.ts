@@ -53,7 +53,10 @@ export async function getDiagnosisAnswers(
   const { scoringConfig, ...diagnosis } = result.diagnosis;
   let scoring: ReturnType<typeof scoreDiagnosisAnswers> = null;
   try {
-    scoring = scoreDiagnosisAnswers(result.diagnosis.answers, scoringConfig);
+    // 回答途中では傾向を生成しない。受付終了後も保存済み回答の閲覧だけを提供する。
+    if (diagnosis.responseStatus === "answered") {
+      scoring = scoreDiagnosisAnswers(result.diagnosis.answers, scoringConfig);
+    }
   } catch (error) {
     // reasonへerror.messageを載せると、採点設定や回答の内容がlogへ流出しうる。
     // ここは採点を諦めて回答閲覧を続ける縮退成功なので、この層が結果を所有して1件記録する。

@@ -180,9 +180,9 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 ### `GET /api/diagnoses/{diagnosisId}/answers`
 
-本人が保存した現在有効な回答を、回答時点のQuestion VersionとChoice、およびAPIが計算した傾向とともに返します。本人の`DiagnosisResponse`が存在すれば、受付終了後および`withdrawn`への公開停止後も取得できます。
+本人が保存した現在有効な回答を、回答時点のQuestion VersionとChoiceとともに返します。回答が完了している場合だけ、APIが計算した傾向も返します。本人の`DiagnosisResponse`と1件以上の保存済み回答があれば、受付終了後および`withdrawn`への公開停止後も取得できます。
 
-回答はDiagnosis Questionの`position`順で返します。質問文と選択肢ラベルはAnswerが保持するQuestion ID / Question Version / Choice IDから解決し、現在の最新版へ暗黙に置き換えません。採点はDiagnosisが参照するD1の版付き設定をAPIが検証して行い、Web UIは計算し直しません。Account ID、DiagnosisResponse ID、Source Record ID、採点設定本体は返しません。
+回答はDiagnosis Questionの`position`順で返します。質問文と選択肢ラベルはAnswerが保持するQuestion ID / Question Version / Choice IDから解決し、現在の最新版へ暗黙に置き換えません。完了済み回答の採点はDiagnosisResponse開始時に固定したD1の版付き設定をAPIが検証して行い、Web UIは計算し直しません。回答途中では採点を実行せず`scoring: null`を返します。Account ID、DiagnosisResponse ID、Source Record ID、採点設定本体は返しません。
 
 ```json
 {
@@ -230,7 +230,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 | --- | --- | --- |
 | `404` | Diagnosisが存在しない、公開前、削除済み、または本人の`DiagnosisResponse`がない | `{ "error": "Diagnosis answers not found", "reason": "diagnosis_answers_not_found" }` |
 
-回答途中でも保存済みの回答は返し、`responseStatus`と件数で未完了であることを表します。Web UIは回答済みから回答内容画面へ遷移しますが、再開機能でも同じ取得結果を利用できます。
+回答途中でも保存済みの回答は返し、`responseStatus`と件数で未完了であることを表します。受付中のWeb UIは再開時の復元に利用し、受付終了後は閲覧専用画面に利用します。受付終了後の追加入力、回答再開、途中回答の結果生成は許可しません。
 
 開発環境で本人の診断を含む個人コンテンツを初期化する操作は[開発用AccountデータリセットAPI契約](development-account-data-reset-api.md)を正とします。
 

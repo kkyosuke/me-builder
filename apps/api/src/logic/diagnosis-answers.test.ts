@@ -47,7 +47,7 @@ describe("getDiagnosisAnswers", () => {
     expect(result).toEqual({ type: "diagnosis-answers-not-found" });
   });
 
-  it("採点設定が不正でも保存済み回答を返す", async () => {
+  it("回答途中では採点せず保存済み回答だけを返す", async () => {
     const diagnosis = {
       id: "diagnosis-1",
       title: "タイトル",

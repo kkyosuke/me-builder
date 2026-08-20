@@ -108,6 +108,28 @@ describe("DiagnosisResultView", () => {
     expect(screen.queryByRole("group", { name: "回答から見える傾向の一覧" })).toBeNull();
   });
 
+  it("受付終了後の途中回答は閲覧だけを許可し、傾向とまとめ導線を表示しない", () => {
+    render(
+      <DiagnosisResultView
+        result={{
+          ...result,
+          responseStatus: "in-progress",
+          answeredCount: 1,
+          questionCount: 3,
+        }}
+        onBack={vi.fn()}
+        progression={{ status: "loading" }}
+      />,
+    );
+
+    expect(screen.getByText("保存済み回答")).toBeTruthy();
+    expect(screen.getByText(/追加回答や結果生成はできません/)).toBeTruthy();
+    expect(screen.getByText(/傾向は生成されません/)).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "回答から見える傾向の一覧" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "わたしのまとめを見る" })).toBeNull();
+    expect(screen.queryByText("わたしのまとめへの反映")).toBeNull();
+  });
+
   it("回答結果を先に置き、確定したうつしレベルの反映先を案内する", () => {
     render(
       <DiagnosisResultView

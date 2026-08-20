@@ -1425,6 +1425,24 @@ describe("App", () => {
     );
   });
 
+  it("LIFFの対象診断リンクから一覧を経由せず診断入口を開く", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      `/?liff.state=${encodeURIComponent("/diagnosis/diagnosis-1")}`,
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "テスト診断" })).toBeTruthy();
+    expect(screen.getByText(/普段の自分を思い浮かべて/)).toBeTruthy();
+    expect(mocks.fetchDiagnosisDefinition).toHaveBeenCalledWith(
+      "https://api.example.com",
+      "diagnosis-1",
+      expect.any(AbortSignal),
+    );
+  });
+
   it("診断詳細を端末の戻る・進むで開閉し、一覧の状態と位置を復元する", async () => {
     window.history.replaceState({}, "", "/diagnosis?category=partner");
     mocks.fetchDiagnosisList.mockResolvedValue([
@@ -1703,7 +1721,7 @@ describe("App", () => {
     await waitFor(() => expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledTimes(2));
   });
 
-  it("受付終了した回答途中診断は再開せず案内へ進む", async () => {
+  it("受付終了した回答途中診断は再開せず保存済み回答だけを表示する", async () => {
     mocks.fetchDiagnosisList.mockResolvedValue([
       diagnosis({ availability: "closed", responseStatus: "in-progress", answeredCount: 1 }),
     ]);
@@ -1711,11 +1729,10 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(screen.getByRole("heading", { name: "この診断は受付を終了しました" })).toBeTruthy();
-    expect(screen.getByText(/途中から再開したりすることはできません/)).toBeTruthy();
+    expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
     expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
     expect(mocks.fetchDiagnosisProgress).not.toHaveBeenCalled();
-    expect(mocks.fetchDiagnosisResult).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisResult).toHaveBeenCalledOnce();
   });
 
   it.each([

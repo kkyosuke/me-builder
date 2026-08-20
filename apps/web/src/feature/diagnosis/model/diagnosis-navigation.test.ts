@@ -4,6 +4,7 @@ import {
   applySavedProgress,
   createDiagnosisDetailHistoryState,
   diagnosisDetailIdFromHistoryState,
+  diagnosisEntryIdFromPathname,
   diagnosisResultIdFromPathname,
   isDiagnosisResultPathname,
   resolveDiagnosisDestination,
@@ -35,8 +36,19 @@ describe("resolveDiagnosisDestination", () => {
     ).toBe("result");
   });
 
-  it("未完了かつ受付終了なら案内へ進む", () => {
+  it("未回答かつ受付終了なら案内へ進む", () => {
     expect(resolveDiagnosisDestination({ ...diagnosis, availability: "closed" })).toBe("closed");
+  });
+
+  it("途中回答がある受付終了後は保存済み回答へ進む", () => {
+    expect(
+      resolveDiagnosisDestination({
+        ...diagnosis,
+        availability: "closed",
+        responseStatus: "in-progress",
+        answeredCount: 3,
+      }),
+    ).toBe("answers");
   });
 });
 
@@ -49,6 +61,18 @@ describe("diagnosisResultIdFromPathname", () => {
     expect(diagnosisResultIdFromPathname("/diagnosis")).toBeNull();
     expect(diagnosisResultIdFromPathname("/diagnosis/%E0%A4%A/answers")).toBeNull();
     expect(isDiagnosisResultPathname("/diagnosis/%E0%A4%A/answers")).toBe(true);
+  });
+});
+
+describe("diagnosisEntryIdFromPathname", () => {
+  it("対象診断の直接URLからDiagnosis IDを復元する", () => {
+    expect(diagnosisEntryIdFromPathname("/diagnosis/value%2Fwork")).toBe("value/work");
+  });
+
+  it("一覧・結果・不正なpercent encodingを診断入口として扱わない", () => {
+    expect(diagnosisEntryIdFromPathname("/diagnosis")).toBeNull();
+    expect(diagnosisEntryIdFromPathname("/diagnosis/diagnosis-1/answers")).toBeNull();
+    expect(diagnosisEntryIdFromPathname("/diagnosis/%E0%A4%A")).toBeNull();
   });
 });
 

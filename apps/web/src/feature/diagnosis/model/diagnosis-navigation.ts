@@ -1,6 +1,6 @@
 import type { DiagnosisListItem } from "./diagnosis-list-item";
 
-export type DiagnosisDestination = "answer" | "result" | "closed";
+export type DiagnosisDestination = "answer" | "result" | "answers" | "closed";
 
 const DIAGNOSIS_DETAIL_HISTORY_STATE_KEY = "me-builder-diagnosis-detail-id";
 
@@ -25,6 +25,16 @@ export function isDiagnosisResultPathname(pathname: string): boolean {
   return /^\/diagnosis\/[^/]+\/answers\/?$/.test(pathname);
 }
 
+export function diagnosisEntryIdFromPathname(pathname: string): string | null {
+  const encodedId = pathname.match(/^\/diagnosis\/([^/]+)\/?$/)?.[1];
+  if (!encodedId) return null;
+  try {
+    return decodeURIComponent(encodedId);
+  } catch {
+    return null;
+  }
+}
+
 export function diagnosisResultIdFromPathname(pathname: string): string | null {
   if (!isDiagnosisResultPathname(pathname)) return null;
   const encodedId = pathname.match(/^\/diagnosis\/([^/]+)\/answers\/?$/)?.[1];
@@ -41,7 +51,7 @@ export function resolveDiagnosisDestination(diagnosis: DiagnosisListItem): Diagn
     return "result";
   }
   if (diagnosis.availability === "closed") {
-    return "closed";
+    return diagnosis.answeredCount > 0 ? "answers" : "closed";
   }
   return "answer";
 }
