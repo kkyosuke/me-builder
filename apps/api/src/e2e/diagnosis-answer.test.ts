@@ -625,7 +625,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
-  it(`${diagnosisAnswerCases.getContents.id}: ${diagnosisAnswerCases.getContents.name}`, async () => {
+  it(`${diagnosisAnswerCases.getContents.id}: 保存済み回答を返し、回答途中は採点しないこと`, async () => {
     await putAnswer("dq-relationship-priority-01", "yes");
     await putAnswer("dq-relationship-priority-02", "no");
 
@@ -651,18 +651,12 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
           choiceLabel: "いいえ",
         },
       ],
-      scoring: {
-        scoringVersion: 1,
-        balancedLabel: "状況に応じて調整",
-        parameters: expect.arrayContaining([
-          expect.objectContaining({ id: "priority-balance", coverage: 33, score: null }),
-        ]),
-      },
+      scoring: null,
     });
   });
 
   it(
-    "seedで参照される全採点設定がQuestion ID・Version・Choiceと一致する",
+    "seedで参照される全Question ID・Version・Choiceへ回答を保存でき、途中結果を採点しない",
     async () => {
       const rows = await database
         .prepare(
@@ -706,10 +700,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({
           id: diagnosisId,
-          scoring: {
-            scoringVersion: expect.any(Number),
-            parameters: expect.any(Array),
-          },
+          scoring: null,
         });
       }
     },
