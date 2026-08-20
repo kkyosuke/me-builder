@@ -1721,7 +1721,7 @@ describe("App", () => {
     await waitFor(() => expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledTimes(2));
   });
 
-  it("受付終了した回答途中診断は再開せず案内へ進む", async () => {
+  it("受付終了した回答途中診断は再開せず保存済み回答だけを表示する", async () => {
     mocks.fetchDiagnosisList.mockResolvedValue([
       diagnosis({ availability: "closed", responseStatus: "in-progress", answeredCount: 1 }),
     ]);
@@ -1729,11 +1729,10 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
 
-    expect(screen.getByRole("heading", { name: "この診断は受付を終了しました" })).toBeTruthy();
-    expect(screen.getByText(/途中から再開したりすることはできません/)).toBeTruthy();
+    expect(await screen.findByText("結果UI: テスト診断 (1件)")).toBeTruthy();
     expect(mocks.fetchDiagnosisDefinition).not.toHaveBeenCalled();
     expect(mocks.fetchDiagnosisProgress).not.toHaveBeenCalled();
-    expect(mocks.fetchDiagnosisResult).not.toHaveBeenCalled();
+    expect(mocks.fetchDiagnosisResult).toHaveBeenCalledOnce();
   });
 
   it.each([
