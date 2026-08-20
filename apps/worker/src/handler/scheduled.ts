@@ -1,5 +1,6 @@
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { getCloudflareBindings, getWorkerConfig } from "../config";
+import { cleanupAvatarOrphansFromCloudflare } from "../job/avatar-orphan-cleanup";
 import { enqueueDailyPrompts, toTokyoLocalDate, toTokyoLocalHour } from "../job/daily-prompt";
 import type { Env } from "../types";
 
@@ -33,6 +34,47 @@ export async function scheduledHandler(
       },
       `[Daily prompt scheduler] enqueued ${enqueuedCount} account(s)`,
     );
+
+    if (toTokyoLocalHour(controller.scheduledTime) === 18) {
+      try {
+        if (!cf.avatarBucket) throw new Error("AVATAR_BUCKET binding is not configured");
+        const cleanup = await cleanupAvatarOrphansFromCloudflare({
+          db: cf.d1,
+          bucket: cf.avatarBucket,
+          mode: workerConfig.avatarCleanupMode,
+          now: new Date(controller.scheduledTime),
+        });
+        logger.info(
+          {
+            event: "profile.avatar.orphan-cleanup.completed",
+            service: "worker",
+            environment: workerConfig.environment,
+            component: "avatar-orphan-cleanup",
+            outcome: cleanup.failedCount === 0 ? "succeeded" : "partially-succeeded",
+            ...cleanup,
+          },
+          "[Avatar orphan cleanup] completed",
+        );
+      } catch (error) {
+        logger.error(
+          {
+            event: "profile.avatar.orphan-cleanup.failed",
+            service: "worker",
+            environment: workerConfig.environment,
+            component: "avatar-orphan-cleanup",
+            outcome: "failed",
+            disposition: "retry-next-schedule",
+            ...toSafeOperationalErrorFields(error, {
+              code: "AVATAR_ORPHAN_CLEANUP_FAILED",
+              category: "dependency",
+              stage: "profile.avatar.orphan-cleanup",
+              retryable: true,
+            }),
+          },
+          "[Avatar orphan cleanup] failed",
+        );
+      }
+    }
   } catch (error) {
     logger.error(
       {

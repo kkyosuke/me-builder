@@ -82,6 +82,20 @@ export async function getProfileAvatar(
   return toAvatarMetadata(row);
 }
 
+/** Private R2 objectが現在のプロフィール画像として参照中かを返す。 */
+export async function isProfileAvatarObjectReferenced(
+  db: SharedD1Client,
+  objectKey: string,
+): Promise<boolean> {
+  const row = await db
+    .select({ accountId: accountProfiles.accountId })
+    .from(accountProfiles)
+    .where(eq(accountProfiles.avatarObjectKey, objectKey))
+    .limit(1)
+    .get();
+  return Boolean(row);
+}
+
 /** Private R2への保存完了後に、Accountの現在アバターを置換する。 */
 export async function setProfileAvatar(
   db: SharedD1Client,

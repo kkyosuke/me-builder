@@ -92,10 +92,13 @@ function workerEnvironment(manifest: InfrastructureManifest) {
     "",
     d1(manifest.database, prefix),
     "",
+    r2(manifest.avatarBucket, prefix),
+    "",
     vectorize(env, prefix),
     "",
     `[env.${env}.vars]`,
     `ENVIRONMENT = "${env}"`,
+    'AVATAR_CLEANUP_MODE = "dry-run"',
   ].join("\n");
 }
 
@@ -249,10 +252,13 @@ export function renderWranglerConfigs(
     "",
     d1(localDatabase),
     "",
+    r2(localManifest.avatarBucket),
+    "",
     vectorize("local"),
     "",
     "[vars]",
     'ENVIRONMENT = "local"',
+    'AVATAR_CLEANUP_MODE = "dry-run"',
     "",
     workerEnvironment(localManifest),
     "",

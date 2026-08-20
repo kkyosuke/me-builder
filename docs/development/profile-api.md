@@ -134,7 +134,7 @@ R2 object keyは認証で解決したAccount IDとアップロードごとの一
 5. 以前のobjectが別keyなら削除
 6. 入力済みbytesから更新後プロフィールを返却
 
-共有D1更新に失敗した場合は、D1を再読込して新しいobjectが現在値でないことを確認してからR2 objectを削除し、失敗を返します。D1を再確認できない場合は参照中の可能性があるobjectを削除せず、本文やobject keyを含めないerrorログを残します。以前のobject削除だけが失敗した場合は現在画像の更新を成功として返し、同じ安全なerrorログを残します。孤立objectの定期清掃はこのAPIの提供範囲に含めません。
+共有D1更新に失敗した場合は、D1を再読込して新しいobjectが現在値でないことを確認してからR2 objectを削除し、失敗を返します。D1を再確認できない場合は参照中の可能性があるobjectを削除せず、本文やobject keyを含めないerrorログを残します。以前のobject削除だけが失敗した場合は現在画像の更新を成功として返し、同じ安全なerrorログを残します。孤立objectの定期清掃はこのAPIの提供範囲に含めず、Queue Workerの定期処理が24時間の猶予と削除直前の共有D1再確認を経て整理します。定期処理は`dry-run`を既定とし、Previewで対象件数を確認してから環境単位で実削除を有効にします。
 
 削除は共有D1の現在画像を先に外し、以前のR2 objectを削除します。R2削除に失敗しても、削除済みのプロフィールへ戻し、同じ安全なerrorログを残します。
 
@@ -163,7 +163,7 @@ GETで保存画像の不整合を検出した場合、共有D1のメタデータ
 ## 10. プライバシーと運用ログ
 
 - 画像bytes、Data URL、元ファイル名、Account ID、LINE user ID、R2 object keyをログへ出さない
-- R2 bucketは公開せず、API Server bindingからだけ読み書きする
+- R2 bucketは公開せず、API Serverと孤立object清掃用Queue Workerのbindingからだけ読み書きする
 - 画像を人物判定、属性推定、AI加工、Brain Item生成へ利用しない
 - Content-Type、byte size、検査結果、最終outcomeなど、原因特定に必要な非識別情報だけを構造化ログへ残す
 

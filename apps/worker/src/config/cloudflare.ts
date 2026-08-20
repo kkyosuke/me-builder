@@ -11,6 +11,7 @@ import type { Env } from "../types";
 
 export type CloudflareBindings = {
   d1: D1.shared.Client;
+  avatarBucket?: Env["AVATAR_BUCKET"];
   planAssignmentProvider?: billing.AccountPlanAssignmentProvider;
   do: {
     conversation: Env["CONVERSATION_COORDINATOR"];
@@ -32,6 +33,7 @@ export function getCloudflareBindings(env: Env): CloudflareBindings {
   const subscriptionAssignments = new D1.shared.action.billing.D1AccountPlanAssignmentProvider(d1);
   return {
     d1,
+    ...(env.AVATAR_BUCKET ? { avatarBucket: env.AVATAR_BUCKET } : {}),
     planAssignmentProvider: new billing.FamilyAwareAccountPlanAssignmentProvider(
       d1,
       env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER ?? subscriptionAssignments,

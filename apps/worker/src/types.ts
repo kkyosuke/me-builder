@@ -21,8 +21,12 @@ export type Env = Omit<
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
   | "ENVIRONMENT"
+  | "AVATAR_BUCKET"
+  | "AVATAR_CLEANUP_MODE"
 > & {
   ENVIRONMENT?: string;
+  AVATAR_BUCKET?: WorkerBindings["AVATAR_BUCKET"];
+  AVATAR_CLEANUP_MODE?: "dry-run" | "delete";
   BASE_DOMAIN?: string;
   BASE_URL?: string;
   API_URL?: string;
