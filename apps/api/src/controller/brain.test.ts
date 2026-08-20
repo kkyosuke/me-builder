@@ -17,6 +17,13 @@ const {
   resetDevelopmentFailedBrainVectorSyncJob: vi.fn(),
   resetAllDevelopmentFailedBrainVectorSyncJobs: vi.fn(),
 }));
+const { recordDevelopmentOperationAudit } = vi.hoisted(() => ({
+  recordDevelopmentOperationAudit: vi.fn(),
+}));
+const authentication = vi.hoisted(() => ({
+  role: "admin" as "user" | "admin",
+  authenticatedAt: new Date(),
+}));
 vi.mock("../logic/development-brain-items", () => ({
   getDevelopmentBrainItems: loadDevelopmentBrainItems,
   getDevelopmentBrainVector: loadDevelopmentBrainVector,
@@ -26,6 +33,7 @@ vi.mock("../logic/development-brain-vector-sync-jobs", () => ({
   resetDevelopmentBrainVectorSyncJob: resetDevelopmentFailedBrainVectorSyncJob,
   resetAllDevelopmentBrainVectorSyncJobs: resetAllDevelopmentFailedBrainVectorSyncJobs,
 }));
+vi.mock("../logic/development-operation-audit", () => ({ recordDevelopmentOperationAudit }));
 vi.mock("../middleware/authentication", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../middleware/authentication")>();
   return {
@@ -34,10 +42,16 @@ vi.mock("../middleware/authentication", async (importOriginal) => {
       c: Parameters<typeof actual.requireAuthentication>[0],
       next: () => Promise<void>,
     ) => {
-      c.set("authenticatedActor", {
+      const actor = {
         accountId: "account-1",
         authenticationMethod: "liff",
-        authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+        authenticatedAt: authentication.authenticatedAt,
+      } as const;
+      c.set("authenticatedActor", actor);
+      c.set("authenticationResult", {
+        type: "authenticated",
+        actor,
+        accountRole: authentication.role,
       });
       await next();
     },
@@ -76,7 +90,11 @@ function request(environment = "development", withBindings = true) {
 }
 
 describe("GET /api/dev/brain-items", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authentication.role = "admin";
+    authentication.authenticatedAt = new Date();
+  });
 
   it("active ItemとEvidenceをISO日時で返す", async () => {
     outcome({
@@ -158,10 +176,21 @@ describe("GET /api/dev/brain-items", () => {
     expect(response.status).toBe(503);
     expect(loadDevelopmentBrainItems).not.toHaveBeenCalled();
   });
+
+  it("一般ユーザーには開発用一覧の存在を公開しない", async () => {
+    authentication.role = "user";
+    const response = await request("preview");
+    expect(response.status).toBe(404);
+    expect(loadDevelopmentBrainItems).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authentication.role = "admin";
+    authentication.authenticatedAt = new Date();
+  });
 
   it("Vectorize実体の確認結果を返す", async () => {
     loadDevelopmentBrainVector.mockResolvedValue({
@@ -230,7 +259,11 @@ describe("GET /api/dev/brain-items/:brainItemId/vector", () => {
 });
 
 describe("開発用Brain Vector同期job API", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authentication.role = "admin";
+    authentication.authenticatedAt = new Date();
+  });
 
   const env = (environment: string | undefined) => ({
     ...(environment === undefined ? {} : { ENVIRONMENT: environment }),
@@ -286,7 +319,11 @@ describe("開発用Brain Vector同期job API", () => {
 
     const response = await app.request(
       "/api/dev/brain-vector-sync-jobs/job-1/reset",
-      { method: "POST", headers: authorization },
+      {
+        method: "POST",
+        headers: { ...authorization, "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmed: true }),
+      },
       env("preview"),
     );
 
@@ -298,22 +335,88 @@ describe("開発用Brain Vector同期job API", () => {
         actor: expect.objectContaining({ accountId: "account-1" }),
       }),
     );
+    expect(recordDevelopmentOperationAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      "brain-vector-single-reset",
+      1,
+    );
   });
 
-  it("Account内の終端jobを一括resetする", async () => {
+  it("Account内の終端jobをdry-run後に一括resetする", async () => {
+    loadDevelopmentFailedBrainVectorSyncJobs.mockResolvedValue({
+      type: "resolved",
+      jobs: [{}, {}, {}],
+      truncated: false,
+    });
     resetAllDevelopmentFailedBrainVectorSyncJobs.mockResolvedValue({
       type: "resolved",
       resetCount: 3,
     });
 
+    const dryRun = await app.request(
+      "/api/dev/brain-vector-sync-jobs/reset-failed",
+      {
+        method: "POST",
+        headers: { ...authorization, "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "dry-run" }),
+      },
+      env("local"),
+    );
+    expect(dryRun.status).toBe(200);
+    expect(await dryRun.json()).toEqual({ mode: "dry-run", candidateCount: 3, resetCount: 0 });
+    expect(resetAllDevelopmentFailedBrainVectorSyncJobs).not.toHaveBeenCalled();
+
     const response = await app.request(
       "/api/dev/brain-vector-sync-jobs/reset-failed",
-      { method: "POST", headers: authorization },
+      {
+        method: "POST",
+        headers: { ...authorization, "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "execute", confirmed: true }),
+      },
       env("local"),
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ resetCount: 3 });
+    expect(await response.json()).toEqual({ mode: "execute", candidateCount: 3, resetCount: 3 });
+    expect(recordDevelopmentOperationAudit).toHaveBeenLastCalledWith(
+      expect.anything(),
+      "brain-vector-bulk-reset",
+      3,
+    );
+  });
+
+  it("一括reset実行は直近10分以内の本人確認を要求する", async () => {
+    authentication.authenticatedAt = new Date(Date.now() - 10 * 60 * 1000 - 1);
+    loadDevelopmentFailedBrainVectorSyncJobs.mockResolvedValue({
+      type: "resolved",
+      jobs: [],
+      truncated: false,
+    });
+    const response = await app.request(
+      "/api/dev/brain-vector-sync-jobs/reset-failed",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "execute", confirmed: true }),
+      },
+      env("preview"),
+    );
+    expect(response.status).toBe(403);
+    expect(resetAllDevelopmentFailedBrainVectorSyncJobs).not.toHaveBeenCalled();
+  });
+
+  it("一括reset実行は明示確認なしでは拒否する", async () => {
+    const response = await app.request(
+      "/api/dev/brain-vector-sync-jobs/reset-failed",
+      {
+        method: "POST",
+        headers: { ...authorization, "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "execute" }),
+      },
+      env("preview"),
+    );
+    expect(response.status).toBe(400);
+    expect(resetAllDevelopmentFailedBrainVectorSyncJobs).not.toHaveBeenCalled();
   });
 
   it.each(["production", "staging", undefined])(

@@ -421,6 +421,43 @@ describe("saveBrainItem", () => {
     expect(result.jobs.at(-1)?.itemRevision).toBe(at.getTime() + 1_000);
   });
 
+  it("終端jobの一括resetを25件に制限し、複数回で収束させる", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(db, createInput({ at }));
+    await db
+      .update(schema.brainVectorSyncJobs)
+      .set({ status: "failed", failureCode: "BRAIN_VECTOR_SYNC_FAILED", updatedAt: at })
+      .where(eq(schema.brainVectorSyncJobs.brainItemId, "brain-1"));
+    await db.insert(schema.brainVectorSyncJobs).values(
+      Array.from({ length: 29 }, (_, index) => {
+        const itemRevision = at.getTime() + (index + 1) * 1_000;
+        return {
+          id: `brain-1:${itemRevision}:upsert`,
+          brainItemId: "brain-1",
+          itemRevision,
+          operation: "upsert" as const,
+          status: "failed" as const,
+          attemptCount: 6,
+          nextAttemptAt: new Date(itemRevision),
+          failureCode: "BRAIN_VECTOR_SYNC_ATTEMPTS_EXHAUSTED",
+          createdAt: new Date(itemRevision),
+          updatedAt: new Date(itemRevision),
+        };
+      }),
+    );
+
+    await expect(resetAllFailedBrainVectorSyncJobs(db, at)).resolves.toBe(25);
+    const remainingAfterFirstReset = await db
+      .select()
+      .from(schema.brainVectorSyncJobs)
+      .where(eq(schema.brainVectorSyncJobs.status, "failed"));
+    expect(remainingAfterFirstReset).toHaveLength(5);
+    await expect(resetAllFailedBrainVectorSyncJobs(db, at)).resolves.toBe(5);
+    await expect(resetAllFailedBrainVectorSyncJobs(db, at)).resolves.toBe(0);
+  });
+
   it("最終dispatchのlease期限切れを終端化して以後claimしない", async () => {
     const db = createTestDb();
     await insertAccountsAndSources(db);

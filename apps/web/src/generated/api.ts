@@ -8871,16 +8871,35 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
     responses: {
-      /** @description resetしたjob件数 */
+      /** @description dry-run対象件数、またはresetしたjob件数 */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           "application/json": {
+            /** @enum {string} */
+            mode: "dry-run" | "execute";
+            candidateCount: number;
             resetCount: number;
+          };
+        };
+      };
+      /** @description modeまたは明示確認が不正 */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
           };
         };
       };
@@ -8896,7 +8915,7 @@ export interface operations {
           };
         };
       };
-      /** @description OriginまたはCSRF tokenが一致しない */
+      /** @description 実行時に直近10分以内の本人確認がない */
       403: {
         headers: {
           [name: string]: unknown;
@@ -8976,7 +8995,11 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
     responses: {
       /** @description reset結果 */
       200: {
@@ -8987,6 +9010,18 @@ export interface operations {
           "application/json": {
             /** @constant */
             reset: true;
+          };
+        };
+      };
+      /** @description 明示確認を含むリクエストではない */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
           };
         };
       };
@@ -9002,7 +9037,7 @@ export interface operations {
           };
         };
       };
-      /** @description OriginまたはCSRF tokenが一致しない */
+      /** @description 直近10分以内の本人確認がない */
       403: {
         headers: {
           [name: string]: unknown;
@@ -9997,7 +10032,11 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
     responses: {
       /** @description 削除した本人のAccountData件数とVector削除予定件数 */
       200: {
@@ -10015,6 +10054,18 @@ export interface operations {
           };
         };
       };
+      /** @description 明示確認を含むリクエストではない */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
+          };
+        };
+      };
       /** @description application sessionを検証できない */
       401: {
         headers: {
@@ -10027,7 +10078,7 @@ export interface operations {
           };
         };
       };
-      /** @description OriginまたはCSRF tokenが一致しない */
+      /** @description 直近10分以内の本人確認がない */
       403: {
         headers: {
           [name: string]: unknown;

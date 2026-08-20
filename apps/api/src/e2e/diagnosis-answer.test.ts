@@ -245,10 +245,21 @@ async function deferQuestion(
 }
 
 async function deleteAccountData(environment: string | undefined): Promise<Response> {
+  await database
+    .prepare("UPDATE accounts SET role = 'admin' WHERE id = ?")
+    .bind("account-answer-e2e")
+    .run();
+  sessionHeaders = (
+    await sessionFixture.issue("account-answer-e2e", { displayName: "あおい" }, new Date())
+  ).headers;
   const { ENVIRONMENT: _, ...baseEnv } = env();
   return app.request(
     "/api/dev/account-data",
-    { method: "DELETE", headers: sessionHeaders },
+    {
+      method: "DELETE",
+      headers: { ...sessionHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmed: true }),
+    },
     { ...baseEnv, ...(environment === undefined ? {} : { ENVIRONMENT: environment }) },
   );
 }

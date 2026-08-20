@@ -1,3 +1,4 @@
+import { D1 } from "@me-builder/lib";
 import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { getCloudflareBindings, getWorkerConfig } from "../config";
 import { cleanupAvatarOrphansFromCloudflare } from "../job/avatar-orphan-cleanup";
@@ -13,6 +14,43 @@ export async function scheduledHandler(
   const startedAt = Date.now();
   const workerConfig = getWorkerConfig(env as unknown as Record<string, unknown>);
   const cf = getCloudflareBindings(env);
+  if (toTokyoLocalHour(controller.scheduledTime) === 18) {
+    try {
+      const deletedCount = await D1.shared.action.developmentAudit.pruneDevelopmentOperationAudits(
+        cf.d1,
+        new Date(controller.scheduledTime),
+      );
+      logger.info(
+        {
+          event: "development.operation-audit.cleanup.completed",
+          service: "worker",
+          environment: workerConfig.environment,
+          component: "development-operation-audit-cleanup",
+          outcome: "succeeded",
+          deletedCount,
+        },
+        "[Development operation audit cleanup] completed",
+      );
+    } catch (error) {
+      logger.error(
+        {
+          event: "development.operation-audit.cleanup.failed",
+          service: "worker",
+          environment: workerConfig.environment,
+          component: "development-operation-audit-cleanup",
+          outcome: "failed",
+          disposition: "retry-next-schedule",
+          ...toSafeOperationalErrorFields(error, {
+            code: "DEVELOPMENT_OPERATION_AUDIT_CLEANUP_FAILED",
+            category: "dependency",
+            stage: "development.operation-audit.cleanup",
+            retryable: true,
+          }),
+        },
+        "[Development operation audit cleanup] failed",
+      );
+    }
+  }
   try {
     if (!cf.queue.dailyPrompt) throw new Error("DAILY_PROMPT_QUEUE binding is not configured");
     const enqueuedCount = await enqueueDailyPrompts({

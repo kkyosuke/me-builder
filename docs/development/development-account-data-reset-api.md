@@ -10,9 +10,9 @@ AccountDataと共有D1の保存境界は[Accountデータ分離設計](../archit
 
 ### `DELETE /api/dev/account-data`
 
-`ENVIRONMENT` bindingに`development`、`local`、`preview`、`test`のいずれかが明示されている環境だけで利用できます。未設定、空文字、未知値、`production`では`404`を返し、削除処理を実行しません。
+`ENVIRONMENT` bindingに`development`、`local`、`preview`、`test`のいずれかが明示され、認証Accountのroleが`admin`の場合だけ利用できます。未設定、空文字、未知値、`production`、または一般利用者では`404`を返し、routeや削除機能の存在を公開しません。共有Previewへ招待された一般テスターは通常機能を利用できますが、開発用操作は表示も実行もできません。
 
-クライアントからAccount IDを受け取りません。HttpOnlyのアプリセッションCookieを他の本人向けAPIと同じ境界で検証し、同一OriginとCSRFトークンを確認したうえで、解決したAccountのAccountDataとConversation Coordinatorだけを操作します。
+クライアントからAccount IDを受け取りません。HttpOnlyのアプリセッションCookieを他の本人向けAPIと同じ境界で検証し、同一OriginとCSRFトークンを確認したうえで、解決した管理者自身のAccountDataとConversation Coordinatorだけを操作します。削除時は認証から10分以内であることと、`{"confirmed":true}`を要求します。確認文の入力は求めません。条件を満たさない場合は`403`とし、別Accountを指定する抜け道は設けません。
 
 ## 3. 削除対象
 
@@ -38,7 +38,7 @@ sequenceDiagram
     participant Q as Brain Vector Queue
     participant V as Vectorize
 
-    W->>A: DELETE /api/dev/account-data
+    W->>A: DELETE /api/dev/account-data<br/>{confirmed: true}
     A->>C: リセット世代を進め、進行中処理と一時状態を削除
     C-->>A: 新しいリセット世代
     A->>D: 新しい世代で個人コンテンツを物理削除
@@ -80,6 +80,8 @@ sequenceDiagram
 
 ## 6. Web UI
 
-プロフィール画面の一番下に`DEV ONLY`の「自分のデータを全削除」を表示します。Web UIの`ENVIRONMENT`がAPIと同じ開発環境として明示されている場合だけ表示し、未設定時とproductionでは表示しません。
+プロフィール画面の一番下に`DEV ONLY`の「自分のデータを全削除」を表示します。Web UIの`ENVIRONMENT`がAPIと同じ開発環境として明示され、検証済みroleが`admin`の場合だけ表示し、一般テスター、未設定時、productionでは表示しません。
 
-操作前に、診断、日記、Brain Item、「わたしのまとめ」、Vectorが対象であり、取り消せないことを確認します。成功後は削除件数とVector削除が非同期であることを表示します。API側の環境制限と本人確認を認可境界とし、UIの非表示だけには依存しません。
+操作前に、診断、日記、Brain Item、「わたしのまとめ」、Vectorが対象であり、取り消せないことをcheckboxで確認します。成功後は削除件数とVector削除が非同期であることを表示します。API側の環境制限、管理者role、直近の本人確認、明示確認を認可境界とし、UIの非表示だけには依存しません。
+
+成功した破壊操作は、Account ID、本文、object key、job IDを含めず、操作種別、結果、対象件数だけを共有D1の監査記録へ保存します。書き込み時とWorkerの日次cleanupで90日より古い記録を削除します。

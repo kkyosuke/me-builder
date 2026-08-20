@@ -3,6 +3,7 @@ export * from "./account-recovery";
 export * from "./agreement";
 export * from "./billing";
 export * from "./catalog";
+export * from "./development-audit";
 export * from "./gemini-usage";
 export * from "./family-seat";
 export * from "./profile";

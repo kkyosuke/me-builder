@@ -12882,21 +12882,96 @@
             "csrfToken": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "mode": {
+                    "kind": "schema",
+                    "type": "picklist",
+                    "expects": "(\"dry-run\" | \"execute\")",
+                    "async": false,
+                    "options": ["dry-run", "execute"],
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  },
+                  "confirmed": {
+                    "kind": "schema",
+                    "type": "optional",
+                    "expects": "(boolean | undefined)",
+                    "async": false,
+                    "wrapped": {
+                      "kind": "schema",
+                      "type": "boolean",
+                      "expects": "boolean",
+                      "async": false,
+                      "~standard": {
+                        "version": 1,
+                        "vendor": "valibot"
+                      }
+                    },
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "resetしたjob件数",
+            "description": "dry-run対象件数、またはresetしたjob件数",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "mode": {
+                      "enum": ["dry-run", "execute"],
+                      "type": "string"
+                    },
+                    "candidateCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "resetCount": {
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 9007199254740991
                     }
                   },
-                  "required": ["resetCount"]
+                  "required": ["mode", "candidateCount", "resetCount"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "modeまたは明示確認が不正",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
                 }
               }
             }
@@ -12918,7 +12993,7 @@
             }
           },
           "403": {
-            "description": "OriginまたはCSRF tokenが一致しない",
+            "description": "実行時に直近10分以内の本人確認がない",
             "content": {
               "application/json": {
                 "schema": {
@@ -13030,6 +13105,36 @@
             "csrfToken": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "confirmed": {
+                    "kind": "schema",
+                    "type": "literal",
+                    "expects": "true",
+                    "async": false,
+                    "literal": true,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "reset結果",
@@ -13043,6 +13148,22 @@
                     }
                   },
                   "required": ["reset"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "明示確認を含むリクエストではない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
                 }
               }
             }
@@ -13064,7 +13185,7 @@
             }
           },
           "403": {
-            "description": "OriginまたはCSRF tokenが一致しない",
+            "description": "直近10分以内の本人確認がない",
             "content": {
               "application/json": {
                 "schema": {
@@ -14992,6 +15113,36 @@
             "csrfToken": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "confirmed": {
+                    "kind": "schema",
+                    "type": "literal",
+                    "expects": "true",
+                    "async": false,
+                    "literal": true,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "削除した本人のAccountData件数とVector削除予定件数",
@@ -15043,6 +15194,22 @@
               }
             }
           },
+          "400": {
+            "description": "明示確認を含むリクエストではない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
           "401": {
             "description": "application sessionを検証できない",
             "content": {
@@ -15060,7 +15227,7 @@
             }
           },
           "403": {
-            "description": "OriginまたはCSRF tokenが一致しない",
+            "description": "直近10分以内の本人確認がない",
             "content": {
               "application/json": {
                 "schema": {

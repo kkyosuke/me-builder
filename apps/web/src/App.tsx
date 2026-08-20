@@ -174,6 +174,10 @@ function AppContents() {
     mainPathname === "/compatibility" || mainPathname?.startsWith("/compatibility/");
   const isMePath = mainPathname === "/me" || mainPathname?.startsWith("/me/");
   const isProfileOpen = profileView !== "closed";
+  const canUseDevelopmentTools =
+    DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") &&
+    authSession.state.status === "authenticated" &&
+    authSession.state.role === "admin";
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
   const mainRouteScrollPositions = useRef(new Map<MainRoute, number>());
   const previousMainRoute = useRef<MainRoute | null>(null);
@@ -627,10 +631,10 @@ function AppContents() {
               onOpenBillingPlans={openBillingPlans}
               onOpenPersonalData={openPersonalData}
               onOpenFamily={openFamily}
-              canOpenBrainItems={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
+              canOpenBrainItems={canUseDevelopmentTools}
               onOpenBrainItems={openBrainItems}
               onRetryProfile={() => setProfileReloadKey((current) => current + 1)}
-              canResetAccountData={DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")}
+              canResetAccountData={canUseDevelopmentTools}
               onResetAccountData={resetAccountData}
               onThemeChange={colorTheme.setTheme}
               onFontSizeChange={fontSize.setFontSize}
@@ -664,7 +668,7 @@ function AppContents() {
           </Suspense>
         </RouteErrorBoundary>
       )}
-      {profileView === "brain-items" && DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") && (
+      {profileView === "brain-items" && canUseDevelopmentTools && (
         <RouteErrorBoundary>
           <Suspense
             fallback={

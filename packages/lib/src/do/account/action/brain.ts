@@ -61,6 +61,7 @@ export type SaveBrainItemResult =
 
 const DEVELOPMENT_BRAIN_ITEM_LIMIT = 100;
 const DEVELOPMENT_FAILED_VECTOR_SYNC_JOB_LIMIT = 100;
+const DEVELOPMENT_FAILED_VECTOR_SYNC_RESET_LIMIT = 25;
 const CHAT_CONTEXT_VECTOR_CANDIDATE_LIMIT = 10;
 const CHAT_CONTEXT_MEMORY_LIMIT = 5;
 const CHAT_CONTEXT_EVIDENCE_LIMIT = 3;
@@ -1029,6 +1030,14 @@ export async function resetAllFailedBrainVectorSyncJobs(
   db: AccountDataDatabase,
   at = new Date(),
 ): Promise<number> {
+  const targets = await db
+    .select({ id: brainVectorSyncJobs.id })
+    .from(brainVectorSyncJobs)
+    .where(and(eq(brainVectorSyncJobs.status, "failed"), eq(brainVectorSyncJobs.isDeleted, false)))
+    .orderBy(asc(brainVectorSyncJobs.updatedAt), asc(brainVectorSyncJobs.id))
+    .limit(DEVELOPMENT_FAILED_VECTOR_SYNC_RESET_LIMIT)
+    .all();
+  if (targets.length === 0) return 0;
   const rows = await db
     .update(brainVectorSyncJobs)
     .set({
@@ -1038,7 +1047,16 @@ export async function resetAllFailedBrainVectorSyncJobs(
       failureCode: null,
       updatedAt: at,
     })
-    .where(and(eq(brainVectorSyncJobs.status, "failed"), eq(brainVectorSyncJobs.isDeleted, false)))
+    .where(
+      and(
+        inArray(
+          brainVectorSyncJobs.id,
+          targets.map(({ id }) => id),
+        ),
+        eq(brainVectorSyncJobs.status, "failed"),
+        eq(brainVectorSyncJobs.isDeleted, false),
+      ),
+    )
     .returning({ id: brainVectorSyncJobs.id })
     .all();
   return rows.length;

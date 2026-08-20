@@ -16,17 +16,25 @@ describe("resetDevelopmentAccountData", () => {
       deletedProfileSummaryVersionCount: 1,
       scheduledVectorDeletionCount: 5,
     };
-    const fetchMock = vi.fn(async () => Response.json(deleted));
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json(deleted),
+    );
     vi.stubGlobal("fetch", fetchMock);
     await expect(resetDevelopmentAccountData(API_URL)).resolves.toEqual(deleted);
-    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/api/dev/account-data`, {
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe(`${API_URL}/api/dev/account-data`);
+    expect(init).toMatchObject({
       method: "DELETE",
       credentials: "include",
+      body: JSON.stringify({ confirmed: true }),
     });
+    expect(new Headers(init?.headers).get("Content-Type")).toBe("application/json");
   });
 
   it.each([
     [401, AuthenticationError, "AUTHENTICATION_REQUIRED"],
+    [403, OperationError, "RECENT_AUTHENTICATION_REQUIRED"],
     [404, OperationError, "DEVELOPMENT_RESET_UNAVAILABLE"],
     [500, UnknownError, "DEVELOPMENT_RESET_REQUEST_FAILED"],
   ] as const)("HTTP %sをcode %sへ変換する", async (status, ErrorType, code) => {
