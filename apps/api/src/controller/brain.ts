@@ -1,7 +1,6 @@
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
-import { isDevelopmentEnvironment } from "../config";
 import {
   DevelopmentBrainItemsResponseSchema,
   DevelopmentRouteNotFoundErrorSchema as DevelopmentBrainRouteNotFoundErrorSchema,
@@ -11,10 +10,13 @@ import {
   DevelopmentRouteNotFoundErrorSchema as DevelopmentBrainVectorRouteNotFoundErrorSchema,
   DevelopmentFailedBrainVectorSyncJobsResponseSchema,
   FailedJobNotFoundErrorSchema,
+  InvalidDevelopmentBrainResetRequestSchema,
+  ResetAllDevelopmentBrainVectorSyncJobsRequestSchema,
   ResetAllDevelopmentBrainVectorSyncJobsResponseSchema,
+  ResetDevelopmentBrainVectorSyncJobRequestSchema,
   ResetDevelopmentBrainVectorSyncJobResponseSchema,
 } from "../contract/brain/dev-vector-sync-jobs";
-import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
+import { ForbiddenErrorSchema, ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { getDevelopmentBrainItems as loadDevelopmentBrainItems } from "../logic/development-brain-items";
 import { getDevelopmentBrainVector as loadDevelopmentBrainVector } from "../logic/development-brain-items";
 import {
@@ -24,11 +26,14 @@ import {
 } from "../logic/development-brain-vector-sync-jobs";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
+import {
+  developmentAdminRouteIsAvailable,
+  hasRecentDevelopmentAuthentication,
+} from "./development-access";
 
 /** `GET /api/dev/brain-items` — 開発環境だけで本人のactive Itemを返す。 */
 export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Response> {
-  const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
-  if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
+  if (!developmentAdminRouteIsAvailable(c)) {
     return c.json(v.parse(DevelopmentBrainRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
   }
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) {
@@ -74,8 +79,7 @@ export async function getDevelopmentBrainItems(c: Context<AppEnv>): Promise<Resp
 
 /** `GET /api/dev/brain-items/:brainItemId/vector` — Vectorizeの実体を明示操作時だけ照合する。 */
 export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Response> {
-  const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
-  if (!explicitEnvironment || !isDevelopmentEnvironment(explicitEnvironment)) {
+  if (!developmentAdminRouteIsAvailable(c)) {
     return c.json(v.parse(DevelopmentBrainRouteNotFoundErrorSchema, { error: "Not Found" }), 404);
   }
   if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.BRAIN_VECTOR_INDEX) {
@@ -106,11 +110,6 @@ export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Res
   }
 }
 
-function developmentRouteIsAvailable(c: Context<AppEnv>): boolean {
-  const explicitEnvironment = c.env?.ENVIRONMENT?.trim();
-  return Boolean(explicitEnvironment && isDevelopmentEnvironment(explicitEnvironment));
-}
-
 function failedJobParams(c: Context<AppEnv>) {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) return undefined;
   return {
@@ -123,7 +122,7 @@ function failedJobParams(c: Context<AppEnv>) {
 export async function getDevelopmentFailedBrainVectorSyncJobs(
   c: Context<AppEnv>,
 ): Promise<Response> {
-  if (!developmentRouteIsAvailable(c)) {
+  if (!developmentAdminRouteIsAvailable(c)) {
     return c.json(
       v.parse(DevelopmentBrainVectorRouteNotFoundErrorSchema, { error: "Not Found" }),
       404,
@@ -148,7 +147,7 @@ export async function getDevelopmentFailedBrainVectorSyncJobs(
 export async function postDevelopmentBrainVectorSyncJobReset(
   c: Context<AppEnv>,
 ): Promise<Response> {
-  if (!developmentRouteIsAvailable(c)) {
+  if (!developmentAdminRouteIsAvailable(c)) {
     return c.json(
       v.parse(DevelopmentBrainVectorRouteNotFoundErrorSchema, { error: "Not Found" }),
       404,
@@ -165,6 +164,19 @@ export async function postDevelopmentBrainVectorSyncJobReset(
       v.parse(DevelopmentBrainVectorRouteNotFoundErrorSchema, { error: "Not Found" }),
       404,
     );
+  }
+  const request = v.safeParse(
+    ResetDevelopmentBrainVectorSyncJobRequestSchema,
+    await c.req.json().catch(() => undefined),
+  );
+  if (!request.success) {
+    return c.json(
+      v.parse(InvalidDevelopmentBrainResetRequestSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+  if (!hasRecentDevelopmentAuthentication(c)) {
+    return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
   }
   const outcome = await resetDevelopmentFailedBrainVectorSyncJob({ ...params, jobId });
   if (!outcome.reset) {
@@ -189,7 +201,7 @@ export async function postDevelopmentBrainVectorSyncJobReset(
 export async function postDevelopmentBrainVectorSyncJobsResetAll(
   c: Context<AppEnv>,
 ): Promise<Response> {
-  if (!developmentRouteIsAvailable(c)) {
+  if (!developmentAdminRouteIsAvailable(c)) {
     return c.json(
       v.parse(DevelopmentBrainVectorRouteNotFoundErrorSchema, { error: "Not Found" }),
       404,
@@ -199,6 +211,30 @@ export async function postDevelopmentBrainVectorSyncJobsResetAll(
   if (!params) {
     logger.error({ path: c.req.path }, "Brain vector sync job storage binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const request = v.safeParse(
+    ResetAllDevelopmentBrainVectorSyncJobsRequestSchema,
+    await c.req.json().catch(() => undefined),
+  );
+  if (!request.success) {
+    return c.json(
+      v.parse(InvalidDevelopmentBrainResetRequestSchema, { error: "Invalid request" }),
+      400,
+    );
+  }
+  const failed = await loadDevelopmentFailedBrainVectorSyncJobs(params);
+  const candidateCount = Math.min(failed.jobs.length, 25);
+  if (request.output.mode === "dry-run") {
+    return c.json(
+      v.parse(ResetAllDevelopmentBrainVectorSyncJobsResponseSchema, {
+        mode: "dry-run",
+        candidateCount,
+        resetCount: 0,
+      }),
+    );
+  }
+  if (!hasRecentDevelopmentAuthentication(c)) {
+    return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
   }
   const outcome = await resetAllDevelopmentFailedBrainVectorSyncJobs(params);
   logger.info(
@@ -212,6 +248,8 @@ export async function postDevelopmentBrainVectorSyncJobsResetAll(
   );
   return c.json(
     v.parse(ResetAllDevelopmentBrainVectorSyncJobsResponseSchema, {
+      mode: "execute",
+      candidateCount,
       resetCount: outcome.resetCount,
     }),
   );

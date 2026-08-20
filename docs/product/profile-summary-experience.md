@@ -117,9 +117,9 @@ AIが診断と日記の根拠から生成した、互いに重複しないinsigh
 
 ### 2.8 開発環境のBrain Item確認
 
-`development`、`local`、`preview`、`test`では、生成処理を確認するため、プロフィールの`DEV ONLY`導線から開く独立した画面に本人のactive Brain Item一覧を表示します。「わたしのまとめ」には一覧も開発用導線も表示しません。LINE内のLIFFと外部ブラウザで表示条件を変えません。statement、分類、AIまたは決定的な導出、作成日時、EvidenceのSource Record IDを表示し、0件も「追加されたBrain Itemはありません」と明示します。チェックポイントの処理状態はBrain Itemの状態ではないため、`pending` Itemとしては表示しません。
+`development`、`local`、`preview`、`test`では、生成処理を確認するため、管理者のプロフィールに限って`DEV ONLY`導線から開く独立した画面に管理者本人のactive Brain Item一覧を表示します。共有Previewへ招待された一般テスターには導線も画面も表示しません。「わたしのまとめ」には一覧も開発用導線も表示しません。LINE内のLIFFと外部ブラウザで表示条件を変えません。statement、分類、AIまたは決定的な導出、作成日時、EvidenceのSource Record IDを表示し、0件も「追加されたBrain Itemはありません」と明示します。チェックポイントの処理状態はBrain Itemの状態ではないため、`pending` Itemとしては表示しません。
 
-この一覧は画面を開いたときに、本人確認済みAccountのデータだけを専用の開発APIから読み、最大100件を新しい順に表示します。戻る操作でプロフィールへ復帰します。Productionでは導線と一覧UIを構築せず、APIも404を返します。否定・修正などの操作は表示しません。
+この一覧は画面を開いたときに、管理者本人のAccountデータだけを専用の開発APIから読み、最大100件を新しい順に表示します。戻る操作でプロフィールへ復帰します。Productionと一般利用者ではAPIも404を返します。否定・修正などの操作は表示しません。
 
 ## 3. 診断結果カード
 

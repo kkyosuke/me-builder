@@ -27,6 +27,8 @@ export async function resetDevelopmentAccountData(
 ): Promise<ResetDevelopmentAccountDataResult> {
   const response = await createAuthenticatedHttpClient(apiUrl).request("/api/dev/account-data", {
     method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirmed: true }),
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) {
@@ -39,6 +41,12 @@ export async function resetDevelopmentAccountData(
     if (response.status === 404) {
       throw new OperationError("この環境では本人データを削除できません。", {
         code: "DEVELOPMENT_RESET_UNAVAILABLE",
+        status: response.status,
+      });
+    }
+    if (response.status === 403) {
+      throw new OperationError("本人確認から10分以上経過しました。再度ログインしてください。", {
+        code: "RECENT_AUTHENTICATION_REQUIRED",
         status: response.status,
       });
     }

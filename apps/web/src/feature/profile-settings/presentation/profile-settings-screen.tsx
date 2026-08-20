@@ -116,6 +116,7 @@ export function ProfileSettingsScreen({
   const wasInactiveRef = useRef(isInactive);
   const inactiveFocusTargetRef = useRef(inactiveFocusTarget);
   const [resetState, setResetState] = useState<AsyncState<string>>({ status: "idle" });
+  const [resetConfirmed, setResetConfirmed] = useState(false);
   const [recoveryCodeState, setRecoveryCodeState] = useState<
     AsyncState<{ code: string; expiresAt: string }>
   >({ status: "idle" });
@@ -146,14 +147,7 @@ export function ProfileSettingsScreen({
   }, [onOpenBillingPortal]);
 
   const resetAccountData = useCallback(async () => {
-    if (!onResetAccountData) return;
-    if (
-      !window.confirm(
-        "ログイン中ユーザーの診断、日記、Brain Item、わたしのまとめ、Vectorをすべて削除します。この操作は取り消せません。続けますか？",
-      )
-    ) {
-      return;
-    }
+    if (!onResetAccountData || !resetConfirmed) return;
     setResetState({ status: "loading" });
     try {
       const deleted = await onResetAccountData();
@@ -170,13 +164,14 @@ export function ProfileSettingsScreen({
             ? "削除対象の本人データはありませんでした。"
             : `本人データを削除しました（${contentCount}件）。Vector ${deleted.scheduledVectorDeletionCount}件の削除を受け付けました。`,
       });
+      setResetConfirmed(false);
     } catch (error) {
       setResetState({
         status: "error",
         message: errorMessage(error, "本人データを削除できませんでした。"),
       });
     }
-  }, [onResetAccountData]);
+  }, [onResetAccountData, resetConfirmed]);
 
   useEffect(() => {
     dialogRef.current?.toggleAttribute("inert", isInactive);
@@ -868,10 +863,20 @@ export function ProfileSettingsScreen({
                   診断、日記、Brain
                   Item、わたしのまとめを物理削除し、すべてのVectorを非同期で削除します。Account、アバター、相性関係は残ります。
                 </p>
+                <label className="mt-3 flex items-start gap-2 text-xs font-semibold text-rose-800 dark:text-rose-200">
+                  <input
+                    type="checkbox"
+                    checked={resetConfirmed}
+                    onChange={(event) => setResetConfirmed(event.currentTarget.checked)}
+                    disabled={resetState.status === "loading"}
+                    className="mt-0.5 size-4"
+                  />
+                  <span>削除対象と取り消せないことを確認しました</span>
+                </label>
                 <button
                   type="button"
                   onClick={() => void resetAccountData()}
-                  disabled={resetState.status === "loading"}
+                  disabled={resetState.status === "loading" || !resetConfirmed}
                   className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-400/50 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-400/10 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 dark:text-rose-200"
                 >
                   {resetState.status === "loading" ? (
