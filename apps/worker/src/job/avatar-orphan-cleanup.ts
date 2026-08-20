@@ -26,18 +26,8 @@ export type AvatarOrphanCleanupResult = Readonly<{
   failedCount: number;
 }>;
 
-async function listAvatarObjects(bucket: AvatarObjectStore): Promise<readonly AvatarObject[]> {
-  const objects: AvatarObject[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await bucket.list({
-      prefix: AVATAR_OBJECT_PREFIX,
-      ...(cursor ? { cursor } : {}),
-    });
-    objects.push(...page.objects);
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
-  return objects;
+function isAvatarObjectKey(key: string): boolean {
+  return /^accounts\/[^/]+\/profile\/avatar\/[^/]+$/.test(key);
 }
 
 /**
@@ -55,28 +45,46 @@ export async function cleanupAvatarOrphans(
 ): Promise<AvatarOrphanCleanupResult> {
   const now = input.now ?? new Date();
   const cutoff = now.getTime() - (input.gracePeriodMs ?? AVATAR_ORPHAN_GRACE_PERIOD_MS);
-  const objects = await listAvatarObjects(input.bucket);
+  let scannedCount = 0;
   let candidateCount = 0;
   let deletedCount = 0;
   let failedCount = 0;
+  let cursor: string | undefined;
+  const seenCursors = new Set<string>();
 
-  for (const object of objects) {
-    if (object.uploaded.getTime() > cutoff) continue;
-    try {
-      if (await dependencies.isReferenced(object.key)) continue;
-      candidateCount += 1;
-      if (input.mode === "delete") {
-        await input.bucket.delete(object.key);
-        deletedCount += 1;
+  while (true) {
+    const page = await input.bucket.list({
+      prefix: AVATAR_OBJECT_PREFIX,
+      ...(cursor ? { cursor } : {}),
+    });
+    scannedCount += page.objects.length;
+    for (const object of page.objects) {
+      // `accounts/`配下へ別用途のobjectが増えても、アバター以外は絶対に削除しない。
+      if (!isAvatarObjectKey(object.key) || object.uploaded.getTime() > cutoff) continue;
+      try {
+        if (await dependencies.isReferenced(object.key)) continue;
+        candidateCount += 1;
+        if (input.mode === "delete") {
+          await input.bucket.delete(object.key);
+          deletedCount += 1;
+        }
+      } catch {
+        failedCount += 1;
       }
-    } catch {
-      failedCount += 1;
     }
+
+    if (!page.truncated) break;
+    const nextCursor = page.cursor;
+    if (!nextCursor || nextCursor === cursor || seenCursors.has(nextCursor)) {
+      throw new Error("Avatar object listing returned an invalid pagination cursor");
+    }
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
   }
 
   return {
     mode: input.mode,
-    scannedCount: objects.length,
+    scannedCount,
     candidateCount,
     deletedCount,
     failedCount,

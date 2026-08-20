@@ -61,6 +61,46 @@ describe("cleanupAvatarOrphans", () => {
     expect(isReferenced).not.toHaveBeenCalledWith("accounts/a/profile/avatar/recent.png");
   });
 
+  it("accounts配下でもアバター以外のobjectは参照確認も削除もしない", async () => {
+    const store = bucket([
+      [
+        object("accounts/a/profile/avatar/orphan.png", "2026-08-16T00:00:00.000Z"),
+        object("accounts/a/profile/document/private.json", "2026-08-16T00:00:00.000Z"),
+        object("accounts/a/profile/avatar/nested/orphan.png", "2026-08-16T00:00:00.000Z"),
+      ],
+    ]);
+    const isReferenced = vi.fn(async () => false);
+
+    await expect(
+      cleanupAvatarOrphans({ bucket: store.value, mode: "delete", now }, { isReferenced }),
+    ).resolves.toEqual({
+      mode: "delete",
+      scannedCount: 3,
+      candidateCount: 1,
+      deletedCount: 1,
+      failedCount: 0,
+    });
+    expect(isReferenced).toHaveBeenCalledOnce();
+    expect(store.deleteObject).toHaveBeenCalledExactlyOnceWith(
+      "accounts/a/profile/avatar/orphan.png",
+    );
+  });
+
+  it("次pageのcursorが欠けている場合は不完全な走査を成功扱いしない", async () => {
+    const list = vi.fn(async () => ({
+      objects: [],
+      truncated: true,
+      delimitedPrefixes: [],
+    }));
+
+    await expect(
+      cleanupAvatarOrphans(
+        { bucket: { list, delete: vi.fn() }, mode: "dry-run", now },
+        { isReferenced: vi.fn() },
+      ),
+    ).rejects.toThrow("invalid pagination cursor");
+  });
+
   it("deleteでは参照を再確認し、失敗したobjectを飛ばして処理を続ける", async () => {
     const store = bucket([
       [
