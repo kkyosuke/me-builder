@@ -9,6 +9,7 @@ import {
   NotebookPen,
   RefreshCw,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import {
   type ReactNode,
@@ -159,11 +160,13 @@ function SummaryCardStack({
   versioning,
   onSelectVersion,
   onRegenerate,
+  onDeleteVersion,
   renderCard,
 }: {
   versioning: ProfileSummaryVersioning;
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
+  onDeleteVersion?: (versionId: string) => Promise<void>;
   renderCard: (version: ProfileSummaryVersion | undefined) => ReactNode;
 }) {
   const dragStart = useRef<{ x: number; y: number; pointerId: number } | null>(null);
@@ -175,6 +178,9 @@ function SummaryCardStack({
   const [transition, setTransition] = useState<CardTransition | null>(null);
   const [transitionStarted, setTransitionStarted] = useState(false);
   const [generationCardHeight, setGenerationCardHeight] = useState<number | null>(null);
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
+  const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
 
   useEffect(
@@ -213,6 +219,20 @@ function SummaryCardStack({
   const reservesGenerationStatus =
     versioning.generation.canRegenerate || versioning.generation.status !== "idle";
 
+  const deleteSelectedVersion = async () => {
+    if (!onDeleteVersion || deletingVersionId) return;
+    setDeletingVersionId(selected.id);
+    setDeleteError(null);
+    try {
+      await onDeleteVersion(selected.id);
+      setDeleteConfirmationId(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "まとめを削除できませんでした。");
+    } finally {
+      setDeletingVersionId(null);
+    }
+  };
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!canSwipe || (event.button !== 0 && event.pointerType !== "touch")) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -231,6 +251,8 @@ function SummaryCardStack({
     direction: CardTransition["direction"],
     prepareFromRest = false,
   ) => {
+    setDeleteConfirmationId(null);
+    setDeleteError(null);
     const nextTransition: CardTransition = { type: "select", direction, versionId };
     const complete = () => {
       onSelectVersion?.(nextTransition.versionId);
@@ -415,6 +437,56 @@ function SummaryCardStack({
         </div>
       )}
 
+      {onDeleteVersion && (
+        <div className="mt-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+          {deleteConfirmationId === selected.id ? (
+            <div role="alertdialog" aria-labelledby="profile-summary-delete-title">
+              <p
+                id="profile-summary-delete-title"
+                className="text-sm font-bold text-slate-900 dark:text-slate-100"
+              >
+                このまとめを削除しますか？
+              </p>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                この版と相性共有用の内容を削除します。元に戻せません。
+              </p>
+              {deleteError && (
+                <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">
+                  {deleteError}
+                </p>
+              )}
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={Boolean(deletingVersionId)}
+                  onClick={() => setDeleteConfirmationId(null)}
+                  className="min-h-10 rounded-xl border border-slate-300 px-3 text-sm font-bold dark:border-slate-600"
+                >
+                  やめる
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(deletingVersionId)}
+                  onClick={() => void deleteSelectedVersion()}
+                  className="min-h-10 rounded-xl bg-red-700 px-3 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {deletingVersionId ? "削除中…" : "削除する"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDeleteConfirmationId(selected.id)}
+              className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-300"
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              このまとめを削除
+            </button>
+          )}
+        </div>
+      )}
+
       {canRegenerate && (
         <button
           type="button"
@@ -467,11 +539,13 @@ function SummaryCardFrame({
   versioning,
   onSelectVersion,
   onRegenerate,
+  onDeleteVersion,
   renderCard,
 }: {
   versioning?: ProfileSummaryVersioning;
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
+  onDeleteVersion?: (versionId: string) => Promise<void>;
   renderCard: (version: ProfileSummaryVersion | undefined) => ReactNode;
 }) {
   if (!versioning) return <div className="mt-8">{renderCard(undefined)}</div>;
@@ -480,6 +554,7 @@ function SummaryCardFrame({
       versioning={versioning}
       {...(onSelectVersion ? { onSelectVersion } : {})}
       {...(onRegenerate ? { onRegenerate } : {})}
+      {...(onDeleteVersion ? { onDeleteVersion } : {})}
       renderCard={renderCard}
     />
   );
@@ -492,6 +567,7 @@ function SummaryContent({
   onSelectVersion,
   onRegenerate,
   onSetSelfView,
+  onDeleteVersion,
 }: {
   summary: ProfileSummary;
   availableDataCounts: Readonly<{ diagnosis: number; diary: number }>;
@@ -499,6 +575,7 @@ function SummaryContent({
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
   onSetSelfView?: (versionId: string, insightKey: string, selfView: "not_aligned" | null) => void;
+  onDeleteVersion?: (versionId: string) => Promise<void>;
 }) {
   const renderCard = (selectedVersion: ProfileSummaryVersion | undefined) => {
     const cardSummary = selectedVersion?.summary ?? summary;
@@ -607,6 +684,7 @@ function SummaryContent({
         {...(versioning ? { versioning } : {})}
         {...(onSelectVersion ? { onSelectVersion } : {})}
         {...(onRegenerate ? { onRegenerate } : {})}
+        {...(onDeleteVersion ? { onDeleteVersion } : {})}
         renderCard={renderCard}
       />
 
@@ -844,6 +922,7 @@ export function ProfileSummaryScreen({
   onSelectVersion,
   onRegenerate,
   onSetSelfView,
+  onDeleteVersion,
   children,
 }: {
   state: AsyncState<ProfileSummaryResult>;
@@ -856,6 +935,7 @@ export function ProfileSummaryScreen({
   onSelectVersion?: (versionId: string) => void;
   onRegenerate?: () => void;
   onSetSelfView?: (versionId: string, insightKey: string, selfView: "not_aligned" | null) => void;
+  onDeleteVersion?: (versionId: string) => Promise<void>;
   children?: ReactNode;
 }) {
   return (
@@ -923,6 +1003,7 @@ export function ProfileSummaryScreen({
               {...(onSelectVersion ? { onSelectVersion } : {})}
               {...(onRegenerate ? { onRegenerate } : {})}
               {...(onSetSelfView ? { onSetSelfView } : {})}
+              {...(onDeleteVersion ? { onDeleteVersion } : {})}
             />
           ) : (
             <EmptySummary

@@ -142,6 +142,17 @@ export async function setProfileSummaryInsightSelfView(
   if (!response.ok) throw new Error("本人の見方を保存できませんでした。");
 }
 
+export async function deleteProfileSummaryVersion(
+  apiUrl: string | undefined,
+  versionId: string,
+): Promise<void> {
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    `/api/profile-summary/versions/${encodeURIComponent(versionId)}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) throw new Error("まとめを削除できませんでした。");
+}
+
 export async function requestProfileSummaryGeneration(
   apiUrl: string | undefined,
   signal?: AbortSignal,

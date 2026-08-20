@@ -158,6 +158,10 @@ export type AccountDataActions = {
     [versionId: string, insightKey: string, selfView: "not_aligned" | null, at?: Date],
     typeof profileSummary.setProfileSummaryInsightSelfView
   >;
+  "profileSummary.deleteVersion": RpcAction<
+    [versionId: string],
+    typeof profileSummary.deleteProfileSummaryVersion
+  >;
   "profileSummary.requestGeneration": (
     requestedAt?: Date,
   ) => Promise<RequestProfileSummaryGenerationResult>;

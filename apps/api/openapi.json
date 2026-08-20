@@ -5075,6 +5075,146 @@
         }
       }
     },
+    "/api/profile-summary/versions/{versionId}": {
+      "delete": {
+        "operationId": "deleteProfileSummaryVersion",
+        "tags": ["Profile"],
+        "summary": "本人が指定した保存済みまとめ版を削除する",
+        "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "指定したまとめ版を削除した",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "const": true
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "本人が所有するまとめ版がない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Not Found"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "現行利用規約への同意が必要",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Terms acceptance required"
+                    },
+                    "reason": {
+                      "const": "terms_not_accepted"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "versionId",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/weekly-reflections": {
       "get": {
         "operationId": "getWeeklyReflections",
@@ -10005,7 +10145,7 @@
                       "type": "array",
                       "items": [
                         {
-                          "const": "attributes"
+                          "const": "metadata"
                         },
                         {
                           "const": "active"
@@ -10025,7 +10165,6 @@
                             "type": "string",
                             "minLength": 1
                           },
-                          "attributes": {},
                           "status": {
                             "enum": ["active", "superseded", "invalidated"],
                             "type": "string"
@@ -10033,6 +10172,9 @@
                           "derivation": {
                             "enum": ["ai", "deterministic"],
                             "type": "string"
+                          },
+                          "isInference": {
+                            "type": "boolean"
                           },
                           "stability": {
                             "type": "string",
@@ -10083,9 +10225,9 @@
                         },
                         "required": [
                           "category",
-                          "attributes",
                           "status",
                           "derivation",
+                          "isInference",
                           "stability",
                           "sensitivity",
                           "validFrom",

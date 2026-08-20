@@ -211,7 +211,7 @@ describe("subscription user journeys", () => {
       type: "resolved",
       features: {
         format: "kagami-brain-features",
-        scopes: ["attributes", "active", "history"],
+        scopes: ["metadata", "active", "history"],
       },
     });
     expect(JSON.stringify(features)).not.toContain("有料期間中に残した大切な日記");

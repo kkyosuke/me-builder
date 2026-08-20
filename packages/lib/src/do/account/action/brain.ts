@@ -115,12 +115,12 @@ export type PersonalDataFeatureExport = Readonly<{
   format: "kagami-brain-features";
   formatVersion: 1;
   generatedAt: string;
-  scopes: readonly ["attributes", "active", "history"];
+  scopes: readonly ["metadata", "active", "history"];
   brainItems: readonly Readonly<{
     category: string;
-    attributes: unknown;
     status: "active" | "superseded" | "invalidated";
     derivation: "ai" | "deterministic";
+    isInference: boolean;
     stability: string;
     sensitivity: string;
     validFrom: string | null;
@@ -185,11 +185,12 @@ export async function readPersonalDataFeatureExport(
     format: "kagami-brain-features",
     formatVersion: 1,
     generatedAt: at.toISOString(),
-    scopes: ["attributes", "active", "history"],
-    brainItems: rows.map(({ id, ...row }) => {
+    scopes: ["metadata", "active", "history"],
+    brainItems: rows.map(({ id, attributes, ...row }) => {
       const observations = observationsByItemId.get(id);
       return {
         ...row,
+        isInference: brainItemIsInference(attributes, row.derivation),
         validFrom: row.validFrom?.toISOString() ?? null,
         validTo: row.validTo?.toISOString() ?? null,
         firstObservedAt: (observations?.firstObservedAt ?? row.createdAt).toISOString(),

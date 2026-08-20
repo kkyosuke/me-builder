@@ -482,6 +482,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/profile-summary/versions/{versionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** 本人が指定した保存済みまとめ版を削除する */
+    delete: operations["deleteProfileSummaryVersion"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/weekly-reflections": {
     parameters: {
       query?: never;
@@ -4122,6 +4139,105 @@ export interface operations {
       };
     };
   };
+  deleteProfileSummaryVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 指定したまとめ版を削除した */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            deleted: true;
+          };
+        };
+      };
+      /** @description application sessionを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 本人が所有するまとめ版がない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Not Found";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
   getWeeklyReflections: {
     parameters: {
       query?: never;
@@ -7168,14 +7284,14 @@ export interface operations {
             formatVersion: 1;
             /** Format: date-time */
             generatedAt: string;
-            scopes: ["attributes", "active", "history"];
+            scopes: ["metadata", "active", "history"];
             brainItems: {
               category: string;
-              attributes: unknown;
               /** @enum {string} */
               status: "active" | "superseded" | "invalidated";
               /** @enum {string} */
               derivation: "ai" | "deterministic";
+              isInference: boolean;
               stability: string;
               sensitivity: string;
               validFrom: string | null;

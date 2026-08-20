@@ -74,13 +74,13 @@ describe("personal data controller", () => {
         format: "kagami-brain-features",
         formatVersion: 1,
         generatedAt: "2026-08-16T00:00:00.000Z",
-        scopes: ["attributes", "active", "history"],
+        scopes: ["metadata", "active", "history"],
         brainItems: [
           {
             category: "preference",
-            attributes: { timePreference: "morning" },
             status: "active",
             derivation: "ai",
+            isInference: true,
             stability: "changeable",
             sensitivity: "normal",
             validFrom: null,
@@ -100,10 +100,12 @@ describe("personal data controller", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
     expect(body).toMatchObject({
-      scopes: ["attributes", "active", "history"],
-      brainItems: [{ attributes: { timePreference: "morning" } }],
+      scopes: ["metadata", "active", "history"],
+      brainItems: [{ isInference: true }],
     });
-    expect(JSON.stringify(body)).not.toMatch(/statement|sourceRecord|evidence|accountId/i);
+    expect(JSON.stringify(body)).not.toMatch(
+      /attributes|statement|sourceRecord|evidence|accountId|sessionId/i,
+    );
   });
 
   it("日記訂正を本人のSource Record IDへだけ適用する", async () => {

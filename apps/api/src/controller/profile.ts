@@ -18,6 +18,7 @@ import {
   ProfileSummaryInsightSelfViewRequestSchema,
   ProfileSummaryInsightSelfViewResponseSchema,
   ProfileSummaryResponseSchema,
+  ProfileSummaryVersionDeleteResponseSchema,
 } from "../contract/profile/summary";
 import {
   WeeklyReflectionGenerationAcceptedSchema,
@@ -234,6 +235,20 @@ export async function putProfileSummaryInsightSelfView(c: Context<AppEnv>): Prom
   );
   if (!updated) return c.json({ error: "Not Found" }, 404);
   return c.json(v.parse(ProfileSummaryInsightSelfViewResponseSchema, { updated: true }));
+}
+
+export async function deleteProfileSummaryVersionContents(c: Context<AppEnv>): Promise<Response> {
+  if (!c.env?.ACCOUNT_DATA) {
+    return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  }
+  const versionId = c.req.param("versionId");
+  if (!versionId) return c.json({ error: "Not Found" }, 404);
+  const deleted = await accountDataFor(c.env.ACCOUNT_DATA, authenticatedActor(c).accountId).execute(
+    "profileSummary.deleteVersion",
+    versionId,
+  );
+  if (!deleted) return c.json({ error: "Not Found" }, 404);
+  return c.json(v.parse(ProfileSummaryVersionDeleteResponseSchema, { deleted: true }));
 }
 
 export async function getWeeklyReflectionContents(c: Context<AppEnv>): Promise<Response> {

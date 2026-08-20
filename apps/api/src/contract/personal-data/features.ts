@@ -5,9 +5,9 @@ import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../s
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
 const BrainFeatureSchema = v.object({
   category: v.pipe(v.string(), v.nonEmpty()),
-  attributes: v.unknown(),
   status: v.picklist(["active", "superseded", "invalidated"]),
   derivation: v.picklist(["ai", "deterministic"]),
+  isInference: v.boolean(),
   stability: v.pipe(v.string(), v.nonEmpty()),
   sensitivity: v.pipe(v.string(), v.nonEmpty()),
   validFrom: v.nullable(TimestampSchema),
@@ -22,7 +22,7 @@ export const PersonalDataFeaturesResponseSchema = v.object({
   format: v.literal("kagami-brain-features"),
   formatVersion: v.literal(1),
   generatedAt: TimestampSchema,
-  scopes: v.tuple([v.literal("attributes"), v.literal("active"), v.literal("history")]),
+  scopes: v.tuple([v.literal("metadata"), v.literal("active"), v.literal("history")]),
   brainItems: v.array(BrainFeatureSchema),
 });
 

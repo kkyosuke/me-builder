@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
 import type { AsyncState } from "../../../model/async-state";
 import {
+  deleteProfileSummaryVersion,
   fetchProfileSummary,
   requestProfileSummaryGeneration,
   setProfileSummaryInsightSelfView,
@@ -168,6 +169,14 @@ export function useProfileSummary() {
     [load],
   );
 
+  const deleteVersion = useCallback(
+    async (versionId: string) => {
+      await deleteProfileSummaryVersion(config.apiUrl, versionId);
+      await load(false);
+    },
+    [load],
+  );
+
   useEffect(() => {
     mounted.current = true;
     let active = true;
@@ -184,5 +193,5 @@ export function useProfileSummary() {
     };
   }, [load]);
 
-  return { state, generationNotice, reload: load, generate, setSelfView };
+  return { state, generationNotice, reload: load, generate, setSelfView, deleteVersion };
 }

@@ -663,6 +663,39 @@ export async function setProfileSummaryInsightSelfView(
   return true;
 }
 
+/** 本人が指定したまとめ版と、その版だけに紐づく表示・共有projectionを物理削除する。 */
+export async function deleteProfileSummaryVersion(
+  db: AccountDataDatabase,
+  accountId: string,
+  versionId: string,
+): Promise<boolean> {
+  const ownedVersion = await db
+    .select({ id: profileSummaryVersions.id })
+    .from(profileSummaryVersions)
+    .innerJoin(
+      profileSummaryGenerations,
+      eq(profileSummaryVersions.generationId, profileSummaryGenerations.id),
+    )
+    .where(
+      and(
+        eq(profileSummaryVersions.id, versionId),
+        eq(profileSummaryGenerations.accountId, accountId),
+      ),
+    )
+    .get();
+  if (!ownedVersion) return false;
+  await db.batch([
+    db
+      .delete(profileSummaryShareProjections)
+      .where(eq(profileSummaryShareProjections.profileSummaryVersionId, versionId)),
+    db
+      .delete(profileSummaryInsightSelfViews)
+      .where(eq(profileSummaryInsightSelfViews.profileSummaryVersionId, versionId)),
+    db.delete(profileSummaryVersions).where(eq(profileSummaryVersions.id, versionId)),
+  ]);
+  return true;
+}
+
 /** Queue再送時に生成結果と利用量ledgerを同じ最終状態へ収束させるための最小状態読取。 */
 export async function readProfileSummaryGenerationStatus(
   db: AccountDataDatabase,

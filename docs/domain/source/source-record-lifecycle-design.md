@@ -152,7 +152,7 @@ Confidenceの具体的な算出方法、閾値、処理基盤は決めません�
 
 取得できるもの:
 
-- Brain Itemのcategory、attributes、status、derivation、stability、sensitivity
+- Brain Itemのcategory、status、derivation、推定か否か、stability、sensitivity
 - 有効期間、初回・最終観測時刻、作成・更新時刻
 - activeと履歴の両方
 
@@ -160,6 +160,7 @@ Confidenceの具体的な算出方法、閾値、処理基盤は決めません�
 
 - 日記、診断回答、AI相談等のSource Record本文とメディア
 - Brain Itemのstatement、Evidence、Confidence、内部ID
+- Brain Itemの永続化attributes（Session ID、時点原文、職業・生活リズム等を含みうる）
 - 根拠・反証・改訂edge、監査記録、認証情報
 
 具体的なAPIと認可は[本人データ特徴API実装契約](../../development/personal-data-export.md)を正とします。

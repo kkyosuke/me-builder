@@ -112,6 +112,7 @@ import {
   profileSummaryGenerationRoute,
   profileSummaryInsightSelfViewRoute,
   profileSummaryRoute,
+  profileSummaryVersionDeleteRoute,
 } from "./contract/profile/summary";
 import {
   weeklyReflectionGenerationRoute,
@@ -196,6 +197,7 @@ import {
   patchPersonalDataRecord,
 } from "./controller/personal-data";
 import {
+  deleteProfileSummaryVersionContents,
   getGoalFollowUpContents,
   getProfileEntitlementContents,
   getProfileProgressionContents,
@@ -485,6 +487,13 @@ app.put(
   requireCurrentTerms,
   profileSummaryInsightSelfViewRoute,
   putProfileSummaryInsightSelfView,
+);
+app.delete(
+  "/api/profile-summary/versions/:versionId",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileSummaryVersionDeleteRoute,
+  deleteProfileSummaryVersionContents,
 );
 app.get(
   "/api/weekly-reflections",

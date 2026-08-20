@@ -10,15 +10,16 @@
 
 APIは次の3 scopeを常に返します。
 
-- `attributes`: Brain Itemの構造化済み特徴
+- `metadata`: allowlist済みのBrain Item特徴メタデータ
 - `active`: 現在有効なItem
 - `history`: `superseded`または`invalidated`となったItem
 
-各Itemに含めるのはcategory、attributes、status、derivation、stability、sensitivity、適用期間、観測日時、作成・更新日時です。次は返しません。
+各Itemに含めるのはcategory、status、derivation、推定か否か、stability、sensitivity、適用期間、観測日時、作成・更新日時です。永続化された`attributes`を応答へ展開せず、次は返しません。
 
 - 日記・会話本文、診断回答、自由記述、AI応答
 - Brain Itemのstatement、Evidence、Confidence
 - Brain Item ID、Source Record ID、Evidence ID、Account ID
+- Session ID、checkpoint ID、相対日付の原文、職業・生活リズム等の分類固有属性
 - 相手Accountの情報、CompatibilityData
 - 認証、運用、model、prompt、課金に関する情報
 
