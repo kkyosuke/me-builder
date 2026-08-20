@@ -165,3 +165,21 @@ describe("POST /api/profile-summary/generations", () => {
     expect(requestProfileSummaryGeneration).not.toHaveBeenCalled();
   });
 });
+
+describe("DELETE /api/profile-summary/versions/:versionId", () => {
+  it("本人のAccountDataにある指定版だけを削除する", async () => {
+    const execute = vi.fn().mockResolvedValue(true);
+    const accountData = {
+      getByName: vi.fn(() => ({ execute })),
+    } as unknown as AccountDataNamespace;
+    const response = await app.request(
+      "/api/profile-summary/versions/version-1",
+      { method: "DELETE" },
+      { LIFF_ID: "2010850319-Yl63upAR", ACCOUNT_DATA: accountData },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ deleted: true });
+    expect(execute).toHaveBeenCalledWith("account-1", "profileSummary.deleteVersion", "version-1");
+  });
+});

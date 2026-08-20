@@ -4,7 +4,7 @@
 
 この文書は、本人がWebで現在有効な診断回答と日記を確認し、原本を訂正または削除するAPI契約を定義します。本人確認、対象範囲、Source Recordの状態遷移、派生物への波及、応答と失敗時の結果を所有します。
 
-Source Recordの不変性、Revision、tombstoneの意味は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)、画面の入口と戻る操作は[プロフィール設定体験設計](../product/profile-settings-experience.md)を正とします。Accountの退会、Identity削除、データエクスポート、送信後10分以内のLINE取り消しは所有しません。
+Source Recordの不変性、Revision、tombstoneの意味は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)、画面の入口と戻る操作は[プロフィール設定体験設計](../product/profile-settings-experience.md)を正とします。Accountの退会、Identity削除、本人データ特徴API、送信後10分以内のLINE取り消しは所有しません。
 
 ## 2. API
 
@@ -13,6 +13,7 @@ Source Recordの不変性、Revision、tombstoneの意味は[Source Recordのラ
 | `GET` | `/api/personal-data/records` | 現在有効な診断回答と日記を新しい順で返す |
 | `PATCH` | `/api/personal-data/records/:sourceRecordId` | 原本を上書きせず、新しいSource RecordとRevisionを作る |
 | `DELETE` | `/api/personal-data/records/:sourceRecordId` | Source Recordをtombstoneへ遷移する |
+| `DELETE` | `/api/profile-summary/versions/:versionId` | 本人が指定した生成済みまとめ版を物理削除する |
 
 全経路でHttpOnlyのアプリセッションCookieを検証し、解決したAccountのAccountDataだけを操作します。Account IDはpath、query、bodyのいずれからも受け取りません。変更系リクエストでは同一OriginとCSRFトークンも検証します。`sourceRecordId`が別Accountの所有物、削除済み、または既に訂正された旧版の場合は、存在を区別せず`404`を返します。
 
@@ -38,7 +39,7 @@ sequenceDiagram
     A-->>W: 200
 ```
 
-訂正前のSource Recordと本文は改訂履歴と将来のエクスポートのために保持します。通常の診断回答・日記一覧、チャット文脈、Brain検索は新版だけを使います。同じ値への再送は新しい版を作らず`unchanged`を返します。
+訂正前のSource Recordと本文は改訂履歴として保持します。通常の診断回答・日記一覧、チャット文脈、Brain検索は新版だけを使います。同じ値への再送は新しい版を作らず`unchanged`を返します。
 
 ## 4. 削除と派生物への波及
 
@@ -46,7 +47,7 @@ sequenceDiagram
 
 削除または訂正の影響を受けるBrain Itemは、古いEvidenceとConfidenceを開示しないため同期的に`invalidated`へ遷移します。対応するVector削除jobを同じ操作で永続化し、Vectorizeの物理削除は既存の再試行可能なQueue経路で収束させます。
 
-「わたしのまとめ」は入力Source Record IDを全件保持しないため、本人操作時はAccount内の生成版と相性共有projectionを利用不能にします。訂正後または残った有効データから、本人が新しいまとめを再生成できます。診断訂正では同じ操作でprojection要求を作り、APIからの即時処理に失敗してもAccountData alarmで再試行します。
+削除前に生成済みの「わたしのまとめ」は過去版として本人が閲覧できますが、削除済み入力を将来の生成、検索、相性共有projectionへ利用しません。本人は各まとめ版を画面から個別削除できます。削除時は対象版、その版の本人見方、および相性共有用projectionを同じAccountData transactionで物理削除し、生成jobの運用履歴は残します。訂正後または残った有効データから、本人が新しいまとめを再生成できます。診断訂正では同じ操作でprojection要求を作り、APIからの即時処理に失敗してもAccountData alarmで再試行します。
 
 ## 5. 応答
 
@@ -67,7 +68,9 @@ sequenceDiagram
 - Freeを含むすべてのPlanで同じ操作を利用できる
 - 別Account、削除済み、改訂済みのSource Recordを操作できない
 - 訂正で旧版を上書きせずRevisionを保持する
-- 削除直後から原文、Brain、生成済みまとめ、相性共有projectionを利用できない
+- 削除直後から原文とBrainを将来処理に利用せず、相性共有projectionから除外する
+- 削除前に生成済みのまとめは過去版として閲覧できるが、削除済み入力から追加入力や結果生成を行わない
+- 本人が生成済みまとめを版ごとに確認後、個別削除できる
 - Vectorize削除が一時失敗と再配送を経ても収束する
 - 診断訂正と日記訂正後の現在一覧が新版だけを返す
 - API、Web、運用ログからAccount IDと本人の原文を漏らさない

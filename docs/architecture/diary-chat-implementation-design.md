@@ -681,7 +681,7 @@ flowchart LR
 
 関係性質問ではPlanごとにさらに縮小します。Freeは現在Turn、Liteは現在Sessionと本人の関連診断だけを使います。Fullだけが意味検索候補のうち`relationship` Access LabelをAccountDataで再認可し、本人が明言した出来事、Goal、相手についての観察を現在の相手に一致する場合だけ追加します。activeな相性共有から使えるのは照合用の表示名とRelationship Categoryだけで、相手AccountのBrainや診断は検索しません。本人側のRelationship Styleは診断projectionから読みます。
 
-activeな相性共有と照合できない固有名は、同名別人を安全に区別できないため過去履歴へ接続しません。照合できる表示名、または現在発言と過去の本人記録で同じ役割（上司、友人、家族など）が明示される場合だけ利用し、推定、根拠なし、旧版、期限切れ、削除済みを除外します。実際に回答へ使ったBrain ItemとSource Record IDは利用監査へ保存し、本人の個人データexportに含めます。
+activeな相性共有と照合できない固有名は、同名別人を安全に区別できないため過去履歴へ接続しません。照合できる表示名、または現在発言と過去の本人記録で同じ役割（上司、友人、家族など）が明示される場合だけ利用し、推定、根拠なし、旧版、期限切れ、削除済みを除外します。実際に回答へ使ったBrain ItemとSource Record IDは利用監査へ保存します。生データを含めない外部提供範囲は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md#8-apiによる特徴取得)を正とします。
 
 ### token budget
 

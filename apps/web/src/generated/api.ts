@@ -482,6 +482,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/profile-summary/versions/{versionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** 本人が指定した保存済みまとめ版を削除する */
+    delete: operations["deleteProfileSummaryVersion"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/weekly-reflections": {
     parameters: {
       query?: never;
@@ -810,49 +827,15 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/personal-data/exports": {
+  "/api/personal-data/features": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    /** 本人データarchiveの非同期生成を要求する */
-    post: operations["requestPersonalDataExport"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/personal-data/exports/{exportId}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 本人データarchiveの生成状態と期限を取得する */
-    get: operations["getPersonalDataExportStatus"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/personal-data/exports/{exportId}/download": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 期限内の本人データarchiveをdownloadする */
-    get: operations["downloadPersonalDataExport"];
+    /** 本人のBrain特徴をAPI連携用に取得する */
+    get: operations["getPersonalDataFeatures"];
     put?: never;
     post?: never;
     delete?: never;
@@ -4156,6 +4139,105 @@ export interface operations {
       };
     };
   };
+  deleteProfileSummaryVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 指定したまとめ版を削除した */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            deleted: true;
+          };
+        };
+      };
+      /** @description application sessionを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 本人が所有するまとめ版がない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Not Found";
+          };
+        };
+      };
+      /** @description 現行利用規約への同意が必要 */
+      428: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Terms acceptance required";
+            /** @constant */
+            reason: "terms_not_accepted";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
   getWeeklyReflections: {
     parameters: {
       query?: never;
@@ -5030,7 +5112,6 @@ export interface operations {
               /** Format: date-time */
               reachedAt: string;
               collectedPiecesDelta: number;
-              categories: string[];
             }[];
           };
         };
@@ -6219,10 +6300,7 @@ export interface operations {
               role: "payer" | "member";
               /** @enum {string} */
               status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
+              displayName: string | null;
             }[];
           };
         };
@@ -6363,10 +6441,7 @@ export interface operations {
               role: "payer" | "member";
               /** @enum {string} */
               status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
+              displayName: string | null;
             };
           };
         };
@@ -6510,10 +6585,7 @@ export interface operations {
               role: "payer" | "member";
               /** @enum {string} */
               status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
+              displayName: string | null;
             };
           };
         };
@@ -6657,10 +6729,7 @@ export interface operations {
               role: "payer" | "member";
               /** @enum {string} */
               status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
+              displayName: string | null;
             };
           };
         };
@@ -6800,10 +6869,7 @@ export interface operations {
               role: "payer" | "member";
               /** @enum {string} */
               status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
+              displayName: string | null;
             };
           };
         };
@@ -6943,10 +7009,7 @@ export interface operations {
               role: "payer" | "member";
               /** @enum {string} */
               status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
+              displayName: string | null;
             };
           };
         };
@@ -7084,10 +7147,7 @@ export interface operations {
               role: "payer" | "member";
               /** @enum {string} */
               status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
+              displayName: string | null;
             };
           };
         };
@@ -7202,7 +7262,7 @@ export interface operations {
       };
     };
   };
-  requestPersonalDataExport: {
+  getPersonalDataFeatures: {
     parameters: {
       query?: never;
       header?: never;
@@ -7211,25 +7271,40 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 生成要求 */
-      202: {
+      /** @description 本文・根拠・識別子を含まない本人のBrain特徴 */
+      200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           "application/json": {
-            /** @enum {string} */
-            outcome?: "created" | "unchanged";
-            export: {
-              id: string;
+            /** @constant */
+            format: "kagami-brain-features";
+            /** @constant */
+            formatVersion: 1;
+            /** Format: date-time */
+            generatedAt: string;
+            scopes: ["metadata", "active", "history"];
+            brainItems: {
+              category: string;
               /** @enum {string} */
-              status: "queued" | "generating" | "ready" | "failed" | "expired";
+              status: "active" | "superseded" | "invalidated";
+              /** @enum {string} */
+              derivation: "ai" | "deterministic";
+              isInference: boolean;
+              stability: string;
+              sensitivity: string;
+              validFrom: string | null;
+              validTo: string | null;
               /** Format: date-time */
-              requestedAt: string;
-              completedAt: string | null;
-              expiresAt: string | null;
-              downloadUrl?: string;
-            };
+              firstObservedAt: string;
+              /** Format: date-time */
+              lastObservedAt: string;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            }[];
           };
         };
       };
@@ -7242,18 +7317,6 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Unauthorized";
-          };
-        };
-      };
-      /** @description OriginまたはCSRF tokenが一致しない */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Forbidden";
           };
         };
       };
@@ -7297,212 +7360,7 @@ export interface operations {
           };
         };
       };
-      /** @description AccountData bindingが設定されていない */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Service Unavailable";
-          };
-        };
-      };
-    };
-  };
-  getPersonalDataExportStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        exportId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description 生成状態 */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @enum {string} */
-            outcome?: "created" | "unchanged";
-            export: {
-              id: string;
-              /** @enum {string} */
-              status: "queued" | "generating" | "ready" | "failed" | "expired";
-              /** Format: date-time */
-              requestedAt: string;
-              completedAt: string | null;
-              expiresAt: string | null;
-              downloadUrl?: string;
-            };
-          };
-        };
-      };
-      /** @description application sessionを検証できない */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Unauthorized";
-          };
-        };
-      };
-      /** @description 本人が所有するexport要求がない */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Personal data export not found";
-          };
-        };
-      };
-      /** @description 現行利用規約への同意が必要 */
-      428: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Terms acceptance required";
-            /** @constant */
-            reason: "terms_not_accepted";
-          };
-        };
-      };
-      /** @description 未処理のサーバーエラー */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Internal Server Error";
-          };
-        };
-      };
-      /** @description AccountData bindingが設定されていない */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Service Unavailable";
-          };
-        };
-      };
-    };
-  };
-  downloadPersonalDataExport: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        exportId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description 本人データarchive */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": Record<string, never>;
-        };
-      };
-      /** @description application sessionを検証できない */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Unauthorized";
-          };
-        };
-      };
-      /** @description 本人が所有するexport要求がない */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Personal data export not found";
-          };
-        };
-      };
-      /** @description 生成中または生成失敗 */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Personal data export is not ready";
-          };
-        };
-      };
-      /** @description download期限切れ */
-      410: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Personal data export expired";
-          };
-        };
-      };
-      /** @description 現行利用規約への同意が必要 */
-      428: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Terms acceptance required";
-            /** @constant */
-            reason: "terms_not_accepted";
-          };
-        };
-      };
-      /** @description 未処理のサーバーエラー */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            /** @constant */
-            error: "Internal Server Error";
-          };
-        };
-      };
-      /** @description AccountData bindingが設定されていない */
+      /** @description D1 bindingが設定されていない */
       503: {
         headers: {
           [name: string]: unknown;

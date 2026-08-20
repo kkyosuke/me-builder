@@ -63,6 +63,11 @@ describe("family seat API authorization", () => {
     const payer = await account(db, "payer");
     const member = await account(db, "member");
     const thirdParty = await account(db, "third-party");
+    await db.insert(D1.shared.schema.accountProfiles).values({
+      accountId: member,
+      displayName: "家族A",
+      displayNameUpdatedAt: new Date("2026-08-16T00:00:00.000Z"),
+    });
     await D1.shared.action.familySeat.createFamilyPack(db, payer);
 
     const issued = await issueFamilySeatInvitation(params(db, payer), at());
@@ -79,6 +84,9 @@ describe("family seat API authorization", () => {
 
     const management = await getFamilySeatManagement(params(db, payer));
     expect(management).toMatchObject({ type: "resolved", role: "payer", maxSeats: 4 });
+    expect(management).toMatchObject({
+      seats: expect.arrayContaining([expect.objectContaining({ displayName: "家族A" })]),
+    });
     expect(JSON.stringify(management)).not.toMatch(
       /memberAccountId|invitationId|diary|diagnosis|profile|relationship/i,
     );

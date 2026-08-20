@@ -52,7 +52,7 @@
 | [Brain内部情報の分類](../docs/domain/brain/brain-content-taxonomy.md) | Brain Itemの分類名、定義、具体例、分類とは別に持つ共通属性、意思決定での利用方法 |
 | [Brain Item生成設計](../docs/domain/brain/brain-item-generation-design.md) | Source RecordからBrain Itemを生成する共通入出力、診断と日記の変換差分、登録・本人確認のタイミング |
 | [根拠・反証・改訂のエッジ設計](../docs/domain/brain/evidence-edge-design.md) | Source RecordとBrain Itemを結ぶエッジの種類と属性、Confidenceとの関係、外部への開示粒度、改訂された旧版の扱い |
-| [Source Recordのライフサイクル設計](../docs/domain/source/source-record-lifecycle-design.md) | Source Recordの不変性、訂正・削除・取り消し・撤回、Brain Itemへの波及、エクスポート範囲 |
+| [Source Recordのライフサイクル設計](../docs/domain/source/source-record-lifecycle-design.md) | Source Recordの不変性、訂正・削除・取り消し・撤回、Brain Itemへの波及、外部提供範囲 |
 | [Brainのラベル・アクセス制御設計](../docs/domain/brain/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則、Source Recordの既定ラベル |
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
 | [Web認証・アプリケーションセッション設計](../docs/architecture/web-authentication-design.md) | LIFF／SSOの入口選択、外部Identity検証、Account解決、provider非依存session、認証と認可の境界、移行順序 |

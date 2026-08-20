@@ -12,7 +12,6 @@ const MilestoneCardSchema = v.object({
   level: v.pipe(v.number(), v.integer(), v.minValue(10), v.multipleOf(10)),
   reachedAt: v.pipe(v.string(), v.isoTimestamp()),
   collectedPiecesDelta: NonNegativeIntegerSchema,
-  categories: v.array(v.string()),
 });
 
 export const ProfileProgressionResponseSchema = v.object({

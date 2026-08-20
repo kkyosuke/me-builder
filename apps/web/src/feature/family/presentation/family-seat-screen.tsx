@@ -168,13 +168,8 @@ export function FamilySeatScreen({
                       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                         {seat ? statusLabel[seat.status] : "空き"}
                       </p>
-                      {seat && (
-                        <p className="mt-1 text-xs text-slate-400">
-                          更新{" "}
-                          {new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(
-                            new Date(seat.updatedAt),
-                          )}
-                        </p>
+                      {seat?.displayName && (
+                        <p className="mt-1 text-xs text-slate-400">{seat.displayName}</p>
                       )}
                     </div>
                     {seat?.status === "invited" && (

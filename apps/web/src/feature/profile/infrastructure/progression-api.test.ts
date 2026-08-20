@@ -28,7 +28,6 @@ describe("fetchProfileProgression", () => {
           level: 10,
           reachedAt: "2026-08-15T00:00:00.000Z",
           collectedPiecesDelta: 20,
-          categories: ["goal"],
         },
       ],
     };

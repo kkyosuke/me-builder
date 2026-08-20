@@ -354,7 +354,13 @@ async function terminateSeat(
 ): Promise<FamilySeatMutationResult> {
   const updated = await db
     .update(familySeats)
-    .set({ status: input.next, terminatedAt: input.at, updatedAt: input.at })
+    .set({
+      memberAccountId: null,
+      invitationId: null,
+      status: input.next,
+      terminatedAt: input.at,
+      updatedAt: input.at,
+    })
     .where(
       and(
         eq(familySeats.id, input.seatId),

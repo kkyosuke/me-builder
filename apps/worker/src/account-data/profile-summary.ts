@@ -28,6 +28,8 @@ export const profileSummaryActions = {
       selfView,
       at,
     ),
+  "profileSummary.deleteVersion": (db: DO.account.Database, accountId: string, versionId: string) =>
+    DO.account.action.profileSummary.deleteProfileSummaryVersion(db, accountId, versionId),
   "profileSummary.requestGeneration": (
     db: DO.account.Database,
     accountId: string,

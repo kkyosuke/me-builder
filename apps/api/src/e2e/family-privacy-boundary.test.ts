@@ -80,4 +80,55 @@ describe("family payer privacy boundary", () => {
     expect(getByName).not.toHaveBeenCalledWith(member);
     expect(personalData).toMatchObject({ type: "resolved" });
   });
+
+  it("元参加者を席管理から切り離し、本人データは本人のAccountにだけ残す", async () => {
+    const db = createTestDb();
+    const payer = await account(db, "former-payer");
+    const formerMember = await account(db, "former-member");
+    await D1.shared.action.familySeat.createFamilyPack(db, payer);
+    await D1.shared.action.familySeat.reserveFamilySeat(db, payer, "former-invitation");
+    const activated = await D1.shared.action.familySeat.activateFamilySeat(
+      db,
+      "former-invitation",
+      formerMember,
+    );
+    if (activated.type !== "updated") throw new Error("family seat fixture was not activated");
+
+    await D1.shared.action.familySeat.removeFamilySeat(db, activated.seat.id);
+
+    await expect(
+      getFamilySeatManagement({
+        actor: {
+          accountId: formerMember,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+        },
+        db,
+      }),
+    ).resolves.toEqual({ type: "no-membership" });
+
+    const execute = vi.fn().mockResolvedValue([
+      {
+        id: "former-member-record",
+        kind: "diary",
+        title: "元参加者本人の日記",
+        value: "本人だけが取得できる内容",
+        recordedAt: "2026-08-16T00:00:00.000Z",
+      },
+    ]);
+    const getByName = vi.fn(() => ({ execute }));
+    const accountData = { getByName } as unknown as AccountDataNamespace;
+    await expect(
+      listPersonalData({
+        actor: {
+          accountId: formerMember,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+        },
+        accountData,
+      }),
+    ).resolves.toMatchObject({ type: "resolved" });
+    expect(getByName).toHaveBeenCalledWith(formerMember);
+    expect(getByName).not.toHaveBeenCalledWith(payer);
+  });
 });

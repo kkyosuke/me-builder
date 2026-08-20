@@ -84,11 +84,7 @@ import {
 import { lineWebhookRoute } from "./contract/line/webhook";
 import { webClientErrorReportRoute } from "./contract/observability/web-client-error";
 import { openApiOptions } from "./contract/openapi";
-import {
-  downloadPersonalDataExportRoute,
-  personalDataExportStatusRoute,
-  requestPersonalDataExportRoute,
-} from "./contract/personal-data/exports";
+import { personalDataFeaturesRoute } from "./contract/personal-data/features";
 import {
   correctPersonalDataRecordRoute,
   deletePersonalDataRecordRoute,
@@ -116,6 +112,7 @@ import {
   profileSummaryGenerationRoute,
   profileSummaryInsightSelfViewRoute,
   profileSummaryRoute,
+  profileSummaryVersionDeleteRoute,
 } from "./contract/profile/summary";
 import {
   weeklyReflectionGenerationRoute,
@@ -195,13 +192,12 @@ import { postLineWebhook } from "./controller/line";
 import { postWebClientError } from "./controller/observability";
 import {
   deletePersonalDataRecordContents,
-  downloadPersonalDataExportContents,
-  getPersonalDataExportStatus,
+  getPersonalDataFeatureContents,
   getPersonalDataRecords,
   patchPersonalDataRecord,
-  postPersonalDataExport,
 } from "./controller/personal-data";
 import {
+  deleteProfileSummaryVersionContents,
   getGoalFollowUpContents,
   getProfileEntitlementContents,
   getProfileProgressionContents,
@@ -492,6 +488,13 @@ app.put(
   profileSummaryInsightSelfViewRoute,
   putProfileSummaryInsightSelfView,
 );
+app.delete(
+  "/api/profile-summary/versions/:versionId",
+  requireAuthentication,
+  requireCurrentTerms,
+  profileSummaryVersionDeleteRoute,
+  deleteProfileSummaryVersionContents,
+);
 app.get(
   "/api/weekly-reflections",
   requireAuthentication,
@@ -664,28 +667,13 @@ app.delete(
   leaveFamilyPackRoute,
   deleteOwnFamilyMembership,
 );
-app.post(
-  "/api/personal-data/exports",
-  requireAuthentication,
-  requireCurrentTerms,
-  requestPersonalDataExportRoute,
-  postPersonalDataExport,
-);
 app.get(
-  "/api/personal-data/exports/:exportId",
+  "/api/personal-data/features",
   requireAuthentication,
   requireCurrentTerms,
-  personalDataExportStatusRoute,
-  getPersonalDataExportStatus,
+  personalDataFeaturesRoute,
+  getPersonalDataFeatureContents,
 );
-app.get(
-  "/api/personal-data/exports/:exportId/download",
-  requireAuthentication,
-  requireCurrentTerms,
-  downloadPersonalDataExportRoute,
-  downloadPersonalDataExportContents,
-);
-
 app.get(
   "/api/dev/brain-items",
   requireDevelopmentEnvironment,

@@ -21,6 +21,7 @@ import {
   loadBrainChatContextMemories,
   loadBrainSemanticDedupCandidates,
   loadRelationshipDiagnosisContexts,
+  readPersonalDataFeatureExport,
   resetAllFailedBrainVectorSyncJobs,
   resetFailedBrainVectorSyncJob,
   saveBrainItem,
@@ -1478,5 +1479,50 @@ describe("listActiveBrainItems", () => {
       ],
       truncated: false,
     });
+  });
+});
+
+describe("readPersonalDataFeatureExport", () => {
+  it("allowlist済み特徴だけを返し、属性・本文・根拠・識別子を持ち出さない", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await saveBrainItem(
+      db,
+      createInput({
+        at,
+        item: {
+          ...createInput().item,
+          id: "private-brain-id",
+          statement: "外へ出してはいけない本文",
+          attributes: {
+            isInference: true,
+            sessionId: "private-session-id",
+            temporalContext: { originalStatement: "来月までに転職したい" },
+          },
+        },
+      }),
+    );
+
+    const result = await readPersonalDataFeatureExport(db, "account-1", at);
+
+    expect(result).toMatchObject({
+      format: "kagami-brain-features",
+      formatVersion: 1,
+      scopes: ["metadata", "active", "history"],
+      brainItems: [
+        expect.objectContaining({
+          status: "active",
+          isInference: true,
+        }),
+      ],
+    });
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("外へ出してはいけない本文");
+    expect(serialized).not.toContain("private-brain-id");
+    expect(serialized).not.toContain("private-session-id");
+    expect(serialized).not.toContain("来月までに転職したい");
+    expect(serialized).not.toContain("attributes");
+    expect(serialized).not.toContain("source-1");
   });
 });

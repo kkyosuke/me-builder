@@ -26,6 +26,7 @@ export const ProfileSummaryInsightSelfViewRequestSchema = v.object({
 });
 
 export const ProfileSummaryInsightSelfViewResponseSchema = v.object({ updated: v.literal(true) });
+export const ProfileSummaryVersionDeleteResponseSchema = v.object({ deleted: v.literal(true) });
 
 const ProfileSummarySchema = v.object({
   generatedAt: v.pipe(v.string(), v.isoTimestamp()),
@@ -151,6 +152,20 @@ export const profileSummaryInsightSelfViewRoute = describeRoute({
     200: jsonResponse("本人の見方を保存した", ProfileSummaryInsightSelfViewResponseSchema),
     ...csrfValidationError,
     ...authenticatedErrors,
+    ...currentTermsPolicyError,
+  },
+} satisfies DescribeRouteOptions);
+
+export const profileSummaryVersionDeleteRoute = describeRoute({
+  operationId: "deleteProfileSummaryVersion",
+  tags: ["Profile"],
+  summary: "本人が指定した保存済みまとめ版を削除する",
+  security: [{ applicationSession: [], csrfToken: [] }],
+  responses: {
+    200: jsonResponse("指定したまとめ版を削除した", ProfileSummaryVersionDeleteResponseSchema),
+    ...csrfValidationError,
+    ...authenticatedErrors,
+    404: jsonResponse("本人が所有するまとめ版がない", v.object({ error: v.literal("Not Found") })),
     ...currentTermsPolicyError,
   },
 } satisfies DescribeRouteOptions);

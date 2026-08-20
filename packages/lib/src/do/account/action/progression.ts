@@ -43,19 +43,7 @@ type UtsushiMilestoneCard = Readonly<{
   level: number;
   reachedAt: string;
   collectedPiecesDelta: number;
-  categories: readonly string[];
 }>;
-
-function readStringArray(value: string): string[] {
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
 
 type ProgressionEventKind = typeof progressionEvents.$inferInsert.kind;
 type ProgressionOriginType = typeof progressionEvents.$inferInsert.originType;
@@ -85,13 +73,6 @@ function readEvidenceFingerprints(value: string): Set<string> {
   } catch {
     return new Set();
   }
-}
-
-function growthForKind(kind: ProgressionEventKind): number {
-  if (kind === "new_item") return 3;
-  if (kind === "evidence_added") return 1;
-  if (kind === "temporal_revision") return 2;
-  return 0;
 }
 
 function eventId(originType: ProgressionOriginType, originId: string): string {
@@ -486,40 +467,17 @@ async function synchronizeProgressionEvents(
     .get();
   if (!state) return initializeProgressionEvents(db, accountId, at);
   if (state.calculationVersion !== UTSUSHI_PROGRESSION_CALCULATION_VERSION) {
-    const events = await db
-      .select({ id: progressionEvents.id, kind: progressionEvents.kind })
-      .from(progressionEvents)
-      .where(
-        and(eq(progressionEvents.accountId, accountId), eq(progressionEvents.isDeleted, false)),
-      )
-      .all();
-    const growthValue = events.reduce((sum, event) => sum + growthForKind(event.kind), 0);
-    const highestLevel = Math.max(state.highestLevel, progressionLevel(growthValue));
-    const updates = events.map((event) =>
-      db
-        .update(progressionEvents)
-        .set({
-          calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
-          growthDelta: growthForKind(event.kind),
-          updatedAt: at,
-        })
-        .where(eq(progressionEvents.id, event.id)),
-    );
-    const stateUpdate = db
+    // 版変更は将来eventへだけ適用し、確定済みeventと累積値は改変しない。
+    await db
       .update(progressionStates)
       .set({
-        growthValue,
         calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
-        highestLevel,
         updatedAt: at,
       })
       .where(eq(progressionStates.accountId, accountId));
-    await db.batch([stateUpdate, ...updates]);
     state = {
       ...state,
-      growthValue,
       calculationVersion: UTSUSHI_PROGRESSION_CALCULATION_VERSION,
-      highestLevel,
     };
   }
 
@@ -965,18 +923,10 @@ export async function readUtsushiProgression(
         ? [{ kind, growthDelta: event.growthDelta, occurredAt: event.occurredAt.toISOString() }]
         : [];
     }),
-    milestoneCards: milestoneCards.slice(0, 3).map((milestone, index) => {
-      const previousCategories = new Set(
-        readStringArray(milestoneCards[index + 1]?.categoriesJson ?? "[]"),
-      );
-      return {
-        level: milestone.level,
-        reachedAt: milestone.reachedAt.toISOString(),
-        collectedPiecesDelta: milestone.collectedPiecesDelta,
-        categories: readStringArray(milestone.categoriesJson).filter(
-          (category) => !previousCategories.has(category),
-        ),
-      };
-    }),
+    milestoneCards: milestoneCards.slice(0, 3).map((milestone) => ({
+      level: milestone.level,
+      reachedAt: milestone.reachedAt.toISOString(),
+      collectedPiecesDelta: milestone.collectedPiecesDelta,
+    })),
   };
 }

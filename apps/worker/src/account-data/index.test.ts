@@ -177,10 +177,6 @@ describe("AccountData alarm", () => {
       DO.account.action.weeklyReflection,
       "listUndispatchedWeeklyReflectionGenerationIds",
     ).mockResolvedValue([]);
-    vi.spyOn(
-      DO.account.action.personalDataExport,
-      "processPendingPersonalDataExport",
-    ).mockResolvedValue({ processed: false });
     vi.spyOn(meBuilderLib, "expireAiUsageReservations").mockResolvedValue(0);
   });
 
@@ -242,9 +238,6 @@ describe("AccountData alarm", () => {
     });
     expect(markDispatched).toHaveBeenCalledWith({}, "account-1", "generation-1");
     expect(markWeeklyDispatched).toHaveBeenCalledWith({}, "account-1", "weekly-generation-1");
-    expect(
-      DO.account.action.personalDataExport.processPendingPersonalDataExport,
-    ).toHaveBeenCalledWith({}, "account-1");
   });
 
   it("Queue投入失敗時も永続状態から次のalarmを明示的に設定する", async () => {

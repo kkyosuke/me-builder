@@ -3,8 +3,7 @@ export type FamilySeat = Readonly<{
   slotNumber: number;
   role: "payer" | "member";
   status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-  createdAt: string;
-  updatedAt: string;
+  displayName: string | null;
 }>;
 
 export type FamilySeatManagement = Readonly<{

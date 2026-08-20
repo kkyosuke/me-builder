@@ -145,27 +145,6 @@ describe("AccountDataRepository", () => {
     expect(repository.nextMaintenanceAt()).toBeNull();
   });
 
-  it("本人データexportの生成要求とarchive期限をmaintenanceとして返す", async () => {
-    const repository = createRepository();
-    await repository.initialize();
-    repository.bindAccount("account-1");
-    const requestedAt = new Date("2026-08-15T00:00:00.000Z");
-    const requested = await DO.account.action.personalDataExport.requestPersonalDataExport(
-      repository.client,
-      "account-1",
-      requestedAt,
-    );
-    expect(repository.nextMaintenanceAt()).toBe(requestedAt.getTime());
-
-    await DO.account.action.personalDataExport.processPendingPersonalDataExport(
-      repository.client,
-      "account-1",
-      requestedAt,
-    );
-    expect(repository.nextMaintenanceAt()).toBe(requestedAt.getTime() + 24 * 60 * 60 * 1_000);
-    expect(requested.export.status).toBe("queued");
-  });
-
   it("AI利用予約のtimeoutをmaintenanceとして返す", async () => {
     const repository = createRepository();
     await repository.initialize();

@@ -234,6 +234,24 @@ describe("ProfileSummaryScreen", () => {
     expect(onRegenerate).toHaveBeenCalledOnce();
   });
 
+  it("表示中のまとめ版を確認後に個別削除する", async () => {
+    const onDeleteVersion = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ProfileSummaryScreen
+        state={{ status: "success", data: { summary, nextAction: "chat" } }}
+        versioning={versioning}
+        onRetry={vi.fn()}
+        onDeleteVersion={onDeleteVersion}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "このまとめを削除" }));
+    expect(screen.getByRole("alertdialog", { name: "このまとめを削除しますか？" })).toBeTruthy();
+    expect(onDeleteVersion).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "削除する" }));
+    await vi.waitFor(() => expect(onDeleteVersion).toHaveBeenCalledWith("version-3"));
+  });
+
   it("左右のスワイプは版の移動だけを行う", () => {
     vi.useFakeTimers();
     const onSelectVersion = vi.fn();

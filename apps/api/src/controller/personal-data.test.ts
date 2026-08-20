@@ -5,6 +5,7 @@ import { app } from "../index";
 
 const mocks = vi.hoisted(() => ({
   listPersonalData: vi.fn(),
+  getPersonalDataFeatures: vi.fn(),
   correctPersonalData: vi.fn(),
   deletePersonalData: vi.fn(),
 }));
@@ -64,6 +65,47 @@ describe("personal data controller", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({ records: [{ id: "source-1" }] });
+  });
+
+  it("本文と識別子を含まないBrain特徴だけをAPIで返す", async () => {
+    mocks.getPersonalDataFeatures.mockResolvedValue({
+      type: "resolved",
+      features: {
+        format: "kagami-brain-features",
+        formatVersion: 1,
+        generatedAt: "2026-08-16T00:00:00.000Z",
+        scopes: ["metadata", "active", "history"],
+        brainItems: [
+          {
+            category: "preference",
+            status: "active",
+            derivation: "ai",
+            isInference: true,
+            stability: "changeable",
+            sensitivity: "normal",
+            validFrom: null,
+            validTo: null,
+            firstObservedAt: "2026-08-15T00:00:00.000Z",
+            lastObservedAt: "2026-08-15T00:00:00.000Z",
+            createdAt: "2026-08-15T00:00:00.000Z",
+            updatedAt: "2026-08-15T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    const response = await app.request("/api/personal-data/features", { headers }, bindings);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json();
+    expect(body).toMatchObject({
+      scopes: ["metadata", "active", "history"],
+      brainItems: [{ isInference: true }],
+    });
+    expect(JSON.stringify(body)).not.toMatch(
+      /attributes|statement|sourceRecord|evidence|accountId|sessionId/i,
+    );
   });
 
   it("日記訂正を本人のSource Record IDへだけ適用する", async () => {

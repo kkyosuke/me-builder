@@ -10,6 +10,7 @@ import { storeLineTextSource } from "./diary";
 import {
   PROFILE_SUMMARY_REGENERATION_INTERVAL_MS,
   completeProfileSummaryGeneration,
+  deleteProfileSummaryVersion,
   failProfileSummaryGeneration,
   listUndispatchedProfileSummaryGenerationIds,
   loadProfileSummaryGenerationContext,
@@ -137,6 +138,56 @@ async function insertDiagnosisInput(db: AccountDataDatabase, accountId: string, 
 }
 
 describe("Profile Summary persistence", () => {
+  it("本人の指定版と表示・共有projectionだけを個別削除する", async () => {
+    const db = createTestDb();
+    const { accountId, recordedAt } = await insertDiaryFixture(db);
+    await db.insert(schema.profileSummaryGenerations).values({
+      id: "generation-delete",
+      accountId,
+      status: "completed",
+      requestedAt: recordedAt,
+      finishedAt: recordedAt,
+    });
+    await db.insert(schema.profileSummaryVersions).values({
+      id: "version-delete",
+      generationId: "generation-delete",
+      sequence: 1,
+      generatedAt: recordedAt,
+      model: "gemini-test",
+      promptVersion: "profile-summary-v1",
+      diagnosisInputCount: 0,
+      diagnosisInputLatestAt: null,
+      diaryInputCount: 1,
+      diaryInputLatestAt: recordedAt,
+      summary: {
+        generatedAt: recordedAt.toISOString(),
+        headline: "削除対象のまとめ",
+        insights: [],
+        recordCount: 1,
+        diagnosisCount: 0,
+        diaryCount: 1,
+        latestRecordedAt: recordedAt.toISOString(),
+      },
+    });
+    await db.insert(schema.profileSummaryShareProjections).values({
+      profileSummaryVersionId: "version-delete",
+      schemaVersion: 1,
+      generatedAt: recordedAt,
+      statements: [],
+      evidenceReferences: [],
+      fingerprint: "delete-fingerprint",
+    });
+
+    await expect(
+      deleteProfileSummaryVersion(db, "another-account", "version-delete"),
+    ).resolves.toBe(false);
+    await expect(deleteProfileSummaryVersion(db, accountId, "version-delete")).resolves.toBe(true);
+    await expect(deleteProfileSummaryVersion(db, accountId, "version-delete")).resolves.toBe(false);
+    expect(await db.select().from(schema.profileSummaryVersions).all()).toEqual([]);
+    expect(await db.select().from(schema.profileSummaryShareProjections).all()).toEqual([]);
+    expect(await db.select().from(schema.profileSummaryGenerations).all()).toHaveLength(1);
+  });
+
   it("Memory化されていない日記からcontextを作り、不変版を冪等に保存する", async () => {
     const db = createTestDb();
     const { accountId, recordedAt } = await insertDiaryFixture(db);

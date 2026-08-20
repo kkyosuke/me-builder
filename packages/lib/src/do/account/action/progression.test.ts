@@ -401,7 +401,6 @@ describe("Utsushi progression", () => {
           level: 10,
           reachedAt: reachedAt.toISOString(),
           collectedPiecesDelta: 12,
-          categories: ["goal", "preference"],
         },
       ],
     });
@@ -434,9 +433,8 @@ describe("Utsushi progression", () => {
           level: 20,
           reachedAt: nextReachedAt.toISOString(),
           collectedPiecesDelta: 18,
-          categories: ["identity"],
         },
-        { level: 10, categories: ["goal", "preference"] },
+        { level: 10 },
       ],
     });
 
@@ -447,11 +445,7 @@ describe("Utsushi progression", () => {
     await expect(
       readUtsushiProgression(db, accountId, new Date("2026-08-18T00:00:00.000Z")),
     ).resolves.toMatchObject({
-      milestoneCards: [
-        { level: 30, collectedPiecesDelta: 5, categories: [] },
-        { level: 20, categories: ["identity"] },
-        { level: 10, categories: ["goal", "preference"] },
-      ],
+      milestoneCards: [{ level: 30, collectedPiecesDelta: 5 }, { level: 20 }, { level: 10 }],
     });
   });
 
@@ -471,6 +465,39 @@ describe("Utsushi progression", () => {
     expect(
       (await db.select().from(schema.progressionMilestones).all()).map(({ level }) => level).sort(),
     ).toEqual([10, 20]);
+  });
+
+  it("計算版が変わっても確定済みeventと累積値を再計算しない", async () => {
+    const db = createTestDb();
+    const accountId = "version-boundary-account";
+    const at = new Date("2026-08-15T00:00:00.000Z");
+    await db.insert(schema.accountDataIdentity).values({ singleton: 1, accountId });
+    await insertItem(db, accountId, "item-1", "goal", at);
+    await readUtsushiProgression(db, accountId, at);
+    await db
+      .update(schema.progressionStates)
+      .set({ growthValue: 99, calculationVersion: 7, highestLevel: 5 })
+      .where(eq(schema.progressionStates.accountId, accountId));
+    await db
+      .update(schema.progressionEvents)
+      .set({ growthDelta: 99, calculationVersion: 7 })
+      .where(eq(schema.progressionEvents.accountId, accountId));
+
+    await expect(readUtsushiProgression(db, accountId, at)).resolves.toMatchObject({
+      growthValue: 99,
+      calculationVersion: 1,
+      highestLevel: 5,
+    });
+    expect(
+      await db
+        .select({
+          growthDelta: schema.progressionEvents.growthDelta,
+          calculationVersion: schema.progressionEvents.calculationVersion,
+        })
+        .from(schema.progressionEvents)
+        .where(eq(schema.progressionEvents.kind, "new_item"))
+        .get(),
+    ).toEqual({ growthDelta: 99, calculationVersion: 7 });
   });
 
   it("推定Itemの時間Revisionと無効Evidenceを加点対象にしない", async () => {

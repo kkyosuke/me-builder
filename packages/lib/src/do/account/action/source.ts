@@ -15,13 +15,8 @@ import {
   diaryChatBrainUsageAudits,
   sourceRecordTextPayloads,
 } from "../schema/diary";
-import {
-  profileSummaryGenerations,
-  profileSummaryShareProjections,
-  profileSummaryVersions,
-} from "../schema/profile-summary";
+import { profileSummaryShareProjections } from "../schema/profile-summary";
 import { sourceRecordRevisions, sourceRecords } from "../schema/source";
-import { weeklyReflectionGenerations, weeklyReflections } from "../schema/weekly-reflection";
 
 type D1BatchStatement = Parameters<AccountDataDatabase["batch"]>[0][number];
 
@@ -245,14 +240,8 @@ function derivedInvalidationStatements(
       ),
     );
   }
-  // 生成物は入力IDを全件保持しないため、本人操作時はAccount内の全版を安全側に破棄する。
-  statements.push(
-    db.delete(profileSummaryShareProjections),
-    db.delete(profileSummaryVersions),
-    db.delete(profileSummaryGenerations),
-    db.delete(weeklyReflections),
-    db.delete(weeklyReflectionGenerations),
-  );
+  // 過去版は本人の履歴として保持し、現在の共有projectionだけを利用不能にする。
+  statements.push(db.delete(profileSummaryShareProjections));
   return statements;
 }
 

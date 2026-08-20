@@ -35,7 +35,7 @@ Customer ID、Subscription ID、Payment ID、Invoice IDはアクセス制限さ�
 
 - 既存契約からのPlan解決と有効期限内の機能
 - Webhook受信、Queue / DLQ、reconciliation、支払失敗からの回復
-- Customer Portal、解約、返金、本人データの訂正・削除・export
+- Customer Portal、解約、返金、本人データの訂正・削除・特徴取得
 - Family参加者の退出とFreeへの復帰
 
 停止後は購入入口とserver側gateの両方が拒否することを確認し、既存のLite、Full、Family Accountで利用権限と解約導線が残ることを確認します。原因を修正し、Previewと運営Accountで再検証した後、保存された`resumeStage`へ再開します。再開先を推測できない場合は`operators`からやり直します。

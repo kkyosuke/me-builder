@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProfileSummaryGenerationUnavailableError } from "../model/profile-summary";
-import { fetchProfileSummary, requestProfileSummaryGeneration } from "./profile-api";
+import {
+  deleteProfileSummaryVersion,
+  fetchProfileSummary,
+  requestProfileSummaryGeneration,
+} from "./profile-api";
 
 describe("fetchProfileSummary", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -101,6 +105,18 @@ describe("fetchProfileSummary", () => {
         method: "POST",
         credentials: "include",
       }),
+    );
+  });
+
+  it("指定したまとめ版をURL encodeして削除する", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ deleted: true })));
+
+    await expect(deleteProfileSummaryVersion("https://api.example.com", "version/1")).resolves.toBe(
+      undefined,
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.example.com/api/profile-summary/versions/version%2F1",
+      expect.objectContaining({ method: "DELETE", credentials: "include" }),
     );
   });
 

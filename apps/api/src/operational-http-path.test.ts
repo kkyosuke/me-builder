@@ -30,16 +30,6 @@ describe("operationalHttpPath", () => {
   });
 
   it.each([
-    ["/api/personal-data/exports/export-1", "/api/personal-data/exports/:exportId"],
-    [
-      "/api/personal-data/exports/export-1/download",
-      "/api/personal-data/exports/:exportId/download",
-    ],
-  ])("Export IDを運用ログへ含めない: %s", (path, expected) => {
-    expect(operationalHttpPath(path)).toBe(expected);
-  });
-
-  it.each([
     ["/api/family/invitations/seat-secret", "/api/family/invitations/:seatId"],
     ["/api/family/seats/seat-secret", "/api/family/seats/:seatId"],
   ])("ファミリー席IDを運用ログへ含めない: %s", (path, expected) => {
