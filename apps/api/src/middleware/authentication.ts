@@ -1,3 +1,4 @@
+import { D1 } from "@me-builder/lib";
 import type { Context, MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import * as v from "valibot";
@@ -44,6 +45,18 @@ async function resolveRequestAuthentication(c: Context<AppEnv>): Promise<Authent
     }),
   ]);
   if (!account) return { type: "unauthenticated", reason: "credential_invalid" };
+  const config = getConfig(c.env);
+  if (
+    config.environment === "production" &&
+    account.role === "admin" &&
+    !(await D1.shared.action.account.revokeAdminAccessUnlessAllowed(
+      applicationSession.db,
+      verified.actor.accountId,
+      config.adminLineUserIds,
+    ))
+  ) {
+    return { type: "unauthenticated", reason: "credential_invalid" };
+  }
 
   c.set("authenticationSource", "application-session");
   c.set("applicationSessionToken", sessionToken);

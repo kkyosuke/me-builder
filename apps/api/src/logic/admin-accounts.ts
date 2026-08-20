@@ -26,7 +26,9 @@ export async function getAdminAccounts(params: Params): Promise<AdminAccountsOut
     logger.info(
       {
         event: "admin.accounts.listed",
-        adminAccountId: params.actor.accountId,
+        adminReference: await D1.shared.action.adminAccount.createAdminAccountReference(
+          params.actor.accountId,
+        ),
         queryPresent: Boolean(input.query?.trim()),
         role: input.role ?? "all",
         status: input.status ?? "all",

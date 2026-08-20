@@ -3564,7 +3564,7 @@
       "get": {
         "operationId": "listAdminAccounts",
         "tags": ["Admin"],
-        "summary": "名前と成長projectionを含むAccount一覧を取得する",
+        "summary": "仮名管理参照と運用に必要な最小projectionを含むAccount一覧を取得する",
         "security": [
           {
             "applicationSession": []
@@ -3595,7 +3595,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["active"]
+              "enum": ["active", "stopped"]
             }
           },
           {
@@ -3630,31 +3630,29 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {
+                          "adminReference": {
                             "type": "string",
-                            "minLength": 1
-                          },
-                          "displayName": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
+                            "pattern": "^account_[0-9a-f]{24}$"
                           },
                           "role": {
                             "enum": ["user", "admin"],
                             "type": "string"
                           },
                           "status": {
-                            "const": "active"
+                            "enum": ["active", "stopped"],
+                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "lastActivityAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "plan": {
+                            "enum": ["free", "lite", "full", "family"],
+                            "type": "string"
                           },
                           "progression": {
                             "anyOf": [
@@ -3723,11 +3721,12 @@
                           }
                         },
                         "required": [
-                          "id",
-                          "displayName",
+                          "adminReference",
                           "role",
                           "status",
                           "createdAt",
+                          "lastActivityAt",
+                          "plan",
                           "progression"
                         ]
                       }
@@ -4139,6 +4138,27 @@
                       "version": 1,
                       "vendor": "valibot"
                     }
+                  },
+                  "confirmed": {
+                    "kind": "schema",
+                    "type": "optional",
+                    "expects": "(boolean | undefined)",
+                    "async": false,
+                    "wrapped": {
+                      "kind": "schema",
+                      "type": "boolean",
+                      "expects": "boolean",
+                      "async": false,
+                      "~standard": {
+                        "version": 1,
+                        "vendor": "valibot"
+                      }
+                    },
+                    "default": false,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
                   }
                 },
                 "~standard": {
@@ -4238,7 +4258,7 @@
             }
           },
           "404": {
-            "description": "認証Accountまたは対象Customerがない",
+            "description": "認証Account、対象Customerがない、またはPreview以外で利用できない",
             "content": {
               "application/json": {
                 "schema": {
@@ -4260,6 +4280,15 @@
                       "properties": {
                         "error": {
                           "const": "Billing customer not found"
+                        }
+                      },
+                      "required": ["error"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "const": "Not Found"
                         }
                       },
                       "required": ["error"]

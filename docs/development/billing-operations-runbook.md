@@ -35,12 +35,7 @@ flowchart TD
 
 `GET /api/admin/billing/health`はCustomer数、有効契約数、遅延projection数、projection未作成Customer数、有効だがPlan未解決の件数だけを返します。Account ID、Stripe ID、個人内容は返しません。遅延判定は`BILLING_PROJECTION_STALE_AFTER_SECONDS`で環境ごとに差し替え、既定は15分です。
 
-Alertの最小条件は次です。
-
-- Billing DLQに1件以上ある
-- `customerWithoutProjectionCount`または`projectionWithoutPlanCount`が1件以上ある
-- `staleProjectionCount`が1件以上ある
-- StripeのWebhook失敗率または請求失敗件数が通常範囲を超える
+課金に関する監視条件は[インフラ・システム構成のProduction運用境界](../architecture/infrastructure-architecture.md#63-production運用境界)を正とします。このRunbookでは通知を受けた後の復旧だけを扱います。
 
 売上、返金、手数料はStripe Dashboard、Plan別の有料Account数は管理者課金healthと共有D1の運用集計で確認します。カード情報、日記、診断、AI相談内容を集計へ含めません。
 
@@ -50,9 +45,11 @@ Alertの最小条件は次です。
 
 1. Stripe Dashboardで対象Customerの現在Subscription、Price、状態を確認する
 2. 管理者再照合APIを`dry-run`で実行する
-3. 差分がStripeの現在状態と一致するときだけ`apply`する
+3. Previewで差分がStripeの現在状態と一致するときだけ、確認modalで了承を得て`confirmed: true`付きの`apply`を実行する
 4. 同じ対象へ再度`dry-run`し、差分0を確認する
 5. 誤ったPriceや未知Priceならcatalogを先に修正し、返金・解約を再照合処理から実行しない
+
+再照合APIはPreviewの管理者だけが利用できます。Productionではrouteの存在を`404`で隠し、手作業によるprojection変更は行いません。
 
 ### 3.2 Webhook / Queue / DLQ
 

@@ -137,12 +137,21 @@ async function applyRequestedRole(
   found: UpsertIdentityResult,
   role: "user" | "admin" | undefined,
 ): Promise<UpsertIdentityResult> {
-  if (role !== "admin" || found.account.role === "admin") return found;
-  await db
+  if (role === undefined || found.account.role === role) return found;
+  const updated = await db
     .update(accounts)
-    .set({ role: "admin", updatedAt: new Date() })
-    .where(eq(accounts.id, found.account.id));
-  return { ...found, account: { ...found.account, role: "admin" } };
+    .set({
+      role,
+      updatedAt: new Date(),
+      ...(found.account.role === "admin" && role === "user"
+        ? { sessionVersion: sql`${accounts.sessionVersion} + 1` }
+        : {}),
+    })
+    .where(eq(accounts.id, found.account.id))
+    .returning()
+    .get();
+  if (!updated) throw new Error("Account role synchronization failed");
+  return { ...found, account: updated };
 }
 
 /**
@@ -359,6 +368,42 @@ export async function resolveAccountByLineMessagingApi(
   );
 
   return { account: canonical.account, identity };
+}
+
+/** Productionの管理者allowlistから外れたAccountを降格し、発行済みsessionを一括失効する。 */
+export async function revokeAdminAccessUnlessAllowed(
+  db: SharedD1Client,
+  accountId: string,
+  allowedLineUserIds: readonly string[],
+): Promise<boolean> {
+  const account = await db.query.accounts.findFirst({
+    columns: { role: true },
+    where: (table, { eq }) => eq(table.id, accountId),
+  });
+  if (!account || account.role !== "admin") return true;
+  const allowed =
+    allowedLineUserIds.length > 0
+      ? await db.query.accountIdentities.findFirst({
+          columns: { id: true },
+          where: (table, { and, eq, inArray }) =>
+            and(
+              eq(table.accountId, accountId),
+              eq(table.isDeleted, false),
+              inArray(table.provider, ["line", "line_login"]),
+              inArray(table.providerAccountId, [...allowedLineUserIds]),
+            ),
+        })
+      : undefined;
+  if (allowed) return true;
+  await db
+    .update(accounts)
+    .set({
+      role: "user",
+      sessionVersion: sql`${accounts.sessionVersion} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(accounts.id, accountId), eq(accounts.role, "admin")));
+  return false;
 }
 
 /** Accountに紐づく有効なMessaging API identityを配送時に解決する。 */

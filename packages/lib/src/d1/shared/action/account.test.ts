@@ -369,6 +369,16 @@ describe("resolveAccountByLineLogin", () => {
 
     expect(resolved?.account.role).toBe("admin");
   });
+
+  it("allowlistから外れた管理者を降格し、既存sessionをすべて失効すること", async () => {
+    const db = createTestDb();
+    const admin = await resolveAccountByLineLogin(db, "U_removed_admin", "admin");
+
+    const resolved = await resolveAccountByLineLogin(db, "U_removed_admin", "user");
+
+    expect(resolved.account.role).toBe("user");
+    expect(resolved.account.sessionVersion).toBe(admin.account.sessionVersion + 1);
+  });
 });
 
 describe("resolveAccountByLineMessagingApi", () => {

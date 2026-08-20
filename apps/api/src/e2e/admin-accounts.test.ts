@@ -99,9 +99,11 @@ describe("Admin Account list local E2E", () => {
   });
   afterAll(async () => miniflare.dispose());
 
-  it("管理者が名前と進行度projectionを検索できる", async () => {
+  it("管理者が仮名管理参照と必要最小限のprojectionだけを検索できる", async () => {
+    const adminReference =
+      await D1.shared.action.adminAccount.createAdminAccountReference(userAccountId);
     const response = await app.request(
-      "/api/admin/accounts?query=%E5%B1%B1%E7%94%B0&sort=level",
+      `/api/admin/accounts?query=${adminReference}&sort=level`,
       { headers: sessionHeaders },
       { DB: database, ...sessionFixture.bindings, ENVIRONMENT: "test" },
     );
@@ -113,11 +115,12 @@ describe("Admin Account list local E2E", () => {
       nextCursor: null,
       accounts: [
         {
-          id: userAccountId,
-          displayName: "山田 花子",
+          adminReference,
           role: "user",
           status: "active",
           createdAt: new Date((timestamp + 1) * 1000).toISOString(),
+          lastActivityAt: new Date((timestamp + 1) * 1000).toISOString(),
+          plan: "free",
           progression: {
             status: "ready",
             level: 2,
@@ -147,5 +150,32 @@ describe("Admin Account list local E2E", () => {
       .prepare("UPDATE accounts SET role = 'admin' WHERE id = ?")
       .bind(adminAccountId)
       .run();
+  });
+
+  it("課金照合はProductionで存在を隠し、Previewのapplyは明示確認を必須にする", async () => {
+    const body = JSON.stringify({
+      accountId: "00000000-0000-4000-8000-000000000001",
+      mode: "apply",
+    });
+    const production = await app.request(
+      "/api/admin/billing/reconciliation",
+      { method: "POST", headers: { ...sessionHeaders, "content-type": "application/json" }, body },
+      {
+        DB: database,
+        ...sessionFixture.bindings,
+        ENVIRONMENT: "production",
+        ADMIN_LINE_USER_IDS: adminLineId,
+      },
+    );
+    expect(production.status).toBe(404);
+    expect(await production.json()).toEqual({ error: "Not Found" });
+
+    const preview = await app.request(
+      "/api/admin/billing/reconciliation",
+      { method: "POST", headers: { ...sessionHeaders, "content-type": "application/json" }, body },
+      { DB: database, ...sessionFixture.bindings, ENVIRONMENT: "preview" },
+    );
+    expect(preview.status).toBe(400);
+    expect(await preview.json()).toEqual({ error: "Invalid request" });
   });
 });

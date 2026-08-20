@@ -1,9 +1,12 @@
 name: CD / Production
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'mainの検証済みcommitをProductionへdeployする場合は deploy-production と入力'
+        required: true
+        type: string
 
 concurrency:
   group: cd-production-environment
@@ -12,6 +15,7 @@ concurrency:
 jobs:
   deploy-production:
     name: Deploy Production Environment
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirmation == 'deploy-production' }}
     runs-on: ubuntu-latest
     environment: prd
     env:
@@ -147,8 +151,7 @@ jobs:
           done
           exit "${validation_failed}"
 
-      # PR の CI と同じ検証を、実際にデプロイするツリーへもう一度かける。
-      # main への push で個別の CI ワークフローは走らせないため、これが本番前の唯一の関門。
+      # PR の CI と同じ検証を、手動で指定したmainのツリーへもう一度かける。
       - name: Run CI Verification
         run: bun run ci
 

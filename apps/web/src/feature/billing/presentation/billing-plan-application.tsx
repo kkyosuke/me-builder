@@ -252,6 +252,7 @@ export default function BillingPlanApplication({
       onCheckout={(plan, interval) => void checkout(plan, interval)}
       onManageSubscription={() => void manageSubscription()}
       onRetry={() => void load()}
+      paidPlansAvailable={config.environment !== "production"}
     />
   );
 }

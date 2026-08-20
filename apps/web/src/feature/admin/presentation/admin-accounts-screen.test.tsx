@@ -10,11 +10,12 @@ const page: AdminAccountPage = {
   nextCursor: null,
   accounts: [
     {
-      id: "account-user",
-      displayName: "山田 花子",
+      adminReference: "account_0123456789abcdef01234567",
       role: "user",
       status: "active",
       createdAt: "2026-08-01T00:00:00.000Z",
+      lastActivityAt: "2026-08-14T00:02:00.000Z",
+      plan: "free",
       progression: {
         status: "ready",
         level: 12,
@@ -26,11 +27,12 @@ const page: AdminAccountPage = {
       },
     },
     {
-      id: "account-admin",
-      displayName: null,
+      adminReference: "account_89abcdef0123456789abcdef",
       role: "admin",
       status: "active",
       createdAt: "2026-07-01T00:00:00.000Z",
+      lastActivityAt: "2026-07-02T00:00:00.000Z",
+      plan: "free",
       progression: { status: "pending" },
     },
   ],
@@ -55,12 +57,12 @@ function renderScreen(overrides: Partial<Parameters<typeof AdminAccountsScreen>[
 describe("AdminAccountsScreen", () => {
   afterEach(cleanup);
 
-  it("名前、ID、レベル、かけら、未集計状態を表示する", () => {
+  it("仮名管理参照、Plan、レベル、かけら、未集計状態を表示する", () => {
     renderScreen();
 
     expect(screen.getByRole("heading", { name: "Account" })).toBeTruthy();
-    expect(screen.getAllByText("山田 花子").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("account-user").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("account_0123456789abcdef01234567").length).toBeGreaterThan(0);
+    expect(screen.queryByText("山田 花子")).toBeNull();
     expect(screen.getAllByText("Lv.12").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/集計更新/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("レベル集計中").length).toBeGreaterThan(0);
@@ -71,13 +73,13 @@ describe("AdminAccountsScreen", () => {
     const onFilterChange = vi.fn();
     renderScreen({ onFilterChange });
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "名前・Account IDを検索" }), {
-      target: { value: "山田" },
+    fireEvent.change(screen.getByRole("searchbox", { name: "管理参照を完全一致で検索" }), {
+      target: { value: "account_0123456789abcdef01234567" },
     });
     fireEvent.change(screen.getByRole("combobox", { name: "roleで絞り込み" }), {
       target: { value: "admin" },
     });
-    expect(onFilterChange).toHaveBeenNthCalledWith(1, "query", "山田");
+    expect(onFilterChange).toHaveBeenNthCalledWith(1, "query", "account_0123456789abcdef01234567");
     expect(onFilterChange).toHaveBeenNthCalledWith(2, "role", "admin");
   });
 

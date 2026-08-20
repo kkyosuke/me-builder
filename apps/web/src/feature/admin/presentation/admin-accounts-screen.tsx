@@ -41,16 +41,13 @@ function AccountCards({ accounts }: { accounts: readonly AdminAccount[] }) {
     <ul className="grid gap-3 lg:hidden">
       {accounts.map((account) => (
         <li
-          key={account.id}
+          key={account.adminReference}
           className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate font-bold text-slate-950 dark:text-slate-50">
-                {account.displayName ?? "名前未取得"}
-              </p>
               <p className="mt-1 break-all font-mono text-xs text-slate-500 dark:text-slate-400">
-                {account.id}
+                {account.adminReference}
               </p>
             </div>
             <div className="flex shrink-0 gap-1.5">
@@ -82,6 +79,14 @@ function AccountCards({ accounts }: { accounts: readonly AdminAccount[] }) {
               <dd className="mt-1">{date.format(new Date(account.createdAt))}</dd>
             </div>
             <div>
+              <dt className="text-xs text-slate-500 dark:text-slate-400">Plan</dt>
+              <dd className="mt-1">{account.plan}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500 dark:text-slate-400">最終利用</dt>
+              <dd className="mt-1 text-xs">{dateTime.format(new Date(account.lastActivityAt))}</dd>
+            </div>
+            <div>
               <dt className="text-xs text-slate-500 dark:text-slate-400">最終成長</dt>
               <dd className="mt-1 text-xs">
                 <LastGrowth account={account} />
@@ -104,7 +109,7 @@ function AccountTable({ accounts }: { accounts: readonly AdminAccount[] }) {
         <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
           <tr>
             <th scope="col" className="px-4 py-3 font-medium">
-              名前 / Account ID
+              管理参照
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
               role / status
@@ -119,17 +124,22 @@ function AccountTable({ accounts }: { accounts: readonly AdminAccount[] }) {
               登録日
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
+              Plan / 最終利用
+            </th>
+            <th scope="col" className="px-4 py-3 font-medium">
               最終成長
             </th>
           </tr>
         </thead>
         <tbody>
           {accounts.map((account) => (
-            <tr key={account.id} className="border-t border-slate-200 dark:border-slate-700">
+            <tr
+              key={account.adminReference}
+              className="border-t border-slate-200 dark:border-slate-700"
+            >
               <th scope="row" className="max-w-64 px-4 py-3 font-medium">
-                <span className="block truncate">{account.displayName ?? "名前未取得"}</span>
                 <span className="mt-1 block break-all font-mono text-xs font-normal text-slate-500 dark:text-slate-400">
-                  {account.id}
+                  {account.adminReference}
                 </span>
               </th>
               <td className="px-4 py-3">
@@ -156,6 +166,12 @@ function AccountTable({ accounts }: { accounts: readonly AdminAccount[] }) {
               </td>
               <td className="px-4 py-3 whitespace-nowrap">
                 {date.format(new Date(account.createdAt))}
+              </td>
+              <td className="px-4 py-3 whitespace-nowrap">
+                <span className="block font-medium">{account.plan}</span>
+                <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                  {dateTime.format(new Date(account.lastActivityAt))}
+                </span>
               </td>
               <td className="px-4 py-3 text-xs whitespace-nowrap">
                 <LastGrowth account={account} />
@@ -262,7 +278,7 @@ export function AdminAccountsScreen({
 
       <div className="mt-4 grid gap-3 rounded-2xl bg-slate-100 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_9rem_9rem_12rem] dark:bg-slate-800/70">
         <label className="relative">
-          <span className="sr-only">名前・Account IDを検索</span>
+          <span className="sr-only">管理参照を完全一致で検索</span>
           <Search
             className="pointer-events-none absolute top-3 left-3 size-4 text-slate-400"
             aria-hidden="true"
@@ -271,7 +287,7 @@ export function AdminAccountsScreen({
             type="search"
             value={filters.query}
             onChange={(event) => onFilterChange("query", event.currentTarget.value)}
-            placeholder="名前・Account IDを検索"
+            placeholder="管理参照を完全一致で検索"
             className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pr-3 pl-9 text-sm dark:border-slate-600 dark:bg-slate-900"
           />
         </label>
@@ -286,6 +302,7 @@ export function AdminAccountsScreen({
           >
             <option value="all">すべてのstatus</option>
             <option value="active">active</option>
+            <option value="stopped">stopped</option>
           </select>
         </label>
         <label>

@@ -2,7 +2,7 @@
 
 ## 1. 目的と前提
 
-新規購入の対象を運営Account、少数招待、一般提供の順で広げ、価格と運用を検証します。既存契約の利用権限、更新、解約、Customer Portal、Webhook処理は新規購入gateから分離し、緊急停止時も継続させます。
+この文書は将来、有料PlanをProductionへ公開するときの段階公開手順を所有します。初期ProductionはFreeだけを提供し、有料Plan、価格、無料トライアル、購入・契約管理UIを公開しません。Stripe catalogと課金実装はPreview検証用として保持します。
 
 Productionで開始する前に、決済側のPreview検証、公開価格・規約・税務確認、監視・復旧手順、Plan機能のPreview検証がすべて完了している必要があります。この文書とrelease controlの追加だけではProduction公開を許可しません。
 

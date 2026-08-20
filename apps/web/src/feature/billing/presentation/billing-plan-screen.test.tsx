@@ -61,6 +61,27 @@ const free: ProfileEntitlement = {
 describe("BillingPlanScreen", () => {
   afterEach(cleanup);
 
+  it("Production向け表示ではFreeだけを案内し、有料Planと購入導線を隠す", () => {
+    render(
+      <BillingPlanScreen
+        plans={{ status: "success", data: plans }}
+        entitlement={{ status: "success", data: free }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
+        onRetry={vi.fn()}
+        paidPlansAvailable={false}
+      />,
+    );
+
+    expect(screen.getByText("現在は無料で利用できます")).toBeTruthy();
+    expect(screen.queryByText("Lite")).toBeNull();
+    expect(screen.queryByText(/トライアル/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /プランを変更する/ })).toBeNull();
+  });
+
   it("価格と更新・解約条件を確認してからCheckoutを開始する", () => {
     const onCheckout = vi.fn();
     render(

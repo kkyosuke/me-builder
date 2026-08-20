@@ -4,11 +4,12 @@ import { fetchAdminAccounts, fetchAdminStatistics } from "./admin-api";
 const page = {
   accounts: [
     {
-      id: "account-1",
-      displayName: "山田 花子",
+      adminReference: "account_0123456789abcdef01234567",
       role: "user",
       status: "active",
       createdAt: "2026-08-01T00:00:00.000Z",
+      lastActivityAt: "2026-08-02T00:00:00.000Z",
+      plan: "free",
       progression: { status: "pending" },
     },
   ],
@@ -26,12 +27,17 @@ describe("Admin Account API", () => {
     await expect(
       fetchAdminAccounts(
         "https://api.example.com",
-        { query: " 山田 ", role: "user", status: "active", sort: "level" },
+        {
+          query: " account_0123456789abcdef01234567 ",
+          role: "user",
+          status: "active",
+          sort: "level",
+        },
         "cursor-value",
       ),
     ).resolves.toEqual(page);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.com/api/admin/accounts?query=%E5%B1%B1%E7%94%B0&role=user&status=active&sort=level&cursor=cursor-value",
+      "https://api.example.com/api/admin/accounts?query=account_0123456789abcdef01234567&role=user&status=active&sort=level&cursor=cursor-value",
       expect.objectContaining({ credentials: "include" }),
     );
   });

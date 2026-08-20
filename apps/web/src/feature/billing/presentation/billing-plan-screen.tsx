@@ -36,6 +36,7 @@ export function BillingPlanScreen({
   onCheckout,
   onManageSubscription,
   onRetry,
+  paidPlansAvailable = true,
 }: {
   plans: AsyncState<readonly BillingPlan[]>;
   entitlement: AsyncState<ProfileEntitlement>;
@@ -46,6 +47,7 @@ export function BillingPlanScreen({
   onCheckout: (plan: PaidPlanCode, interval: BillingInterval) => void;
   onManageSubscription: () => void;
   onRetry: () => void;
+  paidPlansAvailable?: boolean;
 }) {
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [selectedPlan, setSelectedPlan] = useState<PaidPlanCode | null>(null);
@@ -170,7 +172,9 @@ export function BillingPlanScreen({
         <section className="mt-4 flex min-h-16 items-center justify-between gap-4 rounded-xl bg-white px-4 py-3 shadow-sm dark:bg-slate-900">
           <div>
             <h2 className="text-xs font-bold text-slate-500 dark:text-slate-400">現在のプラン</h2>
-            {entitlement.status === "loading" || entitlement.status === "idle" ? (
+            {!paidPlansAvailable ? (
+              <p className="mt-0.5 text-lg font-bold">Free</p>
+            ) : entitlement.status === "loading" || entitlement.status === "idle" ? (
               <output
                 aria-busy="true"
                 aria-label="現在のプランを読み込んでいます"
@@ -186,7 +190,7 @@ export function BillingPlanScreen({
               </p>
             )}
           </div>
-          {paidSubscription && (
+          {paidPlansAvailable && paidSubscription && (
             <button
               type="button"
               disabled={checkoutState.status === "loading"}
@@ -198,7 +202,7 @@ export function BillingPlanScreen({
           )}
         </section>
 
-        {safeDefault && (
+        {paidPlansAvailable && safeDefault && (
           <section className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
             <h2 className="font-bold">現在の契約状態を確認できません</h2>
             <output className="mt-2 block text-sm">
@@ -214,7 +218,12 @@ export function BillingPlanScreen({
           </section>
         )}
 
-        {familySeat ? (
+        {!paidPlansAvailable ? (
+          <section className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+            <h2 className="font-bold">現在は無料で利用できます</h2>
+            <p className="mt-2 text-sm">有料プランは現在提供していません。</p>
+          </section>
+        ) : familySeat ? (
           <section className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
             <h2 className="font-bold">ファミリーパックに参加中です</h2>
             <p className="mt-2 text-sm">
@@ -405,38 +414,42 @@ export function BillingPlanScreen({
           </section>
         )}
 
-        {selected && !familySeat && !safeDefault && entitlement.status === "success" && (
-          <>
-            <div className="h-28" aria-hidden="true" />
-            <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-slate-50/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-6">
-              <div className="mx-auto flex max-w-3xl items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">
-                    {planTabNames[selected.code]}（{selected.name}）
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {formatBillingAmount(billingPlanPrice(selected, interval).amount)} /
-                    {interval === "month" ? "月" : "年"}
-                  </p>
-                  {interval === "year" && annualSavings && (
-                    <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                      年間{formatBillingAmount(annualSavings.amount)}お得
+        {paidPlansAvailable &&
+          selected &&
+          !familySeat &&
+          !safeDefault &&
+          entitlement.status === "success" && (
+            <>
+              <div className="h-28" aria-hidden="true" />
+              <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-slate-50/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-6">
+                <div className="mx-auto flex max-w-3xl items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">
+                      {planTabNames[selected.code]}（{selected.name}）
                     </p>
-                  )}
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {formatBillingAmount(billingPlanPrice(selected, interval).amount)} /
+                      {interval === "month" ? "月" : "年"}
+                    </p>
+                    {interval === "year" && annualSavings && (
+                      <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                        年間{formatBillingAmount(annualSavings.amount)}お得
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={checkoutState.status === "loading" || goalCheckUnavailable}
+                    onClick={requestCheckout}
+                    className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 font-bold text-white shadow-lg disabled:cursor-wait disabled:opacity-60 sm:min-w-56"
+                  >
+                    <ExternalLink className="size-4" aria-hidden="true" />
+                    {actionLabel}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={checkoutState.status === "loading" || goalCheckUnavailable}
-                  onClick={requestCheckout}
-                  className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 font-bold text-white shadow-lg disabled:cursor-wait disabled:opacity-60 sm:min-w-56"
-                >
-                  <ExternalLink className="size-4" aria-hidden="true" />
-                  {actionLabel}
-                </button>
-              </div>
-            </footer>
-          </>
-        )}
+              </footer>
+            </>
+          )}
 
         {goalCheckUnavailable && (
           <p role="alert" className="pb-4 text-center text-sm text-rose-700 dark:text-rose-300">

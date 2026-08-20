@@ -7,10 +7,10 @@ import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
 import {
   InvalidAdminAccountCursorError,
+  createAdminAccountReference,
   listAdminAccounts,
   upsertAccountProgressionProjection,
 } from "./admin-account";
-import { saveVerifiedDisplayName } from "./profile";
 
 function createTestDb(): SharedD1Client {
   const sqlite = new Database(":memory:");
@@ -26,7 +26,6 @@ async function insertAccount(
     id: string;
     createdAt: Date;
     role?: "user" | "admin";
-    displayName?: string;
   }>,
 ): Promise<void> {
   await db.insert(schema.accounts).values({
@@ -35,9 +34,6 @@ async function insertAccount(
     updatedAt: input.createdAt,
     role: input.role ?? "user",
   });
-  if (input.displayName) {
-    await saveVerifiedDisplayName(db, input.id, input.displayName, input.createdAt);
-  }
 }
 
 const emptyProgression = {
@@ -86,12 +82,11 @@ describe("Admin Account progression projection", () => {
 });
 
 describe("Admin Account list", () => {
-  it("projection未作成を残し、名前・roleで検索する", async () => {
+  it("projection未作成を残し、仮名管理参照の完全一致とroleで検索する", async () => {
     const db = createTestDb();
     await insertAccount(db, {
       id: "account-user",
       createdAt: new Date("2026-08-02T00:00:00.000Z"),
-      displayName: "山田 花子",
     });
     await insertAccount(db, {
       id: "account-admin",
@@ -106,19 +101,20 @@ describe("Admin Account list", () => {
       activePieces: 2,
     });
 
-    await expect(listAdminAccounts(db, { query: "山田" })).resolves.toMatchObject({
+    const userReference = await createAdminAccountReference("account-user");
+    await expect(listAdminAccounts(db, { query: userReference })).resolves.toMatchObject({
       total: 1,
       accounts: [
         {
-          id: "account-user",
-          displayName: "山田 花子",
+          adminReference: userReference,
+          plan: "free",
           progression: { status: "ready", level: 2 },
         },
       ],
     });
     await expect(listAdminAccounts(db, { role: "admin" })).resolves.toMatchObject({
       total: 1,
-      accounts: [{ id: "account-admin", progression: { status: "pending" } }],
+      accounts: [{ progression: { status: "pending" } }],
     });
   });
 
@@ -138,14 +134,19 @@ describe("Admin Account list", () => {
     }
 
     const first = await listAdminAccounts(db, { sort: "level", limit: 2 });
-    expect(first.accounts.map(({ id }) => id)).toEqual(["account-2", "account-3"]);
+    expect(first.accounts.map(({ adminReference }) => adminReference)).toEqual([
+      await createAdminAccountReference("account-2"),
+      await createAdminAccountReference("account-3"),
+    ]);
     expect(first.nextCursor).toEqual(expect.any(String));
     const second = await listAdminAccounts(db, {
       sort: "level",
       limit: 2,
       ...(first.nextCursor ? { cursor: first.nextCursor } : {}),
     });
-    expect(second.accounts.map(({ id }) => id)).toEqual(["account-1"]);
+    expect(second.accounts.map(({ adminReference }) => adminReference)).toEqual([
+      await createAdminAccountReference("account-1"),
+    ]);
   });
 
   it("過大なcursorをDBへ渡す前に拒否する", async () => {
