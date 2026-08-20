@@ -545,12 +545,29 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     const response = await personalDataRequest("/api/personal-data/features");
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    const features = await response.text();
-    expect(features).toContain('"trait":"reflective"');
-    expect(features).not.toMatch(
+    const body = (await response.json()) as {
+      scopes: string[];
+      brainItems: Array<Record<string, unknown>>;
+    };
+    expect(body).toMatchObject({
+      scopes: ["metadata", "active", "history"],
+      brainItems: [
+        {
+          category: "preference",
+          status: "active",
+          derivation: "ai",
+          isInference: true,
+          stability: "changeable",
+          sensitivity: "normal",
+        },
+      ],
+    });
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('"trait":"reflective"');
+    expect(serialized).not.toMatch(
       /relationship-must-not-export|partner-account-must-not-export|private-line-event-must-not-export|stripe|customerId|priceId|paymentMethod/,
     );
-    expect(features).not.toMatch(
+    expect(serialized).not.toMatch(
       /APIへ持ち出してはいけない|brain-item-must-not-export|evidence-must-not-export|sourceRecordId/,
     );
   });
