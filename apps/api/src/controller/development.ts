@@ -9,6 +9,7 @@ import {
 } from "../contract/development/account-data-reset";
 import { ForbiddenErrorSchema, ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import { resetDevelopmentAccountData } from "../logic/dev-account-data-reset";
+import { recordDevelopmentOperationAudit } from "../logic/development-operation-audit";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 import {
@@ -41,17 +42,19 @@ export async function deleteDevelopmentAccountData(c: Context<AppEnv>): Promise<
     accountData: c.env.ACCOUNT_DATA,
     conversationCoordinator: c.env.CONVERSATION_COORDINATOR,
   });
+  const deletedContentCount =
+    outcome.deletedDiagnosisResponseCount +
+    outcome.deletedConversationSessionCount +
+    outcome.deletedSourceRecordCount +
+    outcome.deletedBrainItemCount +
+    outcome.deletedProfileSummaryVersionCount;
+  await recordDevelopmentOperationAudit(c.env.DB, "account-data-reset", deletedContentCount);
 
   logger.info(
     {
       event: "development.account-data.reset",
       outcome: "succeeded",
-      deletedContentCount:
-        outcome.deletedDiagnosisResponseCount +
-        outcome.deletedConversationSessionCount +
-        outcome.deletedSourceRecordCount +
-        outcome.deletedBrainItemCount +
-        outcome.deletedProfileSummaryVersionCount,
+      deletedContentCount,
       scheduledVectorDeletionCount: outcome.scheduledVectorDeletionCount,
     },
     "Development Account data was reset",

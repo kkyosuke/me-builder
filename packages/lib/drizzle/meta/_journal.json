@@ -134,6 +134,13 @@
       "when": 1787020751555,
       "tag": "0018_cold_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1787235260292,
+      "tag": "0019_fancy_whizzer",
+      "breakpoints": true
     }
   ]
 }

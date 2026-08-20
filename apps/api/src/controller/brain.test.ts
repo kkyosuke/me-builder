@@ -17,6 +17,9 @@ const {
   resetDevelopmentFailedBrainVectorSyncJob: vi.fn(),
   resetAllDevelopmentFailedBrainVectorSyncJobs: vi.fn(),
 }));
+const { recordDevelopmentOperationAudit } = vi.hoisted(() => ({
+  recordDevelopmentOperationAudit: vi.fn(),
+}));
 const authentication = vi.hoisted(() => ({
   role: "admin" as "user" | "admin",
   authenticatedAt: new Date(),
@@ -30,6 +33,7 @@ vi.mock("../logic/development-brain-vector-sync-jobs", () => ({
   resetDevelopmentBrainVectorSyncJob: resetDevelopmentFailedBrainVectorSyncJob,
   resetAllDevelopmentBrainVectorSyncJobs: resetAllDevelopmentFailedBrainVectorSyncJobs,
 }));
+vi.mock("../logic/development-operation-audit", () => ({ recordDevelopmentOperationAudit }));
 vi.mock("../middleware/authentication", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../middleware/authentication")>();
   return {
@@ -331,6 +335,11 @@ describe("開発用Brain Vector同期job API", () => {
         actor: expect.objectContaining({ accountId: "account-1" }),
       }),
     );
+    expect(recordDevelopmentOperationAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      "brain-vector-single-reset",
+      1,
+    );
   });
 
   it("Account内の終端jobをdry-run後に一括resetする", async () => {
@@ -369,6 +378,11 @@ describe("開発用Brain Vector同期job API", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ mode: "execute", candidateCount: 3, resetCount: 3 });
+    expect(recordDevelopmentOperationAudit).toHaveBeenLastCalledWith(
+      expect.anything(),
+      "brain-vector-bulk-reset",
+      3,
+    );
   });
 
   it("一括reset実行は直近10分以内の本人確認を要求する", async () => {

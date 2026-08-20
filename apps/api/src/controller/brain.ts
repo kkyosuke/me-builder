@@ -24,6 +24,7 @@ import {
   resetAllDevelopmentBrainVectorSyncJobs as resetAllDevelopmentFailedBrainVectorSyncJobs,
   resetDevelopmentBrainVectorSyncJob as resetDevelopmentFailedBrainVectorSyncJob,
 } from "../logic/development-brain-vector-sync-jobs";
+import { recordDevelopmentOperationAudit } from "../logic/development-operation-audit";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 import {
@@ -113,6 +114,7 @@ export async function getDevelopmentBrainVector(c: Context<AppEnv>): Promise<Res
 function failedJobParams(c: Context<AppEnv>) {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) return undefined;
   return {
+    db: c.env.DB,
     actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
   };
@@ -185,6 +187,7 @@ export async function postDevelopmentBrainVectorSyncJobReset(
       404,
     );
   }
+  await recordDevelopmentOperationAudit(params.db, "brain-vector-single-reset", 1);
   logger.info(
     {
       event: "development.brain-vector-sync-job.reset",
@@ -240,6 +243,7 @@ export async function postDevelopmentBrainVectorSyncJobsResetAll(
     return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
   }
   const outcome = await resetAllDevelopmentFailedBrainVectorSyncJobs(params);
+  await recordDevelopmentOperationAudit(params.db, "brain-vector-bulk-reset", outcome.resetCount);
   logger.info(
     {
       event: "development.brain-vector-sync-job.reset",

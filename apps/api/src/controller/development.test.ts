@@ -7,11 +7,15 @@ import type { ResetDevelopmentAccountDataOutcome } from "../logic/dev-account-da
 const { resetDevelopmentAccountData } = vi.hoisted(() => ({
   resetDevelopmentAccountData: vi.fn(),
 }));
+const { recordDevelopmentOperationAudit } = vi.hoisted(() => ({
+  recordDevelopmentOperationAudit: vi.fn(),
+}));
 const authentication = vi.hoisted(() => ({
   role: "admin" as "user" | "admin",
   authenticatedAt: new Date(),
 }));
 vi.mock("../logic/dev-account-data-reset", () => ({ resetDevelopmentAccountData }));
+vi.mock("../logic/development-operation-audit", () => ({ recordDevelopmentOperationAudit }));
 vi.mock("../middleware/authentication", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../middleware/authentication")>();
   return {
@@ -106,6 +110,7 @@ describe("DELETE /api/dev/account-data", () => {
         conversationCoordinator: dummyCoordinator,
       }),
     );
+    expect(recordDevelopmentOperationAudit).toHaveBeenCalledWith(dummyDb, "account-data-reset", 22);
   });
 
   it.each(["production", "staging"])("%sでは404で削除しない", async (environment) => {
