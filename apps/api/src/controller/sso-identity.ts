@@ -28,6 +28,7 @@ import { createSsoRolloutAuthorizer } from "../infrastructure/authentication/sso
 import { createSsoTransactionStore } from "../infrastructure/authentication/sso-transaction-store";
 import {
   SsoAuthenticationError,
+  type SsoAuthenticationFailure,
   SsoCallbackCompletionError,
   cancelSsoAuthentication,
   completeSsoCallback,
@@ -41,6 +42,16 @@ import { setApplicationSessionCookie } from "./authentication";
 const SSO_CALLBACK_STATE_COOKIE = "me_builder_sso_callback_state";
 const SECURE_SSO_CALLBACK_STATE_COOKIE = "__Host-me_builder_sso_callback_state";
 const SSO_CALLBACK_STATE_TTL_SECONDS = 10 * 60;
+
+const SSO_AUTHENTICATION_RESULT_CODES = {
+  identity_unlinked: "SSO_IDENTITY_UNLINKED",
+  invalid_callback: "SSO_INVALID_CALLBACK",
+  invalid_return_to: "SSO_INVALID_RETURN_TO",
+  transaction_expired: "SSO_TRANSACTION_EXPIRED",
+  transaction_missing: "SSO_TRANSACTION_MISSING",
+  transaction_purpose_mismatch: "SSO_TRANSACTION_PURPOSE_MISMATCH",
+  rollout_excluded: "SSO_ROLLOUT_EXCLUDED",
+} as const satisfies Record<SsoAuthenticationFailure, string>;
 
 function callbackStateCookieOptions(secure: boolean) {
   return {
@@ -153,6 +164,7 @@ function logSsoCallbackFailure(input: {
   errorCode: "SSO_PROVIDER_CALLBACK_FAILED" | "SSO_CALLBACK_FAILED";
   errorCategory: "external" | "unknown";
   retryable: boolean;
+  resultCode?: (typeof SSO_AUTHENTICATION_RESULT_CODES)[SsoAuthenticationFailure];
 }): void {
   logger.error(
     {
@@ -166,6 +178,7 @@ function logSsoCallbackFailure(input: {
       errorCode: input.errorCode,
       errorCategory: input.errorCategory,
       retryable: input.retryable,
+      ...(input.resultCode ? { resultCode: input.resultCode } : {}),
     },
     `[SSO] failed at ${input.stage} -> web-redirect (${input.errorCode}, category:${input.errorCategory})`,
   );
@@ -376,6 +389,9 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       errorCode: providerFailure ? "SSO_PROVIDER_CALLBACK_FAILED" : "SSO_CALLBACK_FAILED",
       errorCategory: providerFailure ? "external" : "unknown",
       retryable: providerFailure && error.failure.reason !== "token_invalid",
+      ...(error instanceof SsoAuthenticationError
+        ? { resultCode: SSO_AUTHENTICATION_RESULT_CODES[error.reason] }
+        : {}),
     });
     return redirectToWeb(c, resultPath(callback?.returnTo ?? "/profile", "error"));
   }
