@@ -23,7 +23,7 @@ APIは次の3 scopeを常に返します。
 - 相手Accountの情報、CompatibilityData
 - 認証、運用、model、prompt、課金に関する情報
 
-形式は`kagami-brain-features`、`formatVersion`は`1`です。この応答から原文や根拠の識別子を復元できないことを境界とします。
+形式は`kagami-brain-features`、`formatVersion`は`1`です。写真原本、thumbnail、EXIF、画像固有metadata、画像由来のAI派生物も返しません。この応答から原文、media、根拠の識別子を復元できないことを境界とします。
 
 ## 3. APIと認可
 

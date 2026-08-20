@@ -108,8 +108,9 @@ flowchart TD
 ## 5. データ連携フロー原則
 
 1. **メディア登録とメタデータ保持**
-   - ユーザーから投稿されたバイナリデータ（写真・動画・音声）は Cloudflare R2 へ直接保存します。
+   - 検証を通過して永続化するユーザー投稿のバイナリデータ（写真・動画・音声）はCloudflare R2へ保存します。
    - アバターのobject key、content type、byte size、etag、更新日時など、Account運営に必要なメディアメタデータは共有D1へ記録します。個人コンテンツに属するメディアの構造化情報との境界は[Accountデータ分離設計](account-data-isolation.md)を正とします。
+   - LINE写真日記はアバターとbucket、metadata、処理経路を分離します。取得後の検証、Private R2、AccountData metadata、派生物の境界は[LINE写真日記入力設計](photo-diary-input-design.md)を正とします。
 
 2. **テキストおよびメディアのベクトル化と検索**
    - activeなBrain Itemは、AccountDataの同期outboxと専用Queueを経由してVertex AI Express ModeのGeminiでEmbeddingへ変換されます。
