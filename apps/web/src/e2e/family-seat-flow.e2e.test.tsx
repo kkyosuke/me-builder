@@ -29,16 +29,14 @@ const payerSeat = {
   slotNumber: 1,
   role: "payer" as const,
   status: "active" as const,
-  createdAt: "2026-08-16T00:00:00.000Z",
-  updatedAt: "2026-08-16T00:00:00.000Z",
+  displayName: null,
 };
 const memberSeat = {
   id: "member-seat",
   slotNumber: 2,
   role: "member" as const,
   status: "active" as const,
-  createdAt: "2026-08-16T00:00:00.000Z",
-  updatedAt: "2026-08-16T01:00:00.000Z",
+  displayName: "家族A",
 };
 
 describe("family seat user journey", () => {

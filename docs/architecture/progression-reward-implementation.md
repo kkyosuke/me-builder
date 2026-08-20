@@ -17,11 +17,11 @@ Evidence fingerprintは、本文payloadがある場合はそのcontent hash、�
 
 Revisionは作成時に`correction`か`temporal`を確定します。診断の再回答による置換は`correction`、日記から時点の異なる状態を保存する置換は`temporal`とし、進行度読込時に由来を推測し直しません。
 
-## 3. 計算版と再計算
+## 3. 計算版
 
-確定eventとAccount集計は`calculation_version`を持ちます。現在版と集計版が異なる場合は、本文ではなく保存済みの出来事種別から成長差分を再計算します。
+確定eventとAccount集計は`calculation_version`を持ちます。計算版や加点式を変更しても、確定済みeventの差分と累積値は再計算しません。新しい版は変更後に確定するeventへだけ適用します。
 
-`highest_level`は過去の最高到達レベルを保持し、再計算後のレベルが下がる場合の表示下限にします。削除や式変更で最高到達レベルを下げません。共有D1の管理者一覧projectionにもAccountDataが返した計算版をそのまま写します。
+`highest_level`は過去の最高到達レベルを保持します。削除や式変更で最高到達レベルを下げません。共有D1の管理者一覧projectionにもAccountDataが返した計算版をそのまま写します。
 
 ## 4. 本人向けフィードバック
 

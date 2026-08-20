@@ -6,7 +6,6 @@ export * as development from "./development";
 export * as diary from "./diary";
 export * as goalFollowUp from "./goal-follow-up";
 export * as selfCareContext from "./self-care-context";
-export * as personalDataExport from "./personal-data-export";
 export * as profileSummary from "./profile-summary";
 export * as progression from "./progression";
 export * as source from "./source";

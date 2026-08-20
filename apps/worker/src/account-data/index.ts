@@ -19,7 +19,6 @@ import { compatibilityActions } from "./compatibility";
 import { developmentActions } from "./development";
 import { diagnosisActions } from "./diagnosis";
 import { diaryActions } from "./diary";
-import { personalDataExportActions } from "./personal-data-export";
 import { profileSummaryActions } from "./profile-summary";
 import { AccountDataRepository, type DiagnosisCatalogSnapshot } from "./repository";
 
@@ -29,7 +28,6 @@ const actions = {
   ...diagnosisActions,
   ...developmentActions,
   ...diaryActions,
-  ...personalDataExportActions,
   ...profileSummaryActions,
 } as const;
 
@@ -195,10 +193,6 @@ export class AccountData extends DurableObject<Env> {
           this.repository.client,
           this.accountId,
           this.env.PROFILE_SUMMARY_QUEUE,
-        );
-        await DO.account.action.personalDataExport.processPendingPersonalDataExport(
-          this.repository.client,
-          this.accountId,
         );
         await expireAiUsageReservations(this.repository.client, this.accountId);
         const checkpointClaim = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(

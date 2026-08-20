@@ -363,8 +363,8 @@ describe("GET /api/openapi.json", () => {
       });
     }
     expect(
-      document.paths["/api/personal-data/exports/{exportId}/download"]?.get?.responses?.["200"]
-        ?.content,
+      document.paths["/api/personal-data/features"]?.get?.responses?.["200"]?.content,
     ).toHaveProperty("application/json");
+    expect(document.paths["/api/personal-data/exports"]).toBeUndefined();
   });
 });

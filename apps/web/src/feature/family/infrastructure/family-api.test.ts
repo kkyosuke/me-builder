@@ -12,8 +12,7 @@ const seat = {
   slotNumber: 2,
   role: "member",
   status: "active",
-  createdAt: "2026-08-16T00:00:00.000Z",
-  updatedAt: "2026-08-16T01:00:00.000Z",
+  displayName: "家族A",
 };
 
 describe("family api", () => {

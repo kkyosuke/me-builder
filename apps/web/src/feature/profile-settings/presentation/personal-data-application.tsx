@@ -1,35 +1,16 @@
-import { ArrowLeft, Check, Download, FilePenLine, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, FilePenLine, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
 import {
   type PersonalDataCorrection,
-  type PersonalDataExport,
   type PersonalDataRecord,
   correctPersonalDataRecord,
   deletePersonalDataRecord,
-  downloadPersonalDataExport,
-  fetchPersonalDataExport,
   fetchPersonalDataRecords,
-  requestPersonalDataExport,
 } from "../infrastructure/personal-data-api";
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "入力データを操作できませんでした。";
-}
-
-function waitForNextPoll(signal: AbortSignal): Promise<void> {
-  if (signal.aborted) return Promise.resolve();
-  return new Promise((resolve) => {
-    const onAbort = () => {
-      window.clearTimeout(timer);
-      resolve();
-    };
-    const timer = window.setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    }, 1_000);
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
 }
 
 export function PersonalDataApplication({
@@ -47,13 +28,9 @@ export function PersonalDataApplication({
   const [draft, setDraft] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [dataExport, setDataExport] = useState<PersonalDataExport | null>(null);
-  const [exportBusy, setExportBusy] = useState(false);
-  const exportRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
     backButtonRef.current?.focus();
-    return () => exportRequest.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -108,78 +85,6 @@ export function PersonalDataApplication({
     }
   };
 
-  const pollExport = async (exportId: string, signal: AbortSignal) => {
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      if (signal.aborted) return;
-      const current = await fetchPersonalDataExport(config.apiUrl, exportId, signal);
-      if (signal.aborted) return;
-      setDataExport(current);
-      if (
-        current.status === "ready" ||
-        current.status === "failed" ||
-        current.status === "expired"
-      ) {
-        return;
-      }
-      await waitForNextPoll(signal);
-    }
-    if (signal.aborted) return;
-    throw new Error("作成に時間がかかっています。しばらくしてから再試行してください。");
-  };
-
-  const createExport = async () => {
-    exportRequest.current?.abort();
-    const controller = new AbortController();
-    exportRequest.current = controller;
-    setExportBusy(true);
-    setError(null);
-    try {
-      const created = await requestPersonalDataExport(config.apiUrl, controller.signal);
-      if (controller.signal.aborted) return;
-      setDataExport(created);
-      if (created.status === "queued" || created.status === "generating") {
-        await pollExport(created.id, controller.signal);
-      }
-    } catch (caught) {
-      if (!controller.signal.aborted) setError(message(caught));
-    } finally {
-      if (exportRequest.current === controller) {
-        exportRequest.current = null;
-        if (!controller.signal.aborted) setExportBusy(false);
-      }
-    }
-  };
-
-  const downloadExport = async () => {
-    if (!dataExport || dataExport.status !== "ready") return;
-    exportRequest.current?.abort();
-    const controller = new AbortController();
-    exportRequest.current = controller;
-    setExportBusy(true);
-    setError(null);
-    try {
-      const blob = await downloadPersonalDataExport(
-        config.apiUrl,
-        dataExport.id,
-        controller.signal,
-      );
-      if (controller.signal.aborted) return;
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `me-builder-personal-data-${dataExport.id}.json`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch (caught) {
-      if (!controller.signal.aborted) setError(message(caught));
-    } finally {
-      if (exportRequest.current === controller) {
-        exportRequest.current = null;
-        if (!controller.signal.aborted) setExportBusy(false);
-      }
-    }
-  };
-
   return (
     <dialog
       open
@@ -211,60 +116,6 @@ export function PersonalDataApplication({
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-950 dark:border-sky-500/30 dark:bg-sky-400/10 dark:text-sky-100">
           診断回答と日記を訂正・削除できます。削除した内容は、以後のAI相談、わたしのまとめ、相性共有で利用されません。
         </div>
-
-        <section
-          className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800"
-          aria-labelledby="personal-data-export-title"
-        >
-          <h2 id="personal-data-export-title" className="font-bold text-slate-950 dark:text-white">
-            本人データを書き出す
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-            診断、日記、会話、わたしのまとめなど、ご本人のデータをJSON形式で作成します。料金プランにかかわらず利用でき、完成後24時間ダウンロードできます。
-          </p>
-          {(dataExport?.status === "queued" || dataExport?.status === "generating") && (
-            <output className="mt-3 block text-sm font-bold text-sky-700 dark:text-sky-200">
-              ダウンロードファイルを作成しています…
-            </output>
-          )}
-          {dataExport?.status === "failed" && (
-            <p className="mt-3 text-sm text-rose-700 dark:text-rose-300">
-              作成に失敗しました。もう一度お試しください。
-            </p>
-          )}
-          {dataExport?.status === "expired" && (
-            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-              ダウンロード期限が切れました。
-            </p>
-          )}
-          <div className="mt-4 flex flex-wrap gap-3">
-            {dataExport?.status === "ready" ? (
-              <button
-                type="button"
-                disabled={exportBusy}
-                onClick={() => void downloadExport()}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-600 px-4 text-sm font-bold text-white disabled:opacity-50"
-              >
-                <Download className="size-4" aria-hidden="true" />
-                ダウンロード
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={exportBusy}
-                onClick={() => void createExport()}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-600 px-4 text-sm font-bold text-white disabled:opacity-50"
-              >
-                {exportBusy ? (
-                  <RefreshCw className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Download className="size-4" aria-hidden="true" />
-                )}
-                データを作成
-              </button>
-            )}
-          </div>
-        </section>
 
         {error && (
           <p role="alert" className="mt-4 text-sm font-bold text-rose-700 dark:text-rose-300">

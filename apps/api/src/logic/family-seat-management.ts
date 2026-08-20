@@ -1,4 +1,5 @@
 import { D1 } from "@me-builder/lib";
+import { inArray } from "drizzle-orm";
 import type { AuthenticatedActor } from "./authentication/types";
 
 const INVITATION_TTL_MS = 48 * 60 * 60 * 1000;
@@ -8,8 +9,7 @@ export type PublicFamilySeat = Readonly<{
   slotNumber: number;
   role: "payer" | "member";
   status: "invited" | "active" | "left" | "cancelled" | "removed" | "ended";
-  createdAt: string;
-  updatedAt: string;
+  displayName: string | null;
 }>;
 
 type Params = Readonly<{
@@ -20,20 +20,20 @@ type Params = Readonly<{
 type Dependencies = Readonly<{ now: () => Date }>;
 const defaults: Dependencies = { now: () => new Date() };
 
-const publicSeat = (seat: {
-  id: string;
-  slotNumber: number;
-  role: "payer" | "member";
-  status: PublicFamilySeat["status"];
-  createdAt: string;
-  updatedAt: string;
-}): PublicFamilySeat => ({
+const publicSeat = (
+  seat: {
+    id: string;
+    slotNumber: number;
+    role: "payer" | "member";
+    status: PublicFamilySeat["status"];
+  },
+  displayName: string | null = null,
+): PublicFamilySeat => ({
   id: seat.id,
   slotNumber: seat.slotNumber,
   role: seat.role,
   status: seat.status,
-  createdAt: seat.createdAt,
-  updatedAt: seat.updatedAt,
+  displayName,
 });
 
 function rawToken(): string {
@@ -63,11 +63,32 @@ export async function getFamilySeatManagement(params: Params): Promise<
     params.actor.accountId,
   );
   if (payerPack) {
+    const memberAccountIds = payerPack.seats.flatMap(({ memberAccountId }) =>
+      memberAccountId ? [memberAccountId] : [],
+    );
+    const profiles =
+      memberAccountIds.length === 0
+        ? []
+        : await params.db
+            .select({
+              accountId: D1.shared.schema.accountProfiles.accountId,
+              displayName: D1.shared.schema.accountProfiles.displayName,
+            })
+            .from(D1.shared.schema.accountProfiles)
+            .where(inArray(D1.shared.schema.accountProfiles.accountId, memberAccountIds));
+    const displayNames = new Map(
+      profiles.map((profile) => [profile.accountId, profile.displayName]),
+    );
     return {
       type: "resolved",
       role: "payer",
       maxSeats: 4,
-      seats: payerPack.seats.map(publicSeat),
+      seats: payerPack.seats.map((seat) =>
+        publicSeat(
+          seat,
+          seat.memberAccountId ? (displayNames.get(seat.memberAccountId) ?? null) : null,
+        ),
+      ),
     };
   }
   const membership = await D1.shared.action.familySeat.readActiveFamilySeatByMember(
@@ -75,7 +96,22 @@ export async function getFamilySeatManagement(params: Params): Promise<
     params.actor.accountId,
   );
   return membership
-    ? { type: "resolved", role: "member", maxSeats: 4, seats: [publicSeat(membership.seat)] }
+    ? {
+        type: "resolved",
+        role: "member",
+        maxSeats: 4,
+        seats: [
+          publicSeat(
+            membership.seat,
+            (
+              await params.db.query.accountProfiles.findFirst({
+                columns: { displayName: true },
+                where: (table, { eq }) => eq(table.accountId, params.actor.accountId),
+              })
+            )?.displayName ?? null,
+          ),
+        ],
+      }
     : { type: "no-membership" };
 }
 

@@ -498,27 +498,6 @@ export class AccountDataRepository {
       .orderBy(asc(DO.account.schema.profileSummaryGenerations.requestedAt))
       .limit(1)
       .get();
-    const personalDataExport = this.database
-      .select({ requestedAt: DO.account.schema.personalDataExports.requestedAt })
-      .from(DO.account.schema.personalDataExports)
-      .where(eq(DO.account.schema.personalDataExports.status, "queued"))
-      .orderBy(asc(DO.account.schema.personalDataExports.requestedAt))
-      .limit(1)
-      .get();
-    const generatingPersonalDataExport = this.database
-      .select({ startedAt: DO.account.schema.personalDataExports.startedAt })
-      .from(DO.account.schema.personalDataExports)
-      .where(eq(DO.account.schema.personalDataExports.status, "generating"))
-      .orderBy(asc(DO.account.schema.personalDataExports.startedAt))
-      .limit(1)
-      .get();
-    const expiringPersonalDataExport = this.database
-      .select({ expiresAt: DO.account.schema.personalDataExports.expiresAt })
-      .from(DO.account.schema.personalDataExports)
-      .where(eq(DO.account.schema.personalDataExports.status, "ready"))
-      .orderBy(asc(DO.account.schema.personalDataExports.expiresAt))
-      .limit(1)
-      .get();
     const expiringAiUsageReservation = this.database
       .select({ expiresAt: DO.account.schema.aiUsageRecords.expiresAt })
       .from(DO.account.schema.aiUsageRecords)
@@ -539,12 +518,6 @@ export class AccountDataRepository {
       profileSummaryGeneration
         ? profileSummaryGeneration.requestedAt.getTime() + PROFILE_SUMMARY_DISPATCH_RECOVERY_MS
         : null,
-      personalDataExport?.requestedAt.getTime() ?? null,
-      generatingPersonalDataExport
-        ? (generatingPersonalDataExport.startedAt?.getTime() ?? 0) +
-          DO.account.action.personalDataExport.PERSONAL_DATA_EXPORT_GENERATION_TIMEOUT_MS
-        : null,
-      expiringPersonalDataExport?.expiresAt?.getTime() ?? null,
       expiringAiUsageReservation?.expiresAt.getTime() ?? null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;

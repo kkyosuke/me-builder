@@ -8,18 +8,12 @@ const mocks = vi.hoisted(() => ({
   fetchRecords: vi.fn(),
   correctRecord: vi.fn(),
   deleteRecord: vi.fn(),
-  requestExport: vi.fn(),
-  fetchExport: vi.fn(),
-  downloadExport: vi.fn(),
 }));
 
 vi.mock("../infrastructure/personal-data-api", () => ({
   fetchPersonalDataRecords: mocks.fetchRecords,
   correctPersonalDataRecord: mocks.correctRecord,
   deletePersonalDataRecord: mocks.deleteRecord,
-  requestPersonalDataExport: mocks.requestExport,
-  fetchPersonalDataExport: mocks.fetchExport,
-  downloadPersonalDataExport: mocks.downloadExport,
 }));
 
 describe("PersonalDataApplication", () => {
@@ -55,15 +49,6 @@ describe("PersonalDataApplication", () => {
       recordId: "diary-source",
       invalidatedBrainItemCount: 0,
     });
-    mocks.requestExport.mockResolvedValue({
-      id: "export-1",
-      status: "ready",
-      requestedAt: "2026-08-15T03:00:00.000Z",
-      completedAt: "2026-08-15T03:00:01.000Z",
-      expiresAt: "2026-08-16T03:00:01.000Z",
-      downloadUrl: "/api/personal-data/exports/export-1/download",
-    });
-    mocks.downloadExport.mockResolvedValue(new Blob(["{}"], { type: "application/json" }));
     vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
@@ -105,53 +90,11 @@ describe("PersonalDataApplication", () => {
     expect(screen.queryByText("今日の記録")).toBeNull();
   });
 
-  it("料金プランに依存せず本人データを作成して認証付きでdownloadする", async () => {
-    const createObjectURL = vi.fn().mockReturnValue("blob:personal-data");
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  it("生データの書き出しUIを提供しない", async () => {
     render(<PersonalDataApplication onBack={vi.fn()} />);
 
     await screen.findByText("朝は得意ですか？");
-    fireEvent.click(screen.getByRole("button", { name: "データを作成" }));
-    expect(await screen.findByRole("button", { name: "ダウンロード" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "ダウンロード" }));
-
-    await waitFor(() =>
-      expect(mocks.downloadExport).toHaveBeenCalledWith(
-        undefined,
-        "export-1",
-        expect.any(AbortSignal),
-      ),
-    );
-    expect(createObjectURL).toHaveBeenCalled();
-    expect(click).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:personal-data");
-  });
-
-  it("画面を閉じたら進行中の本人データexport確認を中断する", async () => {
-    mocks.requestExport.mockResolvedValueOnce({
-      id: "export-pending",
-      status: "queued",
-      requestedAt: "2026-08-15T03:00:00.000Z",
-      completedAt: null,
-      expiresAt: null,
-      downloadUrl: null,
-    });
-    let pollSignal: AbortSignal | undefined;
-    mocks.fetchExport.mockImplementationOnce(
-      (_apiUrl: string | undefined, _exportId: string, signal: AbortSignal) => {
-        pollSignal = signal;
-        return new Promise(() => undefined);
-      },
-    );
-    const view = render(<PersonalDataApplication onBack={vi.fn()} />);
-    await screen.findByText("朝は得意ですか？");
-
-    fireEvent.click(screen.getByRole("button", { name: "データを作成" }));
-    await waitFor(() => expect(pollSignal).toBeDefined());
-    view.unmount();
-
-    expect(pollSignal?.aborted).toBe(true);
+    expect(screen.queryByText("本人データを書き出す")).toBeNull();
+    expect(screen.queryByRole("button", { name: "データを作成" })).toBeNull();
   });
 });

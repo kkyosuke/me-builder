@@ -6623,15 +6623,9 @@
                           "collectedPiecesDelta": {
                             "type": "integer",
                             "minimum": 0
-                          },
-                          "categories": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
                           }
                         },
-                        "required": ["level", "reachedAt", "collectedPiecesDelta", "categories"]
+                        "required": ["level", "reachedAt", "collectedPiecesDelta"]
                       },
                       "maxItems": 3
                     }
@@ -8513,16 +8507,19 @@
                             "enum": ["invited", "active", "left", "cancelled", "removed", "ended"],
                             "type": "string"
                           },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time"
+                          "displayName": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
-                        "required": ["id", "slotNumber", "role", "status", "createdAt", "updatedAt"]
+                        "required": ["id", "slotNumber", "role", "status", "displayName"]
                       }
                     }
                   },
@@ -8724,16 +8721,19 @@
                           "enum": ["invited", "active", "left", "cancelled", "removed", "ended"],
                           "type": "string"
                         },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "updatedAt": {
-                          "type": "string",
-                          "format": "date-time"
+                        "displayName": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
-                      "required": ["id", "slotNumber", "role", "status", "createdAt", "updatedAt"]
+                      "required": ["id", "slotNumber", "role", "status", "displayName"]
                     }
                   },
                   "required": ["token", "expiresAt", "seat"]
@@ -8927,16 +8927,19 @@
                           "enum": ["invited", "active", "left", "cancelled", "removed", "ended"],
                           "type": "string"
                         },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "updatedAt": {
-                          "type": "string",
-                          "format": "date-time"
+                        "displayName": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
-                      "required": ["id", "slotNumber", "role", "status", "createdAt", "updatedAt"]
+                      "required": ["id", "slotNumber", "role", "status", "displayName"]
                     }
                   },
                   "required": ["seat"]
@@ -9147,16 +9150,19 @@
                           "enum": ["invited", "active", "left", "cancelled", "removed", "ended"],
                           "type": "string"
                         },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "updatedAt": {
-                          "type": "string",
-                          "format": "date-time"
+                        "displayName": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
-                      "required": ["id", "slotNumber", "role", "status", "createdAt", "updatedAt"]
+                      "required": ["id", "slotNumber", "role", "status", "displayName"]
                     }
                   },
                   "required": ["seat"]
@@ -9367,16 +9373,19 @@
                           "enum": ["invited", "active", "left", "cancelled", "removed", "ended"],
                           "type": "string"
                         },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "updatedAt": {
-                          "type": "string",
-                          "format": "date-time"
+                        "displayName": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
-                      "required": ["id", "slotNumber", "role", "status", "createdAt", "updatedAt"]
+                      "required": ["id", "slotNumber", "role", "status", "displayName"]
                     }
                   },
                   "required": ["seat"]
@@ -9580,16 +9589,19 @@
                           "enum": ["invited", "active", "left", "cancelled", "removed", "ended"],
                           "type": "string"
                         },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "updatedAt": {
-                          "type": "string",
-                          "format": "date-time"
+                        "displayName": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
-                      "required": ["id", "slotNumber", "role", "status", "createdAt", "updatedAt"]
+                      "required": ["id", "slotNumber", "role", "status", "displayName"]
                     }
                   },
                   "required": ["seat"]
@@ -9793,16 +9805,19 @@
                           "enum": ["invited", "active", "left", "cancelled", "removed", "ended"],
                           "type": "string"
                         },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "updatedAt": {
-                          "type": "string",
-                          "format": "date-time"
+                        "displayName": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
-                      "required": ["id", "slotNumber", "role", "status", "createdAt", "updatedAt"]
+                      "required": ["id", "slotNumber", "role", "status", "displayName"]
                     }
                   },
                   "required": ["seat"]
@@ -9958,75 +9973,132 @@
         }
       }
     },
-    "/api/personal-data/exports": {
-      "post": {
-        "operationId": "requestPersonalDataExport",
+    "/api/personal-data/features": {
+      "get": {
+        "operationId": "getPersonalDataFeatures",
         "tags": ["Personal Data"],
-        "summary": "本人データarchiveの非同期生成を要求する",
+        "summary": "本人のBrain特徴をAPI連携用に取得する",
         "security": [
           {
-            "applicationSession": [],
-            "csrfToken": []
+            "applicationSession": []
           }
         ],
         "responses": {
-          "202": {
-            "description": "生成要求",
+          "200": {
+            "description": "本文・根拠・識別子を含まない本人のBrain特徴",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "outcome": {
-                      "enum": ["created", "unchanged"],
-                      "type": "string"
+                    "format": {
+                      "const": "kagami-brain-features"
                     },
-                    "export": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1
+                    "formatVersion": {
+                      "const": 1
+                    },
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": [
+                        {
+                          "const": "attributes"
                         },
-                        "status": {
-                          "enum": ["queued", "generating", "ready", "failed", "expired"],
-                          "type": "string"
+                        {
+                          "const": "active"
                         },
-                        "requestedAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "completedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "expiresAt": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "downloadUrl": {
-                          "type": "string",
-                          "minLength": 1
+                        {
+                          "const": "history"
                         }
-                      },
-                      "required": ["id", "status", "requestedAt", "completedAt", "expiresAt"]
+                      ],
+                      "minItems": 3
+                    },
+                    "brainItems": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "attributes": {},
+                          "status": {
+                            "enum": ["active", "superseded", "invalidated"],
+                            "type": "string"
+                          },
+                          "derivation": {
+                            "enum": ["ai", "deterministic"],
+                            "type": "string"
+                          },
+                          "stability": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sensitivity": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "validFrom": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "validTo": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "firstObservedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "lastObservedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "attributes",
+                          "status",
+                          "derivation",
+                          "stability",
+                          "sensitivity",
+                          "validFrom",
+                          "validTo",
+                          "firstObservedAt",
+                          "lastObservedAt",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
                     }
                   },
-                  "required": ["export"]
+                  "required": ["format", "formatVersion", "generatedAt", "scopes", "brainItems"]
                 }
               }
             }
@@ -10040,22 +10112,6 @@
                   "properties": {
                     "error": {
                       "const": "Unauthorized"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "OriginまたはCSRF tokenが一致しない",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Forbidden"
                     }
                   },
                   "required": ["error"]
@@ -10118,7 +10174,7 @@
             }
           },
           "503": {
-            "description": "AccountData bindingが設定されていない",
+            "description": "D1 bindingが設定されていない",
             "content": {
               "application/json": {
                 "schema": {
@@ -10134,325 +10190,6 @@
             }
           }
         }
-      }
-    },
-    "/api/personal-data/exports/{exportId}": {
-      "get": {
-        "operationId": "getPersonalDataExportStatus",
-        "tags": ["Personal Data"],
-        "summary": "本人データarchiveの生成状態と期限を取得する",
-        "security": [
-          {
-            "applicationSession": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "生成状態",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "outcome": {
-                      "enum": ["created", "unchanged"],
-                      "type": "string"
-                    },
-                    "export": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "status": {
-                          "enum": ["queued", "generating", "ready", "failed", "expired"],
-                          "type": "string"
-                        },
-                        "requestedAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "completedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "expiresAt": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "downloadUrl": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["id", "status", "requestedAt", "completedAt", "expiresAt"]
-                    }
-                  },
-                  "required": ["export"]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "application sessionを検証できない",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Unauthorized"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "本人が所有するexport要求がない",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Personal data export not found"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "428": {
-            "description": "現行利用規約への同意が必要",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Terms acceptance required"
-                    },
-                    "reason": {
-                      "const": "terms_not_accepted"
-                    }
-                  },
-                  "required": ["error", "reason"]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "未処理のサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Internal Server Error"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "AccountData bindingが設定されていない",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Service Unavailable"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "exportId",
-            "required": true
-          }
-        ]
-      }
-    },
-    "/api/personal-data/exports/{exportId}/download": {
-      "get": {
-        "operationId": "downloadPersonalDataExport",
-        "tags": ["Personal Data"],
-        "summary": "期限内の本人データarchiveをdownloadする",
-        "security": [
-          {
-            "applicationSession": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "本人データarchive",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {},
-                  "required": []
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "application sessionを検証できない",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Unauthorized"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "本人が所有するexport要求がない",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Personal data export not found"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "生成中または生成失敗",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Personal data export is not ready"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "download期限切れ",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Personal data export expired"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "428": {
-            "description": "現行利用規約への同意が必要",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Terms acceptance required"
-                    },
-                    "reason": {
-                      "const": "terms_not_accepted"
-                    }
-                  },
-                  "required": ["error", "reason"]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "未処理のサーバーエラー",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Internal Server Error"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "AccountData bindingが設定されていない",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "const": "Service Unavailable"
-                    }
-                  },
-                  "required": ["error"]
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "exportId",
-            "required": true
-          }
-        ]
       }
     },
     "/api/dev/brain-items": {

@@ -1,13 +1,7 @@
 import { logger } from "@me-builder/shared";
 import type { Context } from "hono";
 import * as v from "valibot";
-import {
-  PersonalDataExportArchiveSchema,
-  PersonalDataExportExpiredSchema,
-  PersonalDataExportNotFoundSchema,
-  PersonalDataExportNotReadySchema,
-  PersonalDataExportResponseSchema,
-} from "../contract/personal-data/exports";
+import { PersonalDataFeaturesResponseSchema } from "../contract/personal-data/features";
 import {
   CorrectPersonalDataRecordRequestSchema,
   InvalidPersonalDataMutationSchema,
@@ -19,10 +13,8 @@ import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import {
   correctPersonalData,
   deletePersonalData,
-  downloadPersonalDataExport,
-  getPersonalDataExport,
+  getPersonalDataFeatures,
   listPersonalData,
-  requestPersonalDataExport,
 } from "../logic/personal-data";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
@@ -46,6 +38,14 @@ export async function getPersonalDataRecords(c: Context<AppEnv>): Promise<Respon
   const outcome = await listPersonalData(deps);
   c.header("Cache-Control", "no-store");
   return c.json(v.parse(PersonalDataRecordsResponseSchema, { records: outcome.records }));
+}
+
+export async function getPersonalDataFeatureContents(c: Context<AppEnv>): Promise<Response> {
+  const deps = dependencies(c);
+  if (!deps) return unavailable(c);
+  const outcome = await getPersonalDataFeatures(deps);
+  c.header("Cache-Control", "no-store");
+  return c.json(v.parse(PersonalDataFeaturesResponseSchema, outcome.features));
 }
 
 export async function patchPersonalDataRecord(c: Context<AppEnv>): Promise<Response> {
@@ -124,89 +124,5 @@ export async function deletePersonalDataRecordContents(c: Context<AppEnv>): Prom
       recordId: outcome.result.recordId,
       invalidatedBrainItemCount: outcome.result.invalidatedBrainItemCount,
     }),
-  );
-}
-
-function exportResponse(result: {
-  id: string;
-  status: "queued" | "generating" | "ready" | "failed" | "expired";
-  requestedAt: string;
-  completedAt: string | null;
-  expiresAt: string | null;
-}) {
-  return v.parse(PersonalDataExportResponseSchema, {
-    export: {
-      ...result,
-      ...(result.status === "ready"
-        ? { downloadUrl: `/api/personal-data/exports/${encodeURIComponent(result.id)}/download` }
-        : {}),
-    },
-  });
-}
-
-export async function postPersonalDataExport(c: Context<AppEnv>): Promise<Response> {
-  const deps = dependencies(c);
-  if (!deps) return unavailable(c);
-  const outcome = await requestPersonalDataExport(deps);
-  c.header("Cache-Control", "no-store");
-  return c.json(
-    v.parse(PersonalDataExportResponseSchema, {
-      ...exportResponse(outcome.result.export),
-      outcome: outcome.result.outcome,
-    }),
-    202,
-  );
-}
-
-export async function getPersonalDataExportStatus(c: Context<AppEnv>): Promise<Response> {
-  const deps = dependencies(c);
-  if (!deps) return unavailable(c);
-  const outcome = await getPersonalDataExport({
-    ...deps,
-    exportId: c.req.param("exportId") ?? "",
-  });
-  if (!outcome.result) {
-    return c.json(
-      v.parse(PersonalDataExportNotFoundSchema, { error: "Personal data export not found" }),
-      404,
-    );
-  }
-  c.header("Cache-Control", "no-store");
-  return c.json(exportResponse(outcome.result));
-}
-
-export async function downloadPersonalDataExportContents(c: Context<AppEnv>): Promise<Response> {
-  const deps = dependencies(c);
-  if (!deps) return unavailable(c);
-  const exportId = c.req.param("exportId") ?? "";
-  const outcome = await downloadPersonalDataExport({ ...deps, exportId });
-  if (outcome.result.type === "not-found") {
-    return c.json(
-      v.parse(PersonalDataExportNotFoundSchema, { error: "Personal data export not found" }),
-      404,
-    );
-  }
-  if (outcome.result.type === "expired") {
-    return c.json(
-      v.parse(PersonalDataExportExpiredSchema, { error: "Personal data export expired" }),
-      410,
-    );
-  }
-  if (outcome.result.type === "not-ready") {
-    return c.json(
-      v.parse(PersonalDataExportNotReadySchema, { error: "Personal data export is not ready" }),
-      409,
-    );
-  }
-  return new Response(
-    JSON.stringify(v.parse(PersonalDataExportArchiveSchema, outcome.result.archive)),
-    {
-      headers: {
-        "Cache-Control": "private, no-store",
-        "Content-Disposition": `attachment; filename="me-builder-personal-data-${exportId}.json"`,
-        "Content-Type": "application/json; charset=utf-8",
-        Expires: new Date(outcome.result.expiresAt).toUTCString(),
-      },
-    },
   );
 }

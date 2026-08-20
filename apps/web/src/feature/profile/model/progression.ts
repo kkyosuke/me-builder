@@ -23,7 +23,6 @@ export type UtsushiMilestoneCard = Readonly<{
   level: number;
   reachedAt: string;
   collectedPiecesDelta: number;
-  categories: readonly string[];
 }>;
 
 export function progressionPercentage(progression: UtsushiProgression): number {

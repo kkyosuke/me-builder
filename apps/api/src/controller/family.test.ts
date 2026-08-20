@@ -50,8 +50,7 @@ const seat = {
   slotNumber: 2,
   role: "member" as const,
   status: "invited" as const,
-  createdAt: "2026-08-16T00:00:00.000Z",
-  updatedAt: "2026-08-16T00:00:00.000Z",
+  displayName: null,
 };
 
 describe("family seat HTTP API", () => {

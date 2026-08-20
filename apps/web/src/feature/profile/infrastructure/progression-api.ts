@@ -16,7 +16,6 @@ const MilestoneCardSchema = v.object({
   level: v.pipe(CountSchema, v.minValue(10), v.multipleOf(10)),
   reachedAt: v.pipe(v.string(), v.isoTimestamp()),
   collectedPiecesDelta: CountSchema,
-  categories: v.array(v.string()),
 });
 const ResponseSchema = v.object({
   level: v.pipe(CountSchema, v.minValue(1)),

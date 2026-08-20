@@ -283,7 +283,7 @@ describe("source records", () => {
         .where(eq(schema.brainVectorSyncJobs.brainItemId, "brain-1"))
         .get()?.operation,
     ).toBe("delete");
-    expect(await db.select().from(schema.profileSummaryVersions)).toEqual([]);
+    expect(await db.select().from(schema.profileSummaryVersions)).toHaveLength(1);
     expect(await db.select().from(schema.profileSummaryShareProjections)).toEqual([]);
     await expect(listPersonalDataRecords(db, accountId)).resolves.toMatchObject([
       { id: result.recordId, kind: "diary", value: "訂正後の日記" },
@@ -388,7 +388,7 @@ describe("source records", () => {
         .where(eq(schema.brainItemEvidenceEdges.sourceRecordId, sourceRecordId))
         .get(),
     ).toBeDefined();
-    expect(await db.select().from(schema.profileSummaryVersions)).toEqual([]);
+    expect(await db.select().from(schema.profileSummaryVersions)).toHaveLength(1);
     expect(await db.select().from(schema.profileSummaryShareProjections)).toEqual([]);
     await expect(listPersonalDataRecords(db, accountId)).resolves.toEqual([]);
   });

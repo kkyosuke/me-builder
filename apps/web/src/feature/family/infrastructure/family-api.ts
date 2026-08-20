@@ -15,8 +15,7 @@ const SeatSchema = v.object({
   slotNumber: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(4)),
   role: v.picklist(["payer", "member"]),
   status: v.picklist(["invited", "active", "left", "cancelled", "removed", "ended"]),
-  createdAt: v.pipe(v.string(), v.isoTimestamp()),
-  updatedAt: v.pipe(v.string(), v.isoTimestamp()),
+  displayName: v.nullable(v.pipe(v.string(), v.nonEmpty())),
 }) satisfies v.GenericSchema<FamilySeat>;
 const ManagementSchema = v.object({
   role: v.picklist(["payer", "member"]),

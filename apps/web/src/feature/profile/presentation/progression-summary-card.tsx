@@ -16,20 +16,6 @@ const changeLabels = {
   temporal_change: "今の自分へ更新されました",
 } as const;
 
-const categoryLabels: Readonly<Record<string, string>> = {
-  identity: "自分らしさ",
-  memory: "思い出",
-  behavior_pattern: "行動パターン",
-  value_motivation: "価値観",
-  decision_system: "判断のしかた",
-  preference: "好み",
-  goal: "目標",
-};
-
-function categoryLabel(category: string): string {
-  return categoryLabels[category] ?? category;
-}
-
 function reachedDate(value: string): string {
   return new Intl.DateTimeFormat("ja-JP", {
     year: "numeric",
@@ -52,8 +38,7 @@ function escapeXml(value: string): string {
 }
 
 function downloadMilestoneCard(card: UtsushiMilestoneCard): void {
-  const categories = card.categories.map(categoryLabel).join("・") || "これまでの歩み";
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ede9fe"/><stop offset="0.55" stop-color="#ffffff"/><stop offset="1" stop-color="#e0f2fe"/></linearGradient></defs><rect width="1200" height="630" rx="48" fill="url(#bg)"/><rect x="32" y="32" width="1136" height="566" rx="36" fill="none" stroke="#8b5cf6" stroke-width="4"/><text x="90" y="130" font-family="sans-serif" font-size="34" font-weight="700" fill="#6d28d9">うつし 成長カード</text><text x="90" y="285" font-family="sans-serif" font-size="100" font-weight="800" fill="#0f172a">Lv.${card.level}</text><text x="95" y="360" font-family="sans-serif" font-size="30" fill="#334155">${escapeXml(reachedDate(card.reachedAt))}</text><text x="95" y="440" font-family="sans-serif" font-size="34" font-weight="700" fill="#0f172a">前の節目から かけら +${card.collectedPiecesDelta}</text><text x="95" y="510" font-family="sans-serif" font-size="27" fill="#475569">${escapeXml(categories)}</text><text x="95" y="565" font-family="sans-serif" font-size="22" fill="#64748b">自分への理解が育った歩み</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ede9fe"/><stop offset="0.55" stop-color="#ffffff"/><stop offset="1" stop-color="#e0f2fe"/></linearGradient></defs><rect width="1200" height="630" rx="48" fill="url(#bg)"/><rect x="32" y="32" width="1136" height="566" rx="36" fill="none" stroke="#8b5cf6" stroke-width="4"/><text x="90" y="130" font-family="sans-serif" font-size="34" font-weight="700" fill="#6d28d9">うつし 成長カード</text><text x="90" y="285" font-family="sans-serif" font-size="100" font-weight="800" fill="#0f172a">Lv.${card.level}</text><text x="95" y="360" font-family="sans-serif" font-size="30" fill="#334155">${escapeXml(reachedDate(card.reachedAt))}</text><text x="95" y="440" font-family="sans-serif" font-size="34" font-weight="700" fill="#0f172a">前の節目から かけら +${card.collectedPiecesDelta}</text><text x="95" y="565" font-family="sans-serif" font-size="22" fill="#64748b">自分への理解が育った歩み</text></svg>`;
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -226,11 +211,6 @@ function ProgressionCard({ progression }: { progression: UtsushiProgression }) {
                   </strong>
                   個
                 </p>
-                {card.categories.length > 0 && (
-                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                    広がった分類: {card.categories.map(categoryLabel).join("・")}
-                  </p>
-                )}
               </article>
             ))}
           </div>

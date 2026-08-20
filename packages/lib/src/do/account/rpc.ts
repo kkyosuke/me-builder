@@ -19,7 +19,6 @@ import type * as diagnosis from "./action/diagnosis";
 import type * as diagnosisBrainProjection from "./action/diagnosis-brain-projection";
 import type * as diary from "./action/diary";
 import type * as goalFollowUp from "./action/goal-follow-up";
-import type * as personalDataExport from "./action/personal-data-export";
 import type * as profileSummary from "./action/profile-summary";
 import type * as progression from "./action/progression";
 import type * as selfCareContext from "./action/self-care-context";
@@ -53,6 +52,10 @@ export type AccountDataActions = {
     typeof aiUsage.readAiUsage
   >;
   "brain.listActive": RpcAction<[], typeof brain.listActiveBrainItems>;
+  "brain.readPersonalDataFeatures": RpcAction<
+    [at?: Date],
+    typeof brain.readPersonalDataFeatureExport
+  >;
   "brain.findActiveVectorEntry": RpcAction<
     [brainItemId: string],
     typeof brain.findActiveBrainVectorEntry
@@ -148,18 +151,6 @@ export type AccountDataActions = {
   "source.deletePersonalData": RpcAction<
     [sourceRecordId: string, at?: Date],
     typeof source.deletePersonalDataRecord
-  >;
-  "personalDataExport.request": RpcAction<
-    [at?: Date],
-    typeof personalDataExport.requestPersonalDataExport
-  >;
-  "personalDataExport.readStatus": RpcAction<
-    [exportId: string, at?: Date],
-    typeof personalDataExport.readPersonalDataExportStatus
-  >;
-  "personalDataExport.readArchive": RpcAction<
-    [exportId: string, at?: Date],
-    typeof personalDataExport.readPersonalDataArchive
   >;
   "profileSummary.read": (at?: Date) => Promise<ProfileSummaryReadModel>;
   "profileSummary.readCompatibilityShareProfile": () => Promise<CompatibilityShareProfileReadResult>;

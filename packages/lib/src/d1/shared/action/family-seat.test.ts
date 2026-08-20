@@ -148,7 +148,7 @@ describe("family seat persistence", () => {
     });
     await expect(leaveFamilySeat(db, member)).resolves.toMatchObject({
       type: "updated",
-      seat: { status: "left" },
+      seat: { status: "left", memberAccountId: null },
     });
 
     const next = await reserveFamilySeat(db, payer, "remove-me");
@@ -156,7 +156,7 @@ describe("family seat persistence", () => {
     await activateFamilySeat(db, "remove-me", member);
     await expect(removeFamilySeat(db, next.seat.id)).resolves.toMatchObject({
       type: "updated",
-      seat: { status: "removed" },
+      seat: { status: "removed", memberAccountId: null },
     });
     const history = await db
       .select()

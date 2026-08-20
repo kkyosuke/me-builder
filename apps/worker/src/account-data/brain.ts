@@ -4,6 +4,8 @@ import { type AppliedBrainVectorSync, DO } from "@me-builder/lib";
 export const brainActions = {
   "brain.listActive": (db: DO.account.Database, accountId: string) =>
     DO.account.action.brain.listActiveBrainItems(db, accountId),
+  "brain.readPersonalDataFeatures": (db: DO.account.Database, accountId: string, at?: Date) =>
+    DO.account.action.brain.readPersonalDataFeatureExport(db, accountId, at),
   "brain.findActiveVectorEntry": (
     db: DO.account.Database,
     accountId: string,

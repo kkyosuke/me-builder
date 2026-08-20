@@ -10,11 +10,7 @@ import {
   issueFamilySeatInvitation,
   leaveFamilyPack,
 } from "../logic/family-seat-management";
-import {
-  downloadPersonalDataExport,
-  listPersonalData,
-  requestPersonalDataExport,
-} from "../logic/personal-data";
+import { getPersonalDataFeatures, listPersonalData } from "../logic/personal-data";
 import { getProfileEntitlement } from "../logic/profile-entitlement";
 import { createAccountDataTestStore } from "../testing/account-data";
 
@@ -202,7 +198,7 @@ describe("subscription user journeys", () => {
       type: "resolved",
       records: [{ kind: "diary", value: "有料期間中に残した大切な日記" }],
     });
-    const requested = await requestPersonalDataExport({
+    const features = await getPersonalDataFeatures({
       actor: {
         accountId,
         authenticationMethod: "liff",
@@ -211,29 +207,14 @@ describe("subscription user journeys", () => {
       accountData: accountData.namespace,
       at: new Date("2026-08-20T00:01:00.000Z"),
     });
-    if (requested.type !== "resolved") throw new Error("Export request was not resolved");
-    await DO.account.action.personalDataExport.processPendingPersonalDataExport(
-      accountData.db,
-      accountId,
-      new Date("2026-08-20T00:01:01.000Z"),
-    );
-    const archive = await downloadPersonalDataExport({
-      actor: {
-        accountId,
-        authenticationMethod: "liff",
-        authenticatedAt: new Date("2026-08-20T00:01:02.000Z"),
-      },
-      accountData: accountData.namespace,
-      exportId: requested.result.export.id,
-      at: new Date("2026-08-20T00:01:02.000Z"),
-    });
-    expect(archive).toMatchObject({
+    expect(features).toMatchObject({
       type: "resolved",
-      result: {
-        type: "ready",
-        archive: { sourceRecords: [{ payload: { body: "有料期間中に残した大切な日記" } }] },
+      features: {
+        format: "kagami-brain-features",
+        scopes: ["attributes", "active", "history"],
       },
     });
+    expect(JSON.stringify(features)).not.toContain("有料期間中に残した大切な日記");
   });
 
   it("Family参加者が説明を受けて参加し、退出後も本人の日記を保持する", async () => {

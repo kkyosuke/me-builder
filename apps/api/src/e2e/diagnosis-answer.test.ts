@@ -502,13 +502,13 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     expect(oldDiaryBody?.body).toBe("訂正前の日記");
   });
 
-  it("Free相当でも本人archiveを非同期生成し、他者・内部運用・決済情報を含めない", async () => {
+  it("Free相当でも本文を含まない本人特徴だけをAPIで取得する", async () => {
     const accountId = "account-answer-e2e";
     accountDataStore.bind(accountId);
     const source = await DO.account.action.diary.storeLineTextSource(accountDataStore.db, {
       accountId,
       eventId: "private-line-event-must-not-export",
-      body: "書き出す本人の日記",
+      body: "APIへ持ち出してはいけない本人の日記",
       receivedAt: new Date(timestamp + 20_000),
     });
     await accountDataStore.db.insert(DO.account.schema.compatibilityReferences).values({
@@ -520,39 +520,38 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
       createdAt: new Date(timestamp + 20_000),
       updatedAt: new Date(timestamp + 20_000),
     });
-
-    const request = await personalDataRequest("/api/personal-data/exports", "POST");
-    expect(request.status).toBe(202);
-    const requested = (await request.json()) as {
-      outcome: string;
-      export: { id: string; status: string };
-    };
-    expect(requested).toMatchObject({ outcome: "created", export: { status: "queued" } });
-    await DO.account.action.personalDataExport.processPendingPersonalDataExport(
-      accountDataStore.db,
+    await accountDataStore.db.insert(DO.account.schema.brainItems).values({
+      id: "brain-item-must-not-export",
       accountId,
-    );
-
-    const status = await personalDataRequest(`/api/personal-data/exports/${requested.export.id}`);
-    expect(status.status).toBe(200);
-    expect(await status.json()).toMatchObject({
-      export: {
-        id: requested.export.id,
-        status: "ready",
-        downloadUrl: `/api/personal-data/exports/${requested.export.id}/download`,
-      },
+      category: "preference",
+      statement: "APIへ持ち出してはいけない命題",
+      attributes: { trait: "reflective" },
+      derivation: "ai",
+      status: "active",
+      stability: "changeable",
+      sensitivity: "normal",
+      confidence: { state: "uncomputed" },
     });
-    const download = await personalDataRequest(
-      `/api/personal-data/exports/${requested.export.id}/download`,
-    );
-    expect(download.status).toBe(200);
-    expect(download.headers.get("cache-control")).toBe("private, no-store");
-    expect(download.headers.get("content-disposition")).toContain("attachment");
-    const archive = await download.text();
-    expect(archive).toContain(source.sourceRecordId);
-    expect(archive).toContain("書き出す本人の日記");
-    expect(archive).not.toMatch(
+    await accountDataStore.db.insert(DO.account.schema.brainItemEvidenceEdges).values({
+      id: "evidence-must-not-export",
+      brainItemId: "brain-item-must-not-export",
+      sourceRecordId: source.sourceRecordId,
+      relation: "supports",
+      isDerivationTrigger: true,
+      derivationMethod: "ai",
+      generatedAt: new Date(timestamp + 20_000),
+    });
+
+    const response = await personalDataRequest("/api/personal-data/features");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const features = await response.text();
+    expect(features).toContain('"trait":"reflective"');
+    expect(features).not.toMatch(
       /relationship-must-not-export|partner-account-must-not-export|private-line-event-must-not-export|stripe|customerId|priceId|paymentMethod/,
+    );
+    expect(features).not.toMatch(
+      /APIへ持ち出してはいけない|brain-item-must-not-export|evidence-must-not-export|sourceRecordId/,
     );
   });
 
