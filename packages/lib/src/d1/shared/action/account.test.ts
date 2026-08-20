@@ -11,6 +11,7 @@ import {
   linkIdentity,
   listActiveLineAccountIds,
   listLoginIdentityProviders,
+  recordAccountActivity,
   resolveAccountByLineLogin,
   resolveAccountByLineMessagingApi,
   unlinkLoginIdentityProvider,
@@ -125,6 +126,40 @@ describe("listActiveLineAccountIds", () => {
 
     await expect(listActiveLineAccountIds(db)).resolves.toEqual([]);
     await expect(listActiveLineAccountIds(db, { limit: 101 })).rejects.toThrow(/between 1 and 100/);
+  });
+});
+
+describe("recordAccountActivity", () => {
+  it("最終利用時刻を15分単位で更新する", async () => {
+    const db = createTestDb();
+    const account = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_activity",
+    });
+    await db
+      .update(schema.accounts)
+      .set({ lastActivityAt: null })
+      .where(eq(schema.accounts.id, account.account.id));
+    const first = new Date("2026-08-20T00:00:00.000Z");
+    await recordAccountActivity(db, account.account.id, first);
+    await recordAccountActivity(db, account.account.id, new Date("2026-08-20T00:10:00.000Z"));
+    expect(
+      (
+        await db.query.accounts.findFirst({
+          where: (table, { eq }) => eq(table.id, account.account.id),
+        })
+      )?.lastActivityAt,
+    ).toEqual(first);
+
+    const later = new Date("2026-08-20T00:16:00.000Z");
+    await recordAccountActivity(db, account.account.id, later);
+    expect(
+      (
+        await db.query.accounts.findFirst({
+          where: (table, { eq }) => eq(table.id, account.account.id),
+        })
+      )?.lastActivityAt,
+    ).toEqual(later);
   });
 });
 

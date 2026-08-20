@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, configure, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, configure, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
@@ -112,8 +112,7 @@ describe("subscription entitlement user journey", () => {
     expect(new Headers(entitlementCall?.[1]?.headers).get("Authorization")).toBeNull();
   }, 10_000);
 
-  it("Free Planからアップグレード画面をプロフィールより前面に開く", async () => {
-    let entitlementRequests = 0;
+  it("本番のFree Planでは有料プランへの導線を表示しない", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = urlOf(input);
       if (url.pathname === "/api/auth/liff/exchange") return Response.json(authSession);
@@ -122,10 +121,6 @@ describe("subscription entitlement user journey", () => {
         return Response.json({ role: "user", displayName: "テスト", avatar: null });
       }
       if (url.pathname === "/api/profile/entitlement") {
-        entitlementRequests += 1;
-        if (entitlementRequests > 1) {
-          return Response.json({ error: "Service Unavailable" }, { status: 503 });
-        }
         return Response.json({
           status: "free",
           plan: "free",
@@ -142,42 +137,18 @@ describe("subscription entitlement user journey", () => {
           },
         });
       }
-      if (url.pathname === "/api/billing/plans") {
-        return Response.json({
-          plans: [
-            {
-              code: "lite",
-              name: "Lite",
-              description: "週次の振り返り",
-              highlights: ["AI返信 月150回"],
-              trialDays: 14,
-              prices: [
-                { interval: "month", amount: 780, currency: "JPY" },
-                { interval: "year", amount: 7_800, currency: "JPY" },
-              ],
-            },
-          ],
-        });
-      }
-      if (url.pathname === "/api/billing/trial-eligibility") {
-        return Response.json({ error: "Service Unavailable" }, { status: 503 });
-      }
       throw new Error(`Unexpected E2E request: ${url.pathname}`);
     });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "プランをアップグレードする" }));
-
-    expect(window.location.pathname).toBe("/profile/billing");
-    const billingDialog = await screen.findByRole("dialog", { name: "料金プラン" });
-    expect(billingDialog.className).toContain("z-[70]");
-    expect(await screen.findByRole("radio", { name: "ノーマル Lite" })).toBeTruthy();
-    const profileDialog = document.querySelector<HTMLDialogElement>(
-      'dialog[aria-labelledby="profile-settings-title"]',
-    );
-    expect(profileDialog?.getAttribute("aria-hidden")).toBe("true");
-    expect(profileDialog?.hasAttribute("inert")).toBe(true);
+    expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    expect(await screen.findByText("Free")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "プランをアップグレードする" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "料金プランを比較" })).toBeNull();
+    expect(
+      fetchMock.mock.calls.some(([input]) => urlOf(input).pathname.startsWith("/api/billing/")),
+    ).toBe(false);
   }, 10_000);
 });

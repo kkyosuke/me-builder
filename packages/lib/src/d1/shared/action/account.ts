@@ -3,7 +3,7 @@ import {
   logger,
   serviceTermsDocumentsSatisfyingCurrentRequirement,
 } from "@me-builder/shared";
-import { and, asc, eq, gt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 import { accountAgreementAcceptances } from "../schema/agreement";
@@ -406,6 +406,24 @@ export async function revokeAdminAccessUnlessAllowed(
   return false;
 }
 
+/** 管理一覧用の最終利用時刻を、requestごとの書き込みを避けて15分単位で更新する。 */
+export async function recordAccountActivity(
+  db: SharedD1Client,
+  accountId: string,
+  at = new Date(),
+): Promise<void> {
+  const updateBefore = new Date(at.getTime() - 15 * 60 * 1_000);
+  await db
+    .update(accounts)
+    .set({ lastActivityAt: at })
+    .where(
+      and(
+        eq(accounts.id, accountId),
+        or(isNull(accounts.lastActivityAt), lt(accounts.lastActivityAt, updateBefore)),
+      ),
+    );
+}
+
 /** Accountに紐づく有効なMessaging API identityを配送時に解決する。 */
 export async function findLineIdentityByAccountId(
   db: SharedD1Client,
@@ -489,6 +507,7 @@ export async function upsertIdentity(
     status: "active",
     role: input.role ?? "user",
     sessionVersion: 1,
+    lastActivityAt: now,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,

@@ -34,6 +34,7 @@ vi.spyOn(D1.shared.action.account, "resolveAccountByLineMessagingApi").mockResol
     status: "active",
     role: "user",
     sessionVersion: 1,
+    lastActivityAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,

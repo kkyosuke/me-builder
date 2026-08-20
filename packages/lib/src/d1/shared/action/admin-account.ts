@@ -1,7 +1,8 @@
-import { type SQL, and, count, desc, eq, sql } from "drizzle-orm";
+import { type SQL, and, count, desc, eq, lt, sql } from "drizzle-orm";
 import type { UtsushiProgression } from "../../../do/account/action/progression";
 import type { SharedD1Client } from "../client";
 import { accounts } from "../schema/account";
+import { adminAccountListAudits } from "../schema/admin-audit";
 import { accountProgressionProjections } from "../schema/progression";
 
 export const UTSUSHI_PROGRESSION_CALCULATION_VERSION = 1;
@@ -85,6 +86,36 @@ export async function createAdminAccountReference(accountId: string): Promise<st
     .join("")}`;
 }
 
+export async function recordAdminAccountListAudit(
+  db: SharedD1Client,
+  input: Readonly<{
+    adminReference: string;
+    queryPresent: boolean;
+    role: "all" | "user" | "admin";
+    status: "all" | "active" | "stopped";
+    sort: AdminAccountSort;
+    resultCount: number;
+    total: number;
+  }>,
+  createdAt = new Date(),
+): Promise<void> {
+  const expiresBefore = new Date(createdAt.getTime() - 365 * 24 * 60 * 60 * 1_000);
+  await db.batch([
+    db.insert(adminAccountListAudits).values({
+      id: crypto.randomUUID(),
+      adminReference: input.adminReference,
+      queryPresent: input.queryPresent,
+      roleFilter: input.role,
+      statusFilter: input.status,
+      sort: input.sort,
+      resultCount: input.resultCount,
+      total: input.total,
+      createdAt,
+    }),
+    db.delete(adminAccountListAudits).where(lt(adminAccountListAudits.createdAt, expiresBefore)),
+  ]);
+}
+
 /** AccountDataで確定した進行度を、管理者一覧用の非機密projectionへ反映する。 */
 export async function upsertAccountProgressionProjection(
   db: SharedD1Client,
@@ -140,10 +171,21 @@ export async function listAdminAccounts(db: SharedD1Client, input: AdminAccountL
         and family_packs.is_deleted = 0
     ) then 'family'
     else coalesce((
-      select plan_code from billing_subscription_projections
+      select case
+        when status = 'past_due' then coalesce(payment_failure_plan_code, plan_code)
+        else plan_code
+      end from billing_subscription_projections
       where account_id = ${accounts.id}
         and plan_code is not null
-        and status in ('active', 'trialing', 'past_due')
+        and current_period_end > unixepoch()
+        and (
+          status in ('active', 'trialing')
+          or (
+            status = 'past_due'
+            and payment_failure_started_at is not null
+            and unixepoch() < payment_failure_started_at + 604800
+          )
+        )
       order by last_synced_at desc
       limit 1
     ), 'free')
@@ -154,7 +196,7 @@ export async function listAdminAccounts(db: SharedD1Client, input: AdminAccountL
       role: accounts.role,
       status: accounts.status,
       createdAt: accounts.createdAt,
-      lastActivityAt: accounts.updatedAt,
+      lastActivityAt: accounts.lastActivityAt,
       plan,
       level: accountProgressionProjections.level,
       calculationVersion: accountProgressionProjections.calculationVersion,
@@ -213,7 +255,7 @@ export async function listAdminAccounts(db: SharedD1Client, input: AdminAccountL
       role: row.role,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
-      lastActivityAt: row.lastActivityAt.toISOString(),
+      lastActivityAt: (row.lastActivityAt ?? row.createdAt).toISOString(),
       plan: row.plan,
       progression:
         row.level === null ||

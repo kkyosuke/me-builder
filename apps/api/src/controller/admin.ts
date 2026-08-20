@@ -44,6 +44,7 @@ export async function getAccounts(c: Context<AppEnv>): Promise<Response> {
       ...(parsed.output.sort !== undefined ? { sort: parsed.output.sort } : {}),
       ...(parsed.output.cursor !== undefined ? { cursor: parsed.output.cursor } : {}),
     },
+    auditEnabled: getConfig(c.env).environment === "production",
   });
   switch (outcome.type) {
     case "resolved":
