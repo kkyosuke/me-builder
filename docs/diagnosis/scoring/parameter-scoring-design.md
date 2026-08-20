@@ -147,3 +147,5 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 `diagnosis_scoring_configs`が設定版と設定JSONを保持し、公開済みDiagnosisの`scoring_config_id`は変更しません。初回導入時の未設定`relationshipRequests`だけは前節の条件で補完しますが、採点パラメータ、重み、境界、設定版は変更しません。API ServerはDBから取得した設定をValibotで検証し、AnswerのQuestion ID、Question Version、Choice IDから表示のたびに結果を再計算します。
 
 クライアントの算出値は正として扱いません。Brain Item projectionはサーバー側で同じ共通スコアリングエンジンと版付き採点設定を使用します。採点設定を持たないDiagnosisでは回答内容だけを返し、Brain Itemを生成しません。
+
+`likert_5`は表示順に`-1 / -0.5 / 0 / 0.5 / 1`へ固定し、AIはこの決定論的scoreを再解釈しません。比較できるのは同じDiagnosis、Question Version、scoring configの回答だけです。本人が選んだChoiceとscoreは原本から再現し、AIによる説明は推定として分離します。

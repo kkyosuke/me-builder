@@ -1,5 +1,4 @@
 import { type AccountDataNamespace, type DO, accountDataFor } from "@me-builder/lib";
-import { logger } from "@me-builder/shared";
 import type { AuthenticatedActor } from "./authentication/types";
 
 type CorrectPersonalDataRecordInput = Parameters<
@@ -46,23 +45,13 @@ export async function correctPersonalData(
     at?: Date;
   },
 ): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof correctRecord>> }>> {
-  const accountId = params.actor.accountId;
   const result = await correctRecord(
     params.accountData,
-    accountId,
+    params.actor.accountId,
     params.sourceRecordId,
     params.input,
     params.at,
   );
-  if (result.type === "updated" && result.diagnosisId) {
-    await processDiagnosisProjection(
-      params.accountData,
-      accountId,
-      result.diagnosisId,
-      params.at,
-      "correction",
-    );
-  }
   return { type: "resolved", result };
 }
 
@@ -84,48 +73,13 @@ function correctRecord(
 export async function deletePersonalData(
   params: CommonParams & { sourceRecordId: string; at?: Date },
 ): Promise<PersonalDataOutcome<{ result: Awaited<ReturnType<typeof deleteRecord>> }>> {
-  const accountId = params.actor.accountId;
   const result = await deleteRecord(
     params.accountData,
-    accountId,
+    params.actor.accountId,
     params.sourceRecordId,
     params.at,
   );
-  if (result.type === "deleted" && result.diagnosisId) {
-    await processDiagnosisProjection(
-      params.accountData,
-      accountId,
-      result.diagnosisId,
-      params.at,
-      "deletion",
-    );
-  }
   return { type: "resolved", result };
-}
-
-async function processDiagnosisProjection(
-  accountData: AccountDataNamespace,
-  accountId: string,
-  diagnosisId: string,
-  at: Date | undefined,
-  trigger: "correction" | "deletion",
-): Promise<void> {
-  try {
-    await accountDataFor(accountData, accountId).execute(
-      "diagnosisProjection.processLatest",
-      diagnosisId,
-      at,
-    );
-  } catch (error) {
-    logger.error(
-      {
-        diagnosisId,
-        trigger,
-        reason: error instanceof Error ? error.name : "unknown",
-      },
-      "Personal data diagnosis projection failed; AccountData alarm will retry it",
-    );
-  }
 }
 
 function deleteRecord(

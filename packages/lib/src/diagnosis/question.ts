@@ -15,27 +15,36 @@ export type Choice = Readonly<{
   presentation?: Readonly<Record<string, string>>;
 }>;
 
-export type QuestionVersion = Readonly<{
+type QuestionVersionBase = Readonly<{
   version: number;
   state: QuestionVersionState;
   text: string;
   hint?: string;
-  format: "single_choice";
-  choices: readonly [Choice, Choice];
   approvedAt?: string;
   retiredAt?: string;
 }>;
+
+export type QuestionVersion = QuestionVersionBase &
+  Readonly<
+    | { format: "single_choice"; choices: readonly [Choice, Choice] }
+    | { format: "likert_5"; choices: readonly [Choice, Choice, Choice, Choice, Choice] }
+  >;
 
 export type Question = Readonly<{
   id: string;
   versions: readonly QuestionVersion[];
 }>;
 
-export type QuestionVersionContent = {
+type QuestionVersionContentBase = {
   text: string;
   hint?: string;
-  choices: readonly [Choice, Choice];
 };
+
+export type QuestionVersionContent = QuestionVersionContentBase &
+  (
+    | { format?: "single_choice"; choices: readonly [Choice, Choice] }
+    | { format: "likert_5"; choices: readonly [Choice, Choice, Choice, Choice, Choice] }
+  );
 
 function cloneChoice(choice: Choice): Choice {
   return {
@@ -53,13 +62,29 @@ function createDraftVersion(
   if (!validated.ok) {
     return validated;
   }
-  const [first, second] = content.choices;
-
-  return success({
+  const base = {
     version,
     state: "draft",
     text: content.text,
     ...(content.hint !== undefined ? { hint: content.hint } : {}),
+  } as const;
+  if (content.format === "likert_5") {
+    const [first, second, third, fourth, fifth] = content.choices;
+    return success({
+      ...base,
+      format: "likert_5",
+      choices: [
+        cloneChoice(first),
+        cloneChoice(second),
+        cloneChoice(third),
+        cloneChoice(fourth),
+        cloneChoice(fifth),
+      ],
+    });
+  }
+  const [first, second] = content.choices;
+  return success({
+    ...base,
     format: "single_choice",
     choices: [cloneChoice(first), cloneChoice(second)],
   });

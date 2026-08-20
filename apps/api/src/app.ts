@@ -601,6 +601,7 @@ app.delete(
 
 app.get(
   "/api/personal-data/records",
+  requireDevelopmentEnvironment,
   requireAuthentication,
   requireCurrentTerms,
   personalDataRecordsRoute,
@@ -608,6 +609,7 @@ app.get(
 );
 app.patch(
   "/api/personal-data/records/:sourceRecordId",
+  requireDevelopmentEnvironment,
   requireAuthentication,
   requireCurrentTerms,
   correctPersonalDataRecordRoute,
@@ -636,6 +638,7 @@ app.delete(
 );
 app.delete(
   "/api/personal-data/records/:sourceRecordId",
+  requireDevelopmentEnvironment,
   requireAuthentication,
   requireCurrentTerms,
   deletePersonalDataRecordRoute,
@@ -695,6 +698,7 @@ app.delete(
 );
 app.get(
   "/api/personal-data/features",
+  requireDevelopmentEnvironment,
   requireAuthentication,
   requireCurrentTerms,
   personalDataFeaturesRoute,

@@ -49,14 +49,6 @@ export type CreateAnswerSourceRecordIntent = Readonly<{
   questionVersion: number;
   choiceId: string;
   acceptedAt: string;
-  revisesSourceRecordId?: string;
-}>;
-
-export type DeleteAnswerSourceRecordIntent = Readonly<{
-  kind: "delete-answer-source-record";
-  sourceRecordId: string;
-  accountId: string;
-  deletedAt: string;
 }>;
 
 export type DiagnosisInteractionInput = {
@@ -77,7 +69,7 @@ export type RecordDiagnosisAnswerInput = DiagnosisInteractionInput & {
 
 export type RecordAnswerResult =
   | {
-      outcome: "created" | "revised";
+      outcome: "created";
       response: DiagnosisResponse;
       intent: CreateAnswerSourceRecordIntent;
     }
@@ -85,10 +77,6 @@ export type RecordAnswerResult =
 
 export type DeferQuestionResult =
   | { outcome: "deferred"; response: DiagnosisResponse }
-  | { outcome: "unchanged"; response: DiagnosisResponse };
-
-export type DeleteAnswerResult =
-  | { outcome: "deleted"; response: DiagnosisResponse; intent: DeleteAnswerSourceRecordIntent }
   | { outcome: "unchanged"; response: DiagnosisResponse };
 
 function prepareResponse(input: DiagnosisInteractionInput): DiagnosisResult<DiagnosisResponse> {
@@ -168,6 +156,9 @@ export function recordDiagnosisAnswer(
   if (current?.choiceId === input.choiceId) {
     return success({ outcome: "unchanged", response: prepared.value });
   }
+  if (current) {
+    return failure("question-already-answered", "受理済みの診断回答は変更できません");
+  }
 
   const acceptedAt = input.at.toISOString();
   const answer: Answer = {
@@ -180,12 +171,7 @@ export function recordDiagnosisAnswer(
   };
   const response: DiagnosisResponse = {
     ...prepared.value,
-    answers: [
-      ...prepared.value.answers.filter(
-        (candidate) => candidate.diagnosisQuestionId !== diagnosisQuestion.id,
-      ),
-      answer,
-    ],
+    answers: [...prepared.value.answers, answer],
     deferredQuestions: prepared.value.deferredQuestions.filter(
       (candidate) => candidate.diagnosisQuestionId !== diagnosisQuestion.id,
     ),
@@ -202,10 +188,9 @@ export function recordDiagnosisAnswer(
     questionVersion: diagnosisQuestion.questionVersion,
     choiceId: input.choiceId,
     acceptedAt,
-    ...(current ? { revisesSourceRecordId: current.sourceRecordId } : {}),
   };
 
-  return success({ outcome: current ? "revised" : "created", response, intent });
+  return success({ outcome: "created", response, intent });
 }
 
 export function deferDiagnosisQuestion(
@@ -241,40 +226,6 @@ export function deferDiagnosisQuestion(
         ...prepared.value.deferredQuestions,
         { diagnosisQuestionId: input.diagnosisQuestionId, deferredAt: input.at.toISOString() },
       ],
-    },
-  });
-}
-
-export function deleteDiagnosisAnswer(
-  input: DiagnosisInteractionInput,
-): DiagnosisResult<DeleteAnswerResult> {
-  const validated = validate(DiagnosisInteractionInputSchema, input);
-  if (!validated.ok) {
-    return validated;
-  }
-  const prepared = prepareResponse(input);
-  if (!prepared.ok) {
-    return prepared;
-  }
-  const current = prepared.value.answers.find(
-    (answer) => answer.diagnosisQuestionId === input.diagnosisQuestionId,
-  );
-  if (!current) {
-    return success({ outcome: "unchanged", response: prepared.value });
-  }
-  return success({
-    outcome: "deleted",
-    response: {
-      ...prepared.value,
-      answers: prepared.value.answers.filter(
-        (answer) => answer.diagnosisQuestionId !== input.diagnosisQuestionId,
-      ),
-    },
-    intent: {
-      kind: "delete-answer-source-record",
-      sourceRecordId: current.sourceRecordId,
-      accountId: input.respondent.accountId,
-      deletedAt: input.at.toISOString(),
     },
   });
 }

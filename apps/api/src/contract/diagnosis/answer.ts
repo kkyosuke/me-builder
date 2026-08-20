@@ -35,7 +35,7 @@ export const SaveDiagnosisAnswerResponseSchema = v.object({
 export const InvalidRequestErrorSchema = v.object({ error: v.literal("Invalid request") });
 export const AnswerConflictErrorSchema = v.object({
   error: v.literal("Answer already exists"),
-  reason: v.literal("answer_change_requires_revision"),
+  reason: v.literal("answer_is_immutable"),
 });
 export const InvalidAnswerErrorSchema = v.object({
   error: v.literal("Invalid answer"),
@@ -70,7 +70,7 @@ export const saveDiagnosisAnswerRoute = describeRoute({
       "対応するAccountがない、またはDiagnosisが公開されていない",
       SaveAnswerNotFoundErrorSchema,
     ),
-    409: jsonResponse("受付終了、または回答修正が必要", SaveAnswerConflictErrorSchema),
+    409: jsonResponse("受付終了、または保存済み回答が不変", SaveAnswerConflictErrorSchema),
     422: jsonResponse("Diagnosis QuestionまたはChoiceが不正", InvalidAnswerErrorSchema),
   },
 } satisfies DescribeRouteOptions);

@@ -30,7 +30,7 @@ export const questionVersions = sqliteTable(
     state: text("state", { enum: ["draft", "approved", "retired"] }).notNull(),
     text: text("text").notNull(),
     hint: text("hint"),
-    format: text("format", { enum: ["single_choice"] }).notNull(),
+    format: text("format", { enum: ["single_choice", "likert_5"] }).notNull(),
     approvedAt: integer("approved_at", { mode: "timestamp" }),
     retiredAt: integer("retired_at", { mode: "timestamp" }),
   },

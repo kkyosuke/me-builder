@@ -38,6 +38,7 @@ vi.mock("../middleware/authorization", async (importOriginal) => {
 
 const bindings = {
   LIFF_ID: "2010850319-Yl63upAR",
+  ENVIRONMENT: "test",
   DB: {} as D1Database,
   ACCOUNT_DATA: {} as AccountDataNamespace,
 };
@@ -159,11 +160,27 @@ describe("personal data controller", () => {
     expect(await response.json()).toEqual({ error: "Personal data record not found" });
   });
 
+  it("診断回答の個別削除を409へ変換する", async () => {
+    mocks.deletePersonalData.mockResolvedValue({
+      type: "resolved",
+      result: { type: "immutable-diagnosis" },
+    });
+
+    const response = await app.request(
+      "/api/personal-data/records/diagnosis-source",
+      { method: "DELETE", headers },
+      bindings,
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "Diagnosis answer is immutable" });
+  });
+
   it("bindingがなければ操作せず503を返す", async () => {
     const response = await app.request(
       "/api/personal-data/records",
       { headers },
-      { LIFF_ID: bindings.LIFF_ID },
+      { LIFF_ID: bindings.LIFF_ID, ENVIRONMENT: "test" },
     );
     expect(response.status).toBe(503);
     expect(mocks.listPersonalData).not.toHaveBeenCalled();

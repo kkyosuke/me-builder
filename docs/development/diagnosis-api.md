@@ -132,7 +132,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 このパスはDiagnosis Questionをリソースとする冪等な`PUT`です。同じ本人が同じDiagnosis QuestionとChoice IDを通信再送・二重タップ・並行リクエストで繰り返した場合、2件目以降は新しいAnswer、Source Record、DiagnosisResponseを作らず、`outcome`を`unchanged`として既存Answerと現在の進捗を`200`で返します。`acceptedAt`も初回受付時点から変えません。Idempotency Keyは要求しません。
 
-異なるChoice IDが既に保存されている場合、このAPIでは上書きせず`409 answer_change_requires_revision`を返します。回答修正はSource Recordの改訂を伴う別機能として扱い、このAPIの範囲には含めません。
+異なるChoice IDが既に保存されている場合、このAPIでは上書きせず`409 answer_is_immutable`を返します。受理済みの診断回答は訂正・個別削除できません。
 
 回答保存固有のエラーは次のとおりです。
 
@@ -141,7 +141,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 | `400` | JSONでない、または`choiceId`がない・空 | `{ "error": "Invalid request" }` |
 | `404` | Diagnosisが存在しない、公開前、公開停止、または削除済み | `{ "error": "Diagnosis not found", "reason": "diagnosis_not_found" }` |
 | `409` | Diagnosisが受付終了済み | `{ "error": "Diagnosis closed", "reason": "diagnosis_closed" }` |
-| `409` | 同じ質問へ異なるChoice IDを保存済み | `{ "error": "Answer already exists", "reason": "answer_change_requires_revision" }` |
+| `409` | 同じ質問へ異なるChoice IDを保存済み | `{ "error": "Answer already exists", "reason": "answer_is_immutable" }` |
 | `422` | Diagnosis QuestionがDiagnosisにない | `{ "error": "Invalid answer", "reason": "diagnosis_question_not_found" }` |
 | `422` | Choice IDがDiagnosis固定のQuestion Versionにない | `{ "error": "Invalid answer", "reason": "choice_not_found" }` |
 

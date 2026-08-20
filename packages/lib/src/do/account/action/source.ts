@@ -2,12 +2,7 @@ import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { AccountDataDatabase } from "../database";
 import { brainItemEvidenceEdges, brainItems, brainVectorSyncJobs } from "../schema/brain";
 import { diagnoses, questionChoices, questionVersions } from "../schema/catalog-snapshot";
-import {
-  diagnosisAnswers,
-  diagnosisBrainProjectionHeads,
-  diagnosisBrainProjectionRequests,
-  diagnosisResponses,
-} from "../schema/diagnosis";
+import { diagnosisAnswers, diagnosisResponses } from "../schema/diagnosis";
 import {
   chatTurns,
   conversationMessages,
@@ -38,20 +33,17 @@ export type PersonalDataRecord =
       recordedAt: string;
     }>;
 
-export type CorrectPersonalDataRecordInput = Readonly<
-  { kind: "diagnosis"; choiceId: string } | { kind: "diary"; value: string }
->;
+export type CorrectPersonalDataRecordInput = Readonly<{ kind: "diary"; value: string }>;
 
 export type MutatePersonalDataRecordResult =
   | Readonly<{
       type: "updated" | "deleted" | "unchanged";
       recordId: string;
-      diagnosisId?: string;
       invalidatedBrainItemCount: number;
     }>
   | Readonly<{ type: "not-found" }>
-  | Readonly<{ type: "kind-mismatch" }>
-  | Readonly<{ type: "invalid-choice" }>;
+  | Readonly<{ type: "immutable-diagnosis" }>
+  | Readonly<{ type: "kind-mismatch" }>;
 
 async function sha256(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
@@ -73,7 +65,7 @@ export async function hasActiveSourceRecords(
   return record !== undefined;
 }
 
-/** Webで本人が訂正・削除できる、現在有効な診断回答と日記原本を返す。 */
+/** 開発環境の確認画面へ、現在有効な診断回答と日記原本を返す。 */
 export async function listPersonalDataRecords(
   db: AccountDataDatabase,
   accountId: string,
@@ -350,87 +342,11 @@ export async function correctPersonalDataRecord(
     diaryMessageForSource(db, accountId, sourceRecordId),
   ]);
   if (!answer && !diary) return { type: "not-found" };
+  if (answer) return { type: "immutable-diagnosis" };
   const brainItemIds = await affectedBrainItemIds(db, accountId, sourceRecordId);
   const nextSourceRecordId = crypto.randomUUID();
   const revisionId = crypto.randomUUID();
   const lifecycle = { createdAt: at, updatedAt: at };
-
-  if (answer) {
-    if (input.kind !== "diagnosis") return { type: "kind-mismatch" };
-    if (answer.choiceId === input.choiceId) {
-      return {
-        type: "unchanged",
-        recordId: sourceRecordId,
-        diagnosisId: answer.diagnosisId,
-        invalidatedBrainItemCount: 0,
-      };
-    }
-    const choice = await db
-      .select({ id: questionChoices.choiceId })
-      .from(questionChoices)
-      .where(
-        and(
-          eq(questionChoices.questionId, answer.questionId),
-          eq(questionChoices.questionVersion, answer.questionVersion),
-          eq(questionChoices.choiceId, input.choiceId),
-          eq(questionChoices.isDeleted, false),
-        ),
-      )
-      .get();
-    if (!choice) return { type: "invalid-choice" };
-    const responseRevision = answer.responseRevision + 1;
-    const statements: D1BatchStatement[] = [
-      db.insert(sourceRecords).values({
-        id: nextSourceRecordId,
-        accountId,
-        kind: "user_input",
-        accessLabel: "private",
-        ...lifecycle,
-      }),
-      db.insert(sourceRecordRevisions).values({
-        id: revisionId,
-        previousSourceRecordId: sourceRecordId,
-        nextSourceRecordId,
-        derivationMethod: "deterministic",
-        ...lifecycle,
-      }),
-      db
-        .update(diagnosisAnswers)
-        .set({ isDeleted: true, deletedAt: at, updatedAt: at })
-        .where(eq(diagnosisAnswers.id, answer.answerId)),
-      db.insert(diagnosisAnswers).values({
-        id: crypto.randomUUID(),
-        diagnosisResponseId: answer.responseId,
-        diagnosisQuestionId: answer.diagnosisQuestionId,
-        questionId: answer.questionId,
-        questionVersion: answer.questionVersion,
-        choiceId: input.choiceId,
-        acceptedAt: at,
-        sourceRecordId: nextSourceRecordId,
-        ...lifecycle,
-      }),
-      db
-        .update(diagnosisResponses)
-        .set({ revision: responseRevision, updatedAt: at })
-        .where(eq(diagnosisResponses.id, answer.responseId)),
-      db.insert(diagnosisBrainProjectionRequests).values({
-        id: crypto.randomUUID(),
-        diagnosisResponseId: answer.responseId,
-        responseRevision,
-        status: "pending",
-        nextAttemptAt: at,
-        ...lifecycle,
-      }),
-      ...derivedInvalidationStatements(db, brainItemIds, at),
-    ];
-    await db.batch(statements);
-    return {
-      type: "updated",
-      recordId: nextSourceRecordId,
-      diagnosisId: answer.diagnosisId,
-      invalidatedBrainItemCount: brainItemIds.length,
-    };
-  }
 
   if (!diary) return { type: "not-found" };
   if (input.kind !== "diary") return { type: "kind-mismatch" };
@@ -493,6 +409,7 @@ export async function deletePersonalDataRecord(
     diaryMessageForSource(db, accountId, sourceRecordId),
   ]);
   if (!answer && !diary) return { type: "not-found" };
+  if (answer) return { type: "immutable-diagnosis" };
   const brainItemIds = await affectedBrainItemIds(db, accountId, sourceRecordId);
   const statements: D1BatchStatement[] = [
     db
@@ -511,36 +428,6 @@ export async function deletePersonalDataRecord(
     ...derivedInvalidationStatements(db, brainItemIds, at),
   ];
 
-  if (answer) {
-    const responseRevision = answer.responseRevision + 1;
-    statements.push(
-      db
-        .update(diagnosisAnswers)
-        .set({ isDeleted: true, deletedAt: at, updatedAt: at })
-        .where(eq(diagnosisAnswers.id, answer.answerId)),
-      db
-        .update(diagnosisResponses)
-        .set({ revision: responseRevision, updatedAt: at })
-        .where(eq(diagnosisResponses.id, answer.responseId)),
-      db
-        .delete(diagnosisBrainProjectionHeads)
-        .where(
-          and(
-            eq(diagnosisBrainProjectionHeads.accountId, accountId),
-            eq(diagnosisBrainProjectionHeads.diagnosisId, answer.diagnosisId),
-          ),
-        ),
-      db.insert(diagnosisBrainProjectionRequests).values({
-        id: crypto.randomUUID(),
-        diagnosisResponseId: answer.responseId,
-        responseRevision,
-        status: "pending",
-        nextAttemptAt: at,
-        createdAt: at,
-        updatedAt: at,
-      }),
-    );
-  }
   if (diary) {
     statements.push(
       db
@@ -554,7 +441,6 @@ export async function deletePersonalDataRecord(
   return {
     type: "deleted",
     recordId: sourceRecordId,
-    ...(answer ? { diagnosisId: answer.diagnosisId } : {}),
     invalidatedBrainItemCount: brainItemIds.length,
   };
 }

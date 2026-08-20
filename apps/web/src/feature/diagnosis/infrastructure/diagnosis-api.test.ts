@@ -119,7 +119,7 @@ describe("saveDiagnosisAnswer", () => {
     [401, undefined, AuthenticationError, "AUTHENTICATION_REQUIRED"],
     [404, undefined, OperationError, "DIAGNOSIS_UNAVAILABLE"],
     [409, { reason: "diagnosis_closed" }, OperationError, "DIAGNOSIS_CLOSED"],
-    [409, { reason: "answer_change_requires_revision" }, OperationError, "ANSWER_CONFLICT"],
+    [409, { reason: "answer_is_immutable" }, OperationError, "ANSWER_CONFLICT"],
     [422, undefined, ValidationError, "INVALID_DIAGNOSIS_ANSWER"],
     [500, undefined, UnknownError, "DIAGNOSIS_ANSWER_REQUEST_FAILED"],
   ] as const)("HTTP %sをcode %sへ変換する", async (status, body, ErrorType, code) => {
@@ -208,9 +208,10 @@ describe("fetchDiagnosisDefinition", () => {
             questionVersion: 2,
             text: "API question",
             hint: null,
+            format: "single_choice",
             choices: [
-              { choiceId: "no", label: "いいえ" },
-              { choiceId: "yes", label: "はい" },
+              { choiceId: "no", label: "いいえ", score: null },
+              { choiceId: "yes", label: "はい", score: null },
             ],
           },
         ],
@@ -229,10 +230,56 @@ describe("fetchDiagnosisDefinition", () => {
         {
           questionVersion: 2,
           text: "API question",
+          format: "single_choice",
           left: { choiceId: "no" },
           right: { choiceId: "yes" },
         },
       ],
+    });
+  });
+
+  it("5段階のChoiceとscoreを順序どおり回答画面へ渡す", async () => {
+    const labels = [
+      "まったく当てはまらない",
+      "あまり当てはまらない",
+      "どちらともいえない",
+      "やや当てはまる",
+      "とても当てはまる",
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          id: "likert",
+          title: "5段階",
+          description: "説明",
+          relationshipCategory: "general",
+          opensAt: "2026-08-04T00:00:00.000Z",
+          closesAt: null,
+          questions: [
+            {
+              diagnosisQuestionId: "dq-1",
+              questionId: "q-1",
+              questionVersion: 1,
+              text: "質問",
+              hint: null,
+              format: "likert_5",
+              choices: labels.map((label, index) => ({
+                choiceId: `level-${index + 1}`,
+                label,
+                score: [-1, -0.5, 0, 0.5, 1][index],
+              })),
+            },
+          ],
+        }),
+      ),
+    );
+
+    const definition = await fetchDiagnosisDefinition(API_URL, "likert");
+
+    expect(definition.questions[0]).toMatchObject({
+      format: "likert_5",
+      choices: labels.map((label, index) => ({ label, score: [-1, -0.5, 0, 0.5, 1][index] })),
     });
   });
 

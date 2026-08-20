@@ -15,7 +15,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { createDiagnosisAnswer, summarizeInteractions } from "../../model/answers";
+import {
+  createDiagnosisAnswer,
+  createLikert5DiagnosisAnswer,
+  summarizeInteractions,
+} from "../../model/answers";
 import type { DiagnosisDefinition } from "../../model/diagnosis-definition";
 import type { DiagnosisAnswer, DiagnosisInteraction, SwipeDirection } from "../../model/types";
 import { pickProgressMessage, resolveProgressMilestone } from "../progress-message";
@@ -37,6 +41,41 @@ type BackgroundSave = {
   state: "saving" | "failed";
   message?: string;
 };
+
+function Likert5Card({
+  question,
+  disabled,
+  onSelect,
+}: {
+  question: Extract<DiagnosisDefinition["questions"][number], { format: "likert_5" }>;
+  disabled: boolean;
+  onSelect: (choiceId: string) => void;
+}) {
+  return (
+    <div className="absolute inset-0 flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-950/50 dark:border-slate-700 dark:bg-slate-800">
+      <p className="text-xl leading-relaxed font-bold text-slate-950 dark:text-slate-50">
+        {question.text}
+      </p>
+      {question.hint && (
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{question.hint}</p>
+      )}
+      <div className="mt-auto grid gap-2" aria-label="当てはまる程度を選択">
+        {question.choices.map((choice, index) => (
+          <button
+            key={choice.choiceId}
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelect(choice.choiceId)}
+            className="rounded-xl border border-sky-400/40 bg-sky-400/10 px-3 py-2 text-left text-sm font-semibold text-sky-800 transition-colors hover:bg-sky-400/20 disabled:opacity-40 dark:text-sky-100"
+          >
+            <span className="mr-2 text-xs text-slate-500 dark:text-slate-400">{index + 1}</span>
+            {choice.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** `prefers-reduced-motion: reduce` を購読します。 */
 function useReducedMotion(): boolean {
@@ -338,8 +377,28 @@ export function SwipeDiagnosis({
     [advance, current, isBusy, onDeferQuestion, persistAnswer],
   );
 
+  const commitLikert5 = useCallback(
+    (choiceId: string) => {
+      if (!current || current.format !== "likert_5" || isBusy || actionPending.current) {
+        return;
+      }
+      actionPending.current = true;
+      const answer = createLikert5DiagnosisAnswer(current, choiceId, new Date());
+      setInteractions((previous) => [...previous, answer]);
+      setIndex((previous) => previous + 1);
+      queueMicrotask(() => {
+        actionPending.current = false;
+      });
+      void persistAnswer(answer);
+    },
+    [current, isBusy, persistAnswer],
+  );
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (current?.format === "likert_5") {
+        return;
+      }
       const action = resolveKeyAction(event.key);
       if (!action) {
         return;
@@ -350,10 +409,10 @@ export function SwipeDiagnosis({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [commit]);
+  }, [commit, current?.format]);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (isBusy) {
+    if (isBusy || current?.format === "likert_5") {
       return;
     }
     // 押した子要素でキャプチャすることで、ボタン上からのスワイプと通常のクリックを両立します。
@@ -453,24 +512,32 @@ export function SwipeDiagnosis({
         {finished && backgroundSaves.length === 0 && !isOpeningResult && (
           <DiagnosisComplete interactions={interactions} />
         )}
-        {questions?.slice(index, index + VISIBLE_STACK_SIZE).map((question, offset) => (
-          <SwipeCard
-            key={`${question.diagnosisQuestionId}-v${question.questionVersion}`}
-            question={question}
-            depth={offset}
-            drag={offset === 0 ? drag : null}
-            flyOut={offset === 0 ? flyOut : null}
-            cardWidth={cardWidth}
-            threshold={threshold}
-            reducedMotion={reducedMotion}
-            disabled={isBusy}
-            onSelect={commit}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerCancel}
-          />
-        ))}
+        {current?.format === "likert_5" ? (
+          <Likert5Card question={current} disabled={isBusy} onSelect={commitLikert5} />
+        ) : (
+          questions
+            ?.slice(index, index + VISIBLE_STACK_SIZE)
+            .map((question, offset) =>
+              question.format === "likert_5" ? null : (
+                <SwipeCard
+                  key={`${question.diagnosisQuestionId}-v${question.questionVersion}`}
+                  question={question}
+                  depth={offset}
+                  drag={offset === 0 ? drag : null}
+                  flyOut={offset === 0 ? flyOut : null}
+                  cardWidth={cardWidth}
+                  threshold={threshold}
+                  reducedMotion={reducedMotion}
+                  disabled={isBusy}
+                  onSelect={commit}
+                  onPointerDown={onPointerDown}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerCancel}
+                />
+              ),
+            )
+        )}
       </div>
 
       {finished && (
@@ -504,10 +571,16 @@ export function SwipeDiagnosis({
           </button>
 
           <div className="space-y-1 text-center text-xs text-slate-500">
-            <p>「はい」「いいえ」をタップ、またはカードを左右にスワイプ</p>
+            <p>
+              {current.format === "likert_5"
+                ? "5つの選択肢をタップ、またはTabとEnterで選択"
+                : "「はい」「いいえ」をタップ、またはカードを左右にスワイプ"}
+            </p>
             <p className="flex flex-wrap items-center justify-center gap-x-2">
               <Keyboard className="size-4 shrink-0" aria-hidden="true" />
-              キーボードは ← → で回答、↓ であとで回答
+              {current.format === "likert_5"
+                ? "キーボードはTabで移動、Enterで回答"
+                : "キーボードは ← → で回答、↓ であとで回答"}
             </p>
           </div>
         </div>

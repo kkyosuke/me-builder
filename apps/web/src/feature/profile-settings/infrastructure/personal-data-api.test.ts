@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   correctPersonalDataRecord,
   deletePersonalDataRecord,
+  fetchPersonalDataFeatures,
   fetchPersonalDataRecords,
 } from "./personal-data-api";
 
@@ -29,6 +30,24 @@ describe("personal data api", () => {
     await expect(fetchPersonalDataRecords("https://api.example.com")).resolves.toHaveLength(1);
     expect(fetch).toHaveBeenCalledWith(
       "https://api.example.com/api/personal-data/records",
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
+  it("本文と識別子を含まないBrain特徴を検証して返す", async () => {
+    const features = {
+      format: "kagami-brain-features",
+      formatVersion: 1,
+      generatedAt: "2026-08-21T00:00:00.000Z",
+      scopes: ["metadata", "active", "history"],
+      brainItems: [],
+    };
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(features)));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(fetchPersonalDataFeatures("https://api.example.com")).resolves.toEqual(features);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.example.com/api/personal-data/features",
       expect.objectContaining({ credentials: "include" }),
     );
   });

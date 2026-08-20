@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { LIKERT_5_LABELS } from "./question-format";
 
 export const NonEmptyStringSchema = v.pipe(
   v.string(),
@@ -20,27 +21,59 @@ export const ChoiceSchema = v.object({
   presentation: v.optional(v.record(v.string(), v.string())),
 });
 
-const ChoicesSchema = v.pipe(
+const SingleChoicesSchema = v.pipe(
   v.tuple([ChoiceSchema, ChoiceSchema]),
   v.check(([first, second]) => first.id !== second.id, "Choice IDは重複できません"),
 );
 
-export const QuestionVersionContentSchema = v.object({
-  text: NonEmptyStringSchema,
-  hint: v.optional(NonEmptyStringSchema),
-  choices: ChoicesSchema,
-});
+const Likert5ChoicesSchema = v.pipe(
+  v.tuple([ChoiceSchema, ChoiceSchema, ChoiceSchema, ChoiceSchema, ChoiceSchema]),
+  v.check(
+    (choices) => new Set(choices.map(({ id }) => id)).size === choices.length,
+    "Choice IDは重複できません",
+  ),
+  v.check(
+    (choices) => choices.every(({ label }, index) => label === LIKERT_5_LABELS[index]),
+    "5段階尺度は固定された表示順を使用してください",
+  ),
+);
 
-export const QuestionVersionSchema = v.object({
+export const QuestionVersionContentSchema = v.union([
+  v.object({
+    text: NonEmptyStringSchema,
+    hint: v.optional(NonEmptyStringSchema),
+    format: v.optional(v.literal("single_choice")),
+    choices: SingleChoicesSchema,
+  }),
+  v.object({
+    text: NonEmptyStringSchema,
+    hint: v.optional(NonEmptyStringSchema),
+    format: v.literal("likert_5"),
+    choices: Likert5ChoicesSchema,
+  }),
+]);
+
+const QuestionVersionBase = {
   version: PositiveIntegerSchema,
   state: v.picklist(["draft", "approved", "retired"]),
   text: NonEmptyStringSchema,
   hint: v.optional(NonEmptyStringSchema),
-  format: v.literal("single_choice"),
-  choices: ChoicesSchema,
   approvedAt: v.optional(TimestampSchema),
   retiredAt: v.optional(TimestampSchema),
-});
+};
+
+export const QuestionVersionSchema = v.variant("format", [
+  v.object({
+    ...QuestionVersionBase,
+    format: v.literal("single_choice"),
+    choices: SingleChoicesSchema,
+  }),
+  v.object({
+    ...QuestionVersionBase,
+    format: v.literal("likert_5"),
+    choices: Likert5ChoicesSchema,
+  }),
+]);
 
 export const QuestionSchema = v.pipe(
   v.object({

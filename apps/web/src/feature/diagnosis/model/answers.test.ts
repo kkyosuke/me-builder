@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createDeferredQuestion,
   createDiagnosisAnswer,
+  createLikert5DiagnosisAnswer,
   restoreDiagnosisProgress,
   summarizeInteractions,
 } from "./answers";
@@ -17,6 +18,21 @@ const QUESTION: DiagnosisQuestion = {
 };
 
 const ANSWERED_AT = new Date("2026-07-28T00:00:00.000Z");
+
+const LIKERT_QUESTION: Extract<DiagnosisQuestion, { format: "likert_5" }> = {
+  diagnosisQuestionId: "dq-likert",
+  questionId: "q-likert",
+  questionVersion: 1,
+  text: "当てはまりますか",
+  format: "likert_5",
+  choices: [
+    { choiceId: "level-1", label: "まったく当てはまらない", score: -1 },
+    { choiceId: "level-2", label: "あまり当てはまらない", score: -0.5 },
+    { choiceId: "level-3", label: "どちらともいえない", score: 0 },
+    { choiceId: "level-4", label: "やや当てはまる", score: 0.5 },
+    { choiceId: "level-5", label: "とても当てはまる", score: 1 },
+  ],
+};
 
 describe("createDiagnosisAnswer", () => {
   it("左右それぞれの選択肢のChoice IDを記録すること", () => {
@@ -40,6 +56,19 @@ describe("createDiagnosisAnswer", () => {
     expect(createDiagnosisAnswer(QUESTION, "left", ANSWERED_AT).questionVersion).toBe(
       QUESTION.questionVersion,
     );
+  });
+});
+
+describe("createLikert5DiagnosisAnswer", () => {
+  it("選択したChoiceを方向へ変換せず固定する", () => {
+    expect(createLikert5DiagnosisAnswer(LIKERT_QUESTION, "level-4", ANSWERED_AT)).toEqual({
+      kind: "answer",
+      diagnosisQuestionId: "dq-likert",
+      questionId: "q-likert",
+      questionVersion: 1,
+      choiceId: "level-4",
+      acceptedAt: ANSWERED_AT.toISOString(),
+    });
   });
 });
 

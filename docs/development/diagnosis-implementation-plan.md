@@ -43,16 +43,13 @@ flowchart LR
 
 ### 3.2 回答の修正・削除
 
-- 異なるChoiceへの変更をSource Recordの改訂として保存する
-- 回答削除時に現在有効なAnswerを外し、対応するSource Recordの削除を反映する
-- 修正・削除後の回答状態と進捗を再計算する
-- 回答内容画面から確認付きで操作できるようにする
-
-Source Recordの改訂・削除規則は[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)を正とします。
+- [x] 同じChoiceの再送だけを冪等に受け付け、異なるChoiceを`answer_is_immutable`で拒否する
+- [x] 開発用入力データ画面でも診断回答をread-onlyにする
+- [x] Account削除だけは診断回答を含むAccountData全体へ適用する
 
 ### 3.3 回答画面の操作を完成させる
 
-- 直前の質問へ戻り、保存済み回答を修正できるようにする
+- [x] 選択時に即確定し、直前の質問へ戻る操作を設けない
 - 端末の戻る操作でも保存済み進捗を失わず一覧へ戻れるようにする
 - 未保存の選択がある場合は破棄確認を表示する
 

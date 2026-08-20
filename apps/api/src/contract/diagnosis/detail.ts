@@ -14,16 +14,29 @@ const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
 const DiagnosisChoiceSchema = v.object({
   choiceId: NonEmptyStringSchema,
   label: NonEmptyStringSchema,
+  score: v.nullable(v.number()),
 });
 
-const DiagnosisQuestionSchema = v.object({
+const DiagnosisQuestionBase = {
   diagnosisQuestionId: NonEmptyStringSchema,
   questionId: NonEmptyStringSchema,
   questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
   text: NonEmptyStringSchema,
   hint: v.nullable(NonEmptyStringSchema),
-  choices: v.pipe(v.array(DiagnosisChoiceSchema), v.length(2)),
-});
+};
+
+const DiagnosisQuestionSchema = v.variant("format", [
+  v.object({
+    ...DiagnosisQuestionBase,
+    format: v.literal("single_choice"),
+    choices: v.pipe(v.array(DiagnosisChoiceSchema), v.length(2)),
+  }),
+  v.object({
+    ...DiagnosisQuestionBase,
+    format: v.literal("likert_5"),
+    choices: v.pipe(v.array(DiagnosisChoiceSchema), v.length(5)),
+  }),
+]);
 
 export const DiagnosisDetailResponseSchema = v.object({
   id: NonEmptyStringSchema,

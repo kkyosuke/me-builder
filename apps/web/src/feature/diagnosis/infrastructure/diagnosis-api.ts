@@ -99,14 +99,17 @@ const ApiDiagnosisDetailSchema = v.object({
       questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
       text: v.pipe(v.string(), v.nonEmpty()),
       hint: v.nullable(v.pipe(v.string(), v.nonEmpty())),
+      format: v.picklist(["single_choice", "likert_5"]),
       choices: v.pipe(
         v.array(
           v.object({
             choiceId: v.pipe(v.string(), v.nonEmpty()),
             label: v.pipe(v.string(), v.nonEmpty()),
+            score: v.nullable(v.number()),
           }),
         ),
-        v.length(2),
+        v.minLength(2),
+        v.maxLength(5),
       ),
     }),
   ),
@@ -165,6 +168,20 @@ export async function fetchDiagnosisDefinition(
     questions = v.parse(
       DiagnosisQuestionsSchema,
       body.questions.map((question) => {
+        if (question.format === "likert_5") {
+          if (question.choices.length !== 5) {
+            throw new Error("5段階診断の選択肢数が不正です。");
+          }
+          return {
+            diagnosisQuestionId: question.diagnosisQuestionId,
+            questionId: question.questionId,
+            questionVersion: question.questionVersion,
+            text: question.text,
+            ...(question.hint ? { hint: question.hint } : {}),
+            format: "likert_5" as const,
+            choices: question.choices,
+          };
+        }
         const [left, right] = question.choices;
         if (!left || !right) {
           throw new Error("診断の選択肢が不足しています。");
@@ -175,6 +192,7 @@ export async function fetchDiagnosisDefinition(
           questionVersion: question.questionVersion,
           text: question.text,
           ...(question.hint ? { hint: question.hint } : {}),
+          format: "single_choice" as const,
           left: {
             choiceId: left.choiceId,
             label: left.label,
@@ -261,12 +279,11 @@ export async function saveDiagnosisAnswer(
         // エラー本文が壊れていてもHTTP statusから安全な案内へ変換します。
       }
       throw new OperationError(
-        reason === "answer_change_requires_revision"
-          ? "すでに別の回答が保存されています。回答の修正機能をお待ちください。"
+        reason === "answer_is_immutable"
+          ? "保存済みの診断回答は変更できません。"
           : "受付終了のため、回答を保存できませんでした。",
         {
-          code:
-            reason === "answer_change_requires_revision" ? "ANSWER_CONFLICT" : "DIAGNOSIS_CLOSED",
+          code: reason === "answer_is_immutable" ? "ANSWER_CONFLICT" : "DIAGNOSIS_CLOSED",
           status: response.status,
         },
       );

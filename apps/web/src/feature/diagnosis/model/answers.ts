@@ -22,6 +22,9 @@ export function createDiagnosisAnswer(
   direction: SwipeDirection,
   acceptedAt: Date,
 ): DiagnosisAnswer {
+  if (question.format === "likert_5") {
+    throw new Error("5段階回答は方向では確定できません。");
+  }
   const parsedDirection = v.parse(SwipeDirectionSchema, direction);
   const choice = parsedDirection === "left" ? question.left : question.right;
   return v.parse(DiagnosisAnswerSchema, {
@@ -32,6 +35,26 @@ export function createDiagnosisAnswer(
     questionVersion: question.questionVersion,
     choiceId: choice.choiceId,
     direction: parsedDirection,
+    acceptedAt: acceptedAt.toISOString(),
+  });
+}
+
+/** 5段階の表示済みChoiceを、再解釈せずそのまま回答へ固定します。 */
+export function createLikert5DiagnosisAnswer(
+  question: Extract<DiagnosisQuestion, { format: "likert_5" }>,
+  choiceId: string,
+  acceptedAt: Date,
+): DiagnosisAnswer {
+  const choice = question.choices.find((candidate) => candidate.choiceId === choiceId);
+  if (!choice) {
+    throw new Error("5段階回答のChoice IDが質問にありません。");
+  }
+  return v.parse(DiagnosisAnswerSchema, {
+    kind: "answer",
+    diagnosisQuestionId: question.diagnosisQuestionId,
+    questionId: question.questionId,
+    questionVersion: question.questionVersion,
+    choiceId: choice.choiceId,
     acceptedAt: acceptedAt.toISOString(),
   });
 }
@@ -86,12 +109,18 @@ export function restoreDiagnosisProgress(
       throw new Error("保存済み回答と配信中の質問の版が一致しません。");
     }
     const direction =
-      saved.choiceId === question.left.choiceId
-        ? "left"
-        : saved.choiceId === question.right.choiceId
-          ? "right"
-          : undefined;
-    if (!direction) {
+      question.format === "likert_5"
+        ? undefined
+        : saved.choiceId === question.left.choiceId
+          ? "left"
+          : saved.choiceId === question.right.choiceId
+            ? "right"
+            : undefined;
+    const containsChoice =
+      question.format === "likert_5"
+        ? question.choices.some(({ choiceId }) => choiceId === saved.choiceId)
+        : direction !== undefined;
+    if (!containsChoice) {
       throw new Error("保存済み回答の選択肢が配信中の質問にありません。");
     }
     answers.push(
@@ -101,7 +130,7 @@ export function restoreDiagnosisProgress(
         questionId: saved.questionId,
         questionVersion: saved.questionVersion,
         choiceId: saved.choiceId,
-        direction,
+        ...(direction ? { direction } : {}),
         acceptedAt: saved.acceptedAt,
       }),
     );

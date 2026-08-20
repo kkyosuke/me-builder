@@ -290,69 +290,36 @@ describe("source records", () => {
     ]);
   });
 
-  it("診断回答の訂正で有効回答を差し替え、再projectionを予約する", async () => {
+  it("診断回答の訂正と個別削除を拒否して保存済み回答を維持する", async () => {
     const db = createTestDb();
-    const { accountId, diagnosisId, sourceRecordId } = await insertDiagnosisFixture(db);
+    const { accountId, sourceRecordId } = await insertDiagnosisFixture(db);
 
-    const result = await correctPersonalDataRecord(
-      db,
-      accountId,
-      sourceRecordId,
-      { kind: "diagnosis", choiceId: "yes" },
-      new Date("2026-08-15T02:00:00.000Z"),
-    );
-
-    expect(result).toMatchObject({
-      type: "updated",
-      diagnosisId,
-      invalidatedBrainItemCount: 1,
-    });
-    if (result.type !== "updated") throw new Error("診断訂正結果が不正です");
+    await expect(
+      correctPersonalDataRecord(
+        db,
+        accountId,
+        sourceRecordId,
+        { kind: "diary", value: "診断を日記として変更" },
+        new Date("2026-08-15T02:00:00.000Z"),
+      ),
+    ).resolves.toEqual({ type: "immutable-diagnosis" });
+    await expect(
+      deletePersonalDataRecord(db, accountId, sourceRecordId, new Date("2026-08-15T03:00:00.000Z")),
+    ).resolves.toEqual({ type: "immutable-diagnosis" });
     expect(
       db
         .select()
         .from(schema.diagnosisAnswers)
         .where(eq(schema.diagnosisAnswers.isDeleted, false))
         .get(),
-    ).toMatchObject({ choiceId: "yes", sourceRecordId: result.recordId });
-    expect(
-      db
-        .select()
-        .from(schema.sourceRecordRevisions)
-        .where(eq(schema.sourceRecordRevisions.previousSourceRecordId, sourceRecordId))
-        .get(),
-    ).toMatchObject({ nextSourceRecordId: result.recordId });
-    expect(
-      db
-        .select()
-        .from(schema.diagnosisBrainProjectionRequests)
-        .where(eq(schema.diagnosisBrainProjectionRequests.responseRevision, 2))
-        .get(),
-    ).toMatchObject({ status: "pending" });
+    ).toMatchObject({ choiceId: "no", sourceRecordId });
     expect(
       db.select().from(schema.brainItems).where(eq(schema.brainItems.id, "diagnosis-brain-1")).get()
         ?.status,
-    ).toBe("invalidated");
+    ).toBe("active");
     await expect(listPersonalDataRecords(db, accountId)).resolves.toMatchObject([
-      { id: result.recordId, kind: "diagnosis", value: "はい" },
+      { id: sourceRecordId, kind: "diagnosis", value: "いいえ" },
     ]);
-
-    await expect(
-      deletePersonalDataRecord(
-        db,
-        accountId,
-        result.recordId,
-        new Date("2026-08-15T03:00:00.000Z"),
-      ),
-    ).resolves.toMatchObject({ type: "deleted", diagnosisId });
-    expect(
-      db
-        .select()
-        .from(schema.diagnosisBrainProjectionRequests)
-        .where(eq(schema.diagnosisBrainProjectionRequests.responseRevision, 3))
-        .get(),
-    ).toMatchObject({ status: "pending" });
-    await expect(listPersonalDataRecords(db, accountId)).resolves.toEqual([]);
   });
 
   it("日記の削除で本文を消し、tombstoneと来歴だけを残す", async () => {

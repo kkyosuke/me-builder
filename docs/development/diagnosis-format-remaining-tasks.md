@@ -1,75 +1,60 @@
-# 診断回答形式の残タスク
+# 診断回答形式の実装境界
 
 ## 1. 目的
 
-この文書は、Phase 1の2択`single_choice`へ新しい回答形式を追加する前に必要な意思決定、不変条件、縦切りの順序を管理します。
+この文書は、標準の2択診断を維持しながら、例外的に5段階尺度を使える実装境界を定義します。診断の集約は[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)、画面は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md)、採点は[パラメータ採点設計](../diagnosis/scoring/parameter-scoring-design.md)を正とします。
 
-### 所有する概念
+## 2. 確定した回答形式
 
-- 新しい診断回答形式を選ぶ前の未検討事項
-- 形式ごとにdomain、API、保存、採点、UIを接続する実装順
-- 未設計の形式を現在の回答経路へ流さない境界
+- 診断の標準は、単純なスワイプ体験を優先した2択`single_choice`とする
+- 追加形式は5段階尺度`likert_5`だけとする。自由記述、複数選択、rankingは追加しない
+- 1つのDiagnosis内では全Question Versionを同じ形式に固定し、2択と5段階を混在させない
+- 既存Diagnosisの形式とQuestion Versionは変更しない
+- 初期catalogには5段階診断を公開せず、必要な診断を別途作成・審査して公開する
 
-### 所有しない概念
+5段階の表示順、意味、決定論的scoreは次で固定します。
 
-- Phase 1のQuestion、Diagnosis、DiagnosisResponseの定義
-- 現在の2択診断の画面体験とAPI契約
-- 形式固有の採点規則
+| 表示 | score |
+| --- | ---: |
+| まったく当てはまらない | -1 |
+| あまり当てはまらない | -0.5 |
+| どちらともいえない | 0 |
+| やや当てはまる | 0.5 |
+| とても当てはまる | 1 |
 
-現在の集約と不変条件は[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)、画面は[Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md)、HTTP契約は[診断API契約](diagnosis-api.md)を正とします。
+AIは回答のChoice、表示文言、Question Versionとこのscoreを入力として受け取れますが、scoreを別の値へ読み替えません。AIが作る説明は回答原本ではなく推定です。
 
-## 2. 現在の安全境界
+## 3. 回答と原本
 
-Phase 1のQuestion Versionは、Choiceをちょうど2件持つ`single_choice`だけです。公開catalogの読込時にも形式とChoice件数を検査し、DBへ未設計の形式や壊れた2択が混入してもWeb UIへ返しません。
+- 1問で1つのChoiceを選んだ時だけ回答済みとする
+- 「あとで回答」は未回答の進捗であり、恒久skipにはしない
+- 1回答を1 Source Recordとし、Choice IDから回答時点のQuestion Version、表示文言、尺度値を再現できるようにする
+- サーバーが初回回答を受理した後は、診断回答を個別に訂正・削除できない
+- 同じChoiceの再送は冪等な`unchanged`、別Choiceの再送は`409 answer_is_immutable`とする
+- Account削除では、他のAccountDataと同じ削除境界で診断回答も削除する
+- 入力データ確認とJSON exportは開発環境だけの検証機能とし、診断回答はそこでもread-onlyとする
 
-「あとで回答」は回答ではなく進捗です。恒久的なskip、回答拒否、空の自由記述として解釈しません。既存回答の意味、Source Recordの粒度、採点結果を変えず、新形式は別の縦切りとして追加します。
+## 4. UIと失敗復帰
 
-```mermaid
-flowchart LR
-    Catalog[Published catalog] --> Guard{single_choice<br/>かつ2択か}
-    Guard -->|yes| API[Diagnosis API]
-    Guard -->|no| Reject[設定errorとして拒否]
-    API --> Web[既存スワイプ回答]
-```
+- 2択はタップ、左右スワイプ、左右キーで選択する
+- 5段階は5つの選択肢を常時表示し、タップまたはkeyboard focusとEnterで選択する。スワイプへ割り当てない
+- 選択はタップまたはスワイプ解放時に即時確定し、確認画面、undo、前問へ戻る操作を設けない
+- 回答中、完了後とも保存済み回答へ戻って変更できない。「もう一度」も設けない
+- 通信結果が未確定の間は同じChoiceだけを保持して再送する。未保存と確定した場合だけ未回答へ戻し、新しく選び直せる
+- 端末に別Choiceを一時保存して切り替えたり、再送時にAIやclientがChoiceを置換したりしない
 
-## 3. 【検討必須】未検討事項
+## 5. 採点と比較
 
-| 未検討事項 | 決定する内容 |
-| --- | --- |
-| 最初の1形式 | 自由記述、複数選択、尺度、rankingのどれを、どの価値仮説で最初に追加するか |
-| 回答済み条件 | 空値、部分回答、最小・最大選択数、同順位、範囲外値をどう扱うか |
-| skipとの違い | 「あとで回答」、恒久skip、回答拒否、未回答をどう区別するか |
-| Source Record粒度 | 1問を1原本とするか、複数選択やrankingの各要素をどう保存するか |
-| 訂正・削除 | 部分変更を改訂とする単位、過去版、削除後の回答状態 |
-| 採点 | 採点の有無、設定版、比較可能性、未回答を含む結果の扱い |
-| AI利用 | 自由記述の原文とAI派生の分離、AIなしで保存・閲覧・削除できる範囲 |
-| 相性共有 | 異なる形式・設定版を比較できる条件と、共有対象外にする条件 |
-| export | 原文、選択順、尺度値、設定版、AI派生を区別する形式 |
-| UI・アクセシビリティ | keyboard、screen reader、mobile gesture、入力途中保存、error復帰 |
-| 版互換性 | 既存`single_choice`と新形式を同じDiagnosisへ混在させるか、旧clientの扱い |
+- 採点は版付きscoring configを使い、5段階scoreは`-1..1`へ正規化済みの値として扱う
+- 相性比較へ含められるのは、同じDiagnosis、同じQuestion Version、同じscoring configの回答だけとする
+- 2択と5段階は同じDiagnosisに混在しないため、形式をまたいで同一設問として比較しない
+- 未回答を0点として補完しない
 
-未決定の項目を現在のChoice ID、左右スワイプ、2択採点へ当てはめません。最初の1形式と回答済み条件、Source Record粒度、訂正・削除が決まるまで、schemaのformat enumを増やしません。
+## 6. 公開前の完了条件
 
-## 4. 決定後の実装順
+- catalog読込時に形式、Choice件数、5段階の固定文言・順序、Diagnosis内の形式統一を検証する
+- APIとWebが形式を明示的に受け渡し、未対応形式を拒否する
+- 5段階のtap、keyboard、二重送信防止、同一Choice再送をtestする
+- 公開するDiagnosisごとにQuestionとscoring configを審査する
 
-1. 最初の1形式についてQuestion Version、DiagnosisResponse、Source Recordの不変条件をSSoTへ追加する
-2. 保存、訂正、削除、exportをAIなしで縦に接続する
-3. 採点する形式だけに版付き採点契約を追加する
-4. 形式専用UIとkeyboard、screen reader、mobileの操作試験を追加する
-5. AI派生や相性共有を、それぞれの利用条件が決まった後の別PRで追加する
-6. 既存2択回答の取得、修正、採点、exportが変わらない回帰試験を通す
-
-## 5. 完了条件
-
-- 最初に追加する1形式と価値仮説が決まっている
-- domain、API、採点、訂正、exportのSSoTがある
-- 既存`single_choice`回答の意味を変えない
-- 回答原文とAI派生を区別する
-- keyboard、screen reader、mobileで回答できる
-
-## 6. 更新ルール
-
-- 複数形式を1つの決定や実装PRにまとめない
-- 決定済みの項目は、形式固有SSoTへのリンクへ置き換える
-- UI都合でdomainの回答済み条件を決めない
-- 1形式を完了しても、未実装の形式はこの文書へ残す
+この文書で回答形式に関する検討は完了しています。新しい5段階Diagnosisの質問内容と公開判断は、そのDiagnosisを追加するPRが所有します。

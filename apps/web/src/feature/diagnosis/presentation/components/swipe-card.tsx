@@ -1,5 +1,7 @@
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useRef } from "react";
 import type { DiagnosisQuestion, SwipeDirection } from "../../model/types";
+
+type SwipeQuestion = Exclude<DiagnosisQuestion, { format: "likert_5" }>;
 import {
   type DragOffset,
   SWIPE_TRANSITION_MS,
@@ -11,7 +13,7 @@ import {
 } from "../swipe";
 
 interface SwipeCardProps {
-  question: DiagnosisQuestion;
+  question: SwipeQuestion;
   /** 重なりの奥行き。0 が最前面で、最前面だけドラッグできます。 */
   depth: number;
   /** ドラッグ中の移動量。ドラッグしていなければ `null`。 */
@@ -36,7 +38,7 @@ function CardChoiceButton({
   disabled,
   onSelect,
 }: {
-  question: DiagnosisQuestion;
+  question: SwipeQuestion;
   direction: SwipeDirection;
   disabled: boolean;
   onSelect: (direction: SwipeDirection) => void;
@@ -83,7 +85,7 @@ function ChoiceOverlay({
   direction,
   progress,
 }: {
-  question: DiagnosisQuestion;
+  question: SwipeQuestion;
   direction: SwipeDirection;
   progress: number;
 }) {

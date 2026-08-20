@@ -662,7 +662,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 本人が訂正・削除できる診断回答と日記を取得する */
+    /** 開発環境で診断回答と日記を取得する */
     get: operations["listPersonalDataRecords"];
     put?: never;
     post?: never;
@@ -682,11 +682,11 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** 原本をtombstoneへ遷移し今後の利用を止める */
+    /** 開発環境で日記をtombstoneへ遷移し今後の利用を止める */
     delete: operations["deletePersonalDataRecord"];
     options?: never;
     head?: never;
-    /** 原本を上書きせず新版として訂正する */
+    /** 開発環境で日記を上書きせず新版として訂正する */
     patch: operations["correctPersonalDataRecord"];
     trace?: never;
   };
@@ -851,7 +851,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 本人のBrain特徴をAPI連携用に取得する */
+    /** 開発環境で本人のBrain特徴をJSON取得する */
     get: operations["getPersonalDataFeatures"];
     put?: never;
     post?: never;
@@ -5788,6 +5788,18 @@ export interface operations {
           };
         };
       };
+      /** @description 診断回答は削除できない */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Diagnosis answer is immutable";
+          };
+        };
+      };
       /** @description 現行利用規約への同意が必要 */
       428: {
         headers: {
@@ -5839,17 +5851,11 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json":
-          | {
-              /** @constant */
-              kind: "diagnosis";
-              choiceId: string;
-            }
-          | {
-              /** @constant */
-              kind: "diary";
-              value: string;
-            };
+        "application/json": {
+          /** @constant */
+          kind: "diary";
+          value: string;
+        };
       };
     };
     responses: {
@@ -5915,15 +5921,15 @@ export interface operations {
           };
         };
       };
-      /** @description 診断の選択肢が不正 */
-      422: {
+      /** @description 診断回答は訂正できない */
+      409: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           "application/json": {
             /** @constant */
-            error: "Invalid personal data mutation";
+            error: "Diagnosis answer is immutable";
           };
         };
       };
@@ -7395,18 +7401,23 @@ export interface operations {
           };
         };
       };
-      /** @description 対応するAccountが存在しない */
+      /** @description 開発環境ではない、または対応するAccountがない */
       404: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            /** @constant */
-            error: "Account not found";
-            /** @constant */
-            reason: "friendship_required";
-          };
+          "application/json":
+            | {
+                /** @constant */
+                error: "Account not found";
+                /** @constant */
+                reason: "friendship_required";
+              }
+            | {
+                /** @constant */
+                error: "Not Found";
+              };
         };
       };
       /** @description 現行利用規約への同意が必要 */
@@ -9407,17 +9418,36 @@ export interface operations {
             /** Format: date-time */
             opensAt: string;
             closesAt: string | null;
-            questions: {
-              diagnosisQuestionId: string;
-              questionId: string;
-              questionVersion: number;
-              text: string;
-              hint: string | null;
-              choices: {
-                choiceId: string;
-                label: string;
-              }[];
-            }[];
+            questions: (
+              | {
+                  diagnosisQuestionId: string;
+                  questionId: string;
+                  questionVersion: number;
+                  text: string;
+                  hint: string | null;
+                  /** @constant */
+                  format: "single_choice";
+                  choices: {
+                    choiceId: string;
+                    label: string;
+                    score: number | null;
+                  }[];
+                }
+              | {
+                  diagnosisQuestionId: string;
+                  questionId: string;
+                  questionVersion: number;
+                  text: string;
+                  hint: string | null;
+                  /** @constant */
+                  format: "likert_5";
+                  choices: {
+                    choiceId: string;
+                    label: string;
+                    score: number | null;
+                  }[];
+                }
+            )[];
           };
         };
       };
@@ -9734,7 +9764,7 @@ export interface operations {
               };
         };
       };
-      /** @description 受付終了、または回答修正が必要 */
+      /** @description 受付終了、または保存済み回答が不変 */
       409: {
         headers: {
           [name: string]: unknown;
@@ -9751,7 +9781,7 @@ export interface operations {
                 /** @constant */
                 error: "Answer already exists";
                 /** @constant */
-                reason: "answer_change_requires_revision";
+                reason: "answer_is_immutable";
               };
         };
       };

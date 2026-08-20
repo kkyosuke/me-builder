@@ -83,6 +83,7 @@ export function publishDiagnosis(
   if (diagnosis.state !== "draft") {
     return failure("invalid-transition", `${diagnosis.state}のDiagnosisは公開できません`);
   }
+  const formats = new Set<"single_choice" | "likert_5">();
   for (const diagnosisQuestion of diagnosis.questions) {
     const version = findCatalogVersion(catalog, diagnosisQuestion);
     if (!version) {
@@ -97,6 +98,10 @@ export function publishDiagnosis(
         "Diagnosis公開時点で全Question Versionがapprovedである必要があります",
       );
     }
+    formats.add(version.format);
+  }
+  if (formats.size !== 1) {
+    return failure("invalid-input", "1つのDiagnosisへ回答形式を混在できません");
   }
   return success({
     ...diagnosis,
