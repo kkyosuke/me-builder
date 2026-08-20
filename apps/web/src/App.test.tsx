@@ -1086,6 +1086,7 @@ describe("App", () => {
   });
 
   it("開発環境ではプロフィールからBrain Item一覧の別ページを開いて戻れる", async () => {
+    mocks.authState.role = "admin";
     window.history.replaceState({}, "", "/me");
     render(<App />);
 
@@ -1509,10 +1510,16 @@ describe("App", () => {
   });
 
   it("dev環境ではプロフィール最下部から本人データを全削除する", async () => {
+    mocks.authState.role = "admin";
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "プロフィールを開く" }));
+    fireEvent.click(
+      await screen.findByRole("checkbox", {
+        name: "削除対象と取り消せないことを確認しました",
+      }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "自分のデータを全削除" }));
 
     await waitFor(() =>
@@ -1529,13 +1536,14 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisList).toHaveBeenCalledTimes(2);
   });
 
-  it("dev環境の本人データ削除を確認でキャンセルできる", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("dev環境の本人データ削除は確認前に実行できない", async () => {
+    mocks.authState.role = "admin";
     render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "プロフィールを開く" }));
-    fireEvent.click(await screen.findByRole("button", { name: "自分のデータを全削除" }));
+    const deleteButton = await screen.findByRole("button", { name: "自分のデータを全削除" });
 
+    expect(deleteButton.hasAttribute("disabled")).toBe(true);
     expect(mocks.resetDevelopmentAccountData).not.toHaveBeenCalled();
   });
 
