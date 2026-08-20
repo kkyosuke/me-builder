@@ -191,21 +191,11 @@ describe("GET /api/openapi.json", () => {
         content: {
           "application/json": {
             schema: {
-              oneOf: [
-                {
-                  properties: {
-                    kind: { const: "diagnosis" },
-                    choiceId: { type: "string", minLength: 1 },
-                  },
-                },
-                {
-                  properties: {
-                    kind: { const: "diary" },
-                    value: { type: "string", minLength: 1, maxLength: 5_000 },
-                  },
-                },
-              ],
-              discriminator: { propertyName: "kind" },
+              type: "object",
+              properties: {
+                kind: { type: "string", const: "diary" },
+                value: { type: "string", minLength: 1, maxLength: 5_000 },
+              },
             },
           },
         },

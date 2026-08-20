@@ -30,13 +30,10 @@ const DiaryRecordSchema = v.object({
 export const PersonalDataRecordsResponseSchema = v.object({
   records: v.array(v.variant("kind", [DiagnosisRecordSchema, DiaryRecordSchema])),
 });
-export const CorrectPersonalDataRecordRequestSchema = v.variant("kind", [
-  v.object({ kind: v.literal("diagnosis"), choiceId: NonEmptyStringSchema }),
-  v.object({
-    kind: v.literal("diary"),
-    value: v.pipe(v.string(), v.trim(), v.nonEmpty(), v.maxLength(5_000)),
-  }),
-]);
+export const CorrectPersonalDataRecordRequestSchema = v.object({
+  kind: v.literal("diary"),
+  value: v.pipe(v.string(), v.trim(), v.nonEmpty(), v.maxLength(5_000)),
+});
 export const PersonalDataMutationResponseSchema = v.object({
   outcome: v.picklist(["updated", "deleted", "unchanged"]),
   recordId: NonEmptyStringSchema,
@@ -48,6 +45,9 @@ export const PersonalDataRecordNotFoundSchema = v.object({
 export const InvalidPersonalDataMutationSchema = v.object({
   error: v.literal("Invalid personal data mutation"),
 });
+export const ImmutableDiagnosisAnswerSchema = v.object({
+  error: v.literal("Diagnosis answer is immutable"),
+});
 
 const personalDataErrors = {
   ...authenticatedErrors,
@@ -58,8 +58,8 @@ const personalDataErrors = {
 
 export const personalDataRecordsRoute = describeRoute({
   operationId: "listPersonalDataRecords",
-  tags: ["Personal Data"],
-  summary: "本人が訂正・削除できる診断回答と日記を取得する",
+  tags: ["Development"],
+  summary: "開発環境で診断回答と日記を取得する",
   security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse("現在有効な本人入力", PersonalDataRecordsResponseSchema),
@@ -71,33 +71,20 @@ export const personalDataRecordsRoute = describeRoute({
 
 export const correctPersonalDataRecordRoute = describeRoute({
   operationId: "correctPersonalDataRecord",
-  tags: ["Personal Data"],
-  summary: "原本を上書きせず新版として訂正する",
+  tags: ["Development"],
+  summary: "開発環境で日記を上書きせず新版として訂正する",
   security: [{ applicationSession: [], csrfToken: [] }],
   requestBody: {
     required: true,
     content: {
       "application/json": {
         schema: {
-          oneOf: [
-            {
-              type: "object",
-              properties: {
-                kind: { type: "string", const: "diagnosis" },
-                choiceId: { type: "string", minLength: 1 },
-              },
-              required: ["kind", "choiceId"],
-            },
-            {
-              type: "object",
-              properties: {
-                kind: { type: "string", const: "diary" },
-                value: { type: "string", minLength: 1, maxLength: 5_000 },
-              },
-              required: ["kind", "value"],
-            },
-          ],
-          discriminator: { propertyName: "kind" },
+          type: "object",
+          properties: {
+            kind: { type: "string", const: "diary" },
+            value: { type: "string", minLength: 1, maxLength: 5_000 },
+          },
+          required: ["kind", "value"],
         },
       },
     },
@@ -105,7 +92,7 @@ export const correctPersonalDataRecordRoute = describeRoute({
   responses: {
     200: jsonResponse("訂正結果", PersonalDataMutationResponseSchema),
     400: jsonResponse("bodyまたは種別が不正", InvalidPersonalDataMutationSchema),
-    422: jsonResponse("診断の選択肢が不正", InvalidPersonalDataMutationSchema),
+    409: jsonResponse("診断回答は訂正できない", ImmutableDiagnosisAnswerSchema),
     ...csrfValidationError,
     ...personalDataErrors,
   },
@@ -113,11 +100,12 @@ export const correctPersonalDataRecordRoute = describeRoute({
 
 export const deletePersonalDataRecordRoute = describeRoute({
   operationId: "deletePersonalDataRecord",
-  tags: ["Personal Data"],
-  summary: "原本をtombstoneへ遷移し今後の利用を止める",
+  tags: ["Development"],
+  summary: "開発環境で日記をtombstoneへ遷移し今後の利用を止める",
   security: [{ applicationSession: [], csrfToken: [] }],
   responses: {
     200: jsonResponse("削除受付結果", PersonalDataMutationResponseSchema),
+    409: jsonResponse("診断回答は削除できない", ImmutableDiagnosisAnswerSchema),
     ...csrfValidationError,
     ...personalDataErrors,
   },

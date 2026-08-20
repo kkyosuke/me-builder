@@ -386,7 +386,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     expect(changed.status).toBe(409);
     expect(await changed.json()).toEqual({
       error: "Answer already exists",
-      reason: "answer_change_requires_revision",
+      reason: "answer_is_immutable",
     });
     const persisted = accountDataStore.raw
       .prepare("SELECT choice_id FROM diagnosis_answers WHERE is_deleted = 0")
@@ -395,7 +395,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     expect(await countRows("source_records")).toBe(1);
   });
 
-  it("課金情報なしで診断回答と日記を訂正・削除し、現在一覧へ収束させる", async () => {
+  it("開発環境で診断回答を読取専用にし、日記だけを訂正・削除する", async () => {
     expect((await putAnswer("dq-relationship-priority-01", "yes")).status).toBe(200);
     const diagnosisListResponse = await personalDataRequest();
     expect(diagnosisListResponse.status).toBe(200);
@@ -409,22 +409,17 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     const diagnosisCorrection = await personalDataRequest(
       `/api/personal-data/records/${diagnosisRecord.id}`,
       "PATCH",
-      { kind: "diagnosis", choiceId: "no" },
+      { kind: "diary", value: "診断を日記として変更" },
     );
-    expect(diagnosisCorrection.status).toBe(200);
-    const diagnosisCorrectionBody = (await diagnosisCorrection.json()) as {
-      outcome: string;
-      recordId: string;
-    };
-    expect(diagnosisCorrectionBody).toMatchObject({ outcome: "updated" });
-    expect(diagnosisCorrectionBody.recordId).not.toBe(diagnosisRecord.id);
+    expect(diagnosisCorrection.status).toBe(409);
+    expect(await diagnosisCorrection.json()).toEqual({ error: "Diagnosis answer is immutable" });
 
     const diagnosisDeletion = await personalDataRequest(
-      `/api/personal-data/records/${diagnosisCorrectionBody.recordId}`,
+      `/api/personal-data/records/${diagnosisRecord.id}`,
       "DELETE",
     );
-    expect(diagnosisDeletion.status).toBe(200);
-    expect(await diagnosisDeletion.json()).toMatchObject({ outcome: "deleted" });
+    expect(diagnosisDeletion.status).toBe(409);
+    expect(await diagnosisDeletion.json()).toEqual({ error: "Diagnosis answer is immutable" });
 
     const diaryAt = new Date(timestamp + 10_000);
     const diarySource = await DO.account.action.diary.storeLineTextSource(accountDataStore.db, {
@@ -480,21 +475,24 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     const current = (await currentResponse.json()) as {
       records: Array<{ id: string; kind: string; value: string }>;
     };
-    expect(current.records).toEqual([
-      expect.objectContaining({
-        id: diaryCorrectionBody.recordId,
-        kind: "diary",
-        value: "訂正後の日記",
-      }),
-    ]);
+    expect(current.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: diaryCorrectionBody.recordId,
+          kind: "diary",
+          value: "訂正後の日記",
+        }),
+        expect.objectContaining({ id: diagnosisRecord.id, kind: "diagnosis", value: "はい" }),
+      ]),
+    );
 
     const diaryDeletion = await personalDataRequest(
       `/api/personal-data/records/${diaryCorrectionBody.recordId}`,
       "DELETE",
     );
     expect(diaryDeletion.status).toBe(200);
-    expect(await personalDataRequest().then((response) => response.json())).toEqual({
-      records: [],
+    expect(await personalDataRequest().then((response) => response.json())).toMatchObject({
+      records: [expect.objectContaining({ id: diagnosisRecord.id, kind: "diagnosis" })],
     });
     const oldDiaryBody = accountDataStore.raw
       .prepare("SELECT body FROM source_record_text_payloads WHERE source_record_id = ?")

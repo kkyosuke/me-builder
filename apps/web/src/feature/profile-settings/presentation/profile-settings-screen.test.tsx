@@ -178,7 +178,7 @@ describe("ProfileSettingsScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /入力データを確認・訂正・削除/ }));
+    fireEvent.click(screen.getByRole("button", { name: /入力データを確認する/ }));
     expect(onOpenPersonalData).toHaveBeenCalledOnce();
   });
 

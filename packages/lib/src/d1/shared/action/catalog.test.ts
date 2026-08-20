@@ -1,8 +1,10 @@
 import path from "node:path";
 import Database from "better-sqlite3";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
+import { LIKERT_5_LABELS, LIKERT_5_SCORES } from "../../../diagnosis/question-format";
 import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
 import { findOpenDiagnosisDetail } from "./catalog";
@@ -68,6 +70,23 @@ async function insertDiagnosis(
   );
 }
 
+async function changeQuestionToLikert5(db: SharedD1Client, questionId: string) {
+  await db
+    .update(schema.questionVersions)
+    .set({ format: "likert_5" })
+    .where(eq(schema.questionVersions.questionId, questionId));
+  await db.delete(schema.questionChoices).where(eq(schema.questionChoices.questionId, questionId));
+  await db.insert(schema.questionChoices).values(
+    LIKERT_5_LABELS.map((label, position) => ({
+      questionId,
+      questionVersion: 1,
+      choiceId: `level-${position + 1}`,
+      label,
+      position,
+    })),
+  );
+}
+
 describe("findOpenDiagnosisDetail", () => {
   it("Diagnosisが固定したQuestion VersionとChoiceを位置順に返す", async () => {
     const db = createTestDb();
@@ -89,15 +108,106 @@ describe("findOpenDiagnosisDetail", () => {
             questionId: "diagnosis-detail-q1",
             questionVersion: 1,
             text: "diagnosis-detail-q1の質問",
+            format: "single_choice",
             choices: [
-              { choiceId: "no", label: "いいえ" },
-              { choiceId: "yes", label: "はい" },
+              { choiceId: "no", label: "いいえ", score: null },
+              { choiceId: "yes", label: "はい", score: null },
             ],
           }),
           expect.objectContaining({ diagnosisQuestionId: "diagnosis-detail-sq2" }),
         ],
       }),
     });
+  });
+
+  it("未設計の回答形式をpublished catalogから返さない", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "unsupported-format" });
+    await db
+      .update(schema.questionVersions)
+      .set({ format: "free_text" as never })
+      .where(eq(schema.questionVersions.questionId, "unsupported-format-q1"));
+
+    await expect(
+      findOpenDiagnosisDetail(db, "unsupported-format", new Date("2026-08-03T00:00:00Z")),
+    ).rejects.toThrow("Unsupported diagnosis question format in published catalog");
+  });
+
+  it("2択でないsingle choiceをpublished catalogから返さない", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "malformed-single-choice" });
+    await db
+      .delete(schema.questionChoices)
+      .where(
+        and(
+          eq(schema.questionChoices.questionId, "malformed-single-choice-q1"),
+          eq(schema.questionChoices.choiceId, "yes"),
+        ),
+      );
+
+    await expect(
+      findOpenDiagnosisDetail(db, "malformed-single-choice", new Date("2026-08-03T00:00:00Z")),
+    ).rejects.toThrow("Published single-choice diagnosis question must have exactly two choices");
+  });
+
+  it("固定した5段階の文言とscoreを位置順に返す", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "likert-detail" });
+    await changeQuestionToLikert5(db, "likert-detail-q1");
+    await changeQuestionToLikert5(db, "likert-detail-q2");
+
+    const result = await findOpenDiagnosisDetail(
+      db,
+      "likert-detail",
+      new Date("2026-08-03T00:00:00Z"),
+    );
+
+    expect(result).toMatchObject({
+      type: "found",
+      diagnosis: {
+        questions: [
+          {
+            format: "likert_5",
+            choices: LIKERT_5_LABELS.map((label, position) => ({
+              choiceId: `level-${position + 1}`,
+              label,
+              score: LIKERT_5_SCORES[position],
+            })),
+          },
+          { format: "likert_5" },
+        ],
+      },
+    });
+  });
+
+  it("1つのDiagnosisへ2択と5段階を混在させない", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "mixed-format" });
+    await changeQuestionToLikert5(db, "mixed-format-q2");
+
+    await expect(
+      findOpenDiagnosisDetail(db, "mixed-format", new Date("2026-08-03T00:00:00Z")),
+    ).rejects.toThrow("Published diagnosis must not mix question formats");
+  });
+
+  it("5段階の固定文言が崩れたcatalogを返さない", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "malformed-likert" });
+    await changeQuestionToLikert5(db, "malformed-likert-q1");
+    await changeQuestionToLikert5(db, "malformed-likert-q2");
+    await db
+      .update(schema.questionChoices)
+      .set({ label: "独自ラベル" })
+      .where(
+        and(
+          eq(schema.questionChoices.questionId, "malformed-likert-q1"),
+          eq(schema.questionChoices.choiceId, "level-3"),
+        ),
+      );
+
+    await expect(
+      findOpenDiagnosisDetail(db, "malformed-likert", new Date("2026-08-03T00:00:00Z")),
+    ).rejects.toThrow("Published likert-5 diagnosis question must use the fixed five choices");
   });
 
   it.each([

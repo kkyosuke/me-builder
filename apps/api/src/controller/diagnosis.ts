@@ -161,7 +161,7 @@ export async function putDiagnosisAnswer(c: Context<AppEnv>): Promise<Response> 
       return c.json(
         v.parse(AnswerConflictErrorSchema, {
           error: "Answer already exists",
-          reason: "answer_change_requires_revision",
+          reason: "answer_is_immutable",
         }),
         409,
       );

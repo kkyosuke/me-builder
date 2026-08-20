@@ -4,6 +4,7 @@ import * as v from "valibot";
 import { PersonalDataFeaturesResponseSchema } from "../contract/personal-data/features";
 import {
   CorrectPersonalDataRecordRequestSchema,
+  ImmutableDiagnosisAnswerSchema,
   InvalidPersonalDataMutationSchema,
   PersonalDataMutationResponseSchema,
   PersonalDataRecordNotFoundSchema,
@@ -92,10 +93,10 @@ export async function patchPersonalDataRecord(c: Context<AppEnv>): Promise<Respo
         v.parse(InvalidPersonalDataMutationSchema, { error: "Invalid personal data mutation" }),
         400,
       );
-    case "invalid-choice":
+    case "immutable-diagnosis":
       return c.json(
-        v.parse(InvalidPersonalDataMutationSchema, { error: "Invalid personal data mutation" }),
-        422,
+        v.parse(ImmutableDiagnosisAnswerSchema, { error: "Diagnosis answer is immutable" }),
+        409,
       );
     case "deleted":
       throw new Error("Correction returned an unsupported deleted result");
@@ -113,6 +114,12 @@ export async function deletePersonalDataRecordContents(c: Context<AppEnv>): Prom
     return c.json(
       v.parse(PersonalDataRecordNotFoundSchema, { error: "Personal data record not found" }),
       404,
+    );
+  }
+  if (outcome.result.type === "immutable-diagnosis") {
+    return c.json(
+      v.parse(ImmutableDiagnosisAnswerSchema, { error: "Diagnosis answer is immutable" }),
+      409,
     );
   }
   if (outcome.result.type !== "deleted") {

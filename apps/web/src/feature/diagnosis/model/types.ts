@@ -10,21 +10,41 @@ export const SwipeDirectionSchema = v.picklist(["left", "right"]);
 const DiagnosisChoiceSchema = v.object({
   choiceId: NonEmptyStringSchema,
   label: NonEmptyStringSchema,
+  score: v.optional(v.nullable(v.number())),
 });
 
 /** 1問1画面で表示する質問。 */
-export const DiagnosisQuestionSchema = v.pipe(
+const SingleChoiceQuestionSchema = v.pipe(
   v.object({
     diagnosisQuestionId: NonEmptyStringSchema,
     questionId: NonEmptyStringSchema,
     questionVersion: PositiveIntegerSchema,
     text: NonEmptyStringSchema,
     hint: v.optional(NonEmptyStringSchema),
+    format: v.optional(v.literal("single_choice")),
     left: DiagnosisChoiceSchema,
     right: DiagnosisChoiceSchema,
   }),
   v.check(({ left, right }) => left.choiceId !== right.choiceId, "左右のChoice IDは重複できません"),
 );
+
+const Likert5QuestionSchema = v.object({
+  diagnosisQuestionId: NonEmptyStringSchema,
+  questionId: NonEmptyStringSchema,
+  questionVersion: PositiveIntegerSchema,
+  text: NonEmptyStringSchema,
+  hint: v.optional(NonEmptyStringSchema),
+  format: v.literal("likert_5"),
+  choices: v.tuple([
+    DiagnosisChoiceSchema,
+    DiagnosisChoiceSchema,
+    DiagnosisChoiceSchema,
+    DiagnosisChoiceSchema,
+    DiagnosisChoiceSchema,
+  ]),
+});
+
+export const DiagnosisQuestionSchema = v.union([SingleChoiceQuestionSchema, Likert5QuestionSchema]);
 
 export const DiagnosisAnswerSchema = v.object({
   kind: v.literal("answer"),
@@ -32,7 +52,7 @@ export const DiagnosisAnswerSchema = v.object({
   questionId: NonEmptyStringSchema,
   questionVersion: PositiveIntegerSchema,
   choiceId: NonEmptyStringSchema,
-  direction: SwipeDirectionSchema,
+  direction: v.optional(SwipeDirectionSchema),
   acceptedAt: TimestampSchema,
 });
 

@@ -8,6 +8,10 @@ const developmentRoutes = [
   { method: "POST", path: "/api/dev/brain-vector-sync-jobs/job-1/reset" },
   { method: "POST", path: "/api/dev/brain-vector-sync-jobs/reset-failed" },
   { method: "DELETE", path: "/api/dev/account-data" },
+  { method: "GET", path: "/api/personal-data/records" },
+  { method: "PATCH", path: "/api/personal-data/records/source-1" },
+  { method: "DELETE", path: "/api/personal-data/records/source-1" },
+  { method: "GET", path: "/api/personal-data/features" },
 ] as const;
 
 describe("Production development route isolation E2E", () => {

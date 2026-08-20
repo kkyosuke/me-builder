@@ -1,4 +1,5 @@
 export * from "./question";
+export * from "./question-format";
 export * from "./relationship-category";
 export * from "./response";
 export * from "./scoring";

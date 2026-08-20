@@ -6,12 +6,14 @@ import { PersonalDataApplication } from "./personal-data-application";
 
 const mocks = vi.hoisted(() => ({
   fetchRecords: vi.fn(),
+  fetchFeatures: vi.fn(),
   correctRecord: vi.fn(),
   deleteRecord: vi.fn(),
 }));
 
 vi.mock("../infrastructure/personal-data-api", () => ({
   fetchPersonalDataRecords: mocks.fetchRecords,
+  fetchPersonalDataFeatures: mocks.fetchFeatures,
   correctPersonalDataRecord: mocks.correctRecord,
   deletePersonalDataRecord: mocks.deleteRecord,
 }));
@@ -44,6 +46,13 @@ describe("PersonalDataApplication", () => {
       recordId: "corrected-source",
       invalidatedBrainItemCount: 0,
     });
+    mocks.fetchFeatures.mockResolvedValue({
+      format: "kagami-brain-features",
+      formatVersion: 1,
+      generatedAt: "2026-08-21T00:00:00.000Z",
+      scopes: ["metadata", "active", "history"],
+      brainItems: [],
+    });
     mocks.deleteRecord.mockResolvedValue({
       outcome: "deleted",
       recordId: "diary-source",
@@ -58,31 +67,22 @@ describe("PersonalDataApplication", () => {
     vi.clearAllMocks();
   });
 
-  it("Skeletonから本人入力を表示し、診断回答を訂正する", async () => {
+  it("Skeletonから本人入力を表示し、診断回答を読取専用にする", async () => {
     render(<PersonalDataApplication onBack={vi.fn()} />);
 
     expect(screen.getByRole("status", { name: "入力データを読み込んでいます" })).toBeTruthy();
     expect(await screen.findByText("朝は得意ですか？")).toBeTruthy();
-    const correctButton = screen.getAllByRole("button", { name: "訂正" })[0];
-    if (!correctButton) throw new Error("診断訂正buttonがありません");
-    fireEvent.click(correctButton);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "yes" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存" }));
-
-    await waitFor(() =>
-      expect(mocks.correctRecord).toHaveBeenCalledWith(undefined, "diagnosis-source", {
-        kind: "diagnosis",
-        choiceId: "yes",
-      }),
-    );
-    expect(mocks.fetchRecords).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("確定済みの診断回答は変更・個別削除できません。")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "訂正" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "削除" })).toHaveLength(1);
+    expect(mocks.correctRecord).not.toHaveBeenCalled();
   });
 
   it("確認後に日記を一覧から削除する", async () => {
     render(<PersonalDataApplication onBack={vi.fn()} />);
 
     expect(await screen.findByText("今日の記録")).toBeTruthy();
-    const deleteButton = screen.getAllByRole("button", { name: "削除" })[1];
+    const deleteButton = screen.getByRole("button", { name: "削除" });
     if (!deleteButton) throw new Error("日記削除buttonがありません");
     fireEvent.click(deleteButton);
 
@@ -90,11 +90,19 @@ describe("PersonalDataApplication", () => {
     expect(screen.queryByText("今日の記録")).toBeNull();
   });
 
-  it("生データの書き出しUIを提供しない", async () => {
+  it("匿名化済みのBrain特徴JSONを書き出す", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const createObjectURL = vi.fn().mockReturnValue("blob:brain-features");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
     render(<PersonalDataApplication onBack={vi.fn()} />);
 
     await screen.findByText("朝は得意ですか？");
-    expect(screen.queryByText("本人データを書き出す")).toBeNull();
-    expect(screen.queryByRole("button", { name: "データを作成" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Brain特徴JSONを書き出す" }));
+
+    await waitFor(() => expect(mocks.fetchFeatures).toHaveBeenCalledWith(undefined));
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(click).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:brain-features");
   });
 });

@@ -1,6 +1,11 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
-import { authenticatedErrors, currentTermsPolicyError, jsonResponse } from "../shared/errors";
+import {
+  AccountNotFoundErrorSchema,
+  authenticatedErrors,
+  currentTermsPolicyError,
+  jsonResponse,
+} from "../shared/errors";
 
 const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
 const BrainFeatureSchema = v.object({
@@ -26,10 +31,12 @@ export const PersonalDataFeaturesResponseSchema = v.object({
   brainItems: v.array(BrainFeatureSchema),
 });
 
+const DevelopmentRouteNotFoundErrorSchema = v.object({ error: v.literal("Not Found") });
+
 export const personalDataFeaturesRoute = describeRoute({
   operationId: "getPersonalDataFeatures",
-  tags: ["Personal Data"],
-  summary: "本人のBrain特徴をAPI連携用に取得する",
+  tags: ["Development"],
+  summary: "開発環境で本人のBrain特徴をJSON取得する",
   security: [{ applicationSession: [] }],
   responses: {
     200: jsonResponse(
@@ -38,5 +45,9 @@ export const personalDataFeaturesRoute = describeRoute({
     ),
     ...authenticatedErrors,
     ...currentTermsPolicyError,
+    404: jsonResponse(
+      "開発環境ではない、または対応するAccountがない",
+      v.union([AccountNotFoundErrorSchema, DevelopmentRouteNotFoundErrorSchema]),
+    ),
   },
 } satisfies DescribeRouteOptions);

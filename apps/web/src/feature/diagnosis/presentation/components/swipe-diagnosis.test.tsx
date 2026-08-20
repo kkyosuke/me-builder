@@ -37,9 +37,53 @@ const twoQuestionDiagnosis: DiagnosisDefinition = {
   ],
 };
 
+const likertDiagnosis: DiagnosisDefinition = {
+  ...diagnosis,
+  questions: [
+    {
+      diagnosisQuestionId: "dq-likert",
+      questionId: "q-likert",
+      questionVersion: 1,
+      text: "当てはまりますか",
+      format: "likert_5",
+      choices: [
+        { choiceId: "level-1", label: "まったく当てはまらない", score: -1 },
+        { choiceId: "level-2", label: "あまり当てはまらない", score: -0.5 },
+        { choiceId: "level-3", label: "どちらともいえない", score: 0 },
+        { choiceId: "level-4", label: "やや当てはまる", score: 0.5 },
+        { choiceId: "level-5", label: "とても当てはまる", score: 1 },
+      ],
+    },
+  ],
+};
+
 afterEach(() => cleanup());
 
 describe("SwipeDiagnosis answer persistence", () => {
+  it("5段階は5つのボタンから選択し、左右キーを回答に使わない", async () => {
+    const onSaveAnswer = vi.fn().mockResolvedValue({
+      acceptedAt: "2026-08-05T00:00:02.000Z",
+    });
+    render(
+      <SwipeDiagnosis
+        diagnosis={likertDiagnosis}
+        onBack={vi.fn()}
+        onSaveAnswer={onSaveAnswer}
+        onDeferQuestion={vi.fn()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(onSaveAnswer).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /4 やや当てはまる/ }));
+
+    await waitFor(() => expect(onSaveAnswer).toHaveBeenCalledOnce());
+    expect(onSaveAnswer.mock.calls[0]?.[0]).toMatchObject({
+      diagnosisQuestionId: "dq-likert",
+      choiceId: "level-4",
+    });
+  });
   it("保存済みの質問を飛ばして最初の未回答から再開する", async () => {
     const onSaveAnswer = vi.fn().mockResolvedValue({
       acceptedAt: "2026-08-05T00:00:02.000Z",

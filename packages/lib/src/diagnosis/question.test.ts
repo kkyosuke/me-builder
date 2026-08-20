@@ -5,6 +5,7 @@ import {
   createQuestion,
   retireQuestionVersion,
 } from "./question";
+import { LIKERT_5_LABELS } from "./question-format";
 
 const CHOICES = [
   { id: "stay-home", label: "家で過ごす", presentation: { icon: "house" } },
@@ -52,6 +53,27 @@ describe("Question aggregate", () => {
 
     expect(duplicateChoice).toMatchObject({ ok: false, error: { code: "invalid-input" } });
     expect(emptyText).toMatchObject({ ok: false, error: { code: "invalid-input" } });
+  });
+
+  it("固定ラベルを持つ5段階のdraft版を作成する", () => {
+    const result = createQuestion("likert", {
+      text: "当てはまりますか",
+      format: "likert_5",
+      choices: LIKERT_5_LABELS.map((label, index) => ({ id: `level-${index + 1}`, label })) as [
+        { id: string; label: string },
+        { id: string; label: string },
+        { id: string; label: string },
+        { id: string; label: string },
+        { id: string; label: string },
+      ],
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) {
+      expect(result.value.versions[0]).toMatchObject({ format: "likert_5" });
+      expect(result.value.versions[0]?.choices).toHaveLength(5);
+      expect(result.value.versions[0]?.choices[0]).toMatchObject({ id: "level-1" });
+    }
   });
 
   it("draftをapproveし、既存内容を変えずに次の版を追加する", () => {

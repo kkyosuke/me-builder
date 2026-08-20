@@ -31,11 +31,33 @@ const MutationResponseSchema = v.object({
   recordId: NonEmptyStringSchema,
   invalidatedBrainItemCount: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
 });
+const TimestampSchema = v.pipe(v.string(), v.isoTimestamp());
+const PersonalDataFeaturesSchema = v.object({
+  format: v.literal("kagami-brain-features"),
+  formatVersion: v.literal(1),
+  generatedAt: TimestampSchema,
+  scopes: v.tuple([v.literal("metadata"), v.literal("active"), v.literal("history")]),
+  brainItems: v.array(
+    v.object({
+      category: NonEmptyStringSchema,
+      status: v.picklist(["active", "superseded", "invalidated"]),
+      derivation: v.picklist(["ai", "deterministic"]),
+      isInference: v.boolean(),
+      stability: NonEmptyStringSchema,
+      sensitivity: NonEmptyStringSchema,
+      validFrom: v.nullable(TimestampSchema),
+      validTo: v.nullable(TimestampSchema),
+      firstObservedAt: TimestampSchema,
+      lastObservedAt: TimestampSchema,
+      createdAt: TimestampSchema,
+      updatedAt: TimestampSchema,
+    }),
+  ),
+});
 export type PersonalDataRecord = v.InferOutput<typeof PersonalDataRecordSchema>;
 export type PersonalDataMutationResult = v.InferOutput<typeof MutationResponseSchema>;
-export type PersonalDataCorrection =
-  | Readonly<{ kind: "diagnosis"; choiceId: string }>
-  | Readonly<{ kind: "diary"; value: string }>;
+export type PersonalDataCorrection = Readonly<{ kind: "diary"; value: string }>;
+export type PersonalDataFeatures = v.InferOutput<typeof PersonalDataFeaturesSchema>;
 
 function requestError(status: number): Error {
   if (status === 401) {
@@ -79,6 +101,17 @@ export async function fetchPersonalDataRecords(
     },
   );
   return (await parse(response, RecordsResponseSchema)).records;
+}
+
+export async function fetchPersonalDataFeatures(
+  apiUrl: string | undefined,
+  signal?: AbortSignal,
+): Promise<PersonalDataFeatures> {
+  const response = await createAuthenticatedHttpClient(apiUrl).request(
+    "/api/personal-data/features",
+    signal ? { signal } : undefined,
+  );
+  return parse(response, PersonalDataFeaturesSchema);
 }
 
 export async function correctPersonalDataRecord(

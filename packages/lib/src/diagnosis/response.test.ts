@@ -5,7 +5,6 @@ import {
   type DiagnosisResponse,
   type Respondent,
   deferDiagnosisQuestion,
-  deleteDiagnosisAnswer,
   getResponseStatus,
   recordDiagnosisAnswer,
 } from "./response";
@@ -182,53 +181,23 @@ describe("DiagnosisResponse aggregate", () => {
     });
   });
 
-  it("Choiceの変更では新しいSource Recordと改訂対象を返す", () => {
+  it("Choiceの変更を拒否し、最初の回答を維持する", () => {
     const { catalog, diagnosis } = fixture();
     const first = firstAnswer(diagnosis, catalog);
     if (!first.ok) {
       throw new Error(first.error.message);
     }
-    const revised = firstAnswer(diagnosis, catalog, {
+    const changed = firstAnswer(diagnosis, catalog, {
       response: first.value.response,
       choiceId: "q1-right",
       sourceRecordId: "source-revised",
     });
 
-    expect(revised).toMatchObject({
-      ok: true,
-      value: {
-        outcome: "revised",
-        response: { answers: [{ choiceId: "q1-right", sourceRecordId: "source-revised" }] },
-        intent: { revisesSourceRecordId: "source-1" },
-      },
+    expect(changed).toMatchObject({
+      ok: false,
+      error: { code: "question-already-answered" },
     });
-  });
-
-  it("回答削除で現在回答を外し、Source Record削除意図を返す", () => {
-    const { catalog, diagnosis } = fixture();
-    const first = firstAnswer(diagnosis, catalog);
-    if (!first.ok) {
-      throw new Error(first.error.message);
-    }
-    const deleted = deleteDiagnosisAnswer({
-      response: first.value.response,
-      diagnosis,
-      respondent: ACTIVE,
-      diagnosisQuestionId: "dq-1",
-      at: NOW,
-    });
-
-    expect(deleted).toMatchObject({
-      ok: true,
-      value: {
-        outcome: "deleted",
-        response: { answers: [] },
-        intent: { sourceRecordId: "source-1", accountId: "account-1" },
-      },
-    });
-    if (deleted.ok) {
-      expect(getResponseStatus(deleted.value.response, diagnosis)).toBe("unanswered");
-    }
+    expect(first.value.response.answers[0]?.choiceId).toBe("q1-left");
   });
 
   it("無効Account、受付期間外、所有者不一致を拒否する", () => {

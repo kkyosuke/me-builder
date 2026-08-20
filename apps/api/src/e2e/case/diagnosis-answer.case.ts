@@ -50,7 +50,7 @@ export const diagnosisAnswerCases = {
       status: 409,
       body: {
         error: "Answer already exists",
-        reason: "answer_change_requires_revision",
+        reason: "answer_is_immutable",
       },
     },
   },

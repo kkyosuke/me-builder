@@ -70,7 +70,8 @@
 | [Stripe課金環境の同期運用](../docs/development/stripe-billing-setup.md) | Product・Price・Webhook・Customer PortalとCloudflare secretをDashboard操作なしで同期する運用 |
 | [診断API契約](../docs/development/diagnosis-api.md) | Web UIとAPI Server間の診断APIのパス、認証、入出力、エラー契約 |
 | [プロフィールAPI契約](../docs/development/profile-api.md) | 本人プロフィール、アバター画像、うつしレベル進行度のAPI契約と保存境界 |
-| [本人入力データ訂正・削除API契約](../docs/development/personal-data-api.md) | 現在有効な診断回答・日記の一覧、訂正、削除と派生物への波及契約 |
+| [開発用本人入力データAPI契約](../docs/development/personal-data-api.md) | 開発環境だけの入力確認、日記訂正・削除と診断回答のread-only境界 |
+| [開発用本人データ特徴JSON契約](../docs/development/personal-data-export.md) | 本文を含めないBrain特徴取得とdev限定書き出しの境界 |
 | [開発用AccountデータリセットAPI契約](../docs/development/development-account-data-reset-api.md) | 開発環境で本人の個人コンテンツを初期化するAPI、削除対象、維持対象、Vector削除、プロフィール画面の操作 |
 | [相性API契約](../docs/development/compatibility-api.md) | Web UIとAPI Server間の相性APIのパス、認証、入出力、エラー契約 |
 | [API契約とクライアント型の生成](../docs/development/api-contract-generation.md) | API ServerのHTTP契約の配置、OpenAPI documentとWeb UI用TypeScript型の生成運用 |
@@ -85,6 +86,7 @@
 | [SSO Production段階公開Runbook](../docs/development/sso-production-rollout.md) | Productionへの段階公開phase、監視ゲート、即時停止、再開、完了判定 |
 | [MCP実装残タスク](../docs/development/mcp-remaining-tasks.md) | 管理者限定MCPの認可・同意・監査・解除を実装し、501公開境界を解除するまでの依存順と検証 |
 | [マルチモーダル入力実装残タスク](../docs/development/multimodal-input-remaining-tasks.md) | 写真の保存・AI利用を段階公開する依存順、法務・規約gate、将来mediaの分離 |
+| [診断回答形式の実装境界](../docs/development/diagnosis-format-remaining-tasks.md) | 標準2択と例外5段階の形式、score、保存、UI、互換性の確定事項 |
 | [サブスクリプション実装残タスク](../docs/development/subscription-remaining-tasks.md) | AccountとPlanを紐づける決済系列と、紐付け後の利用権限・機能系列に分けた番号付きPR単位の残作業 |
 | [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |

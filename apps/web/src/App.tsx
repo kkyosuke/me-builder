@@ -84,7 +84,9 @@ function resolveProfileView(pathname: string): ProfileView {
   if (pathname.startsWith("/profile/billing")) return "billing";
   if (pathname.startsWith("/profile/family")) return "family";
   if (pathname.startsWith("/profile/avatar")) return "avatar";
-  if (pathname.startsWith("/profile/personal-data")) return "personal-data";
+  if (pathname.startsWith("/profile/personal-data")) {
+    return DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") ? "personal-data" : "profile";
+  }
   if (pathname.startsWith("/profile/brain-items")) {
     return DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") ? "brain-items" : "profile";
   }
@@ -629,9 +631,11 @@ function AppContents() {
               onOpenAvatar={openAvatar}
               onOpenBillingPortal={openBillingPortal}
               {...(DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")
-                ? { onOpenBillingPlans: openBillingPlans }
+                ? {
+                    onOpenBillingPlans: openBillingPlans,
+                    onOpenPersonalData: openPersonalData,
+                  }
                 : {})}
-              onOpenPersonalData={openPersonalData}
               onOpenFamily={openFamily}
               canOpenBrainItems={canUseDevelopmentTools}
               onOpenBrainItems={openBrainItems}
@@ -681,18 +685,21 @@ function AppContents() {
           </Suspense>
         </RouteErrorBoundary>
       )}
-      {profileView === "personal-data" && (
-        <RouteErrorBoundary>
-          <Suspense
-            fallback={<LoadingState message="入力データを読み込んでいます..." variant="overlay" />}
-          >
-            <PersonalDataApplication
-              onBack={closePersonalData}
-              onChanged={() => setAccountDataResetKey((current) => current + 1)}
-            />
-          </Suspense>
-        </RouteErrorBoundary>
-      )}
+      {profileView === "personal-data" &&
+        DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") && (
+          <RouteErrorBoundary>
+            <Suspense
+              fallback={
+                <LoadingState message="入力データを読み込んでいます..." variant="overlay" />
+              }
+            >
+              <PersonalDataApplication
+                onBack={closePersonalData}
+                onChanged={() => setAccountDataResetKey((current) => current + 1)}
+              />
+            </Suspense>
+          </RouteErrorBoundary>
+        )}
       {profileView === "family" && (
         <RouteErrorBoundary>
           <Suspense

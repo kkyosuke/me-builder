@@ -783,32 +783,8 @@ export function ProfileSettingsScreen({
           </section>
         )}
 
-        {onOpenPersonalData && (
-          <section aria-labelledby="personal-data-heading" className="mt-8">
-            <h2
-              id="personal-data-heading"
-              className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
-            >
-              あなたのデータ
-            </h2>
-            <button
-              type="button"
-              onClick={onOpenPersonalData}
-              className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800"
-            >
-              <FileText className="size-5 text-sky-600 dark:text-sky-300" aria-hidden="true" />
-              <span className="flex-1">
-                <span className="block">入力データを確認・訂正・削除</span>
-                <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
-                  診断回答と日記を管理
-                </span>
-              </span>
-              <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
-            </button>
-          </section>
-        )}
-
-        {((canOpenBrainItems && onOpenBrainItems) ||
+        {(onOpenPersonalData ||
+          (canOpenBrainItems && onOpenBrainItems) ||
           (canResetAccountData && onResetAccountData)) && (
           <section
             aria-labelledby="development-tools-heading"
@@ -823,6 +799,26 @@ export function ProfileSettingsScreen({
             >
               開発用データ操作
             </h2>
+            {onOpenPersonalData && (
+              <button
+                type="button"
+                onClick={onOpenPersonalData}
+                className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-xl border border-violet-300/60 bg-white p-3 text-left transition hover:border-violet-400 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-violet-800 dark:bg-slate-800 dark:hover:bg-violet-950/30"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-700 dark:text-violet-300">
+                  <FileText className="size-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-slate-950 dark:text-white">
+                    入力データを確認する
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                    日記の訂正・削除とBrain特徴JSONを検証
+                  </span>
+                </span>
+                <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+              </button>
+            )}
             {canOpenBrainItems && onOpenBrainItems && (
               <a
                 ref={brainItemsLinkRef}

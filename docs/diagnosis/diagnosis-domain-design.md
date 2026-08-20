@@ -32,14 +32,14 @@ Diagnosis domainは次の3集約で構成します。
 - Diagnosisの公開と受付期間を管理する
 - 本人が選んだ選択肢を質問の版に対して検証する
 - Accountごとの回答進捗と現在有効な回答を管理する
-- 回答の新規作成、修正、削除をSource domainへ依頼する
+- 回答の新規作成をSource domainへ依頼する
 
 ### Diagnosis domainが担当しないこと
 
 | 関心事 | 担当 |
 | --- | --- |
 | 本人確認、Accountの有効性 | Account domain |
-| 回答原本の保持、改訂、削除、Access Label | Source domain |
+| 回答原本の保持、Account削除、Access Label | Source domain |
 | 回答からプロフィールや好みを導出すること | Brain domain |
 | LINE通知とリッチメニュー | 配信・UI層 |
 | スワイプ、ボタン、画面上の進捗表示 | UI層 |
@@ -87,7 +87,7 @@ Questionは1件以上の`Question Version`を持ちます。Question Versionは�
 - 選択肢
 - 審査状態
 
-Phase 1の回答形式は`single_choice`だけとし、スワイプ診断では選択肢を2件に限定します。各選択肢は版の中で一意な`Choice ID`、表示文言、任意の表示用メタデータを持ちます。
+標準の回答形式は2択の`single_choice`です。例外形式として5段階の`likert_5`を利用できますが、1つのDiagnosis内へ形式を混在させません。5段階の固定文言、順序、scoreは[診断回答形式の実装境界](../development/diagnosis-format-remaining-tasks.md)を正とします。各選択肢は版の中で一意な`Choice ID`、表示文言、任意の表示用メタデータを持ちます。
 
 回答が参照するのは表示文言、配列位置、左右の方向ではなくChoice IDです。スワイプ方向はUI上の操作であり、本人が選んだ内容そのものではないため回答へ保存しません。
 
@@ -109,7 +109,7 @@ stateDiagram-v2
 ### 不変条件
 
 - 版はQuestion内で重複しない
-- Phase 1のQuestion VersionはChoiceをちょうど2件持つ
+- `single_choice`はChoiceをちょうど2件、`likert_5`は定義済みのChoiceをちょうど5件持つ
 - Choice IDはQuestion Version内で重複しない
 - approved以降の質問文、補足、回答形式、Choiceを変更しない
 - 既存回答が参照するQuestion Versionを削除しない
@@ -200,7 +200,7 @@ DiagnosisResponseは最初の回答または「あとで回答」の操作時に
 
 「あとで回答」の記録は、まだ表示していない質問と本人が延期した質問を区別するために使いますが、Answerの件数には含めません。全問を表示しても未回答が残っていれば回答済みにはしません。
 
-回答削除により、回答済みから回答途中または未回答へ戻ることを許容します。
+受理済みのAnswerは個別に訂正・削除しないため、回答済みから回答途中または未回答へ戻りません。Account削除はDiagnosisResponseを含むAccountData全体を削除します。
 
 ### Answer
 
@@ -225,17 +225,9 @@ Answerは次の意味を持ちます。
 
 同じ操作が通信再送や二重タップで繰り返されても、同じ内容のSource Recordを重複して増やしません。
 
-#### 回答修正
+#### 再送と不変性
 
-選択内容が変わる修正は新しい命題内容を持ち込むため、新しいSource Recordを作ります。旧Answerを上書きせず、新しいAnswerを現在有効として対応づけ、Source Record間に改訂関係を作ります。
-
-現在と同じChoice IDを再送した場合は変更なしとして扱い、新しいSource Recordを作りません。受付終了後の新規保存、追加入力、修正は許可しません。完了していないResponseは保存済み回答の閲覧だけを許可し、結果生成の対象にしません。
-
-#### 回答削除
-
-削除したDiagnosis QuestionのAnswerを現在有効な回答から外し、Source domainへ対応するSource Recordの削除を依頼します。DiagnosisResponseの回答状態は残ったAnswerから再計算します。
-
-Source Recordの削除後に残すtombstoneと改訂された旧版の扱いは[Source Recordのライフサイクル設計](../domain/source/source-record-lifecycle-design.md)を正とします。物理的な消去時期は未決であり、この文書では決めません。
+現在と同じChoice IDの再送は変更なしとして扱い、新しいSource Recordを作りません。異なるChoice IDの再送は、回答中、回答完了後、開発用データ画面のいずれからも拒否します。個別の訂正・削除は提供せず、Account削除だけが診断回答を削除します。
 
 #### あとで回答
 
@@ -248,7 +240,7 @@ Source Recordの削除後に残すtombstoneと改訂された旧版の扱いは[
 - Answerが参照するQuestion VersionはDiagnosis Questionが固定した版と一致する
 - Answerが参照するChoice IDはそのQuestion Versionに存在する
 - Answerは必ず同じAccountに属するSource Recordと対応する
-- 新規回答と修正はDiagnosisの受付中だけ許可する。削除は受付終了後も許可する
+- 新規回答はDiagnosisの受付中だけ許可し、受理済みAnswerの訂正・個別削除を許可しない
 - 回答主体は検証済みAccountから解決し、クライアント指定のAccount IDを使わない
 
 ## 8. Source domainとの関係

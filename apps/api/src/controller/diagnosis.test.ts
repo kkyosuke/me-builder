@@ -165,11 +165,7 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId", () => {
       { error: "Invalid answer", reason: "diagnosis_question_not_found" },
     ],
     ["choice-not-found", 422, { error: "Invalid answer", reason: "choice_not_found" }],
-    [
-      "answer-conflict",
-      409,
-      { error: "Answer already exists", reason: "answer_change_requires_revision" },
-    ],
+    ["answer-conflict", 409, { error: "Answer already exists", reason: "answer_is_immutable" }],
   ] as const)("%sをHTTP %sへ変換する", async (type, status, body) => {
     answerOutcome({ type });
     const response = await put();
@@ -274,9 +270,10 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
             questionVersion: 1,
             text: "質問",
             hint: null,
+            format: "single_choice",
             choices: [
-              { choiceId: "no", label: "いいえ" },
-              { choiceId: "yes", label: "はい" },
+              { choiceId: "no", label: "いいえ", score: null },
+              { choiceId: "yes", label: "はい", score: null },
             ],
           },
         ],

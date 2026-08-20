@@ -6,6 +6,7 @@ import {
   withdrawDiagnosis,
 } from "./diagnosis";
 import { approveQuestionVersion, createQuestion, retireQuestionVersion } from "./question";
+import { LIKERT_5_LABELS } from "./question-format";
 
 function createApprovedQuestion(id: string) {
   const created = createQuestion(id, {
@@ -22,6 +23,24 @@ function createApprovedQuestion(id: string) {
   if (!approved.ok) {
     throw new Error(approved.error.message);
   }
+  return approved.value;
+}
+
+function createApprovedLikertQuestion(id: string) {
+  const created = createQuestion(id, {
+    text: `${id}の質問`,
+    format: "likert_5",
+    choices: LIKERT_5_LABELS.map((label, index) => ({ id: `level-${index + 1}`, label })) as [
+      { id: string; label: string },
+      { id: string; label: string },
+      { id: string; label: string },
+      { id: string; label: string },
+      { id: string; label: string },
+    ],
+  });
+  if (!created.ok) throw new Error(created.error.message);
+  const approved = approveQuestionVersion(created.value, 1, new Date("2026-07-31T00:00:00Z"));
+  if (!approved.ok) throw new Error(approved.error.message);
   return approved.value;
 }
 
@@ -112,6 +131,16 @@ describe("Diagnosis aggregate", () => {
       ok: true,
       value: { state: "published", publishedAt: "2026-07-31T12:00:00.000Z" },
     });
+  });
+
+  it("1つのDiagnosisへ2択と5段階を混在させない", () => {
+    const result = publishDiagnosis(
+      createDraftDiagnosis(),
+      [createApprovedQuestion("q1"), createApprovedLikertQuestion("q2")],
+      new Date("2026-07-31T12:00:00Z"),
+    );
+
+    expect(result).toMatchObject({ ok: false, error: { code: "invalid-input" } });
   });
 
   it("retiredになったQuestion Versionでは新しく公開できない", () => {
