@@ -36,8 +36,19 @@ describe("resolveDiagnosisDestination", () => {
     ).toBe("result");
   });
 
-  it("未完了かつ受付終了なら案内へ進む", () => {
+  it("未回答かつ受付終了なら案内へ進む", () => {
     expect(resolveDiagnosisDestination({ ...diagnosis, availability: "closed" })).toBe("closed");
+  });
+
+  it("途中回答がある受付終了後は保存済み回答へ進む", () => {
+    expect(
+      resolveDiagnosisDestination({
+        ...diagnosis,
+        availability: "closed",
+        responseStatus: "in-progress",
+        answeredCount: 3,
+      }),
+    ).toBe("answers");
   });
 });
 

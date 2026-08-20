@@ -31,7 +31,8 @@ export function DiagnosisResultView({
   backLabel?: string;
   progression?: AsyncState<UtsushiProgression>;
 }) {
-  const scoring = result.scoring;
+  const isComplete = result.responseStatus === "answered";
+  const scoring = isComplete ? result.scoring : null;
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
@@ -61,7 +62,7 @@ export function DiagnosisResultView({
           </span>
           <div>
             <p className="text-xs font-semibold tracking-wider text-sky-700 dark:text-sky-300">
-              回答結果
+              {isComplete ? "回答結果" : "保存済み回答"}
             </p>
             <p
               className={`mt-1 w-fit rounded-full px-2 py-1 text-xs font-semibold ${getRelationshipCategoryBadgeClassName(result.relationshipCategory)}`}
@@ -74,16 +75,18 @@ export function DiagnosisResultView({
           </div>
         </div>
         <p className="mt-4 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-          {scoring
-            ? "回答から見える現在の傾向です。どちら側にも良し悪しはなく、医療的な診断ではありません。"
-            : "保存した回答内容を確認できます。医療的な診断ではありません。"}
+          {!isComplete
+            ? "回答受付は終了しました。保存済みの回答だけを確認できます。追加回答や結果生成はできません。"
+            : scoring
+              ? "回答から見える現在の傾向です。どちら側にも良し悪しはなく、医療的な診断ではありません。"
+              : "保存した回答内容を確認できます。医療的な診断ではありません。"}
         </p>
         <p className="mt-3 text-xs text-slate-600 dark:text-slate-400">
           {`${result.answeredCount} / ${result.questionCount}問に回答`}
         </p>
       </header>
 
-      {progression && (
+      {isComplete && progression && (
         <section
           aria-labelledby="diagnosis-progression-heading"
           className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 dark:border-violet-800 dark:bg-violet-950/30"
@@ -112,7 +115,11 @@ export function DiagnosisResultView({
         </section>
       )}
 
-      {scoring ? (
+      {!isComplete ? (
+        <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+          回答が完了していないため、傾向は生成されません。
+        </p>
+      ) : scoring ? (
         <section aria-labelledby="profile-heading" className="mt-5">
           <h2
             id="profile-heading"
@@ -209,12 +216,14 @@ export function DiagnosisResultView({
             ))}
           </ol>
         </details>
-        <a
-          href="/me"
-          className="mt-5 flex items-center justify-center rounded-xl bg-sky-400 px-4 py-3 text-sm font-bold text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-        >
-          わたしのまとめを見る
-        </a>
+        {isComplete && (
+          <a
+            href="/me"
+            className="mt-5 flex items-center justify-center rounded-xl bg-sky-400 px-4 py-3 text-sm font-bold text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+          >
+            わたしのまとめを見る
+          </a>
+        )}
       </section>
     </main>
   );

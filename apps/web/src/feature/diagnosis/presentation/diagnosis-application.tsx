@@ -220,7 +220,7 @@ export default function DiagnosisApplication() {
 
   if (detail.state.status === "loading") {
     content =
-      detail.state.destination === "result" ? (
+      detail.state.destination === "result" || detail.state.destination === "answers" ? (
         <DiagnosisResultSkeleton />
       ) : detail.state.showIntroduction ? (
         <DiagnosisIntroductionSkeleton />
@@ -248,7 +248,9 @@ export default function DiagnosisApplication() {
         <DiagnosisResultView
           result={detailContent.result}
           onBack={closeDetail}
-          progression={progression.state}
+          {...(detailContent.result.responseStatus === "answered"
+            ? { progression: progression.state }
+            : {})}
           {...(directDiagnosisId
             ? {
                 backHref: fromProfile ? "/me" : "/diagnosis",

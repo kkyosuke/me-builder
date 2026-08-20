@@ -94,7 +94,7 @@ export function useDiagnosisDetail({ onProgress }: UseDiagnosisDetailOptions) {
           return;
         }
 
-        if (destination === "result") {
+        if (destination === "result" || destination === "answers") {
           const result = await fetchDiagnosisResult(config.apiUrl, diagnosis.id, controller.signal);
           await minimumLoading;
           if (!controller.signal.aborted && mounted.current) {
