@@ -148,6 +148,11 @@ describe("LIFF compatibility share link journey", () => {
     render(<CompatibilityApplication />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "パートナー" }));
+    expect(
+      screen.getByText(
+        "リンクを受け取ってログインした人は誰でも承諾できます。送りたい相手以外へ転送しないでください。最初に1人が承諾すると、リンクは使用済みになります。",
+      ),
+    ).toBeTruthy();
     const issueButton = await screen.findByRole("button", {
       name: "共有して招待リンクを発行する",
     });

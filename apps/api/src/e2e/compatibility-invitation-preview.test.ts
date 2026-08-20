@@ -469,6 +469,85 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
   );
 
   it(
+    `${compatibilityShareCases.acceptForwardedInvitation.id}: ${compatibilityShareCases.acceptForwardedInvitation.name}`,
+    async () => {
+      const relationshipId = await issueInvitationForInviter();
+
+      const forwardedPreview = await app.request(
+        `/api/compatibility/invitations/${relationshipId}`,
+        { headers: sessionHeaders.thirdParty },
+        env(),
+      );
+      expect(forwardedPreview.status).toBe(200);
+      expect(await forwardedPreview.json()).toMatchObject({
+        inviter: { displayName: "あおい" },
+        recipient: { displayName: "そら" },
+        canAccept: true,
+      });
+
+      const forwardedAcceptance = await app.request(
+        `/api/compatibility/invitations/${relationshipId}/accept`,
+        { method: "POST", headers: sessionHeaders.thirdParty },
+        env(),
+      );
+      expect(forwardedAcceptance.status).toBe(200);
+      expect(await forwardedAcceptance.json()).toEqual({ relationshipId, status: "accepted" });
+
+      for (const request of [
+        { path: `/api/compatibility/invitations/${relationshipId}`, method: "GET" },
+        {
+          path: `/api/compatibility/invitations/${relationshipId}/accept`,
+          method: "POST",
+        },
+      ]) {
+        const response = await app.request(
+          request.path,
+          { method: request.method, headers: sessionHeaders.recipient },
+          env(),
+        );
+        expect(response.status).toBe(404);
+        expect(response.headers.get("Cache-Control")).toBe("no-store");
+        expect(await response.json()).toEqual({
+          error: "Compatibility invitation unavailable",
+          reason: "invitation_unavailable",
+        });
+      }
+
+      const unrelatedList = await app.request(
+        "/api/compatibility/relationships",
+        { headers: sessionHeaders.recipient },
+        env(),
+      );
+      expect(await unrelatedList.json()).toEqual({ items: [] });
+      const unrelatedDetail = await app.request(
+        `/api/compatibility/relationships/${relationshipId}`,
+        { headers: sessionHeaders.recipient },
+        env(),
+      );
+      expect(unrelatedDetail.status).toBe(404);
+      expect(unrelatedDetail.headers.get("Cache-Control")).toBe("no-store");
+
+      const inviterList = await app.request(
+        "/api/compatibility/relationships",
+        { headers: sessionHeaders.inviter },
+        env(),
+      );
+      expect(await inviterList.json()).toEqual({
+        items: [
+          {
+            relationshipId,
+            status: "accepted",
+            relationshipCategory: "partner",
+            partnerDisplayName: "そら",
+            readiness: { status: "waiting", nextAction: "profile-summary" },
+          },
+        ],
+      });
+    },
+    e2eTimeoutMs,
+  );
+
+  it(
     `${compatibilityShareCases.shareJourney.id}: LIFF共有から招待表示・承諾・相性シート・共有終了まで完了できること`,
     async () => {
       await Promise.all([completeDiagnosis("inviter-token"), completeDiagnosis("recipient-token")]);
