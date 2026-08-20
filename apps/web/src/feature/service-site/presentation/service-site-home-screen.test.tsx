@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceSiteHomeScreen } from "./service-site-home-screen";
 
@@ -34,28 +34,13 @@ describe("ServiceSiteHomeScreen", () => {
     );
   });
 
-  it("Freeを含む料金プランと利用できる機能を表示する", () => {
+  it("現在は誰でも無料と表示し、有料Plan・価格・trialを掲載しない", () => {
     render(<ServiceSiteHomeScreen />);
 
-    expect(screen.getByRole("heading", { name: "自分に合う続け方を選べます。" })).toBeTruthy();
-    expect(screen.getByText("￥780")).toBeTruthy();
-    expect(screen.getByText("￥1,480")).toBeTruthy();
-    expect(screen.getByText("￥2,980")).toBeTruthy();
-    expect(
-      screen.getByRole("table", {
-        name: "Free、Lite、Full、ファミリーパックの機能比較",
-      }),
-    ).toBeTruthy();
-    expect(screen.queryByRole("row", { name: /わたしのまとめ/u })).toBeNull();
-    expect(screen.queryByRole("row", { name: /基本の相性シート/u })).toBeNull();
-    expect(screen.queryByRole("row", { name: /2人の継続的な振り返り/u })).toBeNull();
-    const aiReplyRow = screen.getByRole("row", { name: /AI返信/u });
-    expect(within(aiReplyRow).getByText("月60回")).toBeTruthy();
-    expect(screen.getByText(/前回生成から7日以上経過し、かつ/u)).toBeTruthy();
-    expect(screen.getByText(/月ごとの回数上限はありません/u)).toBeTruthy();
-    expect(screen.getByText(/AIが生成して正常に届けた回答を1回として数えます/u)).toBeTruthy();
-    expect(screen.getAllByText("提供準備中")).toHaveLength(6);
-    expect(screen.getByText(/現在は購入できません/u)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "現在は無料で利用できます。" })).toBeTruthy();
+    expect(screen.getAllByText(/どなたでも無料で利用できます/u).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Lite|Full|ファミリーパック/u)).toBeNull();
+    expect(screen.queryByText(/￥|トライアル/u)).toBeNull();
   });
 
   it("LINE Account復旧の実装済み範囲と事前コードがない場合の境界を説明する", () => {
@@ -63,7 +48,6 @@ describe("ServiceSiteHomeScreen", () => {
 
     expect(screen.getByText(/事前に発行・保存した一回限りの復旧コード/u)).toBeTruthy();
     expect(screen.getByText(/コードがない場合は自動復旧できません/u)).toBeTruthy();
-    expect(screen.getByText(/窓口の準備後にお問い合わせページで案内/u)).toBeTruthy();
     expect(screen.queryByText(/現在の仕組みでは、Accountを復旧できないことがあります/u)).toBeNull();
   });
 });

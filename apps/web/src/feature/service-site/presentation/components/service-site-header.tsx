@@ -4,7 +4,7 @@ const navigationItems = [
   { href: "/#features", label: "できること" },
   { href: "/#how-it-works", label: "使い方" },
   { href: "/#safety", label: "安心して使う" },
-  { href: "/#pricing", label: "料金プラン" },
+  { href: "/#pricing", label: "利用料金" },
   { href: "/#faq", label: "よくある質問" },
 ] as const;
 

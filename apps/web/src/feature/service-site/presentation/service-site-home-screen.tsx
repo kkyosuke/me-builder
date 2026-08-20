@@ -1,11 +1,4 @@
 import {
-  type PublicPlanCode,
-  publicBillingPlans,
-  publicFreePlan,
-  publicPlanCodes,
-  publicPlanFeatures,
-} from "@me-builder/shared";
-import {
   BookOpen,
   Brain,
   Check,
@@ -24,45 +17,6 @@ import { LineFriendAddButton } from "./components/line-friend-add-button";
 
 const bannerUrl = "/images/service/banner.jpg";
 const characterGuidesUrl = "/images/service/character-guides.jpg";
-
-const publicPlanNames: Readonly<Record<PublicPlanCode, string>> = {
-  free: publicFreePlan.name,
-  lite: "Lite",
-  full: "Full",
-  family: "ファミリーパック",
-};
-
-function priceFor(plan: (typeof publicBillingPlans)[number], interval: "month" | "year") {
-  const price = plan.prices.find((candidate) => candidate.interval === interval);
-  if (!price) throw new Error(`Price is missing: ${plan.code}/${interval}`);
-  return price.amount;
-}
-
-function formatPrice(amount: number): string {
-  return new Intl.NumberFormat("ja-JP", {
-    style: "currency",
-    currency: "JPY",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-const pricingPlans = [
-  {
-    ...publicFreePlan,
-    monthlyAmount: 0,
-    yearlyAmount: 0,
-    trialDays: null,
-  },
-  ...publicBillingPlans.map((plan) => ({
-    code: plan.code,
-    name: plan.name,
-    description: plan.description,
-    highlights: plan.highlights,
-    monthlyAmount: priceFor(plan, "month"),
-    yearlyAmount: priceFor(plan, "year"),
-    trialDays: plan.trialDays,
-  })),
-] as const;
 
 const features = [
   {
@@ -105,13 +59,7 @@ const availability = [
 const faqs = [
   {
     question: "無料で使えますか？",
-    answer:
-      "はい。FreeではLINEの日記、公開中の診断、わたしのまとめ、基本の相性シートを利用できます。有料Planは提供準備中で、提供開始後はAI返信の回数や継続的な振り返りが広がります。",
-  },
-  {
-    question: "Free、Lite、Full、ファミリーパックは何が違いますか？",
-    answer:
-      "わたしのまとめ、診断、日記、基本の相性シートは全Plan共通です。提供開始後のLiteは週次の振り返り、Fullは過去全体との比較や個別化セルフケア、ファミリーパックは最大4人へのFull相当の提供が主な違いです。現在、有料Planは提供準備中です。",
+    answer: "はい。現在公開している機能は、どなたでも無料で利用できます。",
   },
   {
     question: "LINE公式アカウントの友だち追加は必要ですか？",
@@ -121,7 +69,7 @@ const faqs = [
   {
     question: "どのような情報を記録しますか？",
     answer:
-      "診断への回答、LINEで送った日記、プロフィール、機能の利用に必要な履歴などを扱います。詳しい内容は公開予定のプライバシーポリシーで案内します。",
+      "診断への回答、LINEで送った日記、プロフィール、機能の利用に必要な履歴などを扱います。詳しい内容はプライバシーポリシーで確認できます。",
   },
   {
     question: "入力した内容は誰に見えますか？",
@@ -139,14 +87,13 @@ const faqs = [
       "いいえ。医療行為、医学的診断、心理検査、その他の専門的助言ではありません。重要な判断では必要に応じて専門家へ相談してください。",
   },
   {
-    question: "利用をやめたい、データを削除したい場合は？",
-    answer:
-      "一般公開前に、本人確認を含む安全な依頼方法をお問い合わせページで案内します。機微な情報を公開フォームへ書く必要はありません。",
-  },
-  {
     question: "LINE Accountを失った場合は？",
     answer:
-      "有料Planの提供開始後は、利用中のLINE Accountで事前に発行・保存した一回限りの復旧コードがあれば、新しいLINE Accountを同じAccountへ接続できます。コードがない場合は自動復旧できません。解約・問い合わせ方法は、窓口の準備後にお問い合わせページで案内します。",
+      "利用中のLINE Accountで事前に発行・保存した一回限りの復旧コードがあれば、新しいLINE Accountを同じAccountへ接続できます。コードがない場合は自動復旧できません。",
+  },
+  {
+    question: "年齢制限はありますか？",
+    answer: "ありません。生年月日は取得せず、年齢による機能差も設けていません。",
   },
 ] as const;
 
@@ -413,135 +360,16 @@ export function ServiceSiteHomeScreen() {
         >
           <div className="mx-auto max-w-7xl">
             <p className="text-center text-sm font-bold tracking-widest text-violet-700 dark:text-violet-300">
-              料金プラン
+              利用料金
             </p>
             <h2
               id="pricing-heading"
               className="mt-3 text-center text-3xl font-black tracking-tight sm:text-4xl"
             >
-              自分に合う続け方を選べます。
+              現在は無料で利用できます。
             </h2>
             <p className="mx-auto mt-4 max-w-3xl text-center leading-7 text-slate-600 dark:text-slate-300">
-              日記、診断、わたしのまとめ、基本の相性シートはすべてのPlanで共通の対象機能です。有料Planでは、振り返る時間の長さと継続支援が広がります。
-            </p>
-            <p className="mx-auto mt-3 max-w-3xl text-center text-sm font-bold text-amber-800 dark:text-amber-200">
-              有料Planは提供準備中です。以下は提供開始時の予定価格と機能で、現在は購入できません。
-            </p>
-
-            <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-              {pricingPlans.map((plan) => (
-                <article
-                  key={plan.code}
-                  className={`flex flex-col rounded-3xl border bg-white p-6 shadow-sm dark:bg-slate-900 ${
-                    plan.code === "full"
-                      ? "border-violet-400 ring-2 ring-violet-200 dark:border-violet-500 dark:ring-violet-900"
-                      : "border-violet-100 dark:border-slate-700"
-                  }`}
-                >
-                  {plan.code !== "free" && (
-                    <p className="mb-3 w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-200">
-                      提供準備中
-                    </p>
-                  )}
-                  {plan.code === "full" && (
-                    <p className="mb-3 w-fit rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800 dark:bg-violet-400/15 dark:text-violet-200">
-                      しっかり振り返りたい方へ
-                    </p>
-                  )}
-                  <h3 className="text-2xl font-black">{plan.name}</h3>
-                  <p className="mt-3 min-h-20 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    {plan.description}
-                  </p>
-                  <p className="mt-5 text-3xl font-black">
-                    {formatPrice(plan.monthlyAmount)}
-                    <span className="ml-1 text-sm font-normal text-slate-500">/月</span>
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    {plan.yearlyAmount === 0
-                      ? "年額も0円"
-                      : `年額 ${formatPrice(plan.yearlyAmount)}`}
-                  </p>
-                  {plan.trialDays ? (
-                    <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200">
-                      提供開始時は初回{plan.trialDays}日間無料
-                    </p>
-                  ) : (
-                    <p className="mt-4 rounded-xl bg-sky-50 px-3 py-2 text-sm font-bold text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">
-                      ずっと無料
-                    </p>
-                  )}
-                  <ul className="mt-5 flex-1 space-y-3 text-sm leading-6">
-                    {plan.highlights.map((highlight) => (
-                      <li key={highlight} className="flex gap-2">
-                        <Check
-                          className="mt-1 size-4 shrink-0 text-emerald-600 dark:text-emerald-300"
-                          aria-hidden="true"
-                        />
-                        <span>{highlight}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
-
-            <div className="mt-10 overflow-x-auto rounded-3xl border border-violet-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <table className="w-full min-w-[64rem] border-collapse text-left text-sm">
-                <caption className="sr-only">Free、Lite、Full、ファミリーパックの機能比較</caption>
-                <thead>
-                  <tr className="border-b border-violet-100 bg-violet-50/70 dark:border-slate-700 dark:bg-slate-800">
-                    <th
-                      scope="col"
-                      className="sticky left-0 z-10 min-w-52 bg-violet-50 px-5 py-4 font-bold dark:bg-slate-800"
-                    >
-                      機能
-                    </th>
-                    {publicPlanCodes.map((code) => (
-                      <th key={code} scope="col" className="min-w-44 px-5 py-4 font-bold">
-                        <span className="block">{publicPlanNames[code]}</span>
-                        <span
-                          className={`mt-1 block text-xs ${
-                            code === "free"
-                              ? "text-emerald-700 dark:text-emerald-300"
-                              : "text-amber-800 dark:text-amber-200"
-                          }`}
-                        >
-                          {code === "free" ? "利用できます" : "提供準備中"}
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {publicPlanFeatures.map((feature) => (
-                    <tr
-                      key={feature.label}
-                      className="border-b border-violet-100 last:border-0 dark:border-slate-700"
-                    >
-                      <th
-                        scope="row"
-                        className="sticky left-0 z-10 bg-white px-5 py-4 font-bold dark:bg-slate-900"
-                      >
-                        {feature.label}
-                      </th>
-                      {publicPlanCodes.map((code) => (
-                        <td key={code} className="px-5 py-4 text-slate-600 dark:text-slate-300">
-                          {feature.plans[code]}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-5 text-center text-xs leading-6 text-slate-500 dark:text-slate-400">
-              わたしのまとめは全Plan共通で、前回生成から7日以上経過し、かつ診断または日記等の入力が変わった場合に生成できます。月ごとの回数上限はありません。
-            </p>
-            <p className="mt-2 text-center text-xs leading-6 text-slate-500 dark:text-slate-400">
-              AI返信は、メッセージの送信回数ではなく、AIが生成して正常に届けた回答を1回として数えます。Freeの月60回は、1日2回使う場合の約30日分です。
-            </p>
-            <p className="mt-2 text-center text-xs leading-6 text-slate-500 dark:text-slate-400">
-              表示価格は税込です。提供開始後、有料Planは選択した期間で自動更新され、初回トライアルの終了後から料金が発生します。
+              日記、診断、わたしのまとめなど、現在公開している機能はどなたでも無料で利用できます。
             </p>
           </div>
         </section>

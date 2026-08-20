@@ -12,9 +12,7 @@ export function ServiceSiteFooter() {
           <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600 dark:text-slate-300">
             LINEの日記とWebの診断から、自分の考え方や大切にしていることを少しずつ振り返るサービスです。
           </p>
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            運営者の正式名称と窓口は、一般公開前に掲載します。
-          </p>
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">運営者: サービス運用者</p>
         </div>
         <nav aria-label="フッターナビゲーション" className="grid content-start gap-3 text-sm">
           <a className="font-semibold hover:underline" href="/terms">

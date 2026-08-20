@@ -16,6 +16,7 @@ const ISO_TIMESTAMP_WITH_TIMEZONE =
 const publishedServiceTermsHashes: Readonly<Record<string, string>> = {
   "2026-08-15": "sha256:9e0143a66c525bc4784e2a6a5b0e16f511189e98b66f2da90dcb6d43cfe01836",
   "2026-08-15-2": "sha256:1ba63664661455bdcd1e6e72c25768657d833c9dc44475e7276a5d862e1b1afc",
+  "2026-08-20": "sha256:b9e47306efe02299ab14c8c86a3691c7d3fbabf806fd0c80bb66ceedd61b9d14",
 };
 
 describe("service terms documents", () => {
@@ -73,7 +74,7 @@ describe("service terms documents", () => {
 
   it("最新規約ではサービス名をかがみとし、公開済みの旧版は変更しない", () => {
     expect(currentServiceTerms).toMatchObject({
-      version: "2026-08-15-2",
+      version: "2026-08-20",
       title: "かがみ サービス利用規約",
     });
     expect(currentServiceTerms.summary).toContain("かがみは");

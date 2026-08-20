@@ -11,10 +11,9 @@ export type ServiceSitePageMetadata = Readonly<{
 export const serviceSitePageMetadata = {
   contact: {
     pathname: "/contact",
-    title: "お問い合わせ（窓口準備中）｜かがみ",
-    description:
-      "かがみへのお問い合わせ種別と、安全に連絡するための注意事項をご案内します。正式な窓口は公開準備中です。",
-    robots: "noindex,nofollow",
+    title: "お問い合わせ｜かがみ",
+    description: "かがみのサービス運用者へのお問い合わせ方法と注意事項をご案内します。",
+    robots: "index,follow",
   },
   home: {
     pathname: "/",
@@ -25,10 +24,9 @@ export const serviceSitePageMetadata = {
   },
   privacy: {
     pathname: "/privacy",
-    title: "プライバシーポリシー（公開準備中）｜かがみ",
-    description:
-      "かがみのプライバシーポリシーは公開準備中です。正式な本文の公開前に確定する項目を案内します。",
-    robots: "noindex,nofollow",
+    title: "プライバシーポリシー｜かがみ",
+    description: "かがみで扱う情報、利用目的、外部送信、保存、安全管理をご案内します。",
+    robots: "index,follow",
   },
   terms: {
     pathname: "/terms",

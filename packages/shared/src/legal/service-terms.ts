@@ -130,6 +130,48 @@ export const serviceTermsDocuments = [
       ...initialServiceTermsDocument.sections.slice(1),
     ],
   },
+  {
+    ...initialServiceTermsDocument,
+    version: "2026-08-20",
+    contentHash: "sha256:b9e47306efe02299ab14c8c86a3691c7d3fbabf806fd0c80bb66ceedd61b9d14",
+    requiresReacceptance: true,
+    publishedAt: "2026-08-20T00:00:00+09:00",
+    title: "かがみ サービス利用規約",
+    summary:
+      "かがみは、LINEでの日記やWebでの診断を通じて、自分の考え方や傾向を振り返るためのサービスです。内容を確認し、同意したうえでご利用ください。",
+    sections: [
+      {
+        ...initialServiceTermsDocument.sections[0],
+        paragraphs: [
+          "本規約は、かがみ（以下「本サービス」）の利用条件を定めます。利用者は、本規約の内容を確認し、同意した場合に本サービスを利用できます。",
+          "本サービスは年齢を問わず利用できます。利用者が単独で有効な同意をできない場合は、法定代理人など必要な権限を持つ方の同意を得てください。",
+        ],
+      },
+      initialServiceTermsDocument.sections[1],
+      initialServiceTermsDocument.sections[2],
+      {
+        ...initialServiceTermsDocument.sections[3],
+        paragraphs: [
+          initialServiceTermsDocument.sections[3].paragraphs[0],
+          "AI機能を利用者が実行したときだけ、機能の提供に必要な最小限の入力を外部のAIサービスへ送信します。送信内容を外部AIのモデル学習には利用しません。",
+          initialServiceTermsDocument.sections[3].paragraphs[2],
+        ],
+      },
+      ...initialServiceTermsDocument.sections.slice(4, 10),
+      {
+        heading: "11. 本人データの確認と変更",
+        paragraphs: [
+          "本人データの確認や変更は、本サービスの本人向け画面に用意した機能から行います。今後、変更が必要なデータを追加する場合は、そのための画面を用意します。問い合わせだけを根拠にAccount内のデータを書き換えません。",
+        ],
+      },
+      {
+        heading: "12. 準拠法・お問い合わせ",
+        paragraphs: [
+          "本規約は日本法に準拠します。本サービスに関するお問い合わせは、サービス運用者が公開する support@kagami.kyosuke.dev へご連絡ください。対応はベストエフォートで、営業時間や回答期限は設けません。",
+        ],
+      },
+    ],
+  },
 ] as const satisfies readonly ServiceTermsDocument[];
 
 export const currentServiceTerms =
