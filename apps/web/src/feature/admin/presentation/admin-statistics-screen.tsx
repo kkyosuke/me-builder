@@ -277,6 +277,10 @@ export function AdminStatisticsScreen({
           {new Date(data.period.start).toLocaleDateString("ja-JP")}〜
           {new Date(data.period.end).toLocaleString("ja-JP")}
         </p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          取得時刻: {new Date(data.fetchedAt).toLocaleString("ja-JP")}
+          {isRefreshing ? "（更新中。表示値は直前の取得結果です）" : ""}
+        </p>
       </header>
       <div className="grid min-w-0 gap-5">
         <Gemini value={data.gemini} />

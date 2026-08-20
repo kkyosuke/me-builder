@@ -11,6 +11,7 @@ import {
   linkIdentity,
   listActiveLineAccountIds,
   listLoginIdentityProviders,
+  recordAccountActivity,
   resolveAccountByLineLogin,
   resolveAccountByLineMessagingApi,
   unlinkLoginIdentityProvider,
@@ -125,6 +126,40 @@ describe("listActiveLineAccountIds", () => {
 
     await expect(listActiveLineAccountIds(db)).resolves.toEqual([]);
     await expect(listActiveLineAccountIds(db, { limit: 101 })).rejects.toThrow(/between 1 and 100/);
+  });
+});
+
+describe("recordAccountActivity", () => {
+  it("最終利用時刻を15分単位で更新する", async () => {
+    const db = createTestDb();
+    const account = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_activity",
+    });
+    await db
+      .update(schema.accounts)
+      .set({ lastActivityAt: null })
+      .where(eq(schema.accounts.id, account.account.id));
+    const first = new Date("2026-08-20T00:00:00.000Z");
+    await recordAccountActivity(db, account.account.id, first);
+    await recordAccountActivity(db, account.account.id, new Date("2026-08-20T00:10:00.000Z"));
+    expect(
+      (
+        await db.query.accounts.findFirst({
+          where: (table, { eq }) => eq(table.id, account.account.id),
+        })
+      )?.lastActivityAt,
+    ).toEqual(first);
+
+    const later = new Date("2026-08-20T00:16:00.000Z");
+    await recordAccountActivity(db, account.account.id, later);
+    expect(
+      (
+        await db.query.accounts.findFirst({
+          where: (table, { eq }) => eq(table.id, account.account.id),
+        })
+      )?.lastActivityAt,
+    ).toEqual(later);
   });
 });
 
@@ -368,6 +403,16 @@ describe("resolveAccountByLineLogin", () => {
     const resolved = await resolveAccountByLineLogin(db, "U_admin", "admin");
 
     expect(resolved?.account.role).toBe("admin");
+  });
+
+  it("allowlistから外れた管理者を降格し、既存sessionをすべて失効すること", async () => {
+    const db = createTestDb();
+    const admin = await resolveAccountByLineLogin(db, "U_removed_admin", "admin");
+
+    const resolved = await resolveAccountByLineLogin(db, "U_removed_admin", "user");
+
+    expect(resolved.account.role).toBe("user");
+    expect(resolved.account.sessionVersion).toBe(admin.account.sessionVersion + 1);
   });
 });
 

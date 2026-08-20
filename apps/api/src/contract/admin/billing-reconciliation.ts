@@ -11,6 +11,7 @@ import {
 export const AdminBillingReconciliationRequestSchema = v.object({
   accountId: v.pipe(v.string(), v.uuid()),
   mode: v.optional(v.picklist(["dry-run", "apply"]), "dry-run"),
+  confirmed: v.optional(v.boolean(), false),
 });
 
 export const AdminBillingReconciliationResponseSchema = v.object({
@@ -34,6 +35,7 @@ export const BillingCustomerNotFoundSchema = v.object({
   error: v.literal("Billing customer not found"),
 });
 export const InvalidBillingReconciliationSchema = v.object({ error: v.literal("Invalid request") });
+export const BillingReconciliationUnavailableSchema = v.object({ error: v.literal("Not Found") });
 
 export const adminBillingReconciliationRoute = describeRoute({
   operationId: "reconcileAdminBillingProjection",
@@ -51,8 +53,12 @@ export const adminBillingReconciliationRoute = describeRoute({
     400: jsonResponse("リクエストが不正", InvalidBillingReconciliationSchema),
     403: jsonResponse("管理者権限がない", ForbiddenErrorSchema),
     404: jsonResponse(
-      "認証Accountまたは対象Customerがない",
-      v.union([AccountNotFoundErrorSchema, BillingCustomerNotFoundSchema]),
+      "認証Account、対象Customerがない、またはPreview以外で利用できない",
+      v.union([
+        AccountNotFoundErrorSchema,
+        BillingCustomerNotFoundSchema,
+        BillingReconciliationUnavailableSchema,
+      ]),
     ),
   },
 } satisfies DescribeRouteOptions);

@@ -18,3 +18,25 @@ export const healthRoute = describeRoute({
     ...internalServerError,
   },
 } satisfies DescribeRouteOptions);
+
+export const ReadinessResponseSchema = v.object({
+  status: v.literal("ready"),
+  timestamp: v.pipe(v.string(), v.isoTimestamp()),
+});
+
+export const ReadinessUnavailableResponseSchema = v.object({
+  status: v.literal("unavailable"),
+  timestamp: v.pipe(v.string(), v.isoTimestamp()),
+});
+
+export const readinessRoute = describeRoute({
+  operationId: "getReadiness",
+  tags: ["System"],
+  summary: "API Serverが依存先を含めて受付可能か取得する",
+  security: [],
+  responses: {
+    200: jsonResponse("API Serverはリクエストを受付可能", ReadinessResponseSchema),
+    503: jsonResponse("API Serverはリクエストを受付不能", ReadinessUnavailableResponseSchema),
+    ...internalServerError,
+  },
+} satisfies DescribeRouteOptions);

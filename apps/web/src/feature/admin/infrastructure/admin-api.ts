@@ -69,11 +69,12 @@ const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 const AccountsResponseSchema = v.object({
   accounts: v.array(
     v.object({
-      id: v.pipe(v.string(), v.nonEmpty()),
-      displayName: v.nullable(v.pipe(v.string(), v.nonEmpty())),
+      adminReference: v.pipe(v.string(), v.regex(/^account_[0-9a-f]{24}$/)),
       role: v.picklist(["user", "admin"]),
-      status: v.literal("active"),
+      status: v.picklist(["active", "stopped"]),
       createdAt: v.pipe(v.string(), v.isoTimestamp()),
+      lastActivityAt: v.pipe(v.string(), v.isoTimestamp()),
+      plan: v.picklist(["free", "lite", "full", "family"]),
       progression: v.union([
         v.object({ status: v.literal("pending") }),
         v.object({

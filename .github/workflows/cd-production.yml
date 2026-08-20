@@ -1,9 +1,12 @@
 name: CD / Production
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'mainの検証済みcommitをProductionへdeployする場合は deploy-production と入力'
+        required: true
+        type: string
 
 concurrency:
   group: cd-production-environment
@@ -12,6 +15,7 @@ concurrency:
 jobs:
   deploy-production:
     name: Deploy Production Environment
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirmation == 'deploy-production' }}
     runs-on: ubuntu-latest
     environment: prd
     env:
@@ -109,46 +113,7 @@ jobs:
       - name: Verify Service Terms Release Metadata
         run: task terms:verify
 
-      # Stripe同期workflowがCloudflareへ永続化するruntime secretはGitHub側の空値検証では見えない。
-      # secret値は取得せずbinding名だけを照合し、課金設定が欠けた状態で本番を更新しない。
-      - name: Validate Production Runtime Secret Bindings
-        shell: bash
-        run: |
-          set -euo pipefail
-          api_secret_names="$(bun --cwd apps/api wrangler secret list --env production | jq -r '.[].name')"
-          worker_secret_names="$(bun --cwd apps/worker wrangler secret list --env production | jq -r '.[].name')"
-          validation_failed=0
-
-          require_secret() {
-            local service_name="$1"
-            local secret_names="$2"
-            local required_name="$3"
-            if ! grep -Fxq -- "${required_name}" <<< "${secret_names}"; then
-              echo "::error::${service_name} production に ${required_name} secret bindingがありません。Setup / Stripe Billingをmainからprd向けに実行してください。"
-              validation_failed=1
-            fi
-          }
-
-          required_api_secrets=(
-            STRIPE_SECRET_KEY
-            STRIPE_WEBHOOK_SECRET
-            STRIPE_PORTAL_CONFIGURATION_ID
-            STRIPE_PORTAL_PLAN_CHANGE_CONFIGURATION_ID
-            STRIPE_PORTAL_RESET_CONFIGURATION_ID
-            BILLING_PRICE_PLAN_MAP
-          )
-          for secret_name in "${required_api_secrets[@]}"; do
-            require_secret "me-builder-api" "${api_secret_names}" "${secret_name}"
-          done
-
-          required_worker_secrets=(STRIPE_SECRET_KEY BILLING_PRICE_PLAN_MAP)
-          for secret_name in "${required_worker_secrets[@]}"; do
-            require_secret "me-builder-worker" "${worker_secret_names}" "${secret_name}"
-          done
-          exit "${validation_failed}"
-
-      # PR の CI と同じ検証を、実際にデプロイするツリーへもう一度かける。
-      # main への push で個別の CI ワークフローは走らせないため、これが本番前の唯一の関門。
+      # PR の CI と同じ検証を、手動で指定したmainのツリーへもう一度かける。
       - name: Run CI Verification
         run: bun run ci
 

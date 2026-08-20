@@ -261,6 +261,7 @@ describe("GET /api/openapi.json", () => {
     const operationIds = new Set<string>();
     const publicOperations = new Set([
       "get /api/health",
+      "get /api/ready",
       "post /api/auth/liff/exchange",
       "post /api/auth/sso/login",
       "get /api/auth/sso/callback",

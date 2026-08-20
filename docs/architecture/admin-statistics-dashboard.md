@@ -2,7 +2,7 @@
 
 ## 1. 目的
 
-運用者が、Accountの利用状況と外部サービスの利用量をme-builder内で確認できるようにします。Account一覧では表示名、うつしレベル、かけら数などの運用に必要な集計値を扱い、外部サービス統計ではVertex AI Express ModeのGeminiとLINE Messaging APIを扱います。
+サービス運用者が、Accountの利用状況と外部サービスの利用量をme-builder内で確認できるようにします。Account一覧では仮名管理参照、Plan、うつしレベル、かけら数などの運用に必要な集計値だけを扱い、外部サービス統計ではVertex AI Express ModeのGeminiとLINE Messaging APIを扱います。
 
 この文書は管理者の認可境界、ダッシュボードの画面構成、Account一覧の表示項目、統計項目、取得元、障害時の表示を所有します。一般利用者の診断体験、レベル式、各外部サービスの呼び出し処理、データベースの物理設計は所有しません。
 
@@ -14,13 +14,13 @@ Accountの責務は[ドメイン設計](../domain/domain-design.md)、うつし�
 
 - 管理者画面の表示可否だけで認可せず、`/api/admin/`配下のAPIが検証済みLINE IDトークンからAccountを解決して`admin`を確認する
 - roleはクライアントから変更できるAPIを提供しない
-- `ADMIN_LINE_USER_IDS`に含まれる検証済みLINE user IDは、Accountの新規作成時に`admin`を付与し、既存Accountなら次回のLIFF認証またはLINE Webhook受信時に`admin`へ昇格する
+- Productionの`admin`は環境別`ADMIN_LINE_USER_IDS` allowlistだけを根拠とする。追加は次回のLIFF認証またはLINE Webhook受信時に反映し、削除後の最初のrequestでは`user`へ降格して`sessionVersion`を更新し、発行済みsessionをすべて失効する
 - `admin`は統計閲覧を許可するが、日記本文や診断回答など本人データの閲覧権限を含まない
 - 未認証は`401`、Account未解決は`404`、管理者でないAccountは`403`とする
 
 将来、運用権限が複数種類必要になった場合にroleの複数化を検討します。初期段階では汎用的なRBACを導入しません。
 
-Account一覧の取得も統計と同じ認可境界を使います。名前やレベルを表示できても、Accountの行から日記、診断回答、Brain Itemのstatement、Evidence本文へ遷移する権限は付与しません。
+Account一覧の取得も統計と同じ認可境界を使います。Accountの行から日記、診断回答、Brain Itemのstatement、Evidence本文へ遷移する権限は付与しません。
 
 ## 3. 画面構成
 
@@ -30,7 +30,7 @@ Account一覧の取得も統計と同じ認可境界を使います。名前や�
 管理者ダッシュボード
 ├── アカウント
 │   ├── Account数
-│   ├── 名前・Account IDの検索
+│   ├── 仮名管理参照の完全一致検索
 │   └── Account一覧
 └── 利用統計
     ├── Gemini
@@ -47,23 +47,24 @@ Account一覧と利用統計は独立して取得します。一方が失敗し�
 
 | 項目 | 表示 | 取得元 |
 | --- | --- | --- |
-| 名前 | 最後に本人確認できたLINE表示名。未取得なら「名前未取得」 | 検証済みLINEプロフィールの運用snapshot |
-| Account ID | me-builder内部ID | 共有D1のAccount |
+| 管理参照 | Account IDから一方向導出した管理画面専用の仮名参照 | APIで生成する非機密projection |
 | role / status | `user` / `admin`、利用状態 | 共有D1のAccount |
+| Plan | 現在の`free` / `lite` / `full` / `family` | 課金・Family projection |
 | うつしレベル | 現在のレベルと計算版 | AccountDataから共有D1へ出した集計projection |
 | 集めたかけら | これまで集めたBrain Item数 | 同上 |
 | 有効なかけら | 現在`active`なBrain Item数 | 同上 |
 | 登録日 | Account作成日時 | 共有D1のAccount |
+| 最終利用日時 | Accountの最終更新日時 | 共有D1のAccount |
 | 最終成長日時 | 最後に成長イベントを反映した日時。未反映なら「まだ成長記録がありません」 | 集計projection |
 
-名前はLINE user IDではなく、本人確認時にLINEから得た表示名のsnapshotです。LIFF認証またはLINEプロフィールを正当に取得できた処理で更新し、クライアントが任意に送った名前を保存しません。LINE user ID、ID token、アクセストークンは一覧へ返しません。
+一覧には表示名、LINE user ID、メールアドレス、avatar、内部Account ID、日記・診断・AI相談等の本文を返しません。cursorにも内部Account IDを含めません。
 
 うつしレベル、集めたかけら、有効なかけらは、[成長・報酬体験の提案 §4](../product/progression-reward-experience.md#4-うつしレベル)と同じ結果を表示します。管理者画面独自の計算式や補正を持ちません。
 
 ### 4.2 一覧操作
 
 - 初期表示は登録日の新しい順とする
-- 名前の部分一致、または完全なAccount IDで検索できる
+- 仮名管理参照だけを完全一致で検索できる
 - roleとstatusで絞り込める
 - 登録日、うつしレベル、集めたかけら、最終成長日時で並べ替えられる
 - 1ページ50件を上限にcursorで次ページを取得する
@@ -86,7 +87,7 @@ Account一覧と利用統計は独立して取得します。一方が失敗し�
 
 Brain Itemのstatement、分類ごとの内容、Evidence、Source Record、診断回答、日記本文はprojectionへ含めません。一覧にprojectionがまだないAccountは削除せず、「レベル集計中」と表示します。projection更新日時を画面へ表示できるようにし、値が古い可能性を運用者が区別できるようにします。
 
-Account一覧の閲覧は、管理者Account、検索・絞り込み条件、取得件数、取得時刻を監査ログへ記録します。検索語が表示名またはAccount IDを含むため、通常のアプリケーションログへ検索語そのものを出しません。
+Account一覧の閲覧は、操作者の仮名参照、検索条件の有無、絞り込み条件、取得件数、取得時刻だけを管理監査記録へ保存し、Productionでは1年後に削除します。検索語そのもの、内部Account ID、個人内容は記録しません。
 
 ## 5. 最初に表示する統計
 
@@ -130,7 +131,6 @@ Googleの`usageMetadata`はtoken数であり、請求額の確定値ではあり
 flowchart LR
     A[Admin Web UI] -->|LINE ID token| API[Admin API]
     API -->|resolve Account / require admin| D1[(D1)]
-    LIFF[Verified LINE session] -->|display name snapshot| D1
     AD[(AccountData)] -->|level / piece count projection| D1
     API -->|account page / aggregate only| D1
     W[Queue Worker] -->|responseId + usageMetadata| D1
@@ -146,7 +146,6 @@ flowchart LR
 
 - Account一覧と利用統計は独立して取得し、一方の失敗で管理者画面全体を非表示にしない
 - Accountの成長projectionが未作成なら行を残して「レベル集計中」と表示する
-- 表示名を取得できない場合もAccount IDで行を表示し、外部APIへ一覧表示のたびに名前を取りに行かない
 - AccountDataへ直接問い合わせてprojection欠落をその場で補完せず、非同期projectionの再処理対象とする
 - GeminiのD1集計とLINE外部取得は独立して実行し、一方の失敗で他方を非表示にしない
 - D1エラー、外部APIエラー、レスポンス不正を区別できる状態を各sectionに返す

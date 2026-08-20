@@ -11,11 +11,12 @@ type AdminAccountProgression =
   | Readonly<{ status: "pending" }>;
 
 export type AdminAccount = Readonly<{
-  id: string;
-  displayName: string | null;
+  adminReference: string;
   role: "user" | "admin";
-  status: "active";
+  status: "active" | "stopped";
   createdAt: string;
+  lastActivityAt: string;
+  plan: "free" | "lite" | "full" | "family";
   progression: AdminAccountProgression;
 }>;
 

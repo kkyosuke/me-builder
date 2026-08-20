@@ -14,15 +14,27 @@ describe("getAdminAccounts", () => {
   it("管理者には共有D1の一覧だけを返す", async () => {
     const page = { accounts: [], total: 0, nextCursor: null };
     const listAccounts = vi.fn().mockResolvedValue(page);
+    const recordAudit = vi.fn().mockResolvedValue(undefined);
     await expect(
       getAdminAccounts({
         actor,
         db,
         input: { query: "山田", sort: "level" },
+        auditEnabled: true,
         listAccounts,
+        recordAudit,
       }),
     ).resolves.toEqual({ type: "resolved", page });
     expect(listAccounts).toHaveBeenCalledWith(db, { query: "山田", sort: "level" });
+    expect(recordAudit).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        adminReference: expect.stringMatching(/^account_[0-9a-f]{24}$/),
+        queryPresent: true,
+        resultCount: 0,
+        total: 0,
+      }),
+    );
   });
 
   it("不正cursorをinvalid-requestへ変換する", async () => {

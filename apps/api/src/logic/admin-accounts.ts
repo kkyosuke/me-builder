@@ -13,7 +13,9 @@ type Params = Readonly<{
   actor: AuthenticatedActor;
   db: D1.shared.Client;
   input: Parameters<typeof D1.shared.action.adminAccount.listAdminAccounts>[1];
+  auditEnabled?: boolean;
   listAccounts?: typeof D1.shared.action.adminAccount.listAdminAccounts;
+  recordAudit?: typeof D1.shared.action.adminAccount.recordAdminAccountListAudit;
 }>;
 
 export async function getAdminAccounts(params: Params): Promise<AdminAccountsOutcome> {
@@ -23,10 +25,27 @@ export async function getAdminAccounts(params: Params): Promise<AdminAccountsOut
       params.db,
       input,
     );
+    const adminReference = await D1.shared.action.adminAccount.createAdminAccountReference(
+      params.actor.accountId,
+    );
+    if (params.auditEnabled) {
+      await (params.recordAudit ?? D1.shared.action.adminAccount.recordAdminAccountListAudit)(
+        params.db,
+        {
+          adminReference,
+          queryPresent: Boolean(input.query?.trim()),
+          role: input.role ?? "all",
+          status: input.status ?? "all",
+          sort: input.sort ?? "created",
+          resultCount: page.accounts.length,
+          total: page.total,
+        },
+      );
+    }
     logger.info(
       {
         event: "admin.accounts.listed",
-        adminAccountId: params.actor.accountId,
+        adminReference,
         queryPresent: Boolean(input.query?.trim()),
         role: input.role ?? "all",
         status: input.status ?? "all",

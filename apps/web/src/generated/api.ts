@@ -21,6 +21,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/ready": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** API Serverが依存先を含めて受付可能か取得する */
+    get: operations["getReadiness"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/observability/web-errors": {
     parameters: {
       query?: never;
@@ -387,7 +404,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 名前と成長projectionを含むAccount一覧を取得する */
+    /** 仮名管理参照と運用に必要な最小projectionを含むAccount一覧を取得する */
     get: operations["listAdminAccounts"];
     put?: never;
     post?: never;
@@ -1214,6 +1231,57 @@ export interface operations {
           "application/json": {
             /** @constant */
             error: "Internal Server Error";
+          };
+        };
+      };
+    };
+  };
+  getReadiness: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description API Serverはリクエストを受付可能 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            status: "ready";
+            /** Format: date-time */
+            timestamp: string;
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description API Serverはリクエストを受付不能 */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            status: "unavailable";
+            /** Format: date-time */
+            timestamp: string;
           };
         };
       };
@@ -3393,7 +3461,7 @@ export interface operations {
       query?: {
         query?: string;
         role?: "user" | "admin";
-        status?: "active";
+        status?: "active" | "stopped";
         sort?: "created" | "level" | "pieces" | "growth";
         cursor?: string;
       };
@@ -3411,14 +3479,17 @@ export interface operations {
         content: {
           "application/json": {
             accounts: {
-              id: string;
-              displayName: string | null;
+              adminReference: string;
               /** @enum {string} */
               role: "user" | "admin";
-              /** @constant */
-              status: "active";
+              /** @enum {string} */
+              status: "active" | "stopped";
               /** Format: date-time */
               createdAt: string;
+              /** Format: date-time */
+              lastActivityAt: string;
+              /** @enum {string} */
+              plan: "free" | "lite" | "full" | "family";
               progression:
                 | {
                     /** @constant */
@@ -3716,7 +3787,7 @@ export interface operations {
           };
         };
       };
-      /** @description 認証Accountまたは対象Customerがない */
+      /** @description 認証Account、対象Customerがない、またはPreview以外で利用できない */
       404: {
         headers: {
           [name: string]: unknown;
@@ -3732,6 +3803,10 @@ export interface operations {
             | {
                 /** @constant */
                 error: "Billing customer not found";
+              }
+            | {
+                /** @constant */
+                error: "Not Found";
               };
         };
       };

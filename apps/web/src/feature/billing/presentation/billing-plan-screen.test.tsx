@@ -61,6 +61,27 @@ const free: ProfileEntitlement = {
 describe("BillingPlanScreen", () => {
   afterEach(cleanup);
 
+  it("Production向け表示ではFreeだけを案内し、有料Planと購入導線を隠す", () => {
+    render(
+      <BillingPlanScreen
+        plans={{ status: "success", data: plans }}
+        entitlement={{ status: "success", data: free }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
+        onRetry={vi.fn()}
+        paidPlansAvailable={false}
+      />,
+    );
+
+    expect(screen.getByText("現在は無料で利用できます")).toBeTruthy();
+    expect(screen.queryByText("Lite")).toBeNull();
+    expect(screen.queryByText(/トライアル/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /プランを変更する/ })).toBeNull();
+  });
+
   it("価格と更新・解約条件を確認してからCheckoutを開始する", () => {
     const onCheckout = vi.fn();
     render(
@@ -114,6 +135,31 @@ describe("BillingPlanScreen", () => {
 
     expect(screen.getByRole("status").textContent).toContain("料金プランを表示できません");
     fireEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("safe defaultをFree契約と表示せず、再確認まで購入を止める", () => {
+    const onRetry = vi.fn();
+    render(
+      <BillingPlanScreen
+        plans={{ status: "success", data: plans }}
+        entitlement={{
+          status: "success",
+          data: { ...free, status: "safe-default" },
+        }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.getByText("契約状態を確認中")).toBeTruthy();
+    expect(screen.getByText(/Free契約へ変更されたことを示す表示ではありません/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /プランを変更する/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "契約状態を再確認" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 

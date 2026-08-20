@@ -100,11 +100,12 @@ describe("GET /api/admin/accounts", () => {
         nextCursor: null,
         accounts: [
           {
-            id: "account-1",
-            displayName: "山田 花子",
+            adminReference: "account_0123456789abcdef01234567",
             role: "user",
             status: "active",
             createdAt: "2026-08-01T00:00:00.000Z",
+            lastActivityAt: "2026-08-02T00:00:00.000Z",
+            plan: "free",
             progression: { status: "pending" },
           },
         ],
@@ -114,7 +115,7 @@ describe("GET /api/admin/accounts", () => {
     const response = await app.request(
       "/api/admin/accounts?query=%E5%B1%B1%E7%94%B0&role=user&sort=level",
       {},
-      { LIFF_ID: "2010850319-Yl63upAR", DB: dummyDb },
+      { LIFF_ID: "2010850319-Yl63upAR", ENVIRONMENT: "test", DB: dummyDb },
     );
 
     expect(response.status).toBe(200);
@@ -122,7 +123,9 @@ describe("GET /api/admin/accounts", () => {
     expect(getAdminAccounts).toHaveBeenCalledWith(
       expect.objectContaining({ input: { query: "山田", role: "user", sort: "level" } }),
     );
-    expect(await response.json()).toMatchObject({ accounts: [{ id: "account-1" }] });
+    expect(await response.json()).toMatchObject({
+      accounts: [{ adminReference: "account_0123456789abcdef01234567" }],
+    });
   });
 
   it("不正な検索条件を400として拒否する", async () => {

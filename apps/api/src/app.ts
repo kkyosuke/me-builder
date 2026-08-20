@@ -74,7 +74,13 @@ import {
   leaveFamilyPackRoute,
   removeFamilyMemberRoute,
 } from "./contract/family/seats";
-import { HealthResponseSchema, healthRoute } from "./contract/health";
+import {
+  HealthResponseSchema,
+  ReadinessResponseSchema,
+  ReadinessUnavailableResponseSchema,
+  healthRoute,
+  readinessRoute,
+} from "./contract/health";
 import {
   acceptServiceTermsRequestValidator,
   acceptServiceTermsRoute,
@@ -326,6 +332,26 @@ app.get("/api/health", healthRoute, (c) => {
       timestamp: new Date().toISOString(),
     }),
   );
+});
+
+app.get("/api/ready", readinessRoute, async (c) => {
+  const timestamp = new Date().toISOString();
+  c.header("Cache-Control", "no-store");
+  if (!c.env?.DB) {
+    return c.json(
+      v.parse(ReadinessUnavailableResponseSchema, { status: "unavailable", timestamp }),
+      503,
+    );
+  }
+  try {
+    await c.env.DB.prepare("SELECT 1 AS ready").first();
+    return c.json(v.parse(ReadinessResponseSchema, { status: "ready", timestamp }));
+  } catch {
+    return c.json(
+      v.parse(ReadinessUnavailableResponseSchema, { status: "unavailable", timestamp }),
+      503,
+    );
+  }
 });
 
 app.post(

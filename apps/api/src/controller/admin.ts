@@ -13,6 +13,7 @@ import {
   AdminBillingReconciliationRequestSchema,
   AdminBillingReconciliationResponseSchema,
   BillingCustomerNotFoundSchema,
+  BillingReconciliationUnavailableSchema,
   InvalidBillingReconciliationSchema,
 } from "../contract/admin/billing-reconciliation";
 import { AdminStatisticsResponseSchema } from "../contract/admin/statistics";
@@ -43,6 +44,7 @@ export async function getAccounts(c: Context<AppEnv>): Promise<Response> {
       ...(parsed.output.sort !== undefined ? { sort: parsed.output.sort } : {}),
       ...(parsed.output.cursor !== undefined ? { cursor: parsed.output.cursor } : {}),
     },
+    auditEnabled: getConfig(c.env).environment === "production",
   });
   switch (outcome.type) {
     case "resolved":
@@ -72,6 +74,10 @@ export async function getStatistics(c: Context<AppEnv>): Promise<Response> {
 }
 
 export async function postBillingReconciliation(c: Context<AppEnv>): Promise<Response> {
+  const config = getConfig(c.env);
+  if (config.environment !== "preview") {
+    return c.json(v.parse(BillingReconciliationUnavailableSchema, { error: "Not Found" }), 404);
+  }
   if (!c.env?.DB) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
@@ -82,7 +88,9 @@ export async function postBillingReconciliation(c: Context<AppEnv>): Promise<Res
   if (!parsed.success) {
     return c.json(v.parse(InvalidBillingReconciliationSchema, { error: "Invalid request" }), 400);
   }
-  const config = getConfig(c.env);
+  if (parsed.output.mode === "apply" && parsed.output.confirmed !== true) {
+    return c.json(v.parse(InvalidBillingReconciliationSchema, { error: "Invalid request" }), 400);
+  }
   if (!config.stripeSecretKey) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }

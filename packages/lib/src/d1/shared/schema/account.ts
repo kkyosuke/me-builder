@@ -14,6 +14,7 @@ export const accounts = sqliteTable("accounts", {
     .notNull()
     .default("user"),
   sessionVersion: integer("session_version").notNull().default(1),
+  lastActivityAt: integer("last_activity_at", { mode: "timestamp" }),
 });
 
 /**

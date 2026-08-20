@@ -628,7 +628,9 @@ function AppContents() {
               onOpenAdmin={openAdmin}
               onOpenAvatar={openAvatar}
               onOpenBillingPortal={openBillingPortal}
-              onOpenBillingPlans={openBillingPlans}
+              {...(DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")
+                ? { onOpenBillingPlans: openBillingPlans }
+                : {})}
               onOpenPersonalData={openPersonalData}
               onOpenFamily={openFamily}
               canOpenBrainItems={canUseDevelopmentTools}

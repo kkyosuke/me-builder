@@ -201,7 +201,7 @@ GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサ�
       - MCP (`apps/mcp`): `mcp.stg.kagami.kyosuke.dev`
   - **本番環境 (`Production`)**:
     - `wrangler.toml` 内の`env.production`ターゲット（`me-builder-api-production`, `me-builder-mcp-production`, `me-builder-web`）。
-    - `main` ブランチマージ時に、CI/CD パイプライン経由で `wrangler deploy --env production` を実行し本番環境へデプロイ。
+    - `main`の対象commitを指定し、CI成功後にサービス運用者が確認文字列を入力した手動workflowだけが`wrangler deploy --env production`を実行する。
     - **カスタムドメイン・ルーティング配置**:
       - UI (`apps/web`): `kagami.kyosuke.dev`
       - API (`apps/api`): `api.kagami.kyosuke.dev`
@@ -218,6 +218,7 @@ PreviewとProductionでは、APIドキュメントを利用者向けAPIとは別
 | `/api/openapi.json` | 必須 | 機械可読なOpenAPI document |
 | `/api/docs`、`/api/docs/*` | 必須 | Swagger UIを提供する場合の画面と配下のアセット |
 | `/api/health` | 不要 | 外形監視と死活確認 |
+| `/api/ready` | 不要 | 共有D1への接続を含む受付可能性の確認 |
 
 ```mermaid
 flowchart LR
@@ -225,8 +226,10 @@ flowchart LR
     Edge -->|/api/openapi.json<br/>/api/docs/*| Access[Cloudflare Access]
     Access -->|許可された開発者| API[API Worker]
     Access -->|未認証・対象外| Deny[拒否]
-    Edge -->|/api/health| API
+    Edge -->|/api/health<br/>/api/ready| API
 ```
+
+`/api/health`はWorkerが応答できることだけを示すliveness、`/api/ready`は共有D1へ問い合わせできることまでを示すreadinessです。readinessが失敗した場合も、外部レスポンスには依存先名や例外詳細を含めず、`503`と固定状態だけを返します。
 
 AccessのAllow policyは、IdPが検証した個別メールアドレスまたは開発者グループを対象にし、`Everyone`を指定しません。対象外の主体はAccessのdeny-by-defaultで拒否します。PreviewとProductionはホスト名が異なるため環境ごとにApplicationを持ちますが、同じアクセス境界を適用します。
 
@@ -235,6 +238,24 @@ AccessのAllow policyは、IdPが検証した個別メールアドレスまた�
 Access ApplicationとAllow policyが作成され、許可された開発者と未認証リクエストの両方を確認できるまでは、Swagger UIをPreviewまたはProductionへ公開しません。
 
 Applicationとpolicyは`scripts/setup-api-docs-access.ts`で冪等に作成・更新し、CDでAPI Serverのデプロイ前に適用します。デプロイ後は`scripts/verify-api-docs-access.ts`が未認証requestでOpenAPI documentとSwagger UI用パスを取得できないことを確認し、公開されている場合はCDを失敗させます。許可対象やAPI token権限などの実行設定は[開発運用ルール](../../.agents/rules/development.md#apiドキュメントのcloudflare-access設定)を正とします。
+
+### 6.3 Production運用境界
+
+個人開発のため、営業時間、on-call、数値SLO、RTO、RPO、データ損失ゼロは約束せず、復旧と問い合わせ対応はベストエフォートとします。利用者向けアプリ内に運用アラート画面は設けません。
+
+監視Workerは次を検知し、同じ事象について発生時と回復時に各1回だけCloudflare Dashboardと運用メールへ通知します。
+
+- `/api/ready`の失敗が5分継続
+- 終端Queue messageが1件以上、またはDLQ最古messageが10分超
+- 本人データ保存の失敗が1件以上
+- safety経路の失敗が1件以上
+- system起因の認証失敗が5分続き、成功がない
+
+ログはCloudflare標準保持だけを利用し、外部ログ基盤やR2へ複製しません。safety監査はroute種別、成功可否、固定error code、時刻の集計だけとし、Account、入力本文、AI出力を含めません。
+
+公開status pageはサービス、Web、LINE、AIの現在状態と過去30日を表示します。監視から自動反映し、手動workflowによるoverrideも許可します。RSS、購読、メール配信機能は提供しません。
+
+通常のProduction deployはCI後の手動実行です。破壊的操作は直前backupと再確認を必須とし、標準Cloudflare機能による復旧を優先します。緊急時はサービス運用者が停止、maintenance表示、rollbackを実行できます。インフラ操作についてアプリ内監査記録は追加しません。
 
 ## 7. 関連ドキュメント
 

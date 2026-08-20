@@ -7,16 +7,29 @@ import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
 import {
   InvalidAdminAccountCursorError,
+  createAdminAccountReference,
   listAdminAccounts,
+  recordAdminAccountListAudit,
   upsertAccountProgressionProjection,
 } from "./admin-account";
-import { saveVerifiedDisplayName } from "./profile";
 
 function createTestDb(): SharedD1Client {
   const sqlite = new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: path.resolve(__dirname, "../../../../drizzle") });
+
+  Object.defineProperty(db, "batch", {
+    value: async (queries: readonly unknown[]) => {
+      let results: unknown[] = [];
+      sqlite.transaction(() => {
+        results = queries.map((query) => (query as { run: () => unknown }).run());
+      })();
+      return results;
+    },
+    writable: true,
+  });
+
   return db as unknown as SharedD1Client;
 }
 
@@ -26,7 +39,6 @@ async function insertAccount(
     id: string;
     createdAt: Date;
     role?: "user" | "admin";
-    displayName?: string;
   }>,
 ): Promise<void> {
   await db.insert(schema.accounts).values({
@@ -35,9 +47,6 @@ async function insertAccount(
     updatedAt: input.createdAt,
     role: input.role ?? "user",
   });
-  if (input.displayName) {
-    await saveVerifiedDisplayName(db, input.id, input.displayName, input.createdAt);
-  }
 }
 
 const emptyProgression = {
@@ -86,12 +95,11 @@ describe("Admin Account progression projection", () => {
 });
 
 describe("Admin Account list", () => {
-  it("projection未作成を残し、名前・roleで検索する", async () => {
+  it("projection未作成を残し、仮名管理参照の完全一致とroleで検索する", async () => {
     const db = createTestDb();
     await insertAccount(db, {
       id: "account-user",
       createdAt: new Date("2026-08-02T00:00:00.000Z"),
-      displayName: "山田 花子",
     });
     await insertAccount(db, {
       id: "account-admin",
@@ -106,19 +114,20 @@ describe("Admin Account list", () => {
       activePieces: 2,
     });
 
-    await expect(listAdminAccounts(db, { query: "山田" })).resolves.toMatchObject({
+    const userReference = await createAdminAccountReference("account-user");
+    await expect(listAdminAccounts(db, { query: userReference })).resolves.toMatchObject({
       total: 1,
       accounts: [
         {
-          id: "account-user",
-          displayName: "山田 花子",
+          adminReference: userReference,
+          plan: "free",
           progression: { status: "ready", level: 2 },
         },
       ],
     });
     await expect(listAdminAccounts(db, { role: "admin" })).resolves.toMatchObject({
       total: 1,
-      accounts: [{ id: "account-admin", progression: { status: "pending" } }],
+      accounts: [{ progression: { status: "pending" } }],
     });
   });
 
@@ -138,14 +147,62 @@ describe("Admin Account list", () => {
     }
 
     const first = await listAdminAccounts(db, { sort: "level", limit: 2 });
-    expect(first.accounts.map(({ id }) => id)).toEqual(["account-2", "account-3"]);
+    expect(first.accounts.map(({ adminReference }) => adminReference)).toEqual([
+      await createAdminAccountReference("account-2"),
+      await createAdminAccountReference("account-3"),
+    ]);
     expect(first.nextCursor).toEqual(expect.any(String));
     const second = await listAdminAccounts(db, {
       sort: "level",
       limit: 2,
       ...(first.nextCursor ? { cursor: first.nextCursor } : {}),
     });
-    expect(second.accounts.map(({ id }) => id)).toEqual(["account-1"]);
+    expect(second.accounts.map(({ adminReference }) => adminReference)).toEqual([
+      await createAdminAccountReference("account-1"),
+    ]);
+  });
+
+  it("有効期間内の課金projectionだけを現在Planとして返す", async () => {
+    const db = createTestDb();
+    const createdAt = new Date("2026-08-01T00:00:00.000Z");
+    await insertAccount(db, { id: "active-plan", createdAt });
+    await insertAccount(db, { id: "expired-plan", createdAt });
+    for (const [accountId, periodStart, periodEnd] of [
+      ["active-plan", new Date("2099-08-01T00:00:00.000Z"), new Date("2099-09-01T00:00:00.000Z")],
+      ["expired-plan", new Date("2020-08-01T00:00:00.000Z"), new Date("2020-09-01T00:00:00.000Z")],
+    ] as const) {
+      await db.insert(schema.billingCustomers).values({
+        accountId,
+        providerCustomerId: `customer-${accountId}`,
+        createdAt,
+        updatedAt: createdAt,
+      });
+      await db.insert(schema.billingSubscriptionProjections).values({
+        providerSubscriptionId: `subscription-${accountId}`,
+        accountId,
+        providerCustomerId: `customer-${accountId}`,
+        status: "active",
+        planCode: "full",
+        currentPeriodStart: periodStart,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+        providerCreatedAt: createdAt,
+        lastEventCreatedAt: createdAt,
+        lastSyncedAt: createdAt,
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
+
+    const page = await listAdminAccounts(db);
+    const activeReference = await createAdminAccountReference("active-plan");
+    const expiredReference = await createAdminAccountReference("expired-plan");
+    expect(page.accounts.find((account) => account.adminReference === activeReference)?.plan).toBe(
+      "full",
+    );
+    expect(page.accounts.find((account) => account.adminReference === expiredReference)?.plan).toBe(
+      "free",
+    );
   });
 
   it("過大なcursorをDBへ渡す前に拒否する", async () => {
@@ -154,5 +211,34 @@ describe("Admin Account list", () => {
     await expect(listAdminAccounts(db, { cursor: "a".repeat(513) })).rejects.toBeInstanceOf(
       InvalidAdminAccountCursorError,
     );
+  });
+});
+
+describe("Admin Account list audit", () => {
+  it("非機密な操作情報だけを保存し、1年を過ぎた記録を削除する", async () => {
+    const db = createTestDb();
+    const old = new Date("2025-08-19T00:00:00.000Z");
+    const current = new Date("2026-08-20T00:00:00.000Z");
+    const input = {
+      adminReference: await createAdminAccountReference("admin-account"),
+      queryPresent: true,
+      role: "all" as const,
+      status: "active" as const,
+      sort: "created" as const,
+      resultCount: 1,
+      total: 1,
+    };
+    await recordAdminAccountListAudit(db, input, old);
+    await recordAdminAccountListAudit(db, input, current);
+
+    expect(db.select().from(schema.adminAccountListAudits).all()).toEqual([
+      expect.objectContaining({
+        adminReference: input.adminReference,
+        queryPresent: true,
+        roleFilter: "all",
+        statusFilter: "active",
+        createdAt: current,
+      }),
+    ]);
   });
 });

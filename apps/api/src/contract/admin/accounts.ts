@@ -25,7 +25,7 @@ const ProgressionSchema = v.union([
 export const AdminAccountsQuerySchema = v.object({
   query: v.optional(v.pipe(v.string(), v.maxLength(100))),
   role: v.optional(v.picklist(["user", "admin"])),
-  status: v.optional(v.literal("active")),
+  status: v.optional(v.picklist(["active", "stopped"])),
   sort: v.optional(v.picklist(["created", "level", "pieces", "growth"])),
   cursor: v.optional(v.pipe(v.string(), v.nonEmpty(), v.maxLength(512))),
 });
@@ -33,11 +33,12 @@ export const AdminAccountsQuerySchema = v.object({
 export const AdminAccountsResponseSchema = v.object({
   accounts: v.array(
     v.object({
-      id: v.pipe(v.string(), v.nonEmpty()),
-      displayName: v.nullable(v.pipe(v.string(), v.nonEmpty())),
+      adminReference: v.pipe(v.string(), v.regex(/^account_[0-9a-f]{24}$/)),
       role: v.picklist(["user", "admin"]),
-      status: v.literal("active"),
+      status: v.picklist(["active", "stopped"]),
       createdAt: TimestampSchema,
+      lastActivityAt: TimestampSchema,
+      plan: v.picklist(["free", "lite", "full", "family"]),
       progression: ProgressionSchema,
     }),
   ),
@@ -52,7 +53,7 @@ export const InvalidAdminAccountsRequestSchema = v.object({
 export const adminAccountsRoute = describeRoute({
   operationId: "listAdminAccounts",
   tags: ["Admin"],
-  summary: "名前と成長projectionを含むAccount一覧を取得する",
+  summary: "仮名管理参照と運用に必要な最小projectionを含むAccount一覧を取得する",
   security: [{ applicationSession: [] }],
   parameters: [
     { name: "query", in: "query", required: false, schema: { type: "string", maxLength: 100 } },
@@ -66,7 +67,7 @@ export const adminAccountsRoute = describeRoute({
       name: "status",
       in: "query",
       required: false,
-      schema: { type: "string", enum: ["active"] },
+      schema: { type: "string", enum: ["active", "stopped"] },
     },
     {
       name: "sort",

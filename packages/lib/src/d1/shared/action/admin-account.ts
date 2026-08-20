@@ -1,8 +1,8 @@
-import { type SQL, and, count, desc, eq, lt, or, sql } from "drizzle-orm";
+import { type SQL, and, count, desc, eq, lt, sql } from "drizzle-orm";
 import type { UtsushiProgression } from "../../../do/account/action/progression";
 import type { SharedD1Client } from "../client";
 import { accounts } from "../schema/account";
-import { accountProfiles } from "../schema/profile";
+import { adminAccountListAudits } from "../schema/admin-audit";
 import { accountProgressionProjections } from "../schema/progression";
 
 export const UTSUSHI_PROGRESSION_CALCULATION_VERSION = 1;
@@ -14,7 +14,7 @@ export type AdminAccountSort = "created" | "level" | "pieces" | "growth";
 export type AdminAccountListInput = Readonly<{
   query?: string;
   role?: "user" | "admin";
-  status?: "active";
+  status?: "active" | "stopped";
   sort?: AdminAccountSort;
   cursor?: string;
   limit?: number;
@@ -22,8 +22,7 @@ export type AdminAccountListInput = Readonly<{
 
 type CursorPayload = Readonly<{
   sort: AdminAccountSort;
-  value: string | number;
-  accountId: string;
+  offset: number;
 }>;
 
 export class InvalidAdminAccountCursorError extends Error {
@@ -45,9 +44,9 @@ function decodeCursor(cursor: string, sort: AdminAccountSort): CursorPayload {
     const parsed = JSON.parse(atob(padded)) as Partial<CursorPayload>;
     if (
       parsed.sort !== sort ||
-      (typeof parsed.value !== "string" && typeof parsed.value !== "number") ||
-      typeof parsed.accountId !== "string" ||
-      !parsed.accountId
+      typeof parsed.offset !== "number" ||
+      !Number.isSafeInteger(parsed.offset) ||
+      parsed.offset < 0
     ) {
       throw new Error("invalid payload");
     }
@@ -57,22 +56,11 @@ function decodeCursor(cursor: string, sort: AdminAccountSort): CursorPayload {
   }
 }
 
-function escapedLikePattern(value: string): string {
-  return `%${value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
-}
-
 function listFilters(input: AdminAccountListInput): SQL[] {
   const filters: SQL[] = [eq(accounts.isDeleted, false)];
   const query = input.query?.trim();
   if (query) {
     if (query.length > 100) throw new Error("Admin Account query is too long");
-    const pattern = escapedLikePattern(query.toLocaleLowerCase("ja-JP"));
-    filters.push(
-      or(
-        eq(accounts.id, query),
-        sql`lower(${accountProfiles.displayName}) like ${pattern} escape '\\'`,
-      ) as SQL,
-    );
   }
   if (input.role) filters.push(eq(accounts.role, input.role));
   if (input.status) filters.push(eq(accounts.status, input.status));
@@ -87,24 +75,45 @@ function progressionSortValue(sort: Exclude<AdminAccountSort, "created">): SQL<n
   return sql<number>`coalesce(${accountProgressionProjections.lastGrowthAt}, -1)`;
 }
 
-function cursorFilter(payload: CursorPayload): SQL {
-  if (payload.sort === "created") {
-    if (typeof payload.value !== "string") throw new InvalidAdminAccountCursorError();
-    const createdAt = new Date(payload.value);
-    if (Number.isNaN(createdAt.getTime())) throw new InvalidAdminAccountCursorError();
-    return or(
-      lt(accounts.createdAt, createdAt),
-      and(eq(accounts.createdAt, createdAt), lt(accounts.id, payload.accountId)),
-    ) as SQL;
-  }
-  if (typeof payload.value !== "number" || !Number.isSafeInteger(payload.value)) {
-    throw new InvalidAdminAccountCursorError();
-  }
-  const value = progressionSortValue(payload.sort);
-  return or(
-    lt(value, payload.value),
-    and(eq(value, payload.value), lt(accounts.id, payload.accountId)),
-  ) as SQL;
+export async function createAdminAccountReference(accountId: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`kagami-admin-reference:v1:${accountId}`),
+  );
+  return `account_${Array.from(new Uint8Array(digest))
+    .slice(0, 12)
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+export async function recordAdminAccountListAudit(
+  db: SharedD1Client,
+  input: Readonly<{
+    adminReference: string;
+    queryPresent: boolean;
+    role: "all" | "user" | "admin";
+    status: "all" | "active" | "stopped";
+    sort: AdminAccountSort;
+    resultCount: number;
+    total: number;
+  }>,
+  createdAt = new Date(),
+): Promise<void> {
+  const expiresBefore = new Date(createdAt.getTime() - 365 * 24 * 60 * 60 * 1_000);
+  await db.batch([
+    db.insert(adminAccountListAudits).values({
+      id: crypto.randomUUID(),
+      adminReference: input.adminReference,
+      queryPresent: input.queryPresent,
+      roleFilter: input.role,
+      statusFilter: input.status,
+      sort: input.sort,
+      resultCount: input.resultCount,
+      total: input.total,
+      createdAt,
+    }),
+    db.delete(adminAccountListAudits).where(lt(adminAccountListAudits.createdAt, expiresBefore)),
+  ]);
 }
 
 /** AccountDataで確定した進行度を、管理者一覧用の非機密projectionへ反映する。 */
@@ -148,23 +157,47 @@ export async function listAdminAccounts(db: SharedD1Client, input: AdminAccountL
     throw new Error(`Admin Account page limit must be between 1 and ${ADMIN_ACCOUNT_PAGE_LIMIT}`);
   }
   const filters = listFilters(input);
-  const totalRow = await db
-    .select({ value: count() })
-    .from(accounts)
-    .leftJoin(accountProfiles, eq(accountProfiles.accountId, accounts.id))
-    .where(and(...filters))
-    .get();
-
-  const pageFilters = [...filters];
-  if (input.cursor) pageFilters.push(cursorFilter(decodeCursor(input.cursor, sort)));
+  const offset = input.cursor ? decodeCursor(input.cursor, sort).offset : 0;
+  const requestedReference = input.query?.trim();
   const progressionOrder = sort === "created" ? undefined : progressionSortValue(sort);
-  const rows = await db
+  const plan = sql<"free" | "lite" | "full" | "family">`case
+    when exists (
+      select 1 from family_seats
+      inner join family_packs on family_packs.id = family_seats.pack_id
+      where family_seats.member_account_id = ${accounts.id}
+        and family_seats.status = 'active'
+        and family_seats.is_deleted = 0
+        and family_packs.status = 'active'
+        and family_packs.is_deleted = 0
+    ) then 'family'
+    else coalesce((
+      select case
+        when status = 'past_due' then coalesce(payment_failure_plan_code, plan_code)
+        else plan_code
+      end from billing_subscription_projections
+      where account_id = ${accounts.id}
+        and plan_code is not null
+        and current_period_end > unixepoch()
+        and (
+          status in ('active', 'trialing')
+          or (
+            status = 'past_due'
+            and payment_failure_started_at is not null
+            and unixepoch() < payment_failure_started_at + 604800
+          )
+        )
+      order by last_synced_at desc
+      limit 1
+    ), 'free')
+  end`;
+  const query = db
     .select({
       id: accounts.id,
-      displayName: accountProfiles.displayName,
       role: accounts.role,
       status: accounts.status,
       createdAt: accounts.createdAt,
+      lastActivityAt: accounts.lastActivityAt,
+      plan,
       level: accountProgressionProjections.level,
       calculationVersion: accountProgressionProjections.calculationVersion,
       collectedPieces: accountProgressionProjections.collectedPieces,
@@ -173,46 +206,57 @@ export async function listAdminAccounts(db: SharedD1Client, input: AdminAccountL
       projectedAt: accountProgressionProjections.projectedAt,
     })
     .from(accounts)
-    .leftJoin(accountProfiles, eq(accountProfiles.accountId, accounts.id))
     .leftJoin(
       accountProgressionProjections,
       eq(accountProgressionProjections.accountId, accounts.id),
     )
-    .where(and(...pageFilters))
+    .where(and(...filters))
     .orderBy(
       sort === "created" ? desc(accounts.createdAt) : desc(progressionOrder as SQL),
       desc(accounts.id),
-    )
-    .limit(limit + 1)
-    .all();
-
-  const pageRows = rows.slice(0, limit);
-  const last = pageRows.at(-1);
-  const nextCursor =
-    rows.length > limit && last
-      ? encodeCursor({
-          sort,
-          value:
-            sort === "created"
-              ? last.createdAt.toISOString()
-              : sort === "level"
-                ? (last.level ?? -1)
-                : sort === "pieces"
-                  ? (last.collectedPieces ?? -1)
-                  : (last.lastGrowthAt?.getTime() ?? -1),
-          accountId: last.id,
-        })
-      : null;
+    );
+  const rawRows = requestedReference
+    ? await query.all()
+    : await query
+        .limit(limit + 1)
+        .offset(offset)
+        .all();
+  const projectedRows = await Promise.all(
+    rawRows.map(async (row) => ({
+      ...row,
+      adminReference: await createAdminAccountReference(row.id),
+    })),
+  );
+  const matchingRows = requestedReference
+    ? projectedRows.filter((row) => row.adminReference === requestedReference)
+    : projectedRows;
+  const pageRows = requestedReference
+    ? matchingRows.slice(offset, offset + limit)
+    : matchingRows.slice(0, limit);
+  const total = requestedReference
+    ? matchingRows.length
+    : ((
+        await db
+          .select({ value: count() })
+          .from(accounts)
+          .where(and(...filters))
+          .get()
+      )?.value ?? 0);
+  const hasNext = requestedReference
+    ? matchingRows.length > offset + limit
+    : matchingRows.length > limit;
+  const nextCursor = hasNext ? encodeCursor({ sort, offset: offset + limit }) : null;
 
   return {
-    total: totalRow?.value ?? 0,
+    total,
     nextCursor,
     accounts: pageRows.map((row) => ({
-      id: row.id,
-      displayName: row.displayName,
+      adminReference: row.adminReference,
       role: row.role,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
+      lastActivityAt: (row.lastActivityAt ?? row.createdAt).toISOString(),
+      plan: row.plan,
       progression:
         row.level === null ||
         row.calculationVersion === null ||

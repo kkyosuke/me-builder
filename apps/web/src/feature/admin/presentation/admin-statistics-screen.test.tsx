@@ -112,6 +112,8 @@ describe("AdminStatisticsScreen", () => {
     );
 
     expect(screen.getByRole("heading", { name: "利用統計" })).toBeTruthy();
+    expect(screen.getByText(/取得時刻:.*2026\/8\/8/)).toBeTruthy();
+    expect(screen.getByText(/表示値は直前の取得結果です/)).toBeTruthy();
     expect(screen.getAllByText("12")).toHaveLength(2);
     expect(screen.getByText("account-1")).toBeTruthy();
     expect(

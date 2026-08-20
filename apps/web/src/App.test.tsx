@@ -595,11 +595,12 @@ describe("App", () => {
       .mockResolvedValueOnce({
         accounts: [
           {
-            id: "account-before",
-            displayName: "切替前の利用者",
+            adminReference: "account_0123456789abcdef01234567",
             role: "user",
             status: "active",
             createdAt: "2026-08-01T00:00:00.000Z",
+            lastActivityAt: "2026-08-01T01:00:00.000Z",
+            plan: "free",
             progression: { status: "pending" },
           },
         ],
@@ -609,11 +610,12 @@ describe("App", () => {
       .mockResolvedValueOnce({
         accounts: [
           {
-            id: "account-after",
-            displayName: "切替後の利用者",
+            adminReference: "account_89abcdef0123456789abcdef",
             role: "user",
             status: "active",
             createdAt: "2026-08-02T00:00:00.000Z",
+            lastActivityAt: "2026-08-02T01:00:00.000Z",
+            plan: "free",
             progression: { status: "pending" },
           },
         ],
@@ -623,7 +625,9 @@ describe("App", () => {
     window.history.replaceState({}, "", "/admin");
     const view = render(<App />);
 
-    expect((await screen.findAllByText("切替前の利用者")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("account_0123456789abcdef01234567")).length).toBeGreaterThan(
+      0,
+    );
 
     mocks.authState = {
       status: "authenticated",
@@ -633,8 +637,10 @@ describe("App", () => {
     };
     view.rerender(<App />);
 
-    expect((await screen.findAllByText("切替後の利用者")).length).toBeGreaterThan(0);
-    expect(screen.queryAllByText("切替前の利用者")).toHaveLength(0);
+    expect((await screen.findAllByText("account_89abcdef0123456789abcdef")).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryAllByText("account_0123456789abcdef01234567")).toHaveLength(0);
     expect(mocks.fetchAdminAccounts).toHaveBeenCalledTimes(2);
   });
 

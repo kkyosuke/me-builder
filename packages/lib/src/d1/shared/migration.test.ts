@@ -16,6 +16,7 @@ const SHARED_D1_TABLES = [
   "account_recovery_credentials",
   "account_recovery_rate_limits",
   "accounts",
+  "admin_account_list_audits",
   "billing_customers",
   "billing_processed_events",
   "billing_reconciliation_audits",
@@ -57,6 +58,29 @@ const PERSONAL_CONTENT_TABLES = [
   "source_records",
 ];
 
+const REVIEWED_DESTRUCTIVE_MIGRATIONS = new Set([
+  "shared/0006_plain_paladin.sql",
+  "account/0003_conscious_sheva_callister.sql",
+  "account/0013_flat_silver_samurai.sql",
+  "compatibility/0001_yummy_radioactive_man.sql",
+]);
+
+const MIGRATION_FAMILIES = [
+  { name: "shared", directory: migrationsDirectory },
+  { name: "account", directory: path.resolve(__dirname, "../../../drizzle-do-account") },
+  {
+    name: "compatibility",
+    directory: path.resolve(__dirname, "../../../../../apps/worker/drizzle/compatibility-data"),
+  },
+  {
+    name: "coordinator",
+    directory: path.resolve(
+      __dirname,
+      "../../../../../apps/worker/drizzle/conversation-coordinator",
+    ),
+  },
+] as const;
+
 function applyMigrations() {
   const files = readdirSync(migrationsDirectory)
     .filter((filename) => /^\d{4}_.+\.sql$/.test(filename))
@@ -75,6 +99,21 @@ function applyMigrations() {
 }
 
 describe("shared D1 clean baseline migration", () => {
+  it("未審査の破壊的migrationを追加しない", () => {
+    const destructive = MIGRATION_FAMILIES.flatMap(({ name, directory }) =>
+      readdirSync(directory)
+        .filter((filename) => /^\d{4}_.+\.sql$/.test(filename))
+        .filter((filename) =>
+          /\b(?:DROP\s+(?:TABLE|COLUMN)|RENAME\s+(?:TABLE|COLUMN))\b/i.test(
+            readFileSync(path.join(directory, filename), "utf8"),
+          ),
+        )
+        .map((filename) => `${name}/${filename}`),
+    );
+
+    expect(destructive.sort()).toEqual([...REVIEWED_DESTRUCTIVE_MIGRATIONS].sort());
+  });
+
   it("0000から全migrationを適用して現在schemaを作成する", () => {
     const sqlite = applyMigrations();
     const tableNames = sqlite
