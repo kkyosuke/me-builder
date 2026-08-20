@@ -3,7 +3,7 @@ import { isDevelopmentEnvironment } from "../config";
 import { authenticatedSession } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 
-export const DEVELOPMENT_RECENT_AUTHENTICATION_MS = 10 * 60 * 1000;
+const DEVELOPMENT_RECENT_AUTHENTICATION_MS = 10 * 60 * 1000;
 
 /** 開発用routeはPreview系環境の管理者にだけ存在を公開する。 */
 export function developmentAdminRouteIsAvailable(c: Context<AppEnv>): boolean {
