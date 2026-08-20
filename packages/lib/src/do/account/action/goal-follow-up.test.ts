@@ -122,9 +122,10 @@ describe("goal follow-up", () => {
     ).resolves.toMatchObject({ type: "updated", item: { status: "completed" } });
     const read = await readGoalFollowUps(db, ACCOUNT_ID, new Date(AT.getTime() + 3), true);
     expect(read.items).toHaveLength(1);
-    expect(read.candidates).toEqual([
-      { brainItemId: "confirmed", goal: "来週、上司との面談で希望を伝えたい" },
-    ]);
+    expect(read.candidates).toEqual([]);
+    await expect(
+      updateGoalFollowUp(db, ACCOUNT_ID, agreed.item.id, { status: "active" }, AT),
+    ).resolves.toEqual({ type: "not-found" });
   });
 
   it("候補を要求しない読取ではGoal本文を返さず、削除済みのGoalは保存済み状態にも返さない", async () => {
@@ -223,8 +224,8 @@ describe("goal follow-up", () => {
     ).resolves.toEqual({ type: "active-limit-reached" });
     if (first.type !== "agreed") throw new Error("goal agreement failed");
     await expect(
-      updateGoalFollowUp(db, ACCOUNT_ID, first.item.id, { status: "completed" }, AT, 1),
-    ).resolves.toMatchObject({ type: "updated" });
+      updateGoalFollowUp(db, ACCOUNT_ID, first.item.id, { status: "stopped" }, AT, 1),
+    ).resolves.toMatchObject({ type: "updated", item: { status: "stopped" } });
     const second = await agreeGoalFollowUp(db, ACCOUNT_ID, "second", "二歩目を進める", AT, 1);
     expect(second).toMatchObject({ type: "agreed" });
     await expect(
@@ -253,5 +254,11 @@ describe("goal follow-up", () => {
         expect.objectContaining({ status: "completed" }),
       ]),
     });
+    await expect(
+      updateGoalFollowUp(db, ACCOUNT_ID, stopped.item.id, { status: "active" }, AT),
+    ).resolves.toMatchObject({ type: "updated", item: { status: "active" } });
+    await expect(
+      updateGoalFollowUp(db, ACCOUNT_ID, completed.item.id, { status: "active" }, AT),
+    ).resolves.toEqual({ type: "not-found" });
   });
 });

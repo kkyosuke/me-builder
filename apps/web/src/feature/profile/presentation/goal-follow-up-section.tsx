@@ -82,6 +82,20 @@ function FollowUpCard({
             <CircleStop className="size-3" /> 停止
           </button>
         </div>
+      ) : item.status === "stopped" && canManage ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onUpdate({ status: "active" })}
+          className="mt-3 inline-flex items-center gap-1 rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-800 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-200"
+        >
+          {pending ? (
+            <LoaderCircle className="size-3 animate-spin motion-reduce:animate-none" />
+          ) : (
+            <RotateCcw className="size-3" />
+          )}
+          再開
+        </button>
       ) : null}
     </article>
   );
@@ -244,10 +258,10 @@ export function GoalFollowUpSection({
               <FollowUpCard
                 key={item.id}
                 item={item}
-                pending={false}
-                disabled={false}
+                pending={pendingId === item.id}
+                disabled={busy}
                 canManage={state.data.canManage}
-                onUpdate={() => undefined}
+                onUpdate={(input) => onUpdate(item.id, input)}
               />
             ))}
           </div>

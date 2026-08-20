@@ -113,4 +113,31 @@ describe("GoalFollowUpSection", () => {
     );
     expect(screen.getByRole("alert").textContent).toContain("更新できませんでした");
   });
+
+  it("停止したGoalだけを本人が再開でき、完了したGoalは再開できない", () => {
+    const onUpdate = vi.fn();
+    render(
+      <GoalFollowUpSection
+        state={{
+          status: "success",
+          data: {
+            ...result,
+            items: [
+              { ...result.items[0], id: "stopped", status: "stopped" },
+              { ...result.items[0], id: "completed", status: "completed" },
+            ],
+          },
+        }}
+        pendingId={null}
+        operationError={null}
+        onRetry={vi.fn()}
+        onAgree={vi.fn()}
+        onUpdate={onUpdate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "再開" }));
+    expect(onUpdate).toHaveBeenCalledWith("stopped", { status: "active" });
+    expect(screen.getAllByText("完了")).toHaveLength(1);
+  });
 });

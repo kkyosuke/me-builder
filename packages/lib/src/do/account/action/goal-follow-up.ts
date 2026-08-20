@@ -91,7 +91,6 @@ export async function readGoalFollowUps(
               and(
                 eq(goalFollowUps.accountId, accountId),
                 eq(goalFollowUps.brainItemId, brainItems.id),
-                eq(goalFollowUps.status, "active"),
               ),
             ),
         ),
@@ -141,6 +140,13 @@ export async function agreeGoalFollowUp(
     .get();
   if (!goal) return { type: "goal-not-found" };
   if (isInference(goal.attributes, goal.derivation)) return { type: "goal-not-confirmed" };
+  const existing = await db
+    .select({ id: goalFollowUps.id })
+    .from(goalFollowUps)
+    .where(and(eq(goalFollowUps.accountId, accountId), eq(goalFollowUps.brainItemId, brainItemId)))
+    .get();
+  // 停止済みはupdateによる明示再開、完了済みは新しいGoalでの再合意だけを許可する。
+  if (existing) return { type: "goal-not-confirmed" };
   if (activeLimit !== null) {
     const active = await db
       .select({ brainItemId: goalFollowUps.brainItemId })
@@ -162,21 +168,15 @@ export async function agreeGoalFollowUp(
     }
   }
   const id = crypto.randomUUID();
-  await db
-    .insert(goalFollowUps)
-    .values({
-      id,
-      accountId,
-      brainItemId,
-      nextStep: normalized,
-      status: "active",
-      agreedAt: at,
-      updatedAt: at,
-    })
-    .onConflictDoUpdate({
-      target: [goalFollowUps.accountId, goalFollowUps.brainItemId],
-      set: { nextStep: normalized, status: "active", agreedAt: at, updatedAt: at },
-    });
+  await db.insert(goalFollowUps).values({
+    id,
+    accountId,
+    brainItemId,
+    nextStep: normalized,
+    status: "active",
+    agreedAt: at,
+    updatedAt: at,
+  });
   const item = (await readGoalFollowUps(db, accountId, at)).items.find(
     (candidate) => candidate.brainItemId === brainItemId,
   );
@@ -194,6 +194,16 @@ export async function updateGoalFollowUp(
 ): Promise<UpdateGoalFollowUpResult> {
   const nextStep = input.nextStep?.trim();
   if (nextStep !== undefined && (!nextStep || nextStep.length > 500)) return { type: "not-found" };
+  const current = await db
+    .select({ status: goalFollowUps.status })
+    .from(goalFollowUps)
+    .where(and(eq(goalFollowUps.id, id), eq(goalFollowUps.accountId, accountId)))
+    .get();
+  if (!current) return { type: "not-found" };
+  if (current.status === "completed") return { type: "not-found" };
+  if (current.status === "stopped" && (input.status !== "active" || nextStep !== undefined)) {
+    return { type: "not-found" };
+  }
   if (input.status === "active" && activeLimit !== null) {
     const active = await db
       .select({ id: goalFollowUps.id })
