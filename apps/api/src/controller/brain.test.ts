@@ -391,6 +391,20 @@ describe("開発用Brain Vector同期job API", () => {
     expect(resetAllDevelopmentFailedBrainVectorSyncJobs).not.toHaveBeenCalled();
   });
 
+  it("一括reset実行は明示確認なしでは拒否する", async () => {
+    const response = await app.request(
+      "/api/dev/brain-vector-sync-jobs/reset-failed",
+      {
+        method: "POST",
+        headers: { ...authorization, "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "execute" }),
+      },
+      env("preview"),
+    );
+    expect(response.status).toBe(400);
+    expect(resetAllDevelopmentFailedBrainVectorSyncJobs).not.toHaveBeenCalled();
+  });
+
   it.each(["production", "staging", undefined])(
     "ENVIRONMENT=%sでは全操作を404にしてlogicを呼ばない",
     async (environment) => {

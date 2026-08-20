@@ -216,7 +216,10 @@ export async function postDevelopmentBrainVectorSyncJobsResetAll(
     ResetAllDevelopmentBrainVectorSyncJobsRequestSchema,
     await c.req.json().catch(() => undefined),
   );
-  if (!request.success) {
+  if (
+    !request.success ||
+    (request.output.mode === "execute" && request.output.confirmed !== true)
+  ) {
     return c.json(
       v.parse(InvalidDevelopmentBrainResetRequestSchema, { error: "Invalid request" }),
       400,

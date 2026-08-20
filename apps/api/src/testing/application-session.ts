@@ -46,7 +46,11 @@ export function createApplicationSessionFixture(database: D1Database) {
 
   return {
     bindings,
-    async issue(accountId: string, displayProfile?: DisplayProfile) {
+    async issue(
+      accountId: string,
+      displayProfile?: DisplayProfile,
+      authenticatedAt = new Date("2026-08-16T00:00:00.000Z"),
+    ) {
       const runtime = createApplicationSessionService({ DB: database, ...bindings });
       if (!runtime) throw new Error("Application session test runtime is unavailable");
       const identity = await runtime.db.query.accountIdentities.findFirst({
@@ -63,7 +67,7 @@ export function createApplicationSessionFixture(database: D1Database) {
         {
           accountId,
           authenticationMethod: "liff",
-          authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+          authenticatedAt,
         },
         identity.id,
         displayProfile,

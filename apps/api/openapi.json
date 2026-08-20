@@ -12888,60 +12888,34 @@
             "application/json": {
               "schema": {
                 "kind": "schema",
-                "type": "union",
+                "type": "object",
                 "expects": "Object",
                 "async": false,
-                "options": [
-                  {
+                "entries": {
+                  "mode": {
                     "kind": "schema",
-                    "type": "object",
-                    "expects": "Object",
+                    "type": "picklist",
+                    "expects": "(\"dry-run\" | \"execute\")",
                     "async": false,
-                    "entries": {
-                      "mode": {
-                        "kind": "schema",
-                        "type": "literal",
-                        "expects": "\"dry-run\"",
-                        "async": false,
-                        "literal": "dry-run",
-                        "~standard": {
-                          "version": 1,
-                          "vendor": "valibot"
-                        }
-                      }
-                    },
+                    "options": ["dry-run", "execute"],
                     "~standard": {
                       "version": 1,
                       "vendor": "valibot"
                     }
                   },
-                  {
+                  "confirmed": {
                     "kind": "schema",
-                    "type": "object",
-                    "expects": "Object",
+                    "type": "optional",
+                    "expects": "(boolean | undefined)",
                     "async": false,
-                    "entries": {
-                      "mode": {
-                        "kind": "schema",
-                        "type": "literal",
-                        "expects": "\"execute\"",
-                        "async": false,
-                        "literal": "execute",
-                        "~standard": {
-                          "version": 1,
-                          "vendor": "valibot"
-                        }
-                      },
-                      "confirmed": {
-                        "kind": "schema",
-                        "type": "literal",
-                        "expects": "true",
-                        "async": false,
-                        "literal": true,
-                        "~standard": {
-                          "version": 1,
-                          "vendor": "valibot"
-                        }
+                    "wrapped": {
+                      "kind": "schema",
+                      "type": "boolean",
+                      "expects": "boolean",
+                      "async": false,
+                      "~standard": {
+                        "version": 1,
+                        "vendor": "valibot"
                       }
                     },
                     "~standard": {
@@ -12949,7 +12923,7 @@
                       "vendor": "valibot"
                     }
                   }
-                ],
+                },
                 "~standard": {
                   "version": 1,
                   "vendor": "valibot"
