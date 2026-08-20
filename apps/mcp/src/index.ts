@@ -84,13 +84,27 @@ app.get("/health", (c) => {
   });
 });
 
-// MCP SSE / HTTP プロトコル用スケルトンエンドポイント
+const mcpUnavailableResponse = {
+  error: "Not Implemented",
+  code: "MCP_NOT_AVAILABLE",
+  phase: "phase_2",
+} as const;
+
+// 決定済みの認可・同意・監査契約を実装してPreview検証を終えるまで、
+// 将来のMCP clientがスケルトンを利用可能なtransportと誤認しないよう明示的な501へ閉じる。
+app.post("/mcp", (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json(mcpUnavailableResponse, 501);
+});
+
 app.get("/sse", (c) => {
-  return c.text("MCP SSE endpoint skeleton");
+  c.header("Cache-Control", "no-store");
+  return c.json(mcpUnavailableResponse, 501);
 });
 
 app.post("/messages", (c) => {
-  return c.json({ message: "MCP Message endpoint skeleton" });
+  c.header("Cache-Control", "no-store");
+  return c.json(mcpUnavailableResponse, 501);
 });
 
 logger.info(`MCP Server is running on http://localhost:${config.port}`);

@@ -55,6 +55,7 @@
 | [Source Recordのライフサイクル設計](../docs/domain/source/source-record-lifecycle-design.md) | Source Recordの不変性、訂正・削除・取り消し・撤回、Brain Itemへの波及、外部提供範囲 |
 | [Brainのラベル・アクセス制御設計](../docs/domain/brain/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則、Source Recordの既定ラベル |
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
+| [MCP連携設計](../docs/architecture/mcp-integration-design.md) | 管理者限定MCPのtransport、認証・認可、同意、開示、監査、解除、仕様更新と停止境界 |
 | [Web認証・アプリケーションセッション設計](../docs/architecture/web-authentication-design.md) | LIFF／SSOの入口選択、外部Identity検証、Account解決、provider非依存session、認証と認可の境界、移行順序 |
 | [課金・Plan紐付け実装設計](../docs/architecture/billing-implementation-design.md) | Stripe、Billing Queue、共有D1、AccountPlanAssignmentの境界と収束原則 |
 | [Account復旧設計](../docs/architecture/account-recovery-design.md) | LINE Account喪失時の復旧資格情報、Identity再接続、監査、復旧不能時の境界 |
@@ -81,6 +82,7 @@
 | [LIFF交換・アプリケーションセッション境界検証Runbook](../docs/development/application-session-boundary-verification.md) | デプロイ後のCookie／Origin／CSRF検査、実端末・2 Account／2タブ・障害時の検証、証跡形式 |
 | [SSO Preview検証Runbook](../docs/development/sso-preview-verification.md) | LIFF／SSOのPreview成功・失敗シナリオ、切り戻し、証跡、完了判定 |
 | [SSO Production段階公開Runbook](../docs/development/sso-production-rollout.md) | Productionへの段階公開phase、監視ゲート、即時停止、再開、完了判定 |
+| [MCP実装残タスク](../docs/development/mcp-remaining-tasks.md) | 管理者限定MCPの認可・同意・監査・解除を実装し、501公開境界を解除するまでの依存順と検証 |
 | [サブスクリプション実装残タスク](../docs/development/subscription-remaining-tasks.md) | AccountとPlanを紐づける決済系列と、紐付け後の利用権限・機能系列に分けた番号付きPR単位の残作業 |
 | [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |

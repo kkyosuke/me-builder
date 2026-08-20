@@ -9,6 +9,22 @@ describe("MCP Server Error Handling", () => {
     expect(data.status).toBe("ok");
   });
 
+  it.each([
+    ["POST", "/mcp"],
+    ["GET", "/sse"],
+    ["POST", "/messages"],
+  ])("Phase 2開始前は%s %sを明示的な501へ閉じる", async (method, path) => {
+    const res = await app.request(path, { method });
+
+    expect(res.status).toBe(501);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toEqual({
+      error: "Not Implemented",
+      code: "MCP_NOT_AVAILABLE",
+      phase: "phase_2",
+    });
+  });
+
   it("allows CORS only from the configured Web origin", async () => {
     const allowedOrigin = "https://stg.kagami.kyosuke.dev";
     const allowed = await app.request(
