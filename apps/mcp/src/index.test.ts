@@ -10,6 +10,7 @@ describe("MCP Server Error Handling", () => {
   });
 
   it.each([
+    ["POST", "/mcp"],
     ["GET", "/sse"],
     ["POST", "/messages"],
   ])("Phase 2開始前は%s %sを明示的な501へ閉じる", async (method, path) => {

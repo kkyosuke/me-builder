@@ -90,8 +90,13 @@ const mcpUnavailableResponse = {
   phase: "phase_2",
 } as const;
 
-// Phase 2の認可・同意・監査契約が決まるまでprotocolらしい応答を返さない。
-// 将来のMCP clientがスケルトンを利用可能なtransportと誤認しないよう、常に明示的な501へ閉じる。
+// 決定済みの認可・同意・監査契約を実装してPreview検証を終えるまで、
+// 将来のMCP clientがスケルトンを利用可能なtransportと誤認しないよう明示的な501へ閉じる。
+app.post("/mcp", (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json(mcpUnavailableResponse, 501);
+});
+
 app.get("/sse", (c) => {
   c.header("Cache-Control", "no-store");
   return c.json(mcpUnavailableResponse, 501);
