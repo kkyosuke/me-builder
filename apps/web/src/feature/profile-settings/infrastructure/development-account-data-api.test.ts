@@ -16,7 +16,9 @@ describe("resetDevelopmentAccountData", () => {
       deletedProfileSummaryVersionCount: 1,
       scheduledVectorDeletionCount: 5,
     };
-    const fetchMock = vi.fn(async () => Response.json(deleted));
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json(deleted),
+    );
     vi.stubGlobal("fetch", fetchMock);
     await expect(resetDevelopmentAccountData(API_URL)).resolves.toEqual(deleted);
     expect(fetchMock).toHaveBeenCalledOnce();
