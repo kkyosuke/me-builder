@@ -236,6 +236,10 @@ export type AccountDataActions = {
     ],
     typeof goalFollowUp.updateGoalFollowUp
   >;
+  "goalFollowUp.enforceActiveLimit": RpcAction<
+    [activeLimit: number | null, at?: Date],
+    typeof goalFollowUp.enforceGoalFollowUpActiveLimit
+  >;
   "goalFollowUp.selectMemory": RpcAction<
     [mode: "none" | "selected-one" | "relevant-active", currentText: string, at?: Date],
     typeof goalFollowUp.selectGoalFollowUpMemory

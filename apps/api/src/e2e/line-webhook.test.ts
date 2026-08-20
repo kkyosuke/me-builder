@@ -119,4 +119,32 @@ describe("POST /api/line/webhook Queue boundary E2E", () => {
     expect(await response.json()).toEqual({ error: "Unauthorized" });
     expect(send).not.toHaveBeenCalled();
   });
+
+  it("Queue投入に失敗した場合は2xxを返さずLINEの再配送対象にする", async () => {
+    const rawBody = JSON.stringify(linePayload());
+    const send = vi
+      .fn<(message: WebhookQueueMessage) => Promise<void>>()
+      .mockRejectedValue(new Error("queue unavailable"));
+
+    const response = await app.request(
+      "/api/line/webhook",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-line-signature": signature(rawBody),
+        },
+        body: rawBody,
+      },
+      {
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_SECRET: channelSecret,
+        WEBHOOK_QUEUE: { send } as never,
+      },
+    );
+
+    expect(response.status).toBeGreaterThanOrEqual(500);
+    expect(response.status).toBeLessThan(600);
+    expect(send).toHaveBeenCalledOnce();
+  });
 });

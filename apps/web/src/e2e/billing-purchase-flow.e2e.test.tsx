@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createCheckout: vi.fn(),
   verifyCheckout: vi.fn(),
   fetchEntitlement: vi.fn(),
+  fetchGoalFollowUps: vi.fn(),
   fetchTrialEligibility: vi.fn(),
   createPortal: vi.fn(),
   createPlanChange: vi.fn(),
@@ -26,6 +27,9 @@ vi.mock("../feature/billing/infrastructure/billing-api", () => ({
 }));
 vi.mock("../feature/profile-settings/infrastructure/entitlement-api", () => ({
   fetchProfileEntitlement: mocks.fetchEntitlement,
+}));
+vi.mock("../feature/profile/infrastructure/goal-follow-up-api", () => ({
+  fetchGoalFollowUps: mocks.fetchGoalFollowUps,
 }));
 vi.mock("../feature/liff/infrastructure/liff-client", () => ({
   openLiffWindow: mocks.openLiffWindow,
@@ -70,6 +74,12 @@ describe("billing purchase user journey", () => {
     mocks.createCheckout.mockReset().mockResolvedValue("https://checkout.stripe.test/session");
     mocks.verifyCheckout.mockReset().mockResolvedValue(undefined);
     mocks.fetchEntitlement.mockReset().mockResolvedValue(entitlement("free"));
+    mocks.fetchGoalFollowUps.mockReset().mockResolvedValue({
+      items: [],
+      candidates: [],
+      canManage: true,
+      activeLimit: null,
+    });
     mocks.fetchTrialEligibility.mockReset().mockResolvedValue(true);
     mocks.createPortal.mockReset().mockResolvedValue("https://billing.stripe.test/portal");
     mocks.createPlanChange.mockReset().mockResolvedValue("https://billing.stripe.test/plan-change");

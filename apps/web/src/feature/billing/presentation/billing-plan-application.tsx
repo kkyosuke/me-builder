@@ -6,6 +6,8 @@ import type { AsyncState } from "../../../model/async-state";
 import { openLiffWindow } from "../../liff/infrastructure/liff-client";
 import { fetchProfileEntitlement } from "../../profile-settings/infrastructure/entitlement-api";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
+import { fetchGoalFollowUps } from "../../profile/infrastructure/goal-follow-up-api";
+import type { GoalFollowUpResult } from "../../profile/model/goal-follow-up";
 import {
   createCheckoutSession,
   createCustomerPortalSession,
@@ -85,6 +87,9 @@ export default function BillingPlanApplication({
   const [entitlement, setEntitlement] = useState<AsyncState<ProfileEntitlement>>({
     status: "loading",
   });
+  const [goalFollowUps, setGoalFollowUps] = useState<AsyncState<GoalFollowUpResult>>({
+    status: "loading",
+  });
   const [checkoutState, setCheckoutState] = useState<AsyncState<string>>({ status: "idle" });
   const [completionMessage, setCompletionMessage] = useState<string | null>(() =>
     initialCompletionMessage(window.location.search),
@@ -96,9 +101,11 @@ export default function BillingPlanApplication({
     loadController.current = controller;
     setPlans({ status: "loading" });
     setEntitlement({ status: "loading" });
-    const [plansResult, entitlementResult] = await Promise.allSettled([
+    setGoalFollowUps({ status: "loading" });
+    const [plansResult, entitlementResult, goalFollowUpResult] = await Promise.allSettled([
       loadBillingPlans(controller.signal),
       fetchProfileEntitlement(config.apiUrl, controller.signal),
+      fetchGoalFollowUps(config.apiUrl, controller.signal),
     ]);
     if (controller.signal.aborted) return;
     setPlans(
@@ -110,6 +117,11 @@ export default function BillingPlanApplication({
       entitlementResult.status === "fulfilled"
         ? { status: "success", data: entitlementResult.value }
         : { status: "error", message: message(entitlementResult.reason) },
+    );
+    setGoalFollowUps(
+      goalFollowUpResult.status === "fulfilled"
+        ? { status: "success", data: goalFollowUpResult.value }
+        : { status: "error", message: message(goalFollowUpResult.reason) },
     );
   }, []);
 
@@ -124,24 +136,31 @@ export default function BillingPlanApplication({
     const controller = new AbortController();
     setPlans({ status: "loading" });
     setEntitlement({ status: "loading" });
+    setGoalFollowUps({ status: "loading" });
     void (async () => {
       try {
         if (!checkoutSessionId) {
           throw new Error("購入結果を確認できませんでした。料金プランからやり直してください。");
         }
         await verifyCheckoutSessionCompletion(config.apiUrl, checkoutSessionId, controller.signal);
-        const [plansResult, entitlementResult] = await Promise.allSettled([
+        const [plansResult, entitlementResult, goalFollowUpResult] = await Promise.allSettled([
           loadBillingPlans(controller.signal),
           waitForSubscriptionProjection(
             async (signal) => fetchProfileEntitlement(config.apiUrl, signal),
             { signal: controller.signal, intervalMs: projectionPollIntervalMs },
           ),
+          fetchGoalFollowUps(config.apiUrl, controller.signal),
         ]);
         if (controller.signal.aborted) return;
         setPlans(
           plansResult.status === "fulfilled"
             ? plansResult.value
             : { status: "error", message: message(plansResult.reason) },
+        );
+        setGoalFollowUps(
+          goalFollowUpResult.status === "fulfilled"
+            ? { status: "success", data: goalFollowUpResult.value }
+            : { status: "error", message: message(goalFollowUpResult.reason) },
         );
         if (entitlementResult.status === "rejected") {
           setEntitlement({ status: "error", message: message(entitlementResult.reason) });
@@ -162,6 +181,7 @@ export default function BillingPlanApplication({
         const errorMessage = message(error);
         setPlans({ status: "error", message: errorMessage });
         setEntitlement({ status: "error", message: errorMessage });
+        setGoalFollowUps({ status: "error", message: errorMessage });
       }
     })();
     return () => controller.abort();
@@ -225,6 +245,7 @@ export default function BillingPlanApplication({
     <BillingPlanScreen
       plans={plans}
       entitlement={entitlement}
+      goalFollowUps={goalFollowUps}
       checkoutState={checkoutState}
       completionMessage={completionMessage}
       onBack={onBack}

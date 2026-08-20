@@ -3,6 +3,7 @@ import { ArrowLeft, Check, ExternalLink, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { AsyncState } from "../../../model/async-state";
 import type { ProfileEntitlement } from "../../profile-settings/model/entitlement";
+import type { GoalFollowUpItem, GoalFollowUpResult } from "../../profile/model/goal-follow-up";
 import {
   type BillingPlan,
   billingPlanAnnualSavings,
@@ -28,6 +29,7 @@ const planTabNames = {
 export function BillingPlanScreen({
   plans,
   entitlement,
+  goalFollowUps = { status: "loading" },
   checkoutState,
   completionMessage,
   onBack,
@@ -37,6 +39,7 @@ export function BillingPlanScreen({
 }: {
   plans: AsyncState<readonly BillingPlan[]>;
   entitlement: AsyncState<ProfileEntitlement>;
+  goalFollowUps?: AsyncState<GoalFollowUpResult>;
   checkoutState: AsyncState<string>;
   completionMessage: string | null;
   onBack: () => void;
@@ -46,7 +49,13 @@ export function BillingPlanScreen({
 }) {
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [selectedPlan, setSelectedPlan] = useState<PaidPlanCode | null>(null);
+  const [pendingDowngrade, setPendingDowngrade] = useState<Readonly<{
+    plan: PaidPlanCode;
+    interval: BillingInterval;
+    stoppedGoals: readonly GoalFollowUpItem[];
+  }> | null>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmDowngradeRef = useRef<HTMLButtonElement>(null);
   const paidSubscription =
     entitlement.status === "success" && entitlement.data.source === "subscription";
   const familySeat = entitlement.status === "success" && entitlement.data.source === "family-seat";
@@ -61,10 +70,36 @@ export function BillingPlanScreen({
   const selectedPlanIsDowngrade =
     selected !== null && isBillingPlanDowngrade(currentPlan, selected.code);
   const annualSavings = selected ? billingPlanAnnualSavings(selected) : null;
+  const stoppedGoals =
+    selected?.code === "lite" && goalFollowUps.status === "success"
+      ? [...goalFollowUps.data.items]
+          .filter(({ status }) => status === "active")
+          .sort(
+            (left, right) =>
+              Date.parse(left.agreedAt) - Date.parse(right.agreedAt) ||
+              left.id.localeCompare(right.id),
+          )
+          .slice(0, -1)
+      : [];
+  const goalCheckUnavailable =
+    selectedPlanIsDowngrade && selected?.code === "lite" && goalFollowUps.status !== "success";
 
   useEffect(() => {
     backButtonRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (pendingDowngrade) confirmDowngradeRef.current?.focus();
+  }, [pendingDowngrade]);
+
+  const requestCheckout = () => {
+    if (!selected || goalCheckUnavailable) return;
+    if (selectedPlanIsDowngrade && stoppedGoals.length > 0) {
+      setPendingDowngrade({ plan: selected.code, interval, stoppedGoals });
+      return;
+    }
+    onCheckout(selected.code, interval);
+  };
 
   const actionLabel =
     checkoutState.status === "loading"
@@ -371,8 +406,8 @@ export function BillingPlanScreen({
                 </div>
                 <button
                   type="button"
-                  disabled={checkoutState.status === "loading"}
-                  onClick={() => onCheckout(selected.code, interval)}
+                  disabled={checkoutState.status === "loading" || goalCheckUnavailable}
+                  onClick={requestCheckout}
                   className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 font-bold text-white shadow-lg disabled:cursor-wait disabled:opacity-60 sm:min-w-56"
                 >
                   <ExternalLink className="size-4" aria-hidden="true" />
@@ -381,6 +416,61 @@ export function BillingPlanScreen({
               </div>
             </footer>
           </>
+        )}
+
+        {goalCheckUnavailable && (
+          <p role="alert" className="pb-4 text-center text-sm text-rose-700 dark:text-rose-300">
+            停止予定のGoalを確認できないため、プラン変更を開始できません。再読み込みしてください。
+          </p>
+        )}
+
+        {pendingDowngrade && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4">
+            <section
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="goal-downgrade-confirmation-title"
+              className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"
+            >
+              <h2 id="goal-downgrade-confirmation-title" className="text-lg font-bold">
+                停止予定のGoalを確認
+              </h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                Liteが適用される時点で、合意日時が古い次のGoalを停止します。履歴は残り、上限に空きができた後は本人が再開できます。
+              </p>
+              <ul className="mt-3 space-y-2">
+                {pendingDowngrade.stoppedGoals.map((goal) => (
+                  <li key={goal.id} className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800">
+                    <p className="font-bold">{goal.goal}</p>
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      次の一歩：{goal.nextStep}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPendingDowngrade(null)}
+                  className="min-h-11 rounded-xl border border-slate-300 px-4 font-bold dark:border-slate-700"
+                >
+                  変更しない
+                </button>
+                <button
+                  ref={confirmDowngradeRef}
+                  type="button"
+                  onClick={() => {
+                    const confirmed = pendingDowngrade;
+                    setPendingDowngrade(null);
+                    onCheckout(confirmed.plan, confirmed.interval);
+                  }}
+                  className="min-h-11 rounded-xl bg-violet-700 px-4 font-bold text-white"
+                >
+                  了承して変更へ進む
+                </button>
+              </div>
+            </section>
+          </div>
         )}
       </div>
     </dialog>

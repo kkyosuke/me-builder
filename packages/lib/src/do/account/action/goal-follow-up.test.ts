@@ -9,6 +9,7 @@ import { accountSchema as schema } from "../database";
 import { saveBrainItem } from "./brain";
 import {
   agreeGoalFollowUp,
+  enforceGoalFollowUpActiveLimit,
   readGoalFollowUps,
   selectGoalFollowUpMemory,
   updateGoalFollowUp,
@@ -122,9 +123,10 @@ describe("goal follow-up", () => {
     ).resolves.toMatchObject({ type: "updated", item: { status: "completed" } });
     const read = await readGoalFollowUps(db, ACCOUNT_ID, new Date(AT.getTime() + 3), true);
     expect(read.items).toHaveLength(1);
-    expect(read.candidates).toEqual([
-      { brainItemId: "confirmed", goal: "来週、上司との面談で希望を伝えたい" },
-    ]);
+    expect(read.candidates).toEqual([]);
+    await expect(
+      updateGoalFollowUp(db, ACCOUNT_ID, agreed.item.id, { status: "active" }, AT),
+    ).resolves.toEqual({ type: "not-found" });
   });
 
   it("候補を要求しない読取ではGoal本文を返さず、削除済みのGoalは保存済み状態にも返さない", async () => {
@@ -223,12 +225,66 @@ describe("goal follow-up", () => {
     ).resolves.toEqual({ type: "active-limit-reached" });
     if (first.type !== "agreed") throw new Error("goal agreement failed");
     await expect(
-      updateGoalFollowUp(db, ACCOUNT_ID, first.item.id, { status: "completed" }, AT, 1),
-    ).resolves.toMatchObject({ type: "updated" });
+      updateGoalFollowUp(db, ACCOUNT_ID, first.item.id, { status: "stopped" }, AT, 1),
+    ).resolves.toMatchObject({ type: "updated", item: { status: "stopped" } });
     const second = await agreeGoalFollowUp(db, ACCOUNT_ID, "second", "二歩目を進める", AT, 1);
     expect(second).toMatchObject({ type: "agreed" });
     await expect(
       updateGoalFollowUp(db, ACCOUNT_ID, first.item.id, { status: "active" }, AT, 1),
     ).resolves.toEqual({ type: "active-limit-reached" });
+  });
+
+  it("本人が停止・完了したGoalをAI memoryへ自動で戻さない", async () => {
+    const db = createTestDb();
+    await addGoal(db, { id: "stopped", statement: "週末に散歩を続けたい" });
+    await addGoal(db, { id: "completed", statement: "面談の準備を終えたい" });
+    const stopped = await agreeGoalFollowUp(db, ACCOUNT_ID, "stopped", "靴を出す", AT);
+    const completed = await agreeGoalFollowUp(db, ACCOUNT_ID, "completed", "希望を書く", AT);
+    if (stopped.type !== "agreed" || completed.type !== "agreed") {
+      throw new Error("goal agreement failed");
+    }
+    await updateGoalFollowUp(db, ACCOUNT_ID, stopped.item.id, { status: "stopped" }, AT);
+    await updateGoalFollowUp(db, ACCOUNT_ID, completed.item.id, { status: "completed" }, AT);
+
+    await expect(
+      selectGoalFollowUpMemory(db, ACCOUNT_ID, "relevant-active", "散歩と面談の話", AT),
+    ).resolves.toBeNull();
+    await expect(readGoalFollowUps(db, ACCOUNT_ID, AT, false)).resolves.toMatchObject({
+      items: expect.arrayContaining([
+        expect.objectContaining({ status: "stopped" }),
+        expect.objectContaining({ status: "completed" }),
+      ]),
+    });
+    await expect(
+      updateGoalFollowUp(db, ACCOUNT_ID, stopped.item.id, { status: "active" }, AT),
+    ).resolves.toMatchObject({ type: "updated", item: { status: "active" } });
+    await expect(
+      updateGoalFollowUp(db, ACCOUNT_ID, completed.item.id, { status: "active" }, AT),
+    ).resolves.toEqual({ type: "not-found" });
+  });
+
+  it("Plan適用後は合意が古いGoalから停止して新しいactiveだけを上限内に残す", async () => {
+    const db = createTestDb();
+    await addGoal(db, { id: "oldest", statement: "最初の目標" });
+    await addGoal(db, { id: "middle", statement: "二番目の目標" });
+    await addGoal(db, { id: "newest", statement: "最新の目標" });
+    await agreeGoalFollowUp(db, ACCOUNT_ID, "oldest", "最初の一歩", AT);
+    await agreeGoalFollowUp(db, ACCOUNT_ID, "middle", "二番目の一歩", new Date(AT.getTime() + 1));
+    await agreeGoalFollowUp(db, ACCOUNT_ID, "newest", "最新の一歩", new Date(AT.getTime() + 2));
+
+    await expect(
+      enforceGoalFollowUpActiveLimit(db, ACCOUNT_ID, 1, new Date(AT.getTime() + 3)),
+    ).resolves.toEqual({ stoppedCount: 2 });
+    await expect(
+      enforceGoalFollowUpActiveLimit(db, ACCOUNT_ID, 1, new Date(AT.getTime() + 4)),
+    ).resolves.toEqual({ stoppedCount: 0 });
+    const result = await readGoalFollowUps(db, ACCOUNT_ID, new Date(AT.getTime() + 5));
+    expect(result.items.map(({ brainItemId, status }) => ({ brainItemId, status }))).toEqual(
+      expect.arrayContaining([
+        { brainItemId: "newest", status: "active" },
+        { brainItemId: "middle", status: "stopped" },
+        { brainItemId: "oldest", status: "stopped" },
+      ]),
+    );
   });
 });

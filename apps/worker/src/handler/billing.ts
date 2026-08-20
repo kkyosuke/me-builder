@@ -1,4 +1,5 @@
-import { D1, billing } from "@me-builder/lib";
+import { D1, accountDataFor, billing } from "@me-builder/lib";
+import type { AccountDataNamespace } from "@me-builder/lib";
 import type {
   BillingQueueMessage,
   Message,
@@ -69,6 +70,7 @@ export async function processBillingMessage(
   message: Message<BillingQueueMessage>,
   db: D1.shared.Client,
   config: WorkerConfig,
+  accountData?: AccountDataNamespace,
 ): Promise<void> {
   const startedAt = Date.now();
   let outcome: OperationalOutcome = "succeeded";
@@ -91,7 +93,23 @@ export async function processBillingMessage(
       },
       resolvePlan: (priceId) => (priceId ? (config.billingPricePlanMap[priceId] ?? null) : null),
     });
-    if (projectedAccountId) await reconcileFamilyPack(db, projectedAccountId);
+    if (projectedAccountId) {
+      await reconcileFamilyPack(db, projectedAccountId);
+      if (!accountData) throw new Error("ACCOUNT_DATA_BINDING_MISSING");
+      const entitlement = await new billing.EntitlementService(
+        new billing.FamilyAwareAccountPlanAssignmentProvider(db),
+      ).resolve(projectedAccountId);
+      const activeLimit =
+        entitlement.policy.goalFollowUp === "none"
+          ? 0
+          : entitlement.policy.goalFollowUp === "selected-one"
+            ? 1
+            : null;
+      await accountDataFor(accountData, projectedAccountId).execute(
+        "goalFollowUp.enforceActiveLimit",
+        activeLimit,
+      );
+    }
     outcome = result === "ignored" ? "discarded" : "succeeded";
     resultCode = result.toUpperCase();
     message.ack();

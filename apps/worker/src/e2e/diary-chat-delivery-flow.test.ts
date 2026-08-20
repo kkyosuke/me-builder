@@ -367,6 +367,59 @@ describe("LINE diary chat delivery E2E", () => {
     } as unknown as ReturnType<typeof line.client.create>);
   });
 
+  it("順序逆転と同一event再配送でもSource Recordを1件ずつ時系列順に保存する", async () => {
+    const queued: ChatTurnQueueMessage[] = [];
+    const harness = createCoordinator(async (message) => {
+      queued.push(message);
+    });
+    await harness.ready();
+    const namespace = {
+      getByName: vi.fn(() => harness.coordinator),
+    } as unknown as NonNullable<Env["CONVERSATION_COORDINATOR"]>;
+    const accountData = accountDataStore.namespace;
+    const providerAccountId = "U_diary_delivery_redelivery";
+    await acceptCurrentTermsFor(providerAccountId);
+    const older = {
+      type: "message",
+      webhookEventId: "diary-redelivery-older",
+      timestamp: Date.now() - 5_000,
+      message: { type: "text", id: "line-redelivery-older", text: "最初のメッセージ" },
+      source: { type: "user", userId: providerAccountId },
+    };
+    const newer = {
+      type: "message",
+      webhookEventId: "diary-redelivery-newer",
+      timestamp: Date.now() - 1_000,
+      message: { type: "text", id: "line-redelivery-newer", text: "次のメッセージ" },
+      source: { type: "user", userId: providerAccountId },
+    };
+
+    await enqueueLineEvents([newer], namespace, accountData);
+    await enqueueLineEvents([older], namespace, accountData);
+    await enqueueLineEvents(
+      [{ ...newer, deliveryContext: { isRedelivery: true } }],
+      namespace,
+      accountData,
+    );
+    await harness.runAlarm();
+
+    expect(queued).toHaveLength(1);
+    const turn = queued[0];
+    if (!turn) throw new Error("Expected a queued chat turn");
+    const context = await DO.account.action.diary.getTurnContext(
+      accountDataStore.db,
+      turn.turnId,
+      20,
+    );
+    expect(context?.messages.map(({ body }) => body)).toEqual([
+      "最初のメッセージ",
+      "次のメッセージ",
+    ]);
+    expect(await accountDataStore.db.select().from(DO.account.schema.sourceRecords)).toHaveLength(
+      2,
+    );
+  });
+
   afterEach(async () => {
     vi.restoreAllMocks();
     await miniflare.dispose();
