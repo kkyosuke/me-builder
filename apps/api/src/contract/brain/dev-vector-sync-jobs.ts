@@ -36,7 +36,7 @@ export const ResetDevelopmentBrainVectorSyncJobRequestSchema = v.object({
   confirmed: v.literal(true),
 });
 
-export const ResetAllDevelopmentBrainVectorSyncJobsRequestSchema = v.variant("mode", [
+export const ResetAllDevelopmentBrainVectorSyncJobsRequestSchema = v.union([
   v.object({ mode: v.literal("dry-run") }),
   v.object({ mode: v.literal("execute"), confirmed: v.literal(true) }),
 ]);

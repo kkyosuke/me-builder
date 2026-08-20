@@ -12888,10 +12888,9 @@
             "application/json": {
               "schema": {
                 "kind": "schema",
-                "type": "variant",
+                "type": "union",
                 "expects": "Object",
                 "async": false,
-                "key": "mode",
                 "options": [
                   {
                     "kind": "schema",
