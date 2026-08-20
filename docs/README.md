@@ -91,6 +91,7 @@ docs/
 
 - [インフラ・システム構成](architecture/infrastructure-architecture.md) — Cloudflareを利用するシステム構成とサービス配置
 - [MCP連携設計](architecture/mcp-integration-design.md) — 管理者限定MCPのtransport、認証・認可、同意、開示、監査、解除、仕様更新と停止境界
+- [LINE写真日記入力設計](architecture/photo-diary-input-design.md) — LINE写真日記の取得、検証、原本・派生物、容量、安全性、AI利用、削除の境界
 - [Web認証・アプリケーションセッション設計](architecture/web-authentication-design.md) — LIFF／SSOを同じAccountとprovider非依存sessionへ収束させる認証境界と移行順序
 - [Accountデータ分離設計](architecture/account-data-isolation.md) — 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1が保存するもの
 - [相性共有データ実装設計](architecture/compatibility-data-design.md) — 1関係 = 1 CompatibilityData DO、Account別一覧参照、相手単位の継続同意、状態遷移
@@ -118,6 +119,7 @@ docs/
 - [SSO Preview検証Runbook](development/sso-preview-verification.md) — LIFF／SSOの成功・失敗経路、機微情報を残さない証跡、SSOだけの切り戻し手順
 - [SSO Production段階公開Runbook](development/sso-production-rollout.md) — 管理者、少数割合、全対象の公開phase、監視ゲート、即時停止・再開手順
 - [MCP実装残タスク](development/mcp-remaining-tasks.md) — 管理者限定MCPの認可・同意・監査・解除を実装し、501公開境界を解除するまでの依存順と検証
+- [マルチモーダル入力実装残タスク](development/multimodal-input-remaining-tasks.md) — 写真の保存・AI利用を段階公開する依存順、法務・規約gate、将来mediaの分離
 - [Subscription Plan機能のPreview検証](development/subscription-preview-plan-verification.md) — 決済サービスなしでPlan切替、利用上限、本人データ、安全案内、Family境界を確認する手順
 - [SubscriptionのProduction段階公開](development/subscription-production-rollout.md) — 新規購入の段階公開、緊急停止・再開、実取引、30日・90日価格検証の手順
 - [サービス紹介サイト残タスク](development/service-site-remaining-tasks.md) — サービス紹介サイトで未完了の意思決定、法務確認、実環境検証と完了条件

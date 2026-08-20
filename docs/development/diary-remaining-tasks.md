@@ -23,10 +23,13 @@
 
 現状、imageメッセージは原本保存とAI入力の対象外です。暫定対応として、本人には読み込めない旨を返信します。受付境界の詳細は[日記チャット実装設計 §5.1](../architecture/diary-chat-implementation-design.md#51-受付から原本保存)を正とします。
 
+受付、保存、第三者情報、moderation、削除、AI利用の境界は[LINE写真日記入力設計](../architecture/photo-diary-input-design.md)で確定しています。[マルチモーダル入力実装残タスク](multimodal-input-remaining-tasks.md)の保存段階を依存順に実装し、Production公開前の法務・規約gateを完了します。実装完了までは、LINEからcontentを取得せず、非テキストmessageをQueue、Source Record、AI入力へ渡しません。
+
 - 写真付きの日記を受け付け、原本を保存する
 - テキストと同様に、受け付けたことが本人へ伝わるようにする
+- 本人データ特徴APIへ写真bytesと画像固有metadataが混ざらないことを確認する
 
-完了条件は、[プロジェクト概要 §4](../product/project-overview.md#4-想定する利用体験)の入力形式「自由記述（写真を添えられる）」を満たすことです。写真を保存できるまでの間は、受け付けられないことを本人へ伝える暫定対応も許容します。写真の生データは特徴取得APIへ含めません。
+完了条件は、[プロジェクト概要 §4](../product/project-overview.md#4-想定する利用体験)の入力形式「自由記述（写真を添えられる）」を、[LINE写真日記入力設計の受け入れ条件](../architecture/photo-diary-input-design.md#9-観測と受け入れ条件)に従って満たすことです。写真を保存できるまでの間は、受け付けられないことを本人へ伝える暫定対応も許容します。写真のbinary exportは初期提供に含めません。
 
 ## 3. V2の残タスク
 
