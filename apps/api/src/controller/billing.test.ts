@@ -1,5 +1,12 @@
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { app } from "../app";
+import type { AppEnv } from "../types";
+import {
+  getBillingTrialEligibilityResponse,
+  postBillingCheckoutSession,
+  postBillingPlanChangeSession,
+} from "./billing";
 
 describe("billing plan catalog", () => {
   it("認証なしで公開可能なPlan名と税込価格だけを返す", async () => {
@@ -14,6 +21,31 @@ describe("billing plan catalog", () => {
       ],
     });
     expect(JSON.stringify(body)).not.toMatch(/lookupKey|price_|productId/i);
+  });
+
+  it("Productionでは有料Plan catalogを公開しない", async () => {
+    const response = await app.request("/api/billing/plans", undefined, {
+      ENVIRONMENT: "production",
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ plans: [] });
+  });
+
+  it("Productionでは有料Planのtrial・購入・変更APIを閉じる", async () => {
+    const controllerApp = new Hono<AppEnv>();
+    controllerApp.get("/trial", getBillingTrialEligibilityResponse);
+    controllerApp.post("/checkout", postBillingCheckoutSession);
+    controllerApp.post("/change", postBillingPlanChangeSession);
+    const env = { ENVIRONMENT: "production" };
+    const request = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan: "lite", interval: "month" }),
+    };
+
+    expect((await controllerApp.request("/trial", undefined, env)).status).toBe(503);
+    expect((await controllerApp.request("/checkout", request, env)).status).toBe(503);
+    expect((await controllerApp.request("/change", request, env)).status).toBe(503);
   });
 
   it("未認証probeでは課金runtimeの設定有無を区別させない", async () => {

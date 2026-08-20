@@ -9,6 +9,7 @@ describe("API readiness", () => {
     const response = await app.request("/api/ready", {}, { DB: { prepare } as never });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({ status: "ready" });
     expect(prepare).toHaveBeenCalledWith("SELECT 1 AS ready");
     expect(first).toHaveBeenCalledOnce();
@@ -28,6 +29,7 @@ describe("API readiness", () => {
 
     for (const response of [missing, failed]) {
       expect(response.status).toBe(503);
+      expect(response.headers.get("cache-control")).toBe("no-store");
       expect(await response.json()).toMatchObject({ status: "unavailable" });
     }
   });

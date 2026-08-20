@@ -336,6 +336,7 @@ app.get("/api/health", healthRoute, (c) => {
 
 app.get("/api/ready", readinessRoute, async (c) => {
   const timestamp = new Date().toISOString();
+  c.header("Cache-Control", "no-store");
   if (!c.env?.DB) {
     return c.json(
       v.parse(ReadinessUnavailableResponseSchema, { status: "unavailable", timestamp }),

@@ -34,6 +34,14 @@ import { receiveStripeWebhook } from "../logic/stripe-webhook";
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 
+function paidPlansAreAvailable(c: Context<AppEnv>): boolean {
+  return getConfig(c.env).environment !== "production";
+}
+
+function paidPlansUnavailable(c: Context<AppEnv>): Response {
+  return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+}
+
 export async function postStripeWebhook(c: Context<AppEnv>): Promise<Response> {
   const config = getConfig(c.env);
   const outcome = await receiveStripeWebhook({
@@ -63,23 +71,23 @@ export async function postStripeWebhook(c: Context<AppEnv>): Promise<Response> {
 }
 
 export function getBillingPlanCatalog(c: Context<AppEnv>): Response {
+  const plans = paidPlansAreAvailable(c) ? publicBillingPlans : [];
   return c.json(
     v.parse(BillingPlanCatalogResponseSchema, {
-      plans: publicBillingPlans.map(
-        ({ code, name, description, highlights, trialDays, prices }) => ({
-          code,
-          name,
-          description,
-          highlights: [...highlights],
-          trialDays,
-          prices: prices.map(({ interval, amount, currency }) => ({ interval, amount, currency })),
-        }),
-      ),
+      plans: plans.map(({ code, name, description, highlights, trialDays, prices }) => ({
+        code,
+        name,
+        description,
+        highlights: [...highlights],
+        trialDays,
+        prices: prices.map(({ interval, amount, currency }) => ({ interval, amount, currency })),
+      })),
     }),
   );
 }
 
 export async function getBillingTrialEligibilityResponse(c: Context<AppEnv>): Promise<Response> {
+  if (!paidPlansAreAvailable(c)) return paidPlansUnavailable(c);
   const config = getConfig(c.env);
   if (!c.env?.DB || !config.stripeSecretKey) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
@@ -99,6 +107,7 @@ export async function getBillingTrialEligibilityResponse(c: Context<AppEnv>): Pr
 }
 
 export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Response> {
+  if (!paidPlansAreAvailable(c)) return paidPlansUnavailable(c);
   const parsed = v.safeParse(BillingCheckoutRequestSchema, await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(v.parse(BillingInvalidRequestSchema, { error: "Invalid request" }), 400);
@@ -107,6 +116,7 @@ export async function postBillingCheckoutSession(c: Context<AppEnv>): Promise<Re
 }
 
 export async function postBillingPlanChangeSession(c: Context<AppEnv>): Promise<Response> {
+  if (!paidPlansAreAvailable(c)) return paidPlansUnavailable(c);
   const parsed = v.safeParse(BillingCheckoutRequestSchema, await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(v.parse(BillingInvalidRequestSchema, { error: "Invalid request" }), 400);
