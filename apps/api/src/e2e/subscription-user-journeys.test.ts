@@ -182,20 +182,21 @@ describe("subscription user journeys", () => {
 
     const entitlements = new billing.EntitlementService(effectiveAssignments(db));
     const cases = [
-      [freeId, "free", "free", false, 0, false, 0],
-      [liteId, "lite", "subscription", false, 1, false, 0],
-      [fullId, "full", "subscription", false, 5, false, 0],
-      [familyPayerId, "family", "subscription", false, 5, true, 4],
-      [familyMemberId, "family", "family-seat", true, 5, true, 4],
+      [freeId, "free", "free", null, false, 0, false, 0],
+      [liteId, "lite", "subscription", liteId, false, 1, false, 0],
+      [fullId, "full", "subscription", fullId, false, 5, false, 0],
+      [familyPayerId, "family", "subscription", familyPayerId, false, 5, true, 4],
+      [familyMemberId, "family", "family-seat", familyPayerId, true, 5, true, 4],
     ] as const;
 
     for (const [
       accountId,
       plan,
       source,
+      payerAccountId,
       grantedByFamily,
       relationshipLimit,
-      familyPackRelationshipsIncluded,
+      familyPackInternalRelationshipsIncluded,
       seatLimit,
     ] of cases) {
       await expect(
@@ -203,10 +204,11 @@ describe("subscription user journeys", () => {
       ).resolves.toMatchObject({
         plan,
         source,
+        payerAccountId,
         grantedByFamily,
         policy: {
           concurrentRelationshipLimit: relationshipLimit,
-          familyPackRelationshipsIncluded,
+          familyPackInternalRelationshipsIncluded,
           familySeatLimit: seatLimit,
           features: { "relationship-reflection": relationshipLimit > 0 },
         },

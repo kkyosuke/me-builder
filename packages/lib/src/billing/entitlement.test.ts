@@ -36,7 +36,7 @@ describe("EntitlementService", () => {
       weeklyReflection,
       relationshipContext,
       concurrentRelationshipLimit,
-      familyPackRelationshipsIncluded,
+      familyPackInternalRelationshipsIncluded,
       familySeatLimit,
     ) => {
       const service = new EntitlementService(
@@ -55,7 +55,7 @@ describe("EntitlementService", () => {
           semanticSearchDays: searchDays,
           relationshipQuestionContext: relationshipContext,
           concurrentRelationshipLimit,
-          familyPackRelationshipsIncluded,
+          familyPackInternalRelationshipsIncluded,
           familySeatLimit,
           features: {
             "weekly-reflection": weeklyReflection,
