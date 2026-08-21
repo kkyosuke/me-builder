@@ -13,14 +13,13 @@ const PHOTO_STORAGE_LIMITS = {
   family: 20 * 1024 * 1024 * 1024,
 } as const;
 
-export const PHOTO_SAVED_REPLY =
+const PHOTO_SAVED_REPLY =
   "写真を日記として保存しました。写真のAI分析はまだ行っていません。ほかの方が写る写真は、必要な了承と権利を確認して送ってね。";
-export const PHOTO_INVALID_REPLY =
+const PHOTO_INVALID_REPLY =
   "この写真は保存できませんでした。JPEG、PNG、静止WebPのいずれかで、10MB以下の写真を送り直してね。";
-export const PHOTO_CAPACITY_REPLY =
+const PHOTO_CAPACITY_REPLY =
   "写真の保存容量がいっぱいです。Webの写真日記から不要な写真を削除するか、Planを変更してから送り直してね。";
-export const PHOTO_FAILED_REPLY =
-  "写真を保存できませんでした。時間をおいて、写真をもう一度送ってね。";
+const PHOTO_FAILED_REPLY = "写真を保存できませんでした。時間をおいて、写真をもう一度送ってね。";
 
 type LineImageEvent = Readonly<{
   webhookEventId?: string;

@@ -107,7 +107,7 @@ async function dispatchUndispatchedWeeklyReflections(
 }
 
 /** APIからQueueへ渡せなかった写真削除要求を、AccountDataの状態から再配送する。 */
-export async function dispatchUndispatchedPhotoDiaryDeletions(
+async function dispatchUndispatchedPhotoDiaryDeletions(
   db: DO.account.Database,
   accountId: string,
   queue: Env["PHOTO_DIARY_DELETION_QUEUE"],
