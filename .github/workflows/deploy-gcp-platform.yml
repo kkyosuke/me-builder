@@ -84,9 +84,8 @@ jobs:
             fi
           done
 
-          if { [ -n "${GCP_ORGANIZATION_ID}" ] && [ -n "${GCP_FOLDER_ID}" ]; } ||
-            { [ -z "${GCP_ORGANIZATION_ID}" ] && [ -z "${GCP_FOLDER_ID}" ]; }; then
-            echo "::error::GCP_ORGANIZATION_IDまたはGCP_FOLDER_IDのどちらか一方だけを設定してください。"
+          if [ -n "${GCP_ORGANIZATION_ID}" ] && [ -n "${GCP_FOLDER_ID}" ]; then
+            echo "::error::GCP_ORGANIZATION_IDとGCP_FOLDER_IDは両方同時に設定できません。"
             exit 1
           fi
           if { [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ] && [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; } ||
@@ -124,15 +123,29 @@ jobs:
           pulumi -C infra/gcp-platform config set projectName "${GCP_PLATFORM_PROJECT_NAME:-me-builder platform ${TARGET}}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set billingAccount "${GCP_BILLING_ACCOUNT}" --stack "${TARGET}"
 
+          remove_config_if_present() {
+            if pulumi -C infra/gcp-platform config get "$1" --stack "${TARGET}" >/dev/null 2>&1; then
+              pulumi -C infra/gcp-platform config rm "$1" --stack "${TARGET}"
+            fi
+          }
+
           if [ -n "${GCP_ORGANIZATION_ID}" ]; then
+            remove_config_if_present folderId
             pulumi -C infra/gcp-platform config set organizationId "${GCP_ORGANIZATION_ID}" --stack "${TARGET}"
-          else
+          elif [ -n "${GCP_FOLDER_ID}" ]; then
+            remove_config_if_present organizationId
             pulumi -C infra/gcp-platform config set folderId "${GCP_FOLDER_ID}" --stack "${TARGET}"
+          else
+            remove_config_if_present organizationId
+            remove_config_if_present folderId
           fi
 
           if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ]; then
             pulumi -C infra/gcp-platform config set googleOAuthClientId "${GOOGLE_OAUTH_CLIENT_ID}" --stack "${TARGET}"
             pulumi -C infra/gcp-platform config set --secret googleOAuthClientSecret "${GOOGLE_OAUTH_CLIENT_SECRET}" --stack "${TARGET}"
+          else
+            remove_config_if_present googleOAuthClientId
+            remove_config_if_present googleOAuthClientSecret
           fi
 
       - name: Run Pulumi
@@ -148,10 +161,18 @@ jobs:
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          if [ -n "${GCP_ORGANIZATION_ID}" ]; then
+            project_parent="Organization"
+          elif [ -n "${GCP_FOLDER_ID}" ]; then
+            project_parent="Folder"
+          else
+            project_parent="No organization (existing project import)"
+          fi
           {
             echo "### GCP platform ${OPERATION}: ${TARGET}"
             echo
             echo "- Project ID: \`${GCP_PLATFORM_PROJECT_ID}\`"
+            echo "- Project parent: \`${project_parent}\`"
             echo "- Environment: \`${TARGET}\`"
             echo "- Operation: \`${OPERATION}\`"
             echo "- Workflow run: [open run](${RUN_URL})"
