@@ -67,7 +67,8 @@ export async function getPhotoDiaryImage(c: Context<AppEnv>): Promise<Response> 
   if (object.httpMetadata?.contentType !== expectedContentType || object.size !== expectedSize) {
     return notFound(c);
   }
-  return new Response(object.body, {
+  // CloudflareとDOM libが別々に宣言するReadableStreamはruntimeでは同じbody契約を満たす。
+  return new Response(object.body as unknown as BodyInit, {
     headers: {
       "Content-Type": expectedContentType,
       "Cache-Control": "private, no-store",
