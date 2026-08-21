@@ -223,7 +223,7 @@ API keyは`primary`と`secondary`のrotation slotを持ち、平常時はactive 
 
 Google Auth PlatformはOAuth同意画面と一般ユーザー向けWeb OAuth clientを所有します。Development clientにはLocalとPreviewの完全一致callback、Production clientにはProduction callbackだけを登録します。Web OAuth clientの作成はPulumi管理対象外とし、そのClient IDとSecretを環境別Pulumi configへ入力してIdentity PlatformのGoogle providerへ接続します。IAP用またはworkload用OAuth clientで代用しません。
 
-Pulumi Stack outputのactiveなIdentity Platform API keyとVertex AI authorization keyはsecretとして扱い、対応するGitHub Environmentから必要なCloudflare Workerだけへ配布します。OAuth Client SecretもPulumi configとGitHub Environmentの両方でsecretにし、Stack output、CIログ、artifactへ出力しません。Pulumi backendは`PULUMI_BACKEND_URL`で明示した共有・永続backendを必須とし、暗黙のPulumi Cloudやlocal file backendへ状態を分岐させません。GCP共通projectの適用手順は[`infra/gcp-platform/README.md`](../../infra/gcp-platform/README.md)を正とします。
+Pulumi Stack outputのactiveなIdentity Platform API keyとVertex AI authorization keyはsecretとして扱い、対応するGitHub Environmentから必要なCloudflare Workerだけへ配布します。OAuth Client SecretもPulumi configとGitHub Environmentの両方でsecretにし、Stack output、CIログ、artifactへ出力しません。CloudflareとGCPのPulumi projectはbootstrap済みのstate用GCP projectにある別々のGCS bucketを使い、暗号化passphraseとIAM accessも分離します。Pulumi Cloudやlocal file backendへ状態を分岐させません。backendの認証・暗号化・初回adoptionは[`infra/README.md`](../../infra/README.md#state-backend)、GCP共通projectの適用手順は[`infra/gcp-platform/README.md`](../../infra/gcp-platform/README.md)を正とします。
 
 ### 6.3 APIドキュメントのCloudflare Access境界
 

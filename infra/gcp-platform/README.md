@@ -25,10 +25,13 @@ Pulumi authenticates its infrastructure operations with Google Application Defau
 
 ## State backend and first deployment
 
-Set `PULUMI_BACKEND_URL` to one shared durable backend before every command. The repository wrapper and Pulumi program reject an unset backend and `file://` state. A DIY backend such as GCS or S3 also requires a non-empty `PULUMI_CONFIG_PASSPHRASE`; this prevents the OAuth Client Secret from entering state with an empty encryption passphrase. Pulumi Cloud handles state encryption without that variable. Project IDs are globally unique. Use different values for the two Stacks and connect both to the same Billing Account used by Vertex AI. The projects must belong to an organization (directly or through a folder), because Google does not support service-account-bound authorization keys for projects without an organization.
+The existing state project, GCP platform state bucket, required bucket controls, and local ADC are defined by the parent [infrastructure state backend guide](../README.md#state-backend). This project does not create its own backend and does not share a bucket or passphrase with the Cloudflare project. The repository wrapper and Pulumi program require a `gs://` backend and a non-empty `PULUMI_CONFIG_PASSPHRASE` before evaluating resources. This prevents the OAuth Client Secret from entering local state or state encrypted with an empty passphrase.
+
+Application project IDs are globally unique. Use different values for the two Stacks and connect both to the same Billing Account used by Vertex AI. The projects must belong to an organization, directly or through a folder, because Google does not support service-account-bound authorization keys for projects without an organization.
 
 ```bash
-export PULUMI_BACKEND_URL=<shared-backend-url>
+export PULUMI_BACKEND_URL=gs://<existing-gcp-platform-state-bucket>/me-builder
+export PULUMI_CONFIG_PASSPHRASE=<gcp-platform-value-from-password-manager>
 pulumi login "$PULUMI_BACKEND_URL"
 
 pulumi -C infra/gcp-platform stack init development

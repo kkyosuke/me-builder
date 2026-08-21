@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
   pull-requests: write
 
 # Preview のデプロイと同時に変更しない。実行中の reset/deploy は中断させない。
@@ -38,6 +39,11 @@ jobs:
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
+      PULUMI_BACKEND_URL: ${{ vars.PULUMI_BACKEND_URL }}
+      PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+      GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_PULUMI_STATE_SERVICE_ACCOUNT: ${{ vars.GCP_PULUMI_STATE_SERVICE_ACCOUNT }}
 
     steps:
       # 実行時に選んだブランチをそのまま使う。migration・seed・deployの内容と、
@@ -94,6 +100,26 @@ jobs:
             echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Environment dev に設定されていません。"
             exit 1
           fi
+          case "${PULUMI_BACKEND_URL}" in
+            gs://?*) ;;
+            *) echo "::error::PULUMI_BACKEND_URL には既存のGCS bucketをgs://形式で設定してください。"; exit 1 ;;
+          esac
+          if [ -z "${PULUMI_CONFIG_PASSPHRASE//[[:space:]]/}" ]; then
+            echo "::error::PULUMI_CONFIG_PASSPHRASE がGitHub Environment devに設定されていません。"
+            exit 1
+          fi
+          required_gcp_variables=(
+            GCP_STATE_PROJECT_ID
+            GCP_WORKLOAD_IDENTITY_PROVIDER
+            GCP_PULUMI_STATE_SERVICE_ACCOUNT
+          )
+          for variable_name in "${required_gcp_variables[@]}"; do
+            variable_value="${!variable_name}"
+            if [ -z "${variable_value//[[:space:]]/}" ]; then
+              echo "::error::${variable_name} がGitHub Environment devに設定されていません。"
+              exit 1
+            fi
+          done
           sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
           sso_percent="${SSO_ROLLOUT_PERCENT:-0}"
           case "${sso_mode}" in
@@ -109,6 +135,13 @@ jobs:
             exit 1
           fi
           bun --cwd apps/web scripts/validate-liff-configuration.ts
+
+      - name: Authenticate to Pulumi State on Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_STATE_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_PULUMI_STATE_SERVICE_ACCOUNT }}
 
       - name: Install Pulumi CLI
         run: |

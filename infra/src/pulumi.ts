@@ -1,17 +1,14 @@
-import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseManifest } from "./manifest";
 import { run } from "./process";
+import { requirePulumiGcsBackend } from "./pulumi-backend";
 
 const infraRoot = resolve(import.meta.dir, "..");
 const pulumi = process.env.PULUMI_COMMAND || "pulumi";
-const backend = process.env.PULUMI_BACKEND_URL || `file://${resolve(infraRoot, ".pulumi-state")}`;
 
 async function selectPreviewStack() {
-  if (!process.env.PULUMI_BACKEND_URL) {
-    await mkdir(resolve(infraRoot, ".pulumi-state"), { recursive: true });
-  }
-  await run([pulumi, "login", backend]);
+  const backendUrl = requirePulumiGcsBackend(process.env);
+  await run([pulumi, "login", backendUrl]);
   try {
     await run([pulumi, "stack", "select", "preview", "--non-interactive"]);
   } catch {
