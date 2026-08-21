@@ -133,6 +133,26 @@ tasks:
     cmds:
       - bun --cwd infra preview:clean
 
+  infra:gcp-auth:preview:development:
+    desc: 'Preview the Development Identity Platform Pulumi stack'
+    cmds:
+      - bun --cwd infra gcp-auth:preview:development
+
+  infra:gcp-auth:up:development:
+    desc: 'Create or update the Development Identity Platform Pulumi stack'
+    cmds:
+      - bun --cwd infra gcp-auth:up:development
+
+  infra:gcp-auth:preview:production:
+    desc: 'Preview the Production Identity Platform Pulumi stack'
+    cmds:
+      - bun --cwd infra gcp-auth:preview:production
+
+  infra:gcp-auth:up:production:
+    desc: 'Create or update the Production Identity Platform Pulumi stack'
+    cmds:
+      - bun --cwd infra gcp-auth:up:production
+
   db:setup:
     desc: 'Automatically create missing remote D1 databases and update wrangler.toml files'
     cmds:

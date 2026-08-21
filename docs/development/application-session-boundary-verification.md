@@ -15,7 +15,7 @@
 
 - sessionの保存形式、期限、rotation、失効規則 — [アプリケーションセッション実装契約](application-session-contract.md)
 - LIFF／SSO、Identity、Accountの認証・認可境界 — [Web認証・アプリケーションセッション設計](../architecture/web-authentication-design.md)
-- Auth0固有のPreviewシナリオと切り戻し — [SSO Preview検証Runbook](sso-preview-verification.md)
+- Google Cloud Identity Platform固有のPreviewシナリオと切り戻し — [SSO Preview検証Runbook](sso-preview-verification.md)
 - ProductionへのSSO段階公開 — [SSO Production段階公開Runbook](sso-production-rollout.md)
 - ログへ記録できる情報 — [アプリケーション運用ログ方針](operational-logging.md)
 

@@ -29,15 +29,15 @@ describe("sso identity api", () => {
 
   it("link開始をCSRF token付きPOSTで要求し、認可URLだけを受け取る", async () => {
     authSessionRuntime.setCsrfToken("csrf-token");
-    const fetcher = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        Response.json({ authorizationUrl: "https://tenant.auth0.com/authorize?state=opaque" }),
-      );
+    const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
+        authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
+      }),
+    );
 
     await expect(
       startSsoIdentityLink("https://api.example.com/", "/profile?sso=linking"),
-    ).resolves.toBe("https://tenant.auth0.com/authorize?state=opaque");
+    ).resolves.toBe("https://accounts.google.com/o/oauth2/v2/auth?state=opaque");
     expect(fetcher).toHaveBeenCalledWith(
       "https://api.example.com/api/auth/sso/link?returnTo=%2Fprofile%3Fsso%3Dlinking",
       expect.objectContaining({

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ExternalSsoProvider } from "./sso-provider";
 import {
   SsoAuthenticationError,
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
   SsoCallbackCompletionError,
-  type SsoServerClient,
   cancelSsoAuthentication,
   completeSsoAuthentication,
   completeSsoCallback,
@@ -32,14 +32,14 @@ function createMemoryStore(): SsoAuthenticationTransactionStore & {
   };
 }
 
-function createClient(): SsoServerClient {
+function createClient(): ExternalSsoProvider {
   return {
     createAuthorizationUrl: vi.fn(async ({ state }) => {
-      return new URL(`https://tenant.auth0.com/authorize?state=${state}`);
+      return new URL(`https://accounts.google.com/o/oauth2/v2/auth?state=${state}`);
     }),
     exchangeAuthorizationCode: vi.fn(async () => ({
-      providerKey: "auth0" as const,
-      subject: "auth0|user-1",
+      providerKey: "fixture_provider",
+      subject: "identity-platform-uid-1",
       authenticationMethod: "sso" as const,
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
     })),
@@ -133,7 +133,10 @@ describe("SSO authentication transaction", () => {
         now: () => 1_000,
       }),
     ).resolves.toEqual({
-      identity: expect.objectContaining({ providerKey: "auth0", subject: "auth0|user-1" }),
+      identity: expect.objectContaining({
+        providerKey: "fixture_provider",
+        subject: "identity-platform-uid-1",
+      }),
       returnTo: "/settings/account",
       traceId: "00000000-0000-4000-8000-000000000002",
     });
@@ -225,7 +228,7 @@ describe("SSO authentication transaction", () => {
     const identityResolver = {
       findAccount: vi.fn(async () => ({
         accountId: "account-1",
-        authenticatedIdentityId: "identity-auth0",
+        authenticatedIdentityId: "identity-platform-identity",
         role: "user" as const,
       })),
     };
@@ -250,8 +253,8 @@ describe("SSO authentication transaction", () => {
       returnTo: "/diagnoses",
     });
     expect(identityResolver.findAccount).toHaveBeenCalledWith({
-      providerKey: "auth0",
-      subject: "auth0|user-1",
+      providerKey: "fixture_provider",
+      subject: "identity-platform-uid-1",
     });
     expect(rolloutAuthorizer.allows).toHaveBeenCalledWith({
       accountId: "account-1",
@@ -259,7 +262,7 @@ describe("SSO authentication transaction", () => {
     });
     expect(sessionIssuer.issue).toHaveBeenCalledWith({
       accountId: "account-1",
-      authenticatedIdentityId: "identity-auth0",
+      authenticatedIdentityId: "identity-platform-identity",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
     });
@@ -314,7 +317,7 @@ describe("SSO authentication transaction", () => {
         identityResolver: {
           findAccount: vi.fn(async () => ({
             accountId: "account-1",
-            authenticatedIdentityId: "identity-auth0",
+            authenticatedIdentityId: "identity-platform-identity",
             role: "user" as const,
           })),
         },
@@ -338,7 +341,7 @@ describe("SSO authentication transaction", () => {
       returnTo: "/profile",
       expiresAt: 2_000,
     });
-    const identityLinker = { link: vi.fn(async () => "identity-auth0") };
+    const identityLinker = { link: vi.fn(async () => "identity-platform-identity") };
     const sessionIssuer = { issue: vi.fn() };
 
     await expect(
@@ -356,10 +359,10 @@ describe("SSO authentication transaction", () => {
     ).resolves.toEqual({
       purpose: "link",
       accountId: "account-at-start",
-      authenticatedIdentityId: "identity-auth0",
+      authenticatedIdentityId: "identity-platform-identity",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
-      providerKey: "auth0",
+      providerKey: "fixture_provider",
       returnTo: "/profile",
     });
     expect(sessionIssuer.issue).not.toHaveBeenCalled();
@@ -386,7 +389,7 @@ describe("SSO authentication transaction", () => {
         identityResolver: {
           findAccount: vi.fn(async () => ({
             accountId: "account-1",
-            authenticatedIdentityId: "identity-auth0",
+            authenticatedIdentityId: "identity-platform-identity",
             role: "user" as const,
           })),
         },
@@ -434,7 +437,7 @@ describe("SSO authentication transaction", () => {
       returnTo: "/profile?sso=linked",
       expiresAt: 2_000,
     });
-    const identityLinker = { link: vi.fn(async () => "identity-auth0") };
+    const identityLinker = { link: vi.fn(async () => "identity-platform-identity") };
 
     await expect(
       completeSsoIdentityLinking({
@@ -447,16 +450,16 @@ describe("SSO authentication transaction", () => {
       }),
     ).resolves.toEqual({
       accountId: "account-at-start",
-      authenticatedIdentityId: "identity-auth0",
+      authenticatedIdentityId: "identity-platform-identity",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
-      providerKey: "auth0",
+      providerKey: "fixture_provider",
       returnTo: "/profile?sso=linked",
     });
     expect(identityLinker.link).toHaveBeenCalledWith({
       accountId: "account-at-start",
-      providerKey: "auth0",
-      subject: "auth0|user-1",
+      providerKey: "fixture_provider",
+      subject: "identity-platform-uid-1",
     });
     await expect(
       completeSsoIdentityLinking({

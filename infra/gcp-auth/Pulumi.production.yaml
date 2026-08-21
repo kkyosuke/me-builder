@@ -1,0 +1,6 @@
+config:
+  me-builder-gcp-auth:environment: production
+  me-builder-gcp-auth:authorizedDomains:
+    - api.kagami.kyosuke.dev
+  me-builder-gcp-auth:oauthRedirectUris:
+    - https://api.kagami.kyosuke.dev/api/auth/sso/callback

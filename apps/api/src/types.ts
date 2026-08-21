@@ -47,9 +47,9 @@ type Env = Omit<
   WEB_ORIGIN?: string;
   SSO_ROLLOUT_MODE?: string;
   SSO_ROLLOUT_PERCENT?: string;
-  SSO_ISSUER_URL?: string;
-  SSO_CLIENT_ID?: string;
-  SSO_CLIENT_SECRET?: string;
+  GOOGLE_IDENTITY_PLATFORM_API_KEY?: string;
+  GOOGLE_OAUTH_CLIENT_ID?: string;
+  GOOGLE_OAUTH_CLIENT_SECRET?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
   PROFILE_SUMMARY_QUEUE?: Queue<ReflectionGenerationQueueMessage>;
   BILLING_QUEUE?: Queue<BillingQueueMessage>;

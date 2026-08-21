@@ -1,59 +1,37 @@
 import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import * as v from "valibot";
 import type {
-  SsoServerClient,
+  ExternalSsoProvider,
   SsoVerifiedIdentity,
-} from "../../logic/authentication/sso-transaction";
+} from "../../logic/authentication/sso-provider";
+import { SsoProviderError } from "../../logic/authentication/sso-provider";
 
-const DiscoverySchema = v.object({
-  issuer: v.pipe(v.string(), v.url()),
-  authorization_endpoint: v.pipe(v.string(), v.url()),
-  token_endpoint: v.pipe(v.string(), v.url()),
-  jwks_uri: v.pipe(v.string(), v.url()),
-});
+const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"] as const;
+const GOOGLE_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+const GOOGLE_JWKS_ENDPOINT = "https://www.googleapis.com/oauth2/v3/certs";
+const IDENTITY_PLATFORM_SIGN_IN_ENDPOINT =
+  "https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp";
+const SSO_PROVIDER_TIMEOUT_MS = 5_000;
+export const GOOGLE_CLOUD_IDENTITY_PLATFORM_PROVIDER_KEY = "gcp_identity_platform";
 
-const TokenResponseSchema = v.object({
+const GoogleTokenResponseSchema = v.object({
   id_token: v.pipe(v.string(), v.nonEmpty()),
 });
 
-const SSO_PROVIDER_TIMEOUT_MS = 5_000;
+const IdentityPlatformResponseSchema = v.object({
+  localId: v.pipe(v.string(), v.nonEmpty()),
+  providerId: v.literal("google.com"),
+});
 
-type OidcDiscovery = v.InferOutput<typeof DiscoverySchema>;
-
-export type Auth0SsoConfiguration = {
-  issuerUrl: string;
-  clientId: string;
-  clientSecret: string;
+export type GoogleCloudIdentityPlatformSsoConfiguration = {
+  identityPlatformApiKey: string;
+  googleClientId: string;
+  googleClientSecret: string;
   callbackUrl: string;
 };
 
-export class SsoProviderError extends Error {
-  constructor(readonly reason: "configuration" | "provider_rejected" | "token_invalid") {
-    super(`SSO provider failed: ${reason}`);
-    this.name = "SsoProviderError";
-  }
-}
-
-type TokenVerifier = (
-  token: string,
-  discovery: OidcDiscovery,
-  expectedNonce: string,
-) => Promise<SsoVerifiedIdentity>;
-
 type SsoFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-function assertTrustedEndpoint(issuer: URL, endpoint: string): void {
-  const url = new URL(endpoint);
-  if (
-    url.protocol !== "https:" ||
-    url.origin !== issuer.origin ||
-    url.username ||
-    url.password ||
-    url.hash
-  ) {
-    throw new SsoProviderError("configuration");
-  }
-}
 
 function assertTrustedCallback(callbackUrl: string): void {
   const callback = new URL(callbackUrl);
@@ -72,120 +50,106 @@ function assertTrustedCallback(callbackUrl: string): void {
   }
 }
 
-/** Auth0固有のendpointとtokenをadapter内に閉じ込めるOIDC server client。 */
-export function createAuth0SsoClient(
-  configuration: Auth0SsoConfiguration,
+/** GoogleのOIDC証明をIdentity Platformの環境別userへ交換するserver-side client。 */
+export function createGoogleCloudIdentityPlatformSsoClient(
+  configuration: GoogleCloudIdentityPlatformSsoConfiguration,
   dependencies: {
     fetch?: SsoFetch;
     now?: () => Date;
-    verifyToken?: TokenVerifier;
   } = {},
-): SsoServerClient {
-  const fetcher = dependencies.fetch ?? globalThis.fetch;
-  const issuer = new URL(configuration.issuerUrl);
+): ExternalSsoProvider {
   if (
-    issuer.protocol !== "https:" ||
-    issuer.pathname !== "/" ||
-    issuer.username ||
-    issuer.password ||
-    issuer.search ||
-    issuer.hash
+    !configuration.identityPlatformApiKey.trim() ||
+    !configuration.googleClientId.trim() ||
+    !configuration.googleClientSecret.trim()
   ) {
     throw new SsoProviderError("configuration");
   }
   assertTrustedCallback(configuration.callbackUrl);
 
-  let discoveryPromise: Promise<OidcDiscovery> | undefined;
-  let remoteJwks: ReturnType<typeof createRemoteJWKSet> | undefined;
+  const fetcher = dependencies.fetch ?? globalThis.fetch;
+  const remoteJwks = createRemoteJWKSet(new URL(GOOGLE_JWKS_ENDPOINT), {
+    [customFetch]: fetcher,
+    timeoutDuration: SSO_PROVIDER_TIMEOUT_MS,
+    cooldownDuration: 30_000,
+    cacheMaxAge: 10 * 60 * 1000,
+  });
 
-  async function discovery(): Promise<OidcDiscovery> {
-    const pending =
-      discoveryPromise ??
-      (async () => {
-        try {
-          const response = await fetcher(new URL(".well-known/openid-configuration", issuer), {
-            signal: AbortSignal.timeout(SSO_PROVIDER_TIMEOUT_MS),
-          });
-          if (!response.ok) throw new SsoProviderError("configuration");
-          const document = v.parse(DiscoverySchema, await response.json());
-          if (document.issuer !== issuer.href) throw new SsoProviderError("configuration");
-          assertTrustedEndpoint(issuer, document.authorization_endpoint);
-          assertTrustedEndpoint(issuer, document.token_endpoint);
-          assertTrustedEndpoint(issuer, document.jwks_uri);
-          return document;
-        } catch (error) {
-          if (error instanceof SsoProviderError) throw error;
-          throw new SsoProviderError("configuration");
-        }
-      })();
-    discoveryPromise = pending;
+  async function verifyGoogleIdToken(
+    token: string,
+    expectedNonce: string,
+  ): Promise<{
+    authenticatedAt: Date;
+    displayName?: string;
+    pictureUrl?: string;
+  }> {
     try {
-      return await pending;
+      const { payload, protectedHeader } = await jwtVerify(token, remoteJwks, {
+        issuer: [...GOOGLE_ISSUERS],
+        audience: configuration.googleClientId,
+        algorithms: ["RS256"],
+        maxTokenAge: "10 minutes",
+        clockTolerance: 5,
+        ...(dependencies.now ? { currentDate: dependencies.now() } : {}),
+      });
+      if (
+        protectedHeader.alg !== "RS256" ||
+        payload.nonce !== expectedNonce ||
+        !payload.sub ||
+        !Number.isSafeInteger(payload.iat) ||
+        (Array.isArray(payload.aud) &&
+          payload.aud.length > 1 &&
+          payload.azp !== configuration.googleClientId)
+      ) {
+        throw new SsoProviderError("token_invalid");
+      }
+      return {
+        authenticatedAt: new Date((payload.iat as number) * 1000),
+        ...(typeof payload.name === "string" ? { displayName: payload.name } : {}),
+        ...(typeof payload.picture === "string" ? { pictureUrl: payload.picture } : {}),
+      };
     } catch (error) {
-      // 一時的な取得失敗をWorker isolateの生存期間中ずっと固定しない。
-      if (discoveryPromise === pending) discoveryPromise = undefined;
-      throw error;
+      if (error instanceof SsoProviderError) throw error;
+      throw new SsoProviderError("token_invalid");
     }
   }
 
-  const verifyToken: TokenVerifier =
-    dependencies.verifyToken ??
-    (async (token, document, expectedNonce) => {
-      remoteJwks ??= createRemoteJWKSet(new URL(document.jwks_uri), {
-        [customFetch]: fetcher,
-        timeoutDuration: 5_000,
-        cooldownDuration: 30_000,
-        cacheMaxAge: 10 * 60 * 1000,
+  async function exchangeWithIdentityPlatform(googleIdToken: string): Promise<string> {
+    const endpoint = new URL(IDENTITY_PLATFORM_SIGN_IN_ENDPOINT);
+    endpoint.searchParams.set("key", configuration.identityPlatformApiKey);
+    let response: Response;
+    try {
+      response = await fetcher(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestUri: configuration.callbackUrl,
+          postBody: new URLSearchParams({
+            id_token: googleIdToken,
+            providerId: "google.com",
+          }).toString(),
+          returnSecureToken: true,
+          returnIdpCredential: false,
+        }),
+        signal: AbortSignal.timeout(SSO_PROVIDER_TIMEOUT_MS),
       });
-      try {
-        const { payload, protectedHeader } = await jwtVerify(token, remoteJwks, {
-          issuer: issuer.href,
-          audience: configuration.clientId,
-          algorithms: ["RS256"],
-          maxTokenAge: "10 minutes",
-          clockTolerance: 5,
-          ...(dependencies.now ? { currentDate: dependencies.now() } : {}),
-        });
-        if (
-          protectedHeader.alg !== "RS256" ||
-          payload.nonce !== expectedNonce ||
-          !payload.sub ||
-          !Number.isSafeInteger(payload.iat) ||
-          (Array.isArray(payload.aud) &&
-            payload.aud.length > 1 &&
-            payload.azp !== configuration.clientId)
-        ) {
-          throw new SsoProviderError("token_invalid");
-        }
-        const displayName = typeof payload.name === "string" ? payload.name : undefined;
-        const pictureUrl = typeof payload.picture === "string" ? payload.picture : undefined;
-        return {
-          providerKey: "auth0",
-          subject: payload.sub,
-          authenticationMethod: "sso",
-          authenticatedAt: new Date((payload.iat as number) * 1000),
-          ...(displayName || pictureUrl
-            ? {
-                displayProfile: {
-                  ...(displayName ? { displayName } : {}),
-                  ...(pictureUrl ? { pictureUrl } : {}),
-                },
-              }
-            : {}),
-        };
-      } catch (error) {
-        if (error instanceof SsoProviderError) throw error;
-        throw new SsoProviderError("token_invalid");
-      }
-    });
+    } catch {
+      throw new SsoProviderError("provider_rejected");
+    }
+    if (!response.ok) throw new SsoProviderError("provider_rejected");
+    try {
+      return v.parse(IdentityPlatformResponseSchema, await response.json()).localId;
+    } catch {
+      throw new SsoProviderError("provider_rejected");
+    }
+  }
 
   return {
     async createAuthorizationUrl({ state, nonce, codeChallenge }) {
-      const document = await discovery();
-      const url = new URL(document.authorization_endpoint);
+      const url = new URL(GOOGLE_AUTHORIZATION_ENDPOINT);
       url.search = new URLSearchParams({
         response_type: "code",
-        client_id: configuration.clientId,
+        client_id: configuration.googleClientId,
         redirect_uri: configuration.callbackUrl,
         scope: "openid profile",
         state,
@@ -197,16 +161,15 @@ export function createAuth0SsoClient(
     },
 
     async exchangeAuthorizationCode({ code, codeVerifier, expectedNonce }) {
-      const document = await discovery();
       let response: Response;
       try {
-        response = await fetcher(document.token_endpoint, {
+        response = await fetcher(GOOGLE_TOKEN_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
             grant_type: "authorization_code",
-            client_id: configuration.clientId,
-            client_secret: configuration.clientSecret,
+            client_id: configuration.googleClientId,
+            client_secret: configuration.googleClientSecret,
             code,
             redirect_uri: configuration.callbackUrl,
             code_verifier: codeVerifier,
@@ -217,13 +180,30 @@ export function createAuth0SsoClient(
         throw new SsoProviderError("provider_rejected");
       }
       if (!response.ok) throw new SsoProviderError("provider_rejected");
-      let token: string;
+
+      let googleIdToken: string;
       try {
-        token = v.parse(TokenResponseSchema, await response.json()).id_token;
+        googleIdToken = v.parse(GoogleTokenResponseSchema, await response.json()).id_token;
       } catch {
         throw new SsoProviderError("provider_rejected");
       }
-      return await verifyToken(token, document, expectedNonce);
+
+      const googleIdentity = await verifyGoogleIdToken(googleIdToken, expectedNonce);
+      const localId = await exchangeWithIdentityPlatform(googleIdToken);
+      return {
+        providerKey: GOOGLE_CLOUD_IDENTITY_PLATFORM_PROVIDER_KEY,
+        subject: localId,
+        authenticationMethod: "sso",
+        authenticatedAt: googleIdentity.authenticatedAt,
+        ...(googleIdentity.displayName || googleIdentity.pictureUrl
+          ? {
+              displayProfile: {
+                ...(googleIdentity.displayName ? { displayName: googleIdentity.displayName } : {}),
+                ...(googleIdentity.pictureUrl ? { pictureUrl: googleIdentity.pictureUrl } : {}),
+              },
+            }
+          : {}),
+      } satisfies SsoVerifiedIdentity;
     },
   };
 }

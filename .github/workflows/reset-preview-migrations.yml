@@ -33,9 +33,9 @@ jobs:
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       LIFF_ID: ${{ vars.LIFF_ID }}
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
-      SSO_ISSUER_URL: ${{ vars.SSO_ISSUER_URL }}
-      SSO_CLIENT_ID: ${{ vars.SSO_CLIENT_ID }}
-      SSO_CLIENT_SECRET: ${{ secrets.SSO_CLIENT_SECRET }}
+      GOOGLE_IDENTITY_PLATFORM_API_KEY: ${{ secrets.GOOGLE_IDENTITY_PLATFORM_API_KEY }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
 
@@ -104,8 +104,8 @@ jobs:
             echo "::error::SSO_ROLLOUT_PERCENT は0から100の整数で指定してください。"
             exit 1
           fi
-          if [ "${sso_mode}" != "disabled" ] && { [ -z "${SSO_ISSUER_URL}" ] || [ -z "${SSO_CLIENT_ID}" ] || [ -z "${SSO_CLIENT_SECRET}" ]; }; then
-            echo "::error::SSOを有効にするにはSSO_ISSUER_URL、SSO_CLIENT_ID、SSO_CLIENT_SECRETが必要です。"
+          if [ "${sso_mode}" != "disabled" ] && { [ -z "${GOOGLE_IDENTITY_PLATFORM_API_KEY}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; }; then
+            echo "::error::SSOを有効にするにはGOOGLE_IDENTITY_PLATFORM_API_KEY、GOOGLE_OAUTH_CLIENT_ID、GOOGLE_OAUTH_CLIENT_SECRETが必要です。"
             exit 1
           fi
           bun --cwd apps/web scripts/validate-liff-configuration.ts
@@ -151,7 +151,8 @@ jobs:
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
-              ...(process.env.SSO_CLIENT_SECRET ? { SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET } : {}),
+              ...(process.env.GOOGLE_IDENTITY_PLATFORM_API_KEY ? { GOOGLE_IDENTITY_PLATFORM_API_KEY: process.env.GOOGLE_IDENTITY_PLATFORM_API_KEY } : {}),
+              ...(process.env.GOOGLE_OAUTH_CLIENT_SECRET ? { GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET } : {}),
               ...optionalSecrets,
               ...apiConfiguration,
             }));
@@ -165,8 +166,7 @@ jobs:
           sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
           sso_percent="${SSO_ROLLOUT_PERCENT:-0}"
           api_sso_vars=(--var "SSO_ROLLOUT_MODE:${sso_mode}" --var "SSO_ROLLOUT_PERCENT:${sso_percent}")
-          if [ -n "${SSO_ISSUER_URL}" ]; then api_sso_vars+=(--var "SSO_ISSUER_URL:${SSO_ISSUER_URL}"); fi
-          if [ -n "${SSO_CLIENT_ID}" ]; then api_sso_vars+=(--var "SSO_CLIENT_ID:${SSO_CLIENT_ID}"); fi
+          if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ]; then api_sso_vars+=(--var "GOOGLE_OAUTH_CLIENT_ID:${GOOGLE_OAUTH_CLIENT_ID}"); fi
           bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}" "${api_sso_vars[@]}"
           bun --filter @me-builder/mcp deploy:preview
 

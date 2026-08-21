@@ -1,6 +1,11 @@
-# Cloudflare infrastructure
+# Infrastructure
 
-`infra/` is the Pulumi program for the Cloudflare D1 database, private avatar R2 bucket, and Queue resources. Wrangler still deploys Worker bundles, secrets, bindings, and Durable Object migrations. The ownership boundary and deletion order are defined in [the infrastructure architecture](../docs/architecture/infrastructure-architecture.md#61-cloudflareリソースの宣言とデプロイ境界).
+`infra/` contains two independent Pulumi projects:
+
+- the root project manages the Cloudflare D1 database, private avatar R2 bucket, KV namespace, and Queue resources
+- [`gcp-auth/`](./gcp-auth/) manages separate development and production GCP projects for Identity Platform
+
+Wrangler still deploys Worker bundles, secrets, bindings, and Durable Object migrations. The ownership boundary and deletion order are defined in [the infrastructure architecture](../docs/architecture/infrastructure-architecture.md#61-cloudflareリソースの宣言とデプロイ境界).
 
 ## Requirements
 
@@ -8,6 +13,8 @@
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN` with D1, R2, Queues, and Workers Scripts edit permissions
 - A durable Pulumi backend configured with `PULUMI_BACKEND_URL` for shared operation
+
+The GCP authentication project additionally requires Application Default Credentials, project creation permission, and Billing Account User permission. See its [setup guide](./gcp-auth/README.md).
 
 If `PULUMI_BACKEND_URL` is omitted, commands use the ignored `infra/.pulumi-state` local backend. This is useful for local verification only; it must not be treated as shared state.
 

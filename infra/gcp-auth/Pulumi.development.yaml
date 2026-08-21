@@ -1,0 +1,8 @@
+config:
+  me-builder-gcp-auth:environment: development
+  me-builder-gcp-auth:authorizedDomains:
+    - localhost
+    - api.stg.kagami.kyosuke.dev
+  me-builder-gcp-auth:oauthRedirectUris:
+    - http://localhost:3000/api/auth/sso/callback
+    - https://api.stg.kagami.kyosuke.dev/api/auth/sso/callback

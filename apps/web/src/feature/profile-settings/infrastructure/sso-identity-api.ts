@@ -20,7 +20,7 @@ export async function fetchSsoIdentityStatus(
   const response = await createAuthenticatedHttpClient(apiUrl).request("/api/auth/sso/identity", {
     ...(signal ? { signal } : {}),
   });
-  if (!response.ok) throw new Error("SSOの接続状態を確認できませんでした。");
+  if (!response.ok) throw new Error("Googleログインの接続状態を確認できませんでした。");
   return v.parse(SsoIdentityStatusSchema, await response.json());
 }
 
@@ -33,7 +33,7 @@ export async function startSsoIdentityLink(
     `/api/auth/sso/link?${query}`,
     { method: "POST" },
   );
-  if (!response.ok) throw new Error("SSOの接続を開始できませんでした。");
+  if (!response.ok) throw new Error("Google連携を開始できませんでした。");
   return v.parse(SsoAuthorizationUrlSchema, await response.json()).authorizationUrl;
 }
 
@@ -45,7 +45,7 @@ export async function unlinkSsoIdentity(apiUrl: string | undefined): Promise<voi
     throw new Error(
       response.status === 409
         ? "最後のログイン方法は解除できません。"
-        : "SSOの接続を解除できませんでした。",
+        : "Googleログインの接続を解除できませんでした。",
     );
   }
   await authSessionRuntime.synchronizeAfterSessionChange();

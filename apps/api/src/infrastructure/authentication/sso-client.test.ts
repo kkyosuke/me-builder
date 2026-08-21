@@ -1,25 +1,48 @@
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import { describe, expect, it, vi } from "vitest";
-import { SsoProviderError, createAuth0SsoClient } from "./sso-client";
+import { SsoProviderError } from "../../logic/authentication/sso-provider";
+import { createGoogleCloudIdentityPlatformSsoClient } from "./sso-client";
 
 const configuration = {
-  issuerUrl: "https://tenant.auth0.com/",
-  clientId: "client-id",
-  clientSecret: "client-secret",
+  identityPlatformApiKey: "identity-platform-api-key",
+  googleClientId: "google-client-id",
+  googleClientSecret: "google-client-secret",
   callbackUrl: "https://api.example.com/api/auth/sso/callback",
 };
 
-const discovery = {
-  issuer: configuration.issuerUrl,
-  authorization_endpoint: "https://tenant.auth0.com/authorize",
-  token_endpoint: "https://tenant.auth0.com/oauth/token",
-  jwks_uri: "https://tenant.auth0.com/.well-known/jwks.json",
-};
+async function googleToken(input: {
+  nonce?: string;
+  audience?: string | string[];
+  azp?: string;
+}) {
+  const { publicKey, privateKey } = await generateKeyPair("RS256");
+  const publicJwk = await exportJWK(publicKey);
+  const issuedAtSeconds = Date.parse("2026-08-16T00:00:00.000Z") / 1000;
+  const token = await new SignJWT({
+    nonce: input.nonce ?? "expected-nonce",
+    name: "Kagami User",
+    picture: "https://images.example.com/user.png",
+    email: "ignored@example.test",
+    ...(input.azp ? { azp: input.azp } : {}),
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setIssuer("https://accounts.google.com")
+    .setAudience(input.audience ?? configuration.googleClientId)
+    .setSubject("google-subject-never-stored")
+    .setIssuedAt(issuedAtSeconds)
+    .setExpirationTime("5m")
+    .sign(privateKey);
+  return {
+    token,
+    jwks: { keys: [{ ...publicJwk, kid: "test-key", use: "sig" }] },
+    issuedAtSeconds,
+  };
+}
 
-describe("createAuth0SsoClient", () => {
-  it("discovery結果からAuthorization Code Flow + PKCEの認可URLを作る", async () => {
-    const fetcher = vi.fn(async () => Response.json(discovery));
-    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
+describe("createGoogleCloudIdentityPlatformSsoClient", () => {
+  it("Google Authorization Code Flow + PKCEの認可URLを作る", async () => {
+    const fetcher = vi.fn();
+    const client = createGoogleCloudIdentityPlatformSsoClient(configuration, { fetch: fetcher });
 
     const url = await client.createAuthorizationUrl({
       state: "state",
@@ -27,10 +50,10 @@ describe("createAuth0SsoClient", () => {
       codeChallenge: "challenge",
     });
 
-    expect(url.origin + url.pathname).toBe("https://tenant.auth0.com/authorize");
+    expect(url.origin + url.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       response_type: "code",
-      client_id: "client-id",
+      client_id: configuration.googleClientId,
       redirect_uri: configuration.callbackUrl,
       scope: "openid profile",
       state: "state",
@@ -38,147 +61,88 @@ describe("createAuth0SsoClient", () => {
       code_challenge: "challenge",
       code_challenge_method: "S256",
     });
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("discoveryの一時失敗をcacheせず次の開始時に再取得する", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValueOnce(new Response(null, { status: 503 }))
-      .mockResolvedValueOnce(Response.json(discovery));
-    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
-
-    await expect(
-      client.createAuthorizationUrl({ state: "first", nonce: "nonce", codeChallenge: "challenge" }),
-    ).rejects.toEqual(new SsoProviderError("configuration"));
-    await expect(
-      client.createAuthorizationUrl({
-        state: "second",
-        nonce: "nonce",
-        codeChallenge: "challenge",
-      }),
-    ).resolves.toBeInstanceOf(URL);
-    expect(fetcher).toHaveBeenCalledTimes(2);
-  });
-
-  it("authorization codeをserver-sideで交換し、検証済みidentityを返す", async () => {
+  it("Google tokenを検証してIdentity Platform localIdだけをIdentityへ変換する", async () => {
+    const signed = await googleToken({});
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("openid-configuration")) return Response.json(discovery);
-      if (url.endsWith("/oauth/token")) {
+      const url = new URL(String(input));
+      if (url.href === "https://oauth2.googleapis.com/token") {
         expect(init?.method).toBe("POST");
         expect(init?.signal).toBeInstanceOf(AbortSignal);
-        expect(init?.headers).toEqual({ "Content-Type": "application/x-www-form-urlencoded" });
         expect(new URLSearchParams(String(init?.body))).toEqual(
           new URLSearchParams({
             grant_type: "authorization_code",
-            client_id: "client-id",
-            client_secret: "client-secret",
+            client_id: configuration.googleClientId,
+            client_secret: configuration.googleClientSecret,
             code: "authorization-code",
             redirect_uri: configuration.callbackUrl,
             code_verifier: "verifier",
           }),
         );
-        return Response.json({ id_token: "id-token" });
+        return Response.json({ id_token: signed.token });
       }
-      throw new Error(`unexpected URL: ${url}`);
+      if (url.href === "https://www.googleapis.com/oauth2/v3/certs") {
+        return Response.json(signed.jwks);
+      }
+      if (url.origin === "https://identitytoolkit.googleapis.com") {
+        expect(url.searchParams.get("key")).toBe(configuration.identityPlatformApiKey);
+        const body = JSON.parse(String(init?.body));
+        expect(body).toMatchObject({
+          requestUri: configuration.callbackUrl,
+          returnSecureToken: true,
+          returnIdpCredential: false,
+        });
+        expect(new URLSearchParams(body.postBody)).toEqual(
+          new URLSearchParams({ id_token: signed.token, providerId: "google.com" }),
+        );
+        return Response.json({ localId: "identity-platform-uid", providerId: "google.com" });
+      }
+      throw new Error(`unexpected URL: ${url.href}`);
     });
-    const verifyToken = vi.fn(async () => ({
-      providerKey: "auth0" as const,
-      subject: "auth0|user-1",
-      authenticationMethod: "sso" as const,
-      authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
-    }));
-    const client = createAuth0SsoClient(configuration, { fetch: fetcher, verifyToken });
+    const now = new Date("2026-08-16T00:01:00.000Z");
+    const client = createGoogleCloudIdentityPlatformSsoClient(configuration, {
+      fetch: fetcher,
+      now: () => now,
+    });
 
     await expect(
       client.exchangeAuthorizationCode({
         code: "authorization-code",
         codeVerifier: "verifier",
-        expectedNonce: "nonce",
-      }),
-    ).resolves.toEqual(expect.objectContaining({ subject: "auth0|user-1" }));
-    expect(verifyToken).toHaveBeenCalledWith("id-token", discovery, "nonce");
-  });
-
-  it("discovery取得にもprovider通信のtimeout signalを渡す", async () => {
-    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      expect(init?.signal).toBeInstanceOf(AbortSignal);
-      return Response.json(discovery);
-    });
-    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
-
-    await expect(
-      client.createAuthorizationUrl({ state: "state", nonce: "nonce", codeChallenge: "challenge" }),
-    ).resolves.toBeInstanceOf(URL);
-  });
-
-  it("email claimをAccount照合へ渡さずAuth0 subjectだけをIdentityへ変換する", async () => {
-    const { publicKey, privateKey } = await generateKeyPair("RS256");
-    const publicJwk = await exportJWK(publicKey);
-    const issuedAtSeconds = Date.parse("2026-08-16T00:00:00.000Z") / 1000;
-    const token = await new SignJWT({
-      nonce: "expected-nonce",
-      name: "Kagami User",
-      picture: "https://images.example.com/user.png",
-      email: "same-address@example.test",
-      email_verified: true,
-    })
-      .setProtectedHeader({ alg: "RS256", kid: "test-key" })
-      .setIssuer(configuration.issuerUrl)
-      .setAudience(configuration.clientId)
-      .setSubject("auth0|user-1")
-      .setIssuedAt(issuedAtSeconds)
-      .setExpirationTime("5m")
-      .sign(privateKey);
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith("openid-configuration")) return Response.json(discovery);
-      if (url.endsWith("/oauth/token")) return Response.json({ id_token: token });
-      if (url.endsWith("/.well-known/jwks.json")) {
-        return Response.json({ keys: [{ ...publicJwk, kid: "test-key", use: "sig" }] });
-      }
-      throw new Error(`unexpected URL: ${url}`);
-    });
-    const now = new Date("2026-08-16T00:01:00.000Z");
-    const client = createAuth0SsoClient(configuration, { fetch: fetcher, now: () => now });
-
-    await expect(
-      client.exchangeAuthorizationCode({
-        code: "code",
-        codeVerifier: "verifier",
         expectedNonce: "expected-nonce",
       }),
     ).resolves.toEqual({
-      providerKey: "auth0",
-      subject: "auth0|user-1",
+      providerKey: "gcp_identity_platform",
+      subject: "identity-platform-uid",
       authenticationMethod: "sso",
-      authenticatedAt: new Date(issuedAtSeconds * 1000),
+      authenticatedAt: new Date(signed.issuedAtSeconds * 1000),
       displayProfile: {
         displayName: "Kagami User",
         pictureUrl: "https://images.example.com/user.png",
       },
     });
+    expect(JSON.stringify(fetcher.mock.calls)).not.toContain("ignored@example.test");
+    expect(JSON.stringify(fetcher.mock.calls)).not.toContain("google-subject-never-stored");
   });
 
-  it("ID tokenのnonce改ざんを拒否する", async () => {
-    const { publicKey, privateKey } = await generateKeyPair("RS256");
-    const publicJwk = await exportJWK(publicKey);
-    const token = await new SignJWT({ nonce: "tampered" })
-      .setProtectedHeader({ alg: "RS256", kid: "test-key" })
-      .setIssuer(configuration.issuerUrl)
-      .setAudience(configuration.clientId)
-      .setSubject("auth0|user-1")
-      .setIssuedAt()
-      .setExpirationTime("5m")
-      .sign(privateKey);
+  it("ID tokenのnonce改ざんを拒否しIdentity Platformを呼ばない", async () => {
+    const signed = await googleToken({ nonce: "tampered" });
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.endsWith("openid-configuration")) return Response.json(discovery);
-      if (url.endsWith("/oauth/token")) return Response.json({ id_token: token });
-      return Response.json({ keys: [{ ...publicJwk, kid: "test-key", use: "sig" }] });
+      if (url === "https://oauth2.googleapis.com/token") {
+        return Response.json({ id_token: signed.token });
+      }
+      if (url === "https://www.googleapis.com/oauth2/v3/certs") {
+        return Response.json(signed.jwks);
+      }
+      throw new Error(`unexpected URL: ${url}`);
     });
-    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
+    const client = createGoogleCloudIdentityPlatformSsoClient(configuration, {
+      fetch: fetcher,
+      now: () => new Date("2026-08-16T00:01:00.000Z"),
+    });
 
     await expect(
       client.exchangeAuthorizationCode({
@@ -187,26 +151,20 @@ describe("createAuth0SsoClient", () => {
         expectedNonce: "expected-nonce",
       }),
     ).rejects.toEqual(new SsoProviderError("token_invalid"));
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes("identitytoolkit"))).toBe(false);
   });
 
-  it("複数audienceのID tokenでclient自身がauthorized partyでなければ拒否する", async () => {
-    const { publicKey, privateKey } = await generateKeyPair("RS256");
-    const publicJwk = await exportJWK(publicKey);
-    const token = await new SignJWT({ nonce: "expected-nonce", azp: "another-client" })
-      .setProtectedHeader({ alg: "RS256", kid: "test-key" })
-      .setIssuer(configuration.issuerUrl)
-      .setAudience([configuration.clientId, "another-audience"])
-      .setSubject("auth0|user-1")
-      .setIssuedAt()
-      .setExpirationTime("5m")
-      .sign(privateKey);
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith("openid-configuration")) return Response.json(discovery);
-      if (url.endsWith("/oauth/token")) return Response.json({ id_token: token });
-      return Response.json({ keys: [{ ...publicJwk, kid: "test-key", use: "sig" }] });
+  it("複数audienceでGoogle clientがauthorized partyでなければ拒否する", async () => {
+    const signed = await googleToken({
+      audience: [configuration.googleClientId, "another-audience"],
+      azp: "another-client",
     });
-    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
+    const fetcher = vi.fn(async (input: RequestInfo | URL) =>
+      String(input) === "https://oauth2.googleapis.com/token"
+        ? Response.json({ id_token: signed.token })
+        : Response.json(signed.jwks),
+    );
+    const client = createGoogleCloudIdentityPlatformSsoClient(configuration, { fetch: fetcher });
 
     await expect(
       client.exchangeAuthorizationCode({
@@ -215,54 +173,27 @@ describe("createAuth0SsoClient", () => {
         expectedNonce: "expected-nonce",
       }),
     ).rejects.toEqual(new SsoProviderError("token_invalid"));
-  });
-
-  it("issuerと異なるoriginのendpointを含むdiscoveryを拒否する", async () => {
-    const client = createAuth0SsoClient(configuration, {
-      fetch: vi.fn(async () =>
-        Response.json({ ...discovery, token_endpoint: "https://evil.example/oauth/token" }),
-      ),
-    });
-
-    await expect(
-      client.createAuthorizationUrl({ state: "state", nonce: "nonce", codeChallenge: "challenge" }),
-    ).rejects.toEqual(new SsoProviderError("configuration"));
-  });
-
-  it("userinfoを埋め込んだdiscovery endpointを拒否する", async () => {
-    const client = createAuth0SsoClient(configuration, {
-      fetch: vi.fn(async () =>
-        Response.json({
-          ...discovery,
-          token_endpoint: "https://user:password@tenant.auth0.com/oauth/token",
-        }),
-      ),
-    });
-
-    await expect(
-      client.createAuthorizationUrl({ state: "state", nonce: "nonce", codeChallenge: "challenge" }),
-    ).rejects.toEqual(new SsoProviderError("configuration"));
   });
 
   it.each([
-    { issuerUrl: "https://user@tenant.auth0.com/" },
-    { issuerUrl: "https://tenant.auth0.com/?environment=preview" },
-    { issuerUrl: "https://tenant.auth0.com/#issuer" },
+    { identityPlatformApiKey: "" },
+    { googleClientId: "" },
+    { googleClientSecret: "" },
     { callbackUrl: "javascript:alert(1)" },
     { callbackUrl: "http://api.example.com/api/auth/sso/callback" },
     { callbackUrl: "https://api.example.com/api/auth/sso/callback?next=/admin" },
     { callbackUrl: "https://api.example.com/another/callback" },
-  ])("曖昧またはbrowserへ送れないissuer/callback設定を拒否する: %o", (overrides) => {
-    expect(() => createAuth0SsoClient({ ...configuration, ...overrides })).toThrowError(
-      new SsoProviderError("configuration"),
-    );
+  ])("不完全または安全でない設定を拒否する: %o", (overrides) => {
+    expect(() =>
+      createGoogleCloudIdentityPlatformSsoClient({ ...configuration, ...overrides }),
+    ).toThrowError(new SsoProviderError("configuration"));
   });
 
   it.each(["localhost", "127.0.0.1", "[::1]"])(
     "local開発用loopback callbackのHTTPだけを許可する: %s",
     (hostname) => {
       expect(() =>
-        createAuth0SsoClient({
+        createGoogleCloudIdentityPlatformSsoClient({
           ...configuration,
           callbackUrl: `http://${hostname}:8787/api/auth/sso/callback`,
         }),
@@ -270,37 +201,28 @@ describe("createAuth0SsoClient", () => {
     },
   );
 
-  it("fragmentを含むdiscovery endpointを拒否する", async () => {
-    const client = createAuth0SsoClient(configuration, {
-      fetch: vi.fn(async () =>
-        Response.json({
-          ...discovery,
-          authorization_endpoint: `${discovery.authorization_endpoint}#ignored`,
-        }),
-      ),
-    });
-
-    await expect(
-      client.createAuthorizationUrl({ state: "state", nonce: "nonce", codeChallenge: "challenge" }),
-    ).rejects.toEqual(new SsoProviderError("configuration"));
-  });
-
-  it("providerがcode交換を拒否した場合は内容を露出しない固定errorを返す", async () => {
+  it("Identity Platformがcredentialを拒否した場合は固定errorへ変換する", async () => {
+    const signed = await googleToken({});
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
-      return String(input).endsWith("openid-configuration")
-        ? Response.json(discovery)
-        : Response.json(
-            { error: "invalid_grant", error_description: "secret detail" },
-            { status: 401 },
-          );
+      const url = String(input);
+      if (url === "https://oauth2.googleapis.com/token") {
+        return Response.json({ id_token: signed.token });
+      }
+      if (url === "https://www.googleapis.com/oauth2/v3/certs") {
+        return Response.json(signed.jwks);
+      }
+      return Response.json({ error: { message: "CONFIGURATION_NOT_FOUND" } }, { status: 400 });
     });
-    const client = createAuth0SsoClient(configuration, { fetch: fetcher });
+    const client = createGoogleCloudIdentityPlatformSsoClient(configuration, {
+      fetch: fetcher,
+      now: () => new Date("2026-08-16T00:01:00.000Z"),
+    });
 
     await expect(
       client.exchangeAuthorizationCode({
         code: "code",
         codeVerifier: "verifier",
-        expectedNonce: "nonce",
+        expectedNonce: "expected-nonce",
       }),
     ).rejects.toEqual(new SsoProviderError("provider_rejected"));
   });

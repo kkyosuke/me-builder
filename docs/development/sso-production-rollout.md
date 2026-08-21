@@ -23,7 +23,7 @@
 
 - AUTH-A、AUTH-B、AUTH-Cの必須stackがmergeされ、Production対象commitのCIが成功している
 - Preview Runbookを実IdP、普段使うスマートフォン、PCの主要ブラウザ1つでpassしている
-- Production専用Auth0 tenant／client、完全一致callback、secretがPreviewから分離されている
+- `infra/gcp-auth`のPulumi `production` Stackが適用済みで、Production専用GCP project／Identity Platform user store／OAuth client、完全一致callback、secretがDevelopmentから分離されている
 - SSO開始、callback結果、session発行・失効を匿名trace IDで追える
 - 公開操作、停止、問い合わせ、最終承認を行うサービス管理者をrelease記録へ記載している
 - 少数の協力者へIdentity追加方法、SSO利用方法、問い合わせ先を案内している
@@ -44,7 +44,7 @@ support procedure:
 
 ## 3. 設定の参照先
 
-`SSO_ROLLOUT_MODE`と`SSO_ROLLOUT_PERCENT`の値、既定値、対象判定は[Web認証・SSO設計 §9.3](../architecture/web-authentication-design.md#93-環境とurl)を参照します。Account IDやAuth0 subjectのallowlistは作りません。
+`SSO_ROLLOUT_MODE`と`SSO_ROLLOUT_PERCENT`の値、既定値、対象判定は[Web認証・SSO設計 §9.3](../architecture/web-authentication-design.md#93-環境とurl)を参照します。Account IDやIdentity Platform local IDのallowlistは作りません。
 
 少数公開はallowlistではなく、事前にSSO Identityを追加したAccountを少数に保つことで行います。管理者確認では`linked-login`／0%、協力者確認以降は`linked-login`／100%を使用できます。
 

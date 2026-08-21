@@ -18,7 +18,7 @@ import { accountAgreementAcceptances } from "../schema/agreement";
  * LINE Login チャネルが同一プロバイダー配下なら両者は同じ値になります。その場合
  * `line` の identity をそのまま引けます（[resolveAccountByLineLogin](#) の手順 2）。
  */
-export type IdentityProvider = "line" | "line_login" | "google" | "auth0";
+export type IdentityProvider = "line" | "line_login" | "google" | "gcp_identity_platform";
 
 export class CannotUnlinkLastIdentityError extends Error {
   constructor() {

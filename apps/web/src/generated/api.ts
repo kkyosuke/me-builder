@@ -1680,7 +1680,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 同じbrowserで開くAuth0認可URL */
+      /** @description 同じbrowserで開くGoogle認可URL */
       200: {
         headers: {
           [name: string]: unknown;
@@ -1754,7 +1754,7 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 同じbrowserで開くAuth0認可URL */
+      /** @description 同じbrowserで開くGoogle認可URL */
       200: {
         headers: {
           [name: string]: unknown;

@@ -690,7 +690,7 @@
         ],
         "responses": {
           "200": {
-            "description": "同じbrowserで開くAuth0認可URL",
+            "description": "同じbrowserで開くGoogle認可URL",
             "content": {
               "application/json": {
                 "schema": {
@@ -793,7 +793,7 @@
         ],
         "responses": {
           "200": {
-            "description": "同じbrowserで開くAuth0認可URL",
+            "description": "同じbrowserで開くGoogle認可URL",
             "content": {
               "application/json": {
                 "schema": {

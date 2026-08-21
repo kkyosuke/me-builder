@@ -23,7 +23,7 @@
 - 個別feature APIのpath、request / response schema
 - cookie名、session store、期限と失効の具体的な実装契約 — [アプリケーションセッション実装契約](../development/application-session-contract.md)
 
-SSO製品とme-builder側の接続条件は[§9 Auth0接続条件](#9-auth0接続条件)を正とします。SAMLしか提供しないIdPを追加する場合も、アプリケーションからはAuth0のOIDC接続の背後に置き、この認証境界を増やしません。
+SSO製品とme-builder側の接続条件は[§9 Google Cloud Identity Platform接続条件](#9-google-cloud-identity-platform接続条件)を正とします。最初に接続するIdPはGoogleとし、別のIdPを追加する場合も、検証後は同じ`VerifiedExternalIdentity`境界へ収束させます。
 
 ## 2. 結論
 
@@ -356,23 +356,27 @@ OpenAPIのsecurity schemeは`liffIdToken`からprovider非依存のアプリケ�
 - 認証失敗、Account未解決、未同意、権限不足を区別して表示する
 - LIFFまたはSSOが一時的に失敗しても白画面にせず、同じ方式の再試行を提示する
 
-## 9. Auth0接続条件
+## 9. Google Cloud Identity Platform接続条件
 
 ### 9.1 製品、client、subject
 
-外部ブラウザのSSO brokerにはAuth0を採用し、環境ごとに分離したAuth0 tenantへme-builder専用のRegular Web Applicationを1つ登録します。Auth0は外部IdPとの接続を所有しますが、me-builderのAccount、role、Plan、利用規約同意は所有しません。
+外部ブラウザのSSOにはGoogle Cloud Identity Platformを採用し、最初のIdPとしてGoogleを有効にします。Identity PlatformはGoogleの本人確認結果を環境別のUIDへ正規化しますが、me-builderのAccount、role、Plan、利用規約同意は所有しません。GCPプロジェクトはVertex AI等と同じCloud Billingアカウントへ接続しつつ、Productionの認証データを開発環境から分離します。
 
 | 項目 | 決定 |
 | --- | --- |
-| flow | OIDC Authorization Code Flow + PKCE（`S256`のみ） |
-| response | `response_type=code`。API Serverがcodeをtokenへ交換し、ブラウザへAuth0 tokenを保存しない |
+| flow | Google OIDC Authorization Code Flow + PKCE（`S256`のみ） |
+| response | `response_type=code`。API ServerがcodeをGoogle ID tokenへ交換し、ブラウザへprovider tokenを保存しない |
 | scope | `openid profile`。Account照合に使わない`email`と、不要な`offline_access`は要求しない |
-| audience | ID tokenの`aud`として環境別のAuth0 Client IDを要求する。me-builder API用access token audienceは設けない |
-| subject | 検証済みID tokenの`sub`。Auth0 userを削除・再作成した場合は別Identityとして扱う |
-| provider key | 全環境で`auth0`。共有D1自体を環境分離するためtenant名やissuerをprovider keyへ埋め込まない |
+| audience | Google ID tokenの`aud`として環境別のOAuth Client IDを要求する。me-builder API用access token audienceは設けない |
+| subject | Identity Platformの`accounts:signInWithIdp`が返す環境別`localId` |
+| provider key | 全環境で`gcp_identity_platform`。共有D1自体を環境分離するためGCP project IDをprovider keyへ埋め込まない |
 | 登録policy | `link-only`。SSO Identityだけを根拠に新規Accountを作らない |
 
-Auth0の`sub`はAuth0 user profileの`user_id`に由来するため、email、表示名、接続先IdPの独自IDへ分解せず、tenant内で返された文字列全体をsubjectとして保存します。Identityを別Accountへ付け替えたり、Auth0 Dashboard上のuser統合をme-builderのAccount統合として扱ったりしません。
+API Serverは検証済みGoogle ID tokenをIdentity Platformの`accounts:signInWithIdp`へ渡し、返された`localId`だけをIdentityのsubjectとして保存します。Google ID tokenの`sub`とemailはAccount照合やIdentity保存に使いません。Identity Platform上でuserを削除・再作成して`localId`が変わった場合は別Identityとして扱い、email一致で既存Accountへ自動統合しません。
+
+Firebase Web SDKは導入しません。このアプリではprovider認証を一度だけme-builderのHttpOnly application sessionへ交換するため、API Serverが公式OAuth endpointとIdentity Platform REST APIを直接利用します。これにより、Firebaseのブラウザsessionを併設せず、Cloudflare Pagesのcustom domainでredirect helperやstorage制限へ依存しません。将来、クライアント側のFirebase token継続利用、メール認証、MFA等が必要になった時点でSDK採用を再評価します。
+
+認証use caseは`ExternalSsoProvider` portだけへ依存し、Google OAuth／Identity Platform固有処理はinfrastructure adapterへ閉じます。active providerの選択と、環境変数からadapterを生成する処理はcomposition rootへ集約します。providerを変更するときはadapterとcomposition rootを差し替え、transaction、Account解決、link-only policy、application session発行は変更しません。
 
 ### 9.2 transactionとtoken検証
 
@@ -380,41 +384,43 @@ SSO開始時に256 bit以上の暗号学的乱数から`state`、`nonce`、PKCE 
 
 transaction payloadはOAuth stateのSHA-256 hashをkeyとして短命KVへ保存し、10分のTTLで物理削除します。callbackでは共有D1へstate hashだけのconsume claimを単一の`INSERT ... ON CONFLICT DO NOTHING RETURNING`で作成し、claimを取得した1件だけがKV payloadを削除して処理します。これにより、同じstateのcallbackが同時実行されてもprovider交換とsession発行へ進むのは1件だけです。consume claimは個人識別子やnonce、PKCE verifierを持たず、期限後に削除します。
 
-callbackでは、Auth0のOIDC discovery documentから得たissuer、authorization endpoint、token endpoint、JWKS URIを利用します。ID tokenはRS256署名、`iss`の完全一致、`aud`のClient ID一致、`exp`と`iat`、transactionの`nonce`完全一致を検証します。JWKSは`kid`で選び、未知の`kid`だけを契機に再取得します。検証失敗時はIdentity解決とapplication session発行へ進みません。
+callbackではGoogleの固定authorization endpoint、token endpoint、JWKS URIを利用します。Google ID tokenはRS256署名、`iss`が`https://accounts.google.com`または`accounts.google.com`、`aud`のOAuth Client ID一致、`exp`と`iat`、transactionの`nonce`完全一致を検証します。複数audienceの場合は`azp`もOAuth Client IDと一致させます。検証後にIdentity Platformへ交換し、`providerId=google.com`と環境別`localId`を確認できた場合だけIdentity解決へ進みます。
 
 ### 9.3 環境とURL
 
-Auth0が推奨する環境分離に合わせ、PreviewとProductionは別tenant・別clientにします。LocalはPreview tenantの別clientを使い、Productionのuser、callback、Secretへ接続しません。callback、logout、Web originにはwildcardを使わず、次の値を完全一致で登録します。
+DevelopmentとProductionは別GCP project、別Identity Platform user store、別OAuth clientにします。LocalとPreviewはDevelopment projectとDevelopment clientを共有しますが、callback URIを完全一致で個別登録します。Local／PreviewからProductionのuser、callback、Secretへ接続しません。OAuth clientの承認済みリダイレクトURIにはwildcardを使わず、次の値を完全一致で登録します。
 
-| 環境 | Auth0 tenant / client | Allowed Callback URL | Allowed Logout URL | Allowed Web Origin |
-| --- | --- | --- | --- | --- |
-| Local | Preview tenant / Local client | `http://localhost:3000/api/auth/sso/callback` | `http://localhost:5173` | `http://localhost:5173` |
-| Preview | Preview tenant / Preview client | `https://api.stg.kagami.kyosuke.dev/api/auth/sso/callback` | `https://stg.kagami.kyosuke.dev` | `https://stg.kagami.kyosuke.dev` |
-| Production | Production tenant / Production client | `https://api.kagami.kyosuke.dev/api/auth/sso/callback` | `https://kagami.kyosuke.dev` | `https://kagami.kyosuke.dev` |
+| 環境 | GCP project / OAuth client | 承認済みリダイレクトURI |
+| --- | --- | --- |
+| Local | 開発用project / Development client | `http://localhost:3000/api/auth/sso/callback` |
+| Preview | 開発用project / Development client | `https://api.stg.kagami.kyosuke.dev/api/auth/sso/callback` |
+| Production | Production project / Production client | `https://api.kagami.kyosuke.dev/api/auth/sso/callback` |
 
-issuerはtenantのHTTPS URLを末尾`/`付きで`SSO_ISSUER_URL`へ、Client IDは`SSO_CLIENT_ID`へ設定します。`SSO_CLIENT_SECRET`だけを秘密値として扱います。Localはgit管理外の`.env`、PreviewはGitHub Environment `dev`、Productionは`prd`へ環境別に設定し、Cloudflare API Worker secretへデプロイします。Secret値、authorization code、token、subjectはworkflowの引数、ログ、artifactへ出しません。
+Identity PlatformのGCP project、Cloud Billing接続、API有効化、Google provider、API keyは`infra/gcp-auth`の独立したPulumi `development`／`production` Stackで管理します。Google Auth Platformの一般ユーザー向けWeb OAuth clientは、規約確認と同意画面設定を含むため各projectのCloud Consoleで初回だけ手動作成し、Client IDとSecretをPulumi configへ入力します。PulumiのIAP用OAuth client resourceは用途が異なるため代用しません。Development clientにはLocalとPreviewの2つの完全一致callbackを登録し、Production clientと認証データを共有しません。
 
-`SSO_ISSUER_URL`と`SSO_CLIENT_ID`は秘密値ではありませんが、環境を誤接続しないようGitHub Environmentのvariableとして配布します。起動時にissuerがHTTPSであること（Localも接続先Auth0はHTTPS）、callbackのoriginが`BASE_URL`、logoutのreturn URLが`WEB_ORIGIN`と一致することを検証します。
+Identity PlatformのWeb API keyは`GOOGLE_IDENTITY_PLATFORM_API_KEY`、OAuth Client IDは`GOOGLE_OAUTH_CLIENT_ID`、OAuth Client Secretは`GOOGLE_OAUTH_CLIENT_SECRET`へ設定します。Localはgit管理外の`.env`、PreviewはGitHub Environment `dev`、Productionは`prd`へ環境別に設定し、Cloudflare API Workerへデプロイします。API keyはproject識別子であり単独では認可情報になりませんが、この構成ではserver-side専用値としてsecret配布し、Identity Toolkit APIだけへAPI制限を付けます。Secret値、authorization code、token、subjectはworkflowの引数、ログ、artifactへ出しません。
+
+OAuth Client IDは秘密値ではありませんが、環境を誤接続しないようGitHub Environmentのvariableとして配布します。起動時にcallbackのoriginが`BASE_URL`と一致し、ProductionではHTTPS、Localではloopback HTTPだけを許可します。
 
 段階公開の経路は`SSO_ROLLOUT_MODE`で制御します。値は`disabled`（SSO開始・追加とも停止）、`linking`（認証済みAccountからのIdentity追加だけ許可）、`linked-login`（追加済みIdentityの外部ブラウザloginも許可）の3つです。未設定は`disabled`へ安全に倒します。Local、Preview、Productionで値を独立させ、Productionは`AUTH-C-006`の公開操作まで`disabled`を維持します。flagを無効化してもLIFF認証と既存application sessionは停止しません。
 
-`linked-login`内の対象割合はAPI Serverの`SSO_ROLLOUT_PERCENT`で0から100の整数として制御し、未設定は0へ倒します。管理者roleは割合にかかわらず対象とし、一般AccountはAccount IDのSHA-256から得た安定bucketが割合未満の場合だけsessionを発行します。Account ID、Auth0 subject、emailのallowlistを環境変数やログへ置きません。0%で運営確認、少数割合、100%の順に上げ、対象外の既知IdentityはAccountを変更せず`rollout_excluded`として拒否します。この割合はSSO callback後のserver-side境界で適用し、Web UIの値だけで認可しません。
+`linked-login`内の対象割合はAPI Serverの`SSO_ROLLOUT_PERCENT`で0から100の整数として制御し、未設定は0へ倒します。管理者roleは割合にかかわらず対象とし、一般AccountはAccount IDのSHA-256から得た安定bucketが割合未満の場合だけsessionを発行します。Account ID、Identity Platform local ID、emailのallowlistを環境変数やログへ置きません。0%で運営確認、少数割合、100%の順に上げ、対象外の既知IdentityはAccountを変更せず`rollout_excluded`として拒否します。この割合はSSO callback後のserver-side境界で適用し、Web UIの値だけで認可しません。
 
 ### 9.4 session、link-only期間、logout
 
-SSO認証後もAUTH-A系列のapplication sessionだけを発行し、SSO専用sessionは作りません。絶対期限は30日、idle期限は7日、認証transactionは10分とします。権限上昇、Identity追加、Account復旧ではsessionをrotationし、Account停止、Identity解除、復旧完了、local logoutでは対象sessionを即時失効します。
+SSO認証後もAUTH-A系列のapplication sessionだけを発行し、Identity PlatformまたはFirebaseのsessionは作りません。絶対期限は30日、idle期限は7日、認証transactionは10分とします。権限上昇、Identity追加、Account復旧ではsessionをrotationし、Account停止、Identity解除、復旧完了、local logoutでは対象sessionを即時失効します。
 
 `link-only`はPreviewの通し検証完了後も維持し、ProductionではSSO追加済みAccountだけを段階公開対象にします。SSOだけによる新規Account作成は別のプロダクト決定とし、この系列では有効化しません。
 
-logoutの既定はme-builderのlocal logoutだけです。Auth0のlogout endpointや接続先IdPのfederated logoutは呼ばず、他アプリのSSO sessionへ影響させません。明示的な「すべてのSSOからログアウト」を将来追加する場合だけAuth0 OIDC logoutを別操作として使い、登録済みの完全一致URLへ戻します。Auth0のlogoutだけではme-builderのapplication sessionは失効しないため、必ずlocal sessionを先に失効させます。
+logoutの既定はme-builderのlocal logoutだけです。GoogleやIdentity Platformのlogoutは呼ばず、他アプリのGoogle sessionへ影響させません。local logoutでme-builderのapplication sessionを失効し、provider側sessionの継続は次回のGoogle認証画面に委ねます。
 
 ### 9.5 公式仕様との対応
 
-- Auth0は環境ごとにtenantを分離することを推奨しています（[Set Up Multiple Environments](https://auth0.com/docs/get-started/auth0-overview/create-tenants/set-up-multiple-environments)）。
-- Authorization Code Flow + PKCEでは`code_verifier`と`S256`の`code_challenge`を使い、code交換時にverifierを照合します（[Authorization Code Flow with PKCE](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce)）。
-- callback、logout、Web originはApplication Settingsの許可リストへ登録し、Productionでwildcardを使いません（[Application Settings](https://auth0.com/docs/get-started/applications/application-settings)）。
-- ID tokenは署名と標準claimに加えてClient IDへの`aud`と送信した`nonce`を検証します（[Validate ID Tokens](https://auth0.com/docs/secure/tokens/id-tokens/validate-id-tokens)）。
-- Auth0 logoutはme-builder側のsessionを失効しないため、application側で明示的に消去します。federated logoutはproviderごとに挙動が異なります（[Log Users Out of Identity Providers](https://auth0.com/docs/authenticate/login/logout/log-users-out-of-idps)）。
+- Googleは一般ユーザー向けOAuth clientの規約確認、同意画面設定、client作成をCloud Consoleで手動実施するよう定めています（[OAuth 2.0 best practices](https://developers.google.com/identity/protocols/oauth2/resources/best-practices#handle_client_credentials_securely)）。
+- GoogleのWeb server向けOAuth 2.0はauthorization endpointとtoken endpointを使うcode flowを定義しています（[Using OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)）。
+- Google OpenID ConnectではID tokenの署名、`iss`、`aud`、`exp`を検証し、`sub`を一意識別子として扱います（[OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect)）。me-builderはこのGoogle `sub`を保存せず、Identity Platformの環境別`localId`へ交換します。
+- Identity Platformは`accounts:signInWithIdp`でIdP credentialを検証し、project内のuserを表す`localId`を返します（[accounts.signInWithIdp](https://cloud.google.com/identity-platform/docs/reference/rest/v1/accounts/signInWithIdp)）。
+- 開発環境とProductionでFirebase／GCP projectを分離し、環境ごとにOAuth clientと認証データを隔離します（[General best practices for setting up Firebase projects](https://firebase.google.com/docs/projects/dev-workflows/general-best-practices)）。
 
 ## 10. 後続で決めること
 
@@ -424,4 +430,4 @@ logoutの既定はme-builderのlocal logoutだけです。Auth0のlogout endpoin
 - 再認証を要求する操作と認証からの最大経過時間
 - 既存利用者へSSO Identity追加を案内する画面と段階公開方法
 
-これらはAuth0接続条件とprovider非依存の認証境界を変更せず、後続のプロダクト判断または実装PRで確定します。
+これらはGoogle Cloud Identity Platform接続条件とprovider非依存の認証境界を変更せず、後続のプロダクト判断または実装PRで確定します。

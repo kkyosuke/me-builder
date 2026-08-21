@@ -1069,7 +1069,7 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("SSO接続をキャンセルしました。")).toBeTruthy();
+    expect(await screen.findByText("Google連携をキャンセルしました。")).toBeTruthy();
     expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
       "/profile?from=settings#login-method",
     );

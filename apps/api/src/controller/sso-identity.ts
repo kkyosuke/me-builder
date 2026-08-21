@@ -15,17 +15,18 @@ import {
   createApplicationSessionService,
 } from "../infrastructure/authentication/application-session-runtime";
 import {
-  SsoProviderError,
-  createAuth0SsoClient,
-} from "../infrastructure/authentication/sso-client";
-import {
   createSsoExistingIdentityResolver,
   createSsoIdentityLinker,
   getSsoIdentityStatus,
   unlinkSsoIdentity,
 } from "../infrastructure/authentication/sso-identity-repository";
+import {
+  createConfiguredSsoProvider,
+  ssoIdentityProviderPolicy,
+} from "../infrastructure/authentication/sso-provider-runtime";
 import { createSsoRolloutAuthorizer } from "../infrastructure/authentication/sso-rollout";
 import { createSsoTransactionStore } from "../infrastructure/authentication/sso-transaction-store";
+import { SsoProviderError } from "../logic/authentication/sso-provider";
 import {
   SsoAuthenticationError,
   type SsoAuthenticationFailure,
@@ -81,11 +82,10 @@ function unavailable(c: Context<AppEnv>): Response {
 
 function configured(c: Context<AppEnv>) {
   const configuration = getConfig(c.env);
+  const client = createConfiguredSsoProvider(configuration);
   if (
     configuration.ssoRolloutMode === "disabled" ||
-    !configuration.ssoIssuerUrl ||
-    !configuration.ssoClientId ||
-    !configuration.ssoClientSecret ||
+    !client ||
     !configuration.ssoCallbackUrl ||
     !configuration.webOrigin ||
     !c.env?.DB ||
@@ -97,12 +97,7 @@ function configured(c: Context<AppEnv>) {
     configuration,
     secureCallback: new URL(configuration.ssoCallbackUrl).protocol === "https:",
     store: createSsoTransactionStore(D1.shared.client.create(c.env.DB), c.env.SESSION_STORE),
-    client: createAuth0SsoClient({
-      issuerUrl: configuration.ssoIssuerUrl,
-      clientId: configuration.ssoClientId,
-      clientSecret: configuration.ssoClientSecret,
-      callbackUrl: configuration.ssoCallbackUrl,
-    }),
+    client,
   };
 }
 
@@ -132,10 +127,10 @@ function logSsoStarted(input: {
       purpose: input.purpose,
       rolloutMode: input.rolloutMode,
       outcome: "succeeded",
-      disposition: "auth0-redirect",
+      disposition: "provider-redirect",
       stage: "authorization.create",
     },
-    "[SSO] succeeded at authorization.create -> auth0-redirect",
+    "[SSO] succeeded at authorization.create -> provider-redirect",
   );
 }
 
@@ -190,6 +185,7 @@ export async function getSsoIdentityStatusContents(c: Context<AppEnv>): Promise<
   const status = await getSsoIdentityStatus(
     D1.shared.client.create(c.env.DB),
     authenticatedActor(c).accountId,
+    ssoIdentityProviderPolicy,
   );
   return c.json(v.parse(SsoIdentityStatusSchema, status));
 }
@@ -318,12 +314,14 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       code: c.req.query("code") ?? "",
       store: dependencies.store,
       client: dependencies.client,
-      identityResolver: createSsoExistingIdentityResolver(runtime.db),
-      identityLinker: createSsoIdentityLinker(runtime.db),
+      identityResolver: createSsoExistingIdentityResolver(runtime.db, ssoIdentityProviderPolicy),
+      identityLinker: createSsoIdentityLinker(runtime.db, ssoIdentityProviderPolicy),
       rolloutAuthorizer: createSsoRolloutAuthorizer(dependencies.configuration.ssoRolloutPercent),
       sessionIssuer: {
         async issue(actor) {
-          if (previousToken) await runtime.sessions.logout(previousToken, actor.accountId);
+          // Account切替時は旧token自身のAccountを失効する。認証先Account IDを渡すと、
+          // 別Accountのversionを進めて旧Accountの他tab sessionが残ってしまう。
+          if (previousToken) await runtime.sessions.logout(previousToken);
           const issued = await runtime.sessions.issue(actor, actor.authenticatedIdentityId);
           if (!issued) throw new Error("Application session could not be issued");
           return issued;
@@ -348,7 +346,7 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
       return redirectToWeb(c, completed.returnTo);
     }
     if (previousToken) {
-      await runtime.sessions.logout(previousToken, completed.accountId);
+      await runtime.sessions.logout(previousToken);
     } else {
       await runtime.sessions.invalidateAccountSessions(completed.accountId);
     }
@@ -403,7 +401,7 @@ export async function deleteSsoIdentity(c: Context<AppEnv>): Promise<Response> {
   if (getConfig(c.env).ssoRolloutMode === "disabled" || !runtime) return unavailable(c);
   const accountId = authenticatedActor(c).accountId;
   try {
-    await unlinkSsoIdentity(runtime.db, accountId);
+    await unlinkSsoIdentity(runtime.db, accountId, ssoIdentityProviderPolicy);
     await runtime.sessions.invalidateAccountSessions(accountId);
     deleteCookie(c, APPLICATION_SESSION_COOKIE, {
       path: "/",

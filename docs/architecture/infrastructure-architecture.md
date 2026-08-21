@@ -60,6 +60,7 @@ flowchart TD
     end
 
     Gemini["Google Vertex AI Express Mode<br/>(Gemini)"]
+    IdentityPlatform["Google Cloud Identity Platform<br/>(Google login)"]
 
     Web --> CF_Sec
     LINE --> CF_Sec
@@ -72,6 +73,7 @@ flowchart TD
     WorkersAPI --> Queues
     Queues --> WorkersWorker
     WorkersWorker --> Gemini
+    WorkersAPI --> IdentityPlatform
 
     WorkersAPI --> D1
     WorkersAPI --> R2
@@ -103,6 +105,7 @@ flowchart TD
 | **キー・バリュー / キャッシュ** | **Cloudflare KV** | 低遅延グローバルキー・バリューストア。認証トークン、一時セッション、アクセス制御キャッシュ、レート制限カウントを保持。 |
 | **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | 個人コンテンツのSSoT。1 Accountにつき1つのprivate SQLiteへ`Source`・`Brain`・`Diary`・`Diagnosis`回答・プロフィール要約を保存し、連投調停や相性関係の協調も担う。 |
 | **AI / 推論基盤** | **Vertex AI Express Mode (Gemini)** | Queue WorkerからAPI key認証でテキスト生成とEmbedding生成を実行。本文、生成結果、API keyをアプリケーションログへ残さない。 |
+| **外部認証** | **Google Cloud Identity Platform** | Googleの本人確認結果を環境別Identityへ正規化する。Accountとapplication sessionは所有せず、接続条件はWeb認証設計を正とする。 |
 | **セキュリティ & ネットワーク** | **Cloudflare Access / WAF** | DDoS防御、WAFルール適用、SSL/TLS証明書管理、管理画面等へのゼロトラストアクセス制御（Cloudflare Access）。 |
 
 ## 5. データ連携フロー原則
@@ -140,7 +143,7 @@ flowchart TD
 
   ```text
   me-builder/
-  ├── infra/              # PulumiによるCloudflare基盤リソースとWrangler設定の生成
+  ├── infra/              # Cloudflare基盤とGCP認証基盤の独立したPulumi project
   ├── Taskfile.yml       # タスクランナー定義 (task dev, task i, task deploy:preview 等)
   ├── package.json       # ルート設定 (workspaces 定義, wrangler devDependency)
   ├── tsconfig.json      # モノレポ共通 TypeScript 設定
@@ -210,7 +213,15 @@ GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサ�
 
 APIとMCPがブラウザへ返すCORSヘッダは、環境manifestのベースドメインから生成したWeb UIのオリジンだけを許可します。LocalはVite開発サーバーのオリジンを使用し、設定が欠けている場合や一致しないOriginには`Access-Control-Allow-Origin`を返しません。
 
-### 6.2 APIドキュメントのCloudflare Access境界
+### 6.2 GCP認証リソースの宣言境界
+
+`infra/gcp-auth/`はCloudflare基盤と別のPulumi projectとし、`development`と`production`のStackを持ちます。各Stackは環境別GCP project、Cloud Billing接続、Identity Toolkit等のAPI、Identity Platform設定、Google provider、Identity Toolkit APIだけへ制限したAPI keyを所有します。Productionだけでなく認証データを持つDevelopment projectも削除保護します。
+
+Google Auth PlatformはOAuth同意画面と一般ユーザー向けWeb OAuth clientを所有します。Development clientにはLocalとPreviewの完全一致callback、Production clientにはProduction callbackだけを登録します。Web OAuth clientの作成はPulumi管理対象外とし、そのClient IDとSecretを環境別Pulumi configへ入力してIdentity PlatformのGoogle providerへ接続します。IAP用またはworkload用OAuth clientで代用しません。
+
+Pulumi Stack outputのIdentity Platform API keyはsecretとして扱い、対応するGitHub EnvironmentからCloudflare API Worker secretへ配布します。OAuth Client SecretもPulumi configとGitHub Environmentの両方でsecretにし、Stack output、CIログ、artifactへ出力しません。GCP認証projectの適用手順は[`infra/gcp-auth/README.md`](../../infra/gcp-auth/README.md)を正とします。
+
+### 6.3 APIドキュメントのCloudflare Access境界
 
 PreviewとProductionでは、APIドキュメントを利用者向けAPIとは別のCloudflare Access Applicationで保護します。ApplicationはAPIホスト全体ではなく、次のパスだけを対象にします。
 
@@ -260,7 +271,7 @@ Applicationとpolicyは`scripts/setup-api-docs-access.ts`で冪等に作成・�
 
 ## 7. 関連ドキュメント
 
-LIFFと将来のSSOを同じAccountおよびアプリケーションセッションへ収束させる境界は、[Web認証・アプリケーションセッション設計](web-authentication-design.md)を正とします。
+LIFFとGoogleログインを同じAccountおよびアプリケーションセッションへ収束させる境界は、[Web認証・アプリケーションセッション設計](web-authentication-design.md)を正とします。
 
 - [Agent向けガイド](../../.agents/README.md)
 - [開発運用ルール](../../.agents/rules/development.md)

@@ -607,7 +607,7 @@ export function ProfileSettingsScreen({
                   aria-hidden="true"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold">外部ブラウザ SSO</p>
+                  <p className="font-bold">Googleログイン</p>
                   {ssoIdentity.status === "loading" && (
                     <output className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
                       接続状態を確認しています...
@@ -621,8 +621,8 @@ export function ProfileSettingsScreen({
                   {ssoIdentity.status === "success" && (
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       {ssoIdentity.data.linked
-                        ? "接続済みです。外部ブラウザから同じAccountへログインできます。"
-                        : "未接続です。現在のAccountへSSOを追加できます。"}
+                        ? "Googleアカウントを接続済みです。外部ブラウザから同じAccountへログインできます。"
+                        : "未接続です。現在のAccountへGoogleログインを追加できます。"}
                     </p>
                   )}
                 </div>
@@ -633,22 +633,25 @@ export function ProfileSettingsScreen({
                     type="button"
                     disabled={!ssoIdentity.data.canUnlink || ssoMutationState.status === "loading"}
                     onClick={() => {
-                      if (!window.confirm("外部ブラウザ SSO の接続を解除しますか？")) return;
+                      if (!window.confirm("Googleログインの接続を解除しますか？")) return;
                       setSsoMutationState({ status: "loading" });
                       void onUnlinkSsoIdentity()
                         .then(() =>
-                          setSsoMutationState({ status: "success", data: "SSOを解除しました。" }),
+                          setSsoMutationState({
+                            status: "success",
+                            data: "Googleログインを解除しました。",
+                          }),
                         )
                         .catch((error) =>
                           setSsoMutationState({
                             status: "error",
-                            message: errorMessage(error, "SSOを解除できませんでした。"),
+                            message: errorMessage(error, "Googleログインを解除できませんでした。"),
                           }),
                         );
                     }}
                     className="mt-4 min-h-11 rounded-xl border border-rose-400 px-4 text-sm font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-rose-300"
                   >
-                    SSO接続を解除
+                    Google連携を解除
                   </button>
                 ) : (
                   <button
@@ -659,13 +662,13 @@ export function ProfileSettingsScreen({
                       void onLinkSsoIdentity().catch((error) =>
                         setSsoMutationState({
                           status: "error",
-                          message: errorMessage(error, "SSOの接続を開始できませんでした。"),
+                          message: errorMessage(error, "Google連携を開始できませんでした。"),
                         }),
                       );
                     }}
                     className="mt-4 min-h-11 rounded-xl border border-violet-500 px-4 text-sm font-bold text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-violet-200"
                   >
-                    SSOを接続
+                    Googleと連携
                   </button>
                 ))}
               {ssoIdentity.status === "success" &&
@@ -677,17 +680,17 @@ export function ProfileSettingsScreen({
                 )}
               {ssoIdentityCallbackResult === "linked" && (
                 <output className="mt-3 block text-sm text-emerald-700 dark:text-emerald-300">
-                  SSOを接続しました。
+                  Googleと連携しました。
                 </output>
               )}
               {ssoIdentityCallbackResult === "cancelled" && (
                 <output className="mt-3 block text-sm text-slate-600 dark:text-slate-300">
-                  SSO接続をキャンセルしました。
+                  Google連携をキャンセルしました。
                 </output>
               )}
               {ssoIdentityCallbackResult === "error" && (
                 <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
-                  SSOを接続できませんでした。時間をおいてもう一度お試しください。
+                  Googleと連携できませんでした。時間をおいてもう一度お試しください。
                 </p>
               )}
               {ssoMutationState.status === "success" && (
