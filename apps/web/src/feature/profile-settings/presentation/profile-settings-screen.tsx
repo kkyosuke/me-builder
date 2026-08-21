@@ -5,6 +5,7 @@ import {
   CreditCard,
   FileText,
   Moon,
+  Plug,
   RefreshCw,
   Shield,
   Sparkles,
@@ -58,6 +59,7 @@ export function ProfileSettingsScreen({
   fontSize,
   onBack,
   onOpenAdmin,
+  onOpenMcp,
   onOpenAvatar,
   onOpenBillingPortal,
   onOpenBillingPlans,
@@ -80,7 +82,7 @@ export function ProfileSettingsScreen({
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
   isInactive?: boolean;
-  inactiveFocusTarget?: "avatar" | "brain-items" | "billing";
+  inactiveFocusTarget?: "avatar" | "brain-items" | "billing" | "mcp";
   isProfileLoading?: boolean;
   profileError?: string | null;
   entitlement?: AsyncState<ProfileEntitlement>;
@@ -89,6 +91,7 @@ export function ProfileSettingsScreen({
   fontSize: FontSize;
   onBack: () => void;
   onOpenAdmin?: () => void;
+  onOpenMcp?: () => void;
   onOpenAvatar: () => void;
   onOpenBillingPortal?: () => Promise<void>;
   onOpenBillingPlans?: () => void;
@@ -113,6 +116,7 @@ export function ProfileSettingsScreen({
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const brainItemsLinkRef = useRef<HTMLAnchorElement>(null);
   const billingPlansButtonRef = useRef<HTMLButtonElement>(null);
+  const mcpLinkRef = useRef<HTMLAnchorElement>(null);
   const wasInactiveRef = useRef(isInactive);
   const inactiveFocusTargetRef = useRef(inactiveFocusTarget);
   const [resetState, setResetState] = useState<AsyncState<string>>({ status: "idle" });
@@ -182,7 +186,9 @@ export function ProfileSettingsScreen({
     }
 
     if (wasInactiveRef.current) {
-      if (inactiveFocusTargetRef.current === "billing") {
+      if (inactiveFocusTargetRef.current === "mcp") {
+        mcpLinkRef.current?.focus();
+      } else if (inactiveFocusTargetRef.current === "billing") {
         billingPlansButtonRef.current?.focus();
       } else if (inactiveFocusTargetRef.current === "brain-items") {
         brainItemsLinkRef.current?.focus();
@@ -589,6 +595,38 @@ export function ProfileSettingsScreen({
               </span>
               <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
             </a>
+            {onOpenMcp && (
+              <a
+                ref={mcpLinkRef}
+                href="/profile/mcp"
+                onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                  if (
+                    event.defaultPrevented ||
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  onOpenMcp();
+                }}
+                className="mt-3 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-sky-950/20"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200">
+                  <Plug className="size-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold text-slate-950 dark:text-white">MCP連携</span>
+                  <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                    接続、取得履歴、解除を管理
+                  </span>
+                </span>
+                <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+              </a>
+            )}
           </section>
         )}
 

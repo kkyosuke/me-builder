@@ -534,6 +534,15 @@ function brainItemIsInference(attributes: unknown, derivation: "ai" | "determini
     : derivation === "ai";
 }
 
+function mcpPerspective(attributes: unknown, category: string): "self" | "owner_observation" {
+  if (attributes && typeof attributes === "object" && "perspective" in attributes) {
+    if (attributes.perspective === "self" || attributes.perspective === "owner_observation") {
+      return attributes.perspective;
+    }
+  }
+  return category === "memory" ? "owner_observation" : "self";
+}
+
 function hasInvalidOrDuplicateLabels(labels: readonly { label: string }[]): boolean {
   const normalized = labels.map(({ label }) => label.trim());
   return (
@@ -774,6 +783,7 @@ export type BrainVectorSyncTarget =
       category: string;
       derivation: "ai" | "deterministic";
       itemRevision: number;
+      mcpOwnerEligible: boolean;
       previousVectorId?: string;
     }>
   | Readonly<{ action: "delete"; vectorId?: string }>;
@@ -804,7 +814,7 @@ export async function getBrainVectorSyncTarget(
     )
     .get();
   if (!job) return undefined;
-  const [item, entry, newestJob] = await Promise.all([
+  const [item, entry, newestJob, accessLabels] = await Promise.all([
     db
       .select({
         statement: brainItems.statement,
@@ -814,6 +824,8 @@ export async function getBrainVectorSyncTarget(
         status: brainItems.status,
         isDeleted: brainItems.isDeleted,
         updatedAt: brainItems.updatedAt,
+        sensitivity: brainItems.sensitivity,
+        externallyShareable: brainItems.externallyShareable,
       })
       .from(brainItems)
       .where(and(eq(brainItems.id, brainItemId), eq(brainItems.accountId, accountId)))
@@ -840,6 +852,16 @@ export async function getBrainVectorSyncTarget(
       .orderBy(desc(brainVectorSyncJobs.itemRevision))
       .limit(1)
       .get(),
+    db
+      .select({ label: brainItemAccessLabels.label })
+      .from(brainItemAccessLabels)
+      .where(
+        and(
+          eq(brainItemAccessLabels.brainItemId, brainItemId),
+          eq(brainItemAccessLabels.isDeleted, false),
+        ),
+      )
+      .all(),
   ]);
   if (!item || item.isDeleted || item.status !== "active") {
     return { action: "delete", ...(entry ? { vectorId: entry.vectorId } : {}) };
@@ -853,6 +875,10 @@ export async function getBrainVectorSyncTarget(
     category: item.category,
     derivation: item.derivation,
     itemRevision: Math.max(item.updatedAt.getTime(), newestJob?.itemRevision ?? itemRevision),
+    mcpOwnerEligible:
+      item.externallyShareable &&
+      item.sensitivity !== "highly_sensitive" &&
+      accessLabels.some(({ label }) => label !== "unclassified" && label !== "private"),
     ...(entry ? { previousVectorId: entry.vectorId } : {}),
   };
 }
@@ -1437,6 +1463,121 @@ export async function loadBrainChatContextMemories(
     });
   }
   return memories;
+}
+
+export type McpBrainSearchResult = Readonly<{
+  brainItemId: string;
+  category: string;
+  statement: string;
+  perspective: "self" | "owner_observation";
+  derivation: "owner_explicit" | "ai_inference" | "rule_based";
+  evidence: Readonly<{
+    count: number;
+    sourceKinds: readonly ("user_input" | "import")[];
+    firstObservedAt: Date;
+    lastObservedAt: Date;
+  }>;
+}>;
+
+/** Vectorize候補を現在状態で再認可し、原文を読まずMCP向け最小projectionだけを返す。 */
+export async function loadMcpBrainSearchResults(
+  db: AccountDataDatabase,
+  accountId: string,
+  vectorIds: readonly string[],
+  at = new Date(),
+): Promise<readonly McpBrainSearchResult[]> {
+  const candidateVectorIds = [...new Set(vectorIds.filter(Boolean))].slice(0, 20);
+  if (candidateVectorIds.length === 0) return [];
+  const rows = await db
+    .select({
+      vectorId: brainVectorEntries.id,
+      brainItemId: brainItems.id,
+      category: brainItems.category,
+      statement: brainItems.statement,
+      attributes: brainItems.attributes,
+      derivation: brainItems.derivation,
+      accessLabel: brainItemAccessLabels.label,
+    })
+    .from(brainVectorEntries)
+    .innerJoin(brainItems, eq(brainItems.id, brainVectorEntries.brainItemId))
+    .innerJoin(
+      brainItemAccessLabels,
+      and(
+        eq(brainItemAccessLabels.brainItemId, brainItems.id),
+        eq(brainItemAccessLabels.isDeleted, false),
+      ),
+    )
+    .where(
+      and(
+        inArray(brainVectorEntries.id, candidateVectorIds),
+        eq(brainVectorEntries.isDeleted, false),
+        eq(brainItems.accountId, accountId),
+        eq(brainItems.status, "active"),
+        eq(brainItems.isDeleted, false),
+        eq(brainItems.externallyShareable, true),
+        or(eq(brainItems.sensitivity, "normal"), eq(brainItems.sensitivity, "sensitive")),
+        or(isNull(brainItems.validFrom), lte(brainItems.validFrom, at)),
+        or(isNull(brainItems.validTo), gt(brainItems.validTo, at)),
+      ),
+    )
+    .all();
+  const selected = candidateVectorIds
+    .flatMap((vectorId) => {
+      const itemRows = rows.filter((row) => row.vectorId === vectorId);
+      const row = itemRows[0];
+      const eligible = itemRows.some(
+        ({ accessLabel }) => accessLabel !== "unclassified" && accessLabel !== "private",
+      );
+      return row && eligible ? [row] : [];
+    })
+    .slice(0, 5);
+  const itemIds = selected.map(({ brainItemId }) => brainItemId);
+  const evidenceRows =
+    itemIds.length === 0
+      ? []
+      : await db
+          .select({
+            brainItemId: brainItemEvidenceEdges.brainItemId,
+            sourceKind: sourceRecords.kind,
+            recordedAt: sourceRecords.createdAt,
+          })
+          .from(brainItemEvidenceEdges)
+          .innerJoin(sourceRecords, eq(sourceRecords.id, brainItemEvidenceEdges.sourceRecordId))
+          .where(
+            and(
+              inArray(brainItemEvidenceEdges.brainItemId, itemIds),
+              eq(brainItemEvidenceEdges.relation, "supports"),
+              eq(brainItemEvidenceEdges.isDeleted, false),
+              eq(sourceRecords.accountId, accountId),
+              eq(sourceRecords.isDeleted, false),
+            ),
+          )
+          .all();
+  return selected.flatMap((item) => {
+    const evidence = evidenceRows.filter(({ brainItemId }) => brainItemId === item.brainItemId);
+    if (evidence.length === 0) return [];
+    const observed = evidence.map(({ recordedAt }) => recordedAt.getTime());
+    const isInference = brainItemIsInference(item.attributes, item.derivation);
+    return [
+      {
+        brainItemId: item.brainItemId,
+        category: item.category,
+        statement: item.statement,
+        perspective: mcpPerspective(item.attributes, item.category),
+        derivation: isInference
+          ? "ai_inference"
+          : item.derivation === "deterministic"
+            ? "rule_based"
+            : "owner_explicit",
+        evidence: {
+          count: evidence.length,
+          sourceKinds: [...new Set(evidence.map(({ sourceKind }) => sourceKind))].sort(),
+          firstObservedAt: new Date(Math.min(...observed)),
+          lastObservedAt: new Date(Math.max(...observed)),
+        },
+      },
+    ];
+  });
 }
 
 /** 開発用の確認画面へ、本人のactiveなBrain Item、根拠、Vector同期状態を返す。 */

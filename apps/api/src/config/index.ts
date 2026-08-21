@@ -103,6 +103,12 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
       rawBaseUrl && rawBaseUrl !== "/"
         ? `${rawBaseUrl.replace(/\/$/u, "")}/api/auth/sso/callback`
         : undefined,
+    mcpResourceUrl:
+      getEnv("MCP_RESOURCE_URL", env)?.trim() ||
+      (rawBaseDomain && rawBaseDomain !== "localhost"
+        ? `https://mcp.${rawBaseDomain.replace(/^https?:\/\//, "")}/mcp`
+        : undefined),
+    mcpFeatureEnabled: getEnv("MCP_FEATURE_ENABLED", env)?.trim() === "true",
     adminLineUserIds,
   };
 

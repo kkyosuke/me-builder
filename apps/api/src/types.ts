@@ -60,6 +60,9 @@ type Env = Omit<
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
   CONVERSATION_COORDINATOR?: ConversationCoordinatorNamespace;
   BRAIN_VECTOR_INDEX?: ApiBindings["BRAIN_VECTOR_INDEX"];
+  MCP_TOKEN_HMAC_SECRET?: string;
+  MCP_RESOURCE_URL?: string;
+  MCP_FEATURE_ENABLED?: string;
   /** Wrangler local以外では常に設定する。単体テストでは未設定へ縮退できる。 */
   WEB_ERROR_RATE_LIMITER?: {
     limit(options: { key: string }): Promise<{ success: boolean }>;

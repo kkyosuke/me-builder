@@ -7,6 +7,7 @@ export * from "./catalog";
 export * from "./development-audit";
 export * from "./gemini-usage";
 export * from "./family-seat";
+export * from "./mcp";
 export * from "./profile";
 export * from "./progression";
 export * from "./sso-authentication";

@@ -144,6 +144,7 @@ async function upsertBrainVector(
     category: string;
     derivation: "ai" | "deterministic";
     itemRevision: number;
+    mcpOwnerEligible: boolean;
     previousVectorId?: string;
   }>,
   workerConfig: WorkerConfig,
@@ -169,6 +170,7 @@ async function upsertBrainVector(
       values,
       metadata: {
         owner_scope: ownerScope,
+        ...(target.mcpOwnerEligible ? { mcp_owner_scope: ownerScope } : {}),
         category: target.category,
         derivation: target.derivation,
         embedding_version: EMBEDDING_VERSION,

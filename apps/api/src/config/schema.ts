@@ -75,6 +75,8 @@ export const ConfigSchema = v.object({
       v.check(isSsoCallback, "SSO callback must use the fixed secure callback path"),
     ),
   ),
+  mcpResourceUrl: v.optional(v.pipe(v.string(), v.url())),
+  mcpFeatureEnabled: v.optional(v.boolean(), false),
   /** カンマ区切りの設定値を解析した、管理者として扱うLINE user ID。 */
   adminLineUserIds: v.optional(v.array(v.string()), []),
   webhookQueueName: v.optional(v.string()),

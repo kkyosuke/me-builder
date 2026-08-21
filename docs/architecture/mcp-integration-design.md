@@ -16,7 +16,7 @@
 
 - Brain Item、Evidence、Derivationの意味 — [Brain Item生成設計](../domain/brain/brain-item-generation-design.md)と[根拠・反証・改訂のエッジ設計](../domain/brain/evidence-edge-design.md)
 - Access Label、Access Policy、Access Profileの共通原則 — [Brainのラベル・アクセス制御設計](../domain/brain/brain-access-label-design.md)
-- 実装PRの依存順、Preview検証と公開までの残作業 — [MCP実装残タスク](../development/mcp-remaining-tasks.md)
+- Preview／Productionの有効化、実client検証、停止と再開 — [MCP運用検証runbook](../development/mcp-remaining-tasks.md)
 - 一般利用者向けMCPと、その接続数・利用量に対する課金
 
 ## 2. 結論
