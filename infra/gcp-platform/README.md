@@ -19,6 +19,10 @@ Google Auth Platform owns the OAuth consent screen and Web OAuth client. Google 
 
 The development client must contain both callback URIs listed in `Pulumi.development.yaml`. The production client must contain only the production callback in `Pulumi.production.yaml`.
 
+## GCP deploy authentication
+
+Pulumi authenticates its infrastructure operations with Google Application Default Credentials (ADC); this is separate from the runtime API keys created by the Stack. For local setup, run `gcloud auth application-default login` with an operator that has the permissions described below. Do not create or commit a service-account JSON key for local deployment. If these Stacks are automated in CI later, use OIDC / Workload Identity Federation and short-lived credentials instead of a stored JSON key.
+
 ## State backend and first deployment
 
 Set `PULUMI_BACKEND_URL` to one shared durable backend before every command. The repository wrapper and Pulumi program reject an unset backend and `file://` state. A DIY backend such as GCS or S3 also requires a non-empty `PULUMI_CONFIG_PASSPHRASE`; this prevents the OAuth Client Secret from entering state with an empty encryption passphrase. Pulumi Cloud handles state encryption without that variable. Project IDs are globally unique. Use different values for the two Stacks and connect both to the same Billing Account used by Vertex AI. The projects must belong to an organization (directly or through a folder), because Google does not support service-account-bound authorization keys for projects without an organization.
