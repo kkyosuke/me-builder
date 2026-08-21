@@ -4,7 +4,7 @@
   "ignoreDependencies": ["cloudflare", "lightningcss", "markdown-link-check"],
   "workspaces": {
     "infra": {
-      "entry": ["index.ts", "gcp-auth/index.ts", "scripts/*.ts", "src/cleanup-worker.ts"]
+      "entry": ["index.ts", "gcp-platform/index.ts", "scripts/*.ts", "src/cleanup-worker.ts"]
     },
     "apps/worker": {
       "entry": [

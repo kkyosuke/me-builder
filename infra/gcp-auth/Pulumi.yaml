@@ -1,7 +1,0 @@
-name: me-builder-gcp-auth
-description: Google Cloud Identity Platform resources for me-builder
-runtime:
-  name: nodejs
-  options:
-    packagemanager: bun
-main: index.ts

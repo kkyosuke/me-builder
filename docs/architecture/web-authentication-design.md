@@ -396,7 +396,7 @@ DevelopmentとProductionは別GCP project、別Identity Platform user store、�
 | Preview | 開発用project / Development client | `https://api.stg.kagami.kyosuke.dev/api/auth/sso/callback` |
 | Production | Production project / Production client | `https://api.kagami.kyosuke.dev/api/auth/sso/callback` |
 
-Identity PlatformのGCP project、Cloud Billing接続、API有効化、Google provider、API keyは`infra/gcp-auth`の独立したPulumi `development`／`production` Stackで管理します。Google Auth Platformの一般ユーザー向けWeb OAuth clientは、規約確認と同意画面設定を含むため各projectのCloud Consoleで初回だけ手動作成し、Client IDとSecretをPulumi configへ入力します。PulumiのIAP用OAuth client resourceは用途が異なるため代用しません。Development clientにはLocalとPreviewの2つの完全一致callbackを登録し、Production clientと認証データを共有しません。
+Identity PlatformとVertex AIのGCP project、Cloud Billing接続、API有効化、実行Identity、API keyは`infra/gcp-platform`の独立したPulumi `development`／`production` Stackで管理します。Google Auth Platformの一般ユーザー向けWeb OAuth clientは、規約確認と同意画面設定を含むため各projectのCloud Consoleで初回だけ手動作成し、Client IDとSecretをPulumi configへ入力します。PulumiのIAP用OAuth client resourceは用途が異なるため代用しません。Development clientにはLocalとPreviewの2つの完全一致callbackを登録し、Production clientと認証データを共有しません。
 
 Identity PlatformのWeb API keyは`GOOGLE_IDENTITY_PLATFORM_API_KEY`、OAuth Client IDは`GOOGLE_OAUTH_CLIENT_ID`、OAuth Client Secretは`GOOGLE_OAUTH_CLIENT_SECRET`へ設定します。Localはgit管理外の`.env`、PreviewはGitHub Environment `dev`、Productionは`prd`へ環境別に設定し、Cloudflare API Workerへデプロイします。API keyはproject識別子であり単独では認可情報になりませんが、この構成ではserver-side専用値としてsecret配布し、Identity Toolkit APIだけへAPI制限を付けます。Secret値、authorization code、token、subjectはworkflowの引数、ログ、artifactへ出しません。
 

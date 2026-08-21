@@ -13,10 +13,10 @@
     "preview:destroy": "bun scripts/preview-destroy.ts",
     "preview:sync": "bun scripts/preview-sync.ts",
     "preview:up": "bun scripts/preview-up.ts",
-    "gcp-auth:preview:development": "pulumi -C gcp-auth preview --stack development",
-    "gcp-auth:preview:production": "pulumi -C gcp-auth preview --stack production",
-    "gcp-auth:up:development": "pulumi -C gcp-auth up --stack development",
-    "gcp-auth:up:production": "pulumi -C gcp-auth up --stack production"
+    "gcp-platform:preview:development": "pulumi -C gcp-platform preview --stack development",
+    "gcp-platform:preview:production": "pulumi -C gcp-platform preview --stack production",
+    "gcp-platform:up:development": "pulumi -C gcp-platform up --stack development",
+    "gcp-platform:up:production": "pulumi -C gcp-platform up --stack production"
   },
   "devDependencies": {
     "@types/bun": "latest",

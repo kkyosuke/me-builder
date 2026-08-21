@@ -7,7 +7,7 @@ type Environment = (typeof supportedEnvironments)[number];
 const config = new pulumi.Config();
 const environmentValue = config.require("environment");
 if (!supportedEnvironments.includes(environmentValue as Environment)) {
-  throw new Error(`Unsupported GCP authentication environment: ${environmentValue}`);
+  throw new Error(`Unsupported GCP platform environment: ${environmentValue}`);
 }
 const environment = environmentValue as Environment;
 if (pulumi.getStack() !== environment) {
@@ -15,7 +15,7 @@ if (pulumi.getStack() !== environment) {
 }
 
 const projectId = config.require("projectId");
-const projectName = config.get("projectName") ?? `me-builder auth ${environment}`;
+const projectName = config.get("projectName") ?? `me-builder platform ${environment}`;
 const billingAccount = config.require("billingAccount");
 const organizationId = config.get("organizationId");
 const folderId = config.get("folderId");
@@ -59,7 +59,7 @@ if (
 const protect = true;
 
 const project = new gcp.organizations.Project(
-  "identityProject",
+  "platformProject",
   {
     projectId,
     name: projectName,
@@ -69,7 +69,7 @@ const project = new gcp.organizations.Project(
     labels: {
       application: "me-builder",
       environment,
-      component: "authentication",
+      component: "platform",
     },
     ...(organizationId ? { orgId: organizationId } : {}),
     ...(folderId ? { folderId } : {}),
@@ -78,8 +78,10 @@ const project = new gcp.organizations.Project(
 );
 
 const enabledServices = [
+  "aiplatform.googleapis.com",
   "apikeys.googleapis.com",
   "identitytoolkit.googleapis.com",
+  "iam.googleapis.com",
   "serviceusage.googleapis.com",
 ] as const;
 const services = enabledServices.map(
@@ -134,12 +136,36 @@ const googleProvider =
       )
     : undefined;
 
+const vertexServiceAccount = new gcp.serviceaccount.Account(
+  "vertexRuntime",
+  {
+    project: project.projectId,
+    accountId: `me-builder-vertex-${environment}`,
+    displayName: `me-builder Vertex AI ${environment}`,
+  },
+  { dependsOn: services, protect },
+);
+
+const vertexRoleBindings = ["roles/aiplatform.user", "roles/serviceusage.serviceUsageConsumer"].map(
+  (role) =>
+    new gcp.projects.IAMMember(
+      `vertex-${role.replaceAll(/[./]/gu, "-")}`,
+      {
+        project: project.projectId,
+        role,
+        member: pulumi.interpolate`serviceAccount:${vertexServiceAccount.email}`,
+      },
+      { dependsOn: vertexServiceAccount, protect },
+    ),
+);
+
 const apiKey = new gcp.projects.ApiKey(
   "identityPlatformApiKey",
   {
     project: project.projectId,
     name: `me-builder-identity-${environment}`,
     displayName: `me-builder Identity Platform ${environment}`,
+    deletionPolicy: "PREVENT",
     restrictions: {
       apiTargets: [{ service: "identitytoolkit.googleapis.com" }],
     },
@@ -147,7 +173,22 @@ const apiKey = new gcp.projects.ApiKey(
   { dependsOn: services, protect },
 );
 
-export const authentication = {
+const vertexApiKey = new gcp.projects.ApiKey(
+  "vertexAiApiKey",
+  {
+    project: project.projectId,
+    name: `me-builder-vertex-${environment}`,
+    displayName: `me-builder Vertex AI ${environment}`,
+    deletionPolicy: "PREVENT",
+    serviceAccountEmail: vertexServiceAccount.email,
+    restrictions: {
+      apiTargets: [{ service: "aiplatform.googleapis.com" }],
+    },
+  },
+  { dependsOn: [...services, ...vertexRoleBindings], protect },
+);
+
+export const platform = {
   environment,
   projectId: project.projectId,
   projectNumber: project.number,
@@ -156,4 +197,6 @@ export const authentication = {
   googleOAuthClientId,
   oauthRedirectUris,
   identityPlatformApiKey: pulumi.secret(apiKey.keyString),
+  vertexAiServiceAccount: vertexServiceAccount.email,
+  vertexAiApiKey: pulumi.secret(vertexApiKey.keyString),
 };

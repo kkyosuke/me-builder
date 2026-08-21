@@ -1,0 +1,7 @@
+name: me-builder-gcp-platform
+description: Google Cloud Identity Platform and Vertex AI resources for me-builder
+runtime:
+  name: nodejs
+  options:
+    packagemanager: bun
+main: index.ts

@@ -24,7 +24,7 @@ Productionへの公開は[SSO Production段階公開Runbook](sso-production-roll
 検証担当者は、次がすべて満たされるまで通し検証を開始しません。
 
 - 対象commitのCIが成功し、Preview Web、API、D1、短命transaction storeが同じstackでdeploy済み
-- `infra/gcp-auth`のPulumi `development` Stackが適用済みで、Identity PlatformとGoogle providerが有効である
+- `infra/gcp-platform`のPulumi `development` Stackが適用済みで、Identity Platform、Google provider、Vertex AIが有効である
 - Development OAuth clientにLocalとPreviewの承認済みリダイレクトURIが設計書どおり登録されている
 - `GOOGLE_IDENTITY_PLATFORM_API_KEY`はIdentity Toolkit APIへAPI制限済みで、Development OAuth clientと同じGCP projectを指している
 - application session issuerと失効処理が接続済みで、SSO transactionを同時実行時にも一度だけconsumeできる
