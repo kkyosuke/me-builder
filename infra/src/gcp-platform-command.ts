@@ -1,8 +1,7 @@
 import { pulumiGcsBackends, requirePulumiGcsBackend } from "./pulumi-backend";
 
-export const gcpPlatformEnvironments = ["development", "production"] as const;
-export type GcpPlatformEnvironment = (typeof gcpPlatformEnvironments)[number];
-export type GcpPlatformOperation = "preview" | "up";
+const gcpPlatformEnvironments = ["development", "production"] as const;
+type GcpPlatformEnvironment = (typeof gcpPlatformEnvironments)[number];
 
 export function gcpPlatformCommand(
   operation: string | undefined,
