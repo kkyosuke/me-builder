@@ -30,7 +30,13 @@ Configure these values in the protected GitHub Environment `dev`:
 
 The workflow cannot create the identity that it uses to authenticate. Create the Workload Identity Pool/Provider and direct IAM bindings once from an existing project administrator session before the first run. These are authentication prerequisites only; the bucket and managed folders remain workflow-owned.
 
-The workflow uses Direct Workload Identity Federation and does not impersonate a service account. Map `google.subject=assertion.sub`, restrict the Provider to this repository, and grant the resulting `dev` Environment principal `storage.buckets.create`, `storage.buckets.get`, `storage.buckets.update`, `storage.buckets.setIamPolicy`, `storage.managedFolders.create`, and `storage.managedFolders.get` in the state project. Replace `SUBJECT_ATTRIBUTE_VALUE` in the principal identifier shown by Google Cloud with the exact `sub` value issued for this repository's `dev` Environment; do not guess it from the branch name because an Environment changes the GitHub subject format, and repositories using immutable subjects also include numeric owner and repository IDs. Prefer a bootstrap-specific custom role; if `roles/storage.admin` is granted temporarily, replace it with managed-folder-scoped state access after the first successful run. Do not create or store a service-account JSON key.
+The workflow uses Direct Workload Identity Federation and does not impersonate a service account. Configure `google.subject=assertion.sub` and `attribute.repository=assertion.repository`, and restrict the Provider to `assertion.repository=='kkyosuke/me-builder'`. Because access is granted by the mapped repository attribute, use this exact principal set:
+
+```text
+principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloadIdentityPools/github-actions/attribute.repository/kkyosuke/me-builder
+```
+
+`principal://.../attribute.repository/...` is invalid: `principal://` is only for one mapped `subject`, while a mapped attribute requires `principalSet://`. Grant this principal set `storage.buckets.create`, `storage.buckets.get`, `storage.buckets.update`, `storage.buckets.setIamPolicy`, `storage.managedFolders.create`, and `storage.managedFolders.get` in the state project. Prefer a bootstrap-specific custom role; if `roles/storage.admin` is granted temporarily, replace it with `roles/storage.objectAdmin` on `kagami/cloudflare/` after the first successful run. Do not create or store a service-account JSON key.
 
 After this workflow is merged to the default branch, run it from the Actions screen on `main` with confirmation `bootstrap-kagami-infra`, or use:
 
