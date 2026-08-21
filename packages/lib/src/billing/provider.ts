@@ -46,6 +46,7 @@ export type BillingWebhookEvent = Readonly<{
 
 export interface BillingProvider {
   createCustomer(input: { accountId: string }, idempotencyKey: string): Promise<BillingCustomer>;
+  deleteCustomer(customerId: string, idempotencyKey: string): Promise<BillingCustomer>;
   createCheckoutSession(
     input: {
       customerId: string;

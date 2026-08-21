@@ -193,6 +193,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/account": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** 本人のAccountと個人データを削除する */
+    delete: operations["deleteAccount"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/account-recovery/codes": {
     parameters: {
       query?: never;
@@ -2172,6 +2189,105 @@ export interface operations {
       };
     };
   };
+  deleteAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @constant */
+          confirmed: true;
+        };
+      };
+    };
+    responses: {
+      /** @description Accountと本人データを削除した */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 明示確認を含むリクエストではない */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Invalid request";
+          };
+        };
+      };
+      /** @description application sessionを検証できない */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 直近10分以内の本人確認がない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description 対応するAccountが存在しない */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Account not found";
+            /** @constant */
+            reason: "friendship_required";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description D1 bindingが設定されていない */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
   issueAccountRecoveryCode: {
     parameters: {
       query?: never;
@@ -3078,6 +3194,29 @@ export interface operations {
                 paragraphs: string[];
               }[];
             };
+            notice: {
+              /** @enum {string} */
+              type: "important-upcoming" | "minor-update";
+              document: {
+                /** @constant */
+                documentKey: "terms_of_service";
+                version: string;
+                contentHash: string;
+                requiresReacceptance: boolean;
+                /** Format: date-time */
+                publishedAt: string;
+                title: string;
+                summary: string;
+                sections: {
+                  heading: string;
+                  paragraphs: string[];
+                }[];
+              };
+              /** Format: date-time */
+              effectiveAt: string;
+              /** Format: date-time */
+              displayUntil: string;
+            } | null;
             acceptance: {
               required: boolean;
               acceptedVersion: string | null;

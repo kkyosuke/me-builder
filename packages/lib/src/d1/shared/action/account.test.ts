@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { SharedD1Client } from "../client";
 import * as schema from "../schema";
 import {
+  deleteAccount,
   findAccountByIdentity,
   linkIdentity,
   listActiveLineAccountIds,
@@ -160,6 +161,58 @@ describe("recordAccountActivity", () => {
         })
       )?.lastActivityAt,
     ).toEqual(later);
+  });
+});
+
+describe("deleteAccount", () => {
+  it("identityと表示用個人情報を削除し、同意記録は保持する", async () => {
+    const db = createTestDb();
+    const created = await upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "U_delete_me",
+    });
+    const previouslyUnlinked = await linkIdentity(db, {
+      accountId: created.account.id,
+      provider: "line",
+      providerAccountId: "U_delete_me",
+    });
+    await db
+      .update(schema.accountIdentities)
+      .set({ isDeleted: true, deletedAt: new Date("2026-08-21T00:30:00.000Z") })
+      .where(eq(schema.accountIdentities.id, previouslyUnlinked.id));
+    await acceptCurrentTerms(db, created.account.id);
+    await db.insert(schema.accountProfiles).values({
+      accountId: created.account.id,
+      displayName: "削除対象",
+      displayNameUpdatedAt: new Date("2026-08-21T00:00:00.000Z"),
+    });
+
+    await expect(
+      deleteAccount(db, created.account.id, new Date("2026-08-21T01:00:00.000Z")),
+    ).resolves.toEqual({ deleted: true, avatarObjectKey: null });
+
+    const account = await db.query.accounts.findFirst({
+      where: (table, { eq }) => eq(table.id, created.account.id),
+    });
+    expect(account).toMatchObject({ status: "stopped", role: "user", isDeleted: true });
+    const identities = await db.query.accountIdentities.findMany({
+      where: (table, { eq }) => eq(table.accountId, created.account.id),
+    });
+    expect(identities).toHaveLength(2);
+    expect(identities.every((identity) => identity.isDeleted)).toBe(true);
+    expect(identities.every((identity) => identity.providerAccountId.startsWith("deleted:"))).toBe(
+      true,
+    );
+    expect(
+      await db.query.accountProfiles.findFirst({
+        where: (table, { eq }) => eq(table.accountId, created.account.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.accountAgreementAcceptances.findMany({
+        where: (table, { eq }) => eq(table.accountId, created.account.id),
+      }),
+    ).toHaveLength(1);
   });
 });
 

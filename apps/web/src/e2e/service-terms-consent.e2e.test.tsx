@@ -36,6 +36,7 @@ function installTermsApi(initialAcceptedVersion: string | null) {
       const accepted = acceptedVersion === currentServiceTerms.version;
       return Response.json({
         document: currentServiceTerms,
+        notice: null,
         acceptance: {
           required: !accepted,
           acceptedVersion: accepted ? currentServiceTerms.version : null,

@@ -35,6 +35,7 @@ const authenticatedSession = {
 };
 const acceptedTerms = {
   document: currentServiceTerms,
+  notice: null,
   acceptance: {
     required: false,
     acceptedVersion: currentServiceTerms.version,
@@ -212,6 +213,7 @@ describe("application session Web E2E", () => {
             ? acceptedTerms
             : {
                 document: currentServiceTerms,
+                notice: null,
                 acceptance: {
                   required: true,
                   acceptedVersion: null,

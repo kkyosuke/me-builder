@@ -7,6 +7,7 @@ import type {
 
 type Handlers = Partial<{
   createCustomer: BillingProvider["createCustomer"];
+  deleteCustomer: BillingProvider["deleteCustomer"];
   createCheckoutSession: BillingProvider["createCheckoutSession"];
   createPortalSession: BillingProvider["createPortalSession"];
   scheduleSubscriptionChange: BillingProvider["scheduleSubscriptionChange"];
@@ -26,6 +27,11 @@ export class FakeBillingProvider implements BillingProvider {
   async createCustomer(input: { accountId: string }, key: string): Promise<BillingCustomer> {
     if (this.handlers.createCustomer) return this.handlers.createCustomer(input, key);
     return { id: `cus_${input.accountId}`, deleted: false };
+  }
+
+  async deleteCustomer(customerId: string, key: string): Promise<BillingCustomer> {
+    if (this.handlers.deleteCustomer) return this.handlers.deleteCustomer(customerId, key);
+    return { id: customerId, deleted: true };
   }
 
   async createCheckoutSession(

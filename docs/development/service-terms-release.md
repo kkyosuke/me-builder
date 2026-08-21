@@ -26,18 +26,19 @@
 flowchart TD
     A[変更内容と影響範囲を整理] --> B[再同意要否を確認]
     B --> C[公開済み一覧の末尾へ新versionを追加]
-    C --> D[version・公開日時・本文hashを検証]
-    D --> E[Previewで本文と同意導線を確認]
-    E --> F[PRレビュー]
-    F --> G[mainへのマージで本番公開]
-    G --> H[現在versionと同意状態を確認]
+    C --> D[version・告知日時・適用日時・本文hashを検証]
+    D --> E[Previewで本文と告知導線を確認]
+    E --> F[開発者レビュー]
+    F --> G[重要改定を14日以上前に告知]
+    G --> H[適用日時から再同意gateを開始]
+    H --> I[現在versionと同意状態を確認]
 ```
 
 ### 2.1 変更内容を確定する
 
 1. 変更理由と利用者への影響をPRへ記載する
-2. [同意体験設計の版管理規則](../product/service-terms-consent-experience.md#3-規約の版管理)に基づき、プロダクト責任者が`requiresReacceptance`を決定する
-3. 本文の意味に影響する変更は、必要な法務確認を完了する
+2. [同意体験設計の版管理規則](../product/service-terms-consent-experience.md#3-規約の版管理)に基づき、開発者が`requiresReacceptance`を決定してPRで確認する
+3. 個人開発の通常改定では外部法務承認を必須gateにしない。media入力など別SSoTで法務確認を必須とした変更は、その条件を維持する
 4. 再同意要否と内容確認が完了していない状態で公開用versionを追加しない
 
 ### 2.2 新しいversionを追加する
@@ -47,6 +48,8 @@ flowchart TD
 - `publishedAt`は実際に公開する日時をISO 8601で記録し、Asia/Tokyoでの公開日をversionの日付と一致させ、一覧で単調増加させる
 - `contentHash`以外の公開文書全体を`JSON.stringify`したUTF-8バイト列のSHA-256を保存する
 - 公開済みversionごとの固定hash一覧へ新versionのhashを追加し、既存の固定値は変更しない
+- 重要改定は`serviceTermsAnnouncements`へ適用日の14日以上前の告知日時を追加する。告知releaseでは新本文を閲覧可能にするが、適用日時までは旧版を現行規約として返す
+- 軽微改定は公開日時から30日間だけWeb／LIFFへ非遮断通知を表示する
 
 ## 3. 自動検証
 
@@ -63,6 +66,8 @@ task terms:verify
 - 本文hashの一致とhashの一意性
 - 重要改定が1件以上あり、最新の同意必須versionを解決できること
 - 全公開済みversionの本文と運用属性が固定hashから変更されていないこと
+- 重要改定の告知日時が適用日時の14日以上前であること
+- 適用日前は旧版、適用日時以後は新versionが同意対象になること
 
 PreviewとProductionのCDは、外部resourceの変更やデプロイより前に`task terms:verify`を独立したrelease gateとして実行します。不一致時は後続stepへ進みません。`task ci`にも同じ検証を含めますが、Preview CDは全CIを実行しないため、このgateを省略できません。
 
@@ -77,6 +82,8 @@ Previewでは、初回利用者と既存利用者の両方で確認します。
 - 同じversionへの再送で履歴が重複しない
 
 PRでは変更理由、`requiresReacceptance`の判断根拠、Preview確認結果を記載します。本文の意味に影響する変更は、実装レビューとは別に必要な内容確認を完了してからマージします。
+
+重要改定の告知releaseでは、Web／LIFF通知が表示され、対象AccountへのLINE pushが同じversionについて1回だけ記録されることを確認します。適用releaseでは、Web、LINE誘導先、直接APIが同じ新versionへ収束することを確認します。軽微改定は30日間の表示と、LINE push・再同意がないことを確認します。証跡へAccount ID、外部identity、token、日記本文を残しません。
 
 ## 5. 公開後の訂正
 

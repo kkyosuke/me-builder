@@ -57,6 +57,13 @@ export class StripeBillingProvider implements BillingProvider {
     });
   }
 
+  async deleteCustomer(customerId: string, idempotencyKey: string): Promise<BillingCustomer> {
+    return this.call(async () => {
+      const customer = await this.stripe.customers.del(customerId, { idempotencyKey });
+      return { id: customer.id, deleted: customer.deleted === true };
+    });
+  }
+
   async createCheckoutSession(
     input: {
       customerId: string;

@@ -45,6 +45,7 @@ function dependencies(acceptance?: { acceptedAt: string }) {
       deletedAt: null,
       isDeleted: false,
     }),
+    now: () => new Date("2026-08-21T00:00:00.000Z"),
   };
 }
 
@@ -91,7 +92,12 @@ describe("service terms", () => {
       deps,
     );
     expect(result).toMatchObject({ type: "accepted", acceptance: { accountId: "account-1" } });
-    expect(deps.accept).toHaveBeenCalledWith(db, "account-1");
+    expect(deps.accept).toHaveBeenCalledWith(
+      db,
+      "account-1",
+      new Date("2026-08-21T00:00:00.000Z"),
+      new Date("2026-08-21T00:00:00.000Z"),
+    );
   });
 
   it("本人の同意履歴を現在有効・過去へ分類する", async () => {

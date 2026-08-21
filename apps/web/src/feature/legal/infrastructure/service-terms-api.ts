@@ -24,6 +24,25 @@ const StatusSchema = v.object({
       v.object({ heading: NonEmptyStringSchema, paragraphs: v.array(NonEmptyStringSchema) }),
     ),
   }),
+  notice: v.nullable(
+    v.object({
+      type: v.picklist(["important-upcoming", "minor-update"]),
+      document: v.object({
+        documentKey: v.literal("terms_of_service"),
+        version: NonEmptyStringSchema,
+        contentHash: v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/)),
+        requiresReacceptance: v.boolean(),
+        publishedAt: v.pipe(v.string(), v.isoTimestamp()),
+        title: NonEmptyStringSchema,
+        summary: NonEmptyStringSchema,
+        sections: v.array(
+          v.object({ heading: NonEmptyStringSchema, paragraphs: v.array(NonEmptyStringSchema) }),
+        ),
+      }),
+      effectiveAt: v.pipe(v.string(), v.isoTimestamp()),
+      displayUntil: v.pipe(v.string(), v.isoTimestamp()),
+    }),
+  ),
   acceptance: v.object({
     required: v.boolean(),
     acceptedVersion: v.nullable(NonEmptyStringSchema),
@@ -110,4 +129,17 @@ export async function fetchServiceTermsAcceptanceHistory(
   );
   if (!response.ok) throw errorFor(response.status);
   return v.parse(AcceptanceHistorySchema, await response.json()).acceptances;
+}
+
+export async function deleteOwnAccount(apiUrl: string | undefined): Promise<void> {
+  const response = await createAuthenticatedHttpClient(apiUrl).request("/api/account", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirmed: true }),
+  });
+  if (response.status === 403) {
+    throw new Error("本人確認から10分以上経過しました。LINEから開き直してください。");
+  }
+  if (!response.ok)
+    throw new Error("Accountを削除できませんでした。時間をおいて再試行してください。");
 }

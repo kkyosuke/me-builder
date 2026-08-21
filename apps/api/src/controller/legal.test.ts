@@ -42,6 +42,7 @@ describe("service terms controller", () => {
     vi.mocked(getServiceTermsStatus).mockResolvedValue({
       type: "resolved",
       document,
+      notice: null,
       acceptance: {
         required: true,
         acceptedVersion: null,
@@ -58,6 +59,7 @@ describe("service terms controller", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({
       document: { version: currentServiceTerms.version },
+      notice: null,
       acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
     });
   });

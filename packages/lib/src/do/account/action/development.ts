@@ -11,6 +11,7 @@ import {
   brainVectorEntries,
   brainVectorSyncJobs,
   chatTurns,
+  compatibilityReferences,
   conversationMessages,
   conversationSessions,
   dailyPromptDeliveries,
@@ -24,7 +25,11 @@ import {
   diaryBrainCheckpointItems,
   diaryBrainCheckpoints,
   diaryChatBrainUsageAudits,
+  goalFollowUps,
+  monthlyChangeVersions,
+  personalDataExports,
   profileSummaryGenerations,
+  profileSummaryInsightSelfViews,
   profileSummaryShareProjections,
   profileSummaryVersions,
   progressionEvents,
@@ -32,6 +37,7 @@ import {
   progressionMilestones,
   progressionPendingEvents,
   progressionStates,
+  selfCareConfirmations,
   sourceRecordRevisions,
   sourceRecordTextPayloads,
   sourceRecords,
@@ -51,8 +57,8 @@ export type DeletedDevelopmentAccountData = Readonly<{
 type D1BatchStatement = Parameters<AccountDataDatabase["batch"]>[0][number];
 
 /**
- * 開発用に、AccountDataの個人コンテンツを物理削除する。
- * Account identity、catalog snapshot、相性参照、Vector削除完了用の行は維持する。
+ * AccountDataの個人コンテンツを物理削除する。
+ * Account identity、catalog snapshot、Vector削除完了用の行だけを維持する。
  */
 export async function deleteAllDevelopmentAccountData(
   db: AccountDataDatabase,
@@ -121,10 +127,16 @@ export async function deleteAllDevelopmentAccountData(
       .set({ resetEpoch })
       .where(eq(accountDataIdentity.accountId, accountId)),
     db.delete(profileSummaryShareProjections),
+    db.delete(profileSummaryInsightSelfViews),
     db.delete(profileSummaryVersions),
     db.delete(profileSummaryGenerations),
     db.delete(weeklyReflections),
     db.delete(weeklyReflectionGenerations),
+    db.delete(monthlyChangeVersions),
+    db.delete(goalFollowUps),
+    db.delete(selfCareConfirmations),
+    db.delete(personalDataExports),
+    db.delete(compatibilityReferences),
     db.delete(aiUsageRecords),
     db.delete(progressionPendingEvents),
     db.delete(progressionItemStates),

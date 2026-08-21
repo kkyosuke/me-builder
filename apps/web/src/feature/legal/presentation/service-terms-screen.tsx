@@ -7,15 +7,22 @@ export function ServiceTermsScreen({
   submitting = false,
   error = null,
   onAccept,
+  onDeleteAccount,
+  deletingAccount = false,
+  deleteAccountError = null,
   onBack,
 }: {
   status: ServiceTermsStatus;
   submitting?: boolean;
   error?: string | null;
   onAccept?: () => void;
+  onDeleteAccount?: () => void;
+  deletingAccount?: boolean;
+  deleteAccountError?: string | null;
   onBack?: () => void;
 }) {
   const [confirmed, setConfirmed] = useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const { document, acceptance } = status;
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-950 dark:bg-slate-900 dark:text-white">
@@ -100,6 +107,38 @@ export function ServiceTermsScreen({
               )}
               {submitting ? "同意を記録しています..." : "同意して利用を始める"}
             </button>
+            {onDeleteAccount && (
+              <details className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
+                <summary className="cursor-pointer text-center text-sm font-bold text-slate-600 dark:text-slate-300">
+                  同意せずAccountを削除する
+                </summary>
+                <p className="mt-3 text-xs leading-6 text-slate-600 dark:text-slate-300">
+                  保存済みの本人データとログイン情報を削除します。この操作は元に戻せません。
+                </p>
+                <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm font-bold">
+                  <input
+                    type="checkbox"
+                    checked={deleteConfirmed}
+                    onChange={(event) => setDeleteConfirmed(event.target.checked)}
+                    className="mt-0.5 size-5 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                  />
+                  Accountと本人データが削除されることを確認しました
+                </label>
+                {deleteAccountError && (
+                  <p role="alert" className="mt-2 text-sm text-rose-700 dark:text-rose-300">
+                    {deleteAccountError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={onDeleteAccount}
+                  disabled={!deleteConfirmed || deletingAccount}
+                  className="mt-3 min-h-11 w-full rounded-2xl border border-rose-300 px-5 font-bold text-rose-700 disabled:cursor-not-allowed disabled:opacity-45 dark:border-rose-700 dark:text-rose-300"
+                >
+                  {deletingAccount ? "Accountを削除しています..." : "Accountを完全に削除する"}
+                </button>
+              </details>
+            )}
           </div>
         </div>
       )}
