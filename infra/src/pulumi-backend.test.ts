@@ -64,6 +64,8 @@ describe("requirePulumiGcsBackend", () => {
 
     expect(cloudflareProject).toContain(`url: ${pulumiGcsBackends.cloudflare}`);
     expect(gcpPlatformProject).toContain(`url: ${pulumiGcsBackends.gcpPlatform}`);
+    expect(gcpPlatformProgram).toContain('from "../src/gcp-authorization-key-policy.ts"');
+    expect(gcpPlatformProgram).toContain('from "../src/pulumi-backend.ts"');
     expect(gcpPlatformProgram).toContain("...(standaloneProject ? { import: projectId } : {})");
     expect(gcpPlatformProgram).toContain(
       "...(!standaloneProject ? { autoCreateNetwork: false } : {})",

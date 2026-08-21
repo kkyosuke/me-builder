@@ -1,7 +1,7 @@
 import * as gcp from "@pulumi/gcp";
 import * as pulumi from "@pulumi/pulumi";
-import { authorizationKeyPolicyRule } from "../src/gcp-authorization-key-policy";
-import { pulumiGcsBackends, requirePulumiGcsBackend } from "../src/pulumi-backend";
+import { authorizationKeyPolicyRule } from "../src/gcp-authorization-key-policy.ts";
+import { pulumiGcsBackends, requirePulumiGcsBackend } from "../src/pulumi-backend.ts";
 
 requirePulumiGcsBackend(process.env, pulumiGcsBackends.gcpPlatform);
 
