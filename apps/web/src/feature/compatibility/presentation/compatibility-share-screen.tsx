@@ -249,6 +249,13 @@ function ShareConsentContent({
 
       <CompatibilityShareScope headingId="share-scope-heading" />
 
+      <section className="mt-6 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-100">
+        <p className="font-bold">招待リンクを送る相手を確認してください</p>
+        <p className="mt-1">
+          リンクを受け取ってログインした人は誰でも承諾できます。送りたい相手以外へ転送しないでください。最初に1人が承諾すると、リンクは使用済みになります。
+        </p>
+      </section>
+
       <CompatibilityPrivacyNotice
         title="共有されない詳細"
         footer="相手が承諾するまで、共有は始まりません。共有は後から終了できます。"

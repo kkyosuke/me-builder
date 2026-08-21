@@ -109,6 +109,46 @@ export const compatibilityShareCases = {
       },
     },
   },
+  acceptForwardedInvitation: {
+    id: "COMPATIBILITY-INVITATION-FORWARDED-001",
+    name: "転送先が最初に承諾した後は他Accountへ招待と共有内容を返さないこと",
+    in: {
+      method: "POST",
+      path: "/api/compatibility/invitations/:relationshipId/accept",
+      session: "forwarded-recipient-token",
+      setup: ["送信者が招待を発行", "リンクを受け取った第三者が最初に承諾"],
+    },
+    out: {
+      status: 200,
+      body: {
+        relationshipStatus: "accepted",
+        acceptedRecipient: "forwarded-recipient",
+        laterPreviewStatus: 404,
+        laterAcceptStatus: 404,
+        unrelatedList: "empty",
+        unrelatedDetailStatus: 404,
+      },
+    },
+  },
+  acceptForwardedInvitationConcurrently: {
+    id: "COMPATIBILITY-INVITATION-FORWARDED-CONCURRENT-001",
+    name: "転送された同一招待を同時承諾しても1 Accountだけを受信者にすること",
+    in: {
+      method: "POST",
+      path: "/api/compatibility/invitations/:relationshipId/accept",
+      session: "two-recipient-tokens",
+      setup: ["送信者が招待を発行", "リンクを持つ2 Accountが同時に承諾"],
+    },
+    out: {
+      status: 200,
+      body: {
+        acceptedCount: 1,
+        rejectedCount: 1,
+        loserList: "empty",
+        loserDetailStatus: 404,
+      },
+    },
+  },
   acceptInvitation: {
     id: "COMPATIBILITY-INVITATION-ACCEPT-001",
     name: "受信者の共有同意で相性関係と双方の一覧参照を成立させること",

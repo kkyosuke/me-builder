@@ -190,6 +190,8 @@ AccountDataの一覧RPCは、内部的に`pending`、`reserved`、`active`の参
 - terminal状態から別状態へ戻さない
 - CompatibilityData RPCはraw SQLite clientを公開しない
 - 招待previewへAccount IDと同意時刻を含めない
+- 招待は宛先Accountを事前指定せず、pending状態を最初に承諾した認証済みAccountだけを受信者として固定する
+- 最初の承諾後は、同じリンクを持つ別Accountによるpreview、承諾、一覧参照、相性シート取得を拒否する
 - AccountData参照は一覧projectionであり、相性シートの閲覧権限に使わない
 - 承諾前に双方のAccountDataを同じ順序で予約し、同じ2人のaccepted関係を重複作成しない
 - CompatibilityDataは双方の予約を確認できないpending招待の承諾を拒否する
