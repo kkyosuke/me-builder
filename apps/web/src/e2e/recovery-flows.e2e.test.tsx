@@ -170,6 +170,44 @@ describe("Web recovery flows E2E", () => {
     vi.useRealTimers();
   });
 
+  it("無効な復旧コードを拒否した後、有効なコードで同じAccountへ接続する", async () => {
+    const submittedCodes: string[] = [];
+    let authExchanges = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = urlOf(input);
+      if (url.pathname === "/api/auth/liff/exchange") {
+        authExchanges += 1;
+        return Response.json(authSession);
+      }
+      if (url.pathname === "/api/account-recovery/complete") {
+        const body = JSON.parse(String(init?.body)) as { code: string };
+        submittedCodes.push(body.code);
+        return body.code === "active.recovery-code"
+          ? Response.json({ status: "recovered", alreadyRecovered: false })
+          : Response.json({ error: "Invalid recovery code" }, { status: 400 });
+      }
+      throw new Error(`Unexpected E2E request: ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.replaceState({}, "", "/account-recovery");
+
+    render(<App />);
+
+    const input = await screen.findByLabelText("復旧コード");
+    fireEvent.change(input, { target: { value: "expired.recovery-code" } });
+    fireEvent.click(screen.getByRole("button", { name: "このLINE Accountへ接続" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "復旧コードを確認できませんでした",
+    );
+    fireEvent.change(input, { target: { value: "active.recovery-code" } });
+    fireEvent.click(screen.getByRole("button", { name: "このLINE Accountへ接続" }));
+
+    expect(await screen.findByText("同じAccountへ接続しました")).toBeTruthy();
+    expect(submittedCodes).toEqual(["expired.recovery-code", "active.recovery-code"]);
+    expect(authExchanges).toBe(2);
+  });
+
   it("診断結果の直リンク取得が一時失敗しても、同じURLから再試行して表示する", async () => {
     let resultRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
