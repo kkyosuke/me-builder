@@ -21,17 +21,16 @@ The GCP platform project additionally requires Application Default Credentials, 
 
 The state project is a bootstrap prerequisite and is not created or deleted by either Pulumi project in this repository. Create the bucket and managed folders once with the manual [`Setup / Pulumi State Backend`](../.github/workflows/setup-pulumi-state.yml) workflow. The workflow is idempotent: it preserves an existing bucket, verifies its immutable location, and reconciles its mutable security, storage-class, and versioning settings.
 
-Create a protected GitHub Environment named `infra-bootstrap`, then configure these Environment variables:
+Configure these values in the protected GitHub Environment `dev`:
 
 | Kind | Name | Value |
 | --- | --- | --- |
 | Variable | `GCP_STATE_PROJECT_ID` | the existing project that owns `gs://kagami-infra/` |
-| Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER` | the full Workload Identity Provider resource name restricted to this repository and the `main` branch |
-| Variable | `GCP_STATE_BOOTSTRAP_SERVICE_ACCOUNT` | the dedicated service account impersonated only by the bootstrap workflow |
+| Secret | `GCP_WORKLOAD_IDENTITY_PROVIDER` | the full Workload Identity Provider resource name restricted to this repository and Environment |
 
-The workflow cannot create the identity that it uses to authenticate. Create the Workload Identity Pool/Provider, bootstrap service account, repository-and-`main`-restricted impersonation binding, and bootstrap IAM role once from an existing project administrator session before the first run. These are authentication prerequisites only; the bucket and managed folders remain workflow-owned.
+The workflow cannot create the identity that it uses to authenticate. Create the Workload Identity Pool/Provider and direct IAM bindings once from an existing project administrator session before the first run. These are authentication prerequisites only; the bucket and managed folders remain workflow-owned.
 
-Require reviewers on `infra-bootstrap`. The WIF principal must be allowed to impersonate the configured service account. That service account needs `storage.buckets.create`, `storage.buckets.get`, `storage.buckets.update`, `storage.buckets.setIamPolicy`, `storage.managedFolders.create`, and `storage.managedFolders.get` in the state project. Prefer a bootstrap-specific custom role; if `roles/storage.admin` is granted temporarily, revoke it after the first successful run. Do not store a service-account JSON key in GitHub.
+The workflow uses Direct Workload Identity Federation and does not impersonate a service account. Map `google.subject=assertion.sub`, restrict the Provider to this repository, and grant the resulting `dev` Environment principal `storage.buckets.create`, `storage.buckets.get`, `storage.buckets.update`, `storage.buckets.setIamPolicy`, `storage.managedFolders.create`, and `storage.managedFolders.get` in the state project. Replace `SUBJECT_ATTRIBUTE_VALUE` in the principal identifier shown by Google Cloud with the exact `sub` value issued for this repository's `dev` Environment; do not guess it from the branch name because an Environment changes the GitHub subject format, and repositories using immutable subjects also include numeric owner and repository IDs. Prefer a bootstrap-specific custom role; if `roles/storage.admin` is granted temporarily, replace it with managed-folder-scoped state access after the first successful run. Do not create or store a service-account JSON key.
 
 After this workflow is merged to the default branch, run it from the Actions screen on `main` with confirmation `bootstrap-kagami-infra`, or use:
 
@@ -61,12 +60,12 @@ No GCP service-account JSON key is required or accepted for this procedure. Keep
 
 | Operation | Required credential |
 | --- | --- |
-| state backend bootstrap workflow | GitHub OIDC / Workload Identity Federation; no JSON key |
+| state backend bootstrap workflow | GitHub OIDC / Direct Workload Identity Federation; no service account or JSON key |
 | break-glass manual bucket operation | the interactive `gcloud auth login` session |
 | local Pulumi state and GCP operations | ADC from `gcloud auth application-default login` |
 | Pulumi state decryption | a user-generated `PULUMI_CONFIG_PASSPHRASE`; use different values for Cloudflare and GCP |
 | Cloudflare resource operations | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` |
-| GitHub Actions state access | OIDC / Workload Identity Federation; no JSON key |
+| GitHub Actions state access | OIDC / Direct Workload Identity Federation; no service account or JSON key |
 
 ```bash
 export PULUMI_CONFIG_PASSPHRASE=<cloudflare-value-from-password-manager>
@@ -81,10 +80,9 @@ The `Reset / Preview Migrations` workflow authenticates with GitHub OIDC and Wor
 | --- | --- | --- |
 | Secret | `PULUMI_CONFIG_PASSPHRASE` | the non-empty passphrase for the Cloudflare Stack |
 | Variable | `GCP_STATE_PROJECT_ID` | the project that owns `gs://kagami-infra/` |
-| Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER` | the full Workload Identity Provider resource name restricted to this repository |
-| Variable | `GCP_PULUMI_STATE_SERVICE_ACCOUNT` | the service account impersonated by GitHub Actions |
+| Secret | `GCP_WORKLOAD_IDENTITY_PROVIDER` | the full Workload Identity Provider resource name restricted to this repository and Environment |
 
-The Workload Identity principal must be allowed to impersonate only the configured service account. Grant that service account object access on the `kagami/cloudflare/` managed folder, not at bucket level, and do not grant it access to `kagami/gcp-platform/`. The workflow does not accept a JSON key fallback.
+Grant the direct Workload Identity principal object access on the `kagami/cloudflare/` managed folder, not at bucket level, and do not grant it access to `kagami/gcp-platform/`. The workflows do not accept a service-account or JSON-key fallback.
 
 An empty GCS backend has no knowledge of the existing Cloudflare resources. For the first adoption, either import every resource into the `preview` Stack or run the destructive `Reset / Preview Migrations` workflow after reviewing its deletion scope. Do not run a normal `infra:preview:up` against an empty backend while the named resources still exist.
 

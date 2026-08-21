@@ -40,16 +40,31 @@ describe("requirePulumiGcsBackend", () => {
   });
 
   it("Pulumi projectとbootstrap workflowの固定backendを一致させる", async () => {
-    const [cloudflareProject, gcpPlatformProject, bootstrapWorkflow] = await Promise.all([
-      readFile(new URL("../Pulumi.yaml", import.meta.url), "utf8"),
-      readFile(new URL("../gcp-platform/Pulumi.yaml", import.meta.url), "utf8"),
-      readFile(new URL("../../.github/workflows/setup-pulumi-state.yml", import.meta.url), "utf8"),
-    ]);
+    const [cloudflareProject, gcpPlatformProject, bootstrapWorkflow, resetWorkflow] =
+      await Promise.all([
+        readFile(new URL("../Pulumi.yaml", import.meta.url), "utf8"),
+        readFile(new URL("../gcp-platform/Pulumi.yaml", import.meta.url), "utf8"),
+        readFile(
+          new URL("../../.github/workflows/setup-pulumi-state.yml", import.meta.url),
+          "utf8",
+        ),
+        readFile(
+          new URL("../../.github/workflows/reset-preview-migrations.yml", import.meta.url),
+          "utf8",
+        ),
+      ]);
 
     expect(cloudflareProject).toContain(`url: ${pulumiGcsBackends.cloudflare}`);
     expect(gcpPlatformProject).toContain(`url: ${pulumiGcsBackends.gcpPlatform}`);
     expect(bootstrapWorkflow).toContain('bucket_uri="gs://kagami-infra"');
     expect(bootstrapWorkflow).toContain("--default-storage-class=STANDARD");
     expect(bootstrapWorkflow).not.toContain("NEARLINE");
+    for (const workflow of [bootstrapWorkflow, resetWorkflow]) {
+      expect(workflow).toContain("uses: google-github-actions/auth@v2");
+      expect(workflow).toContain(
+        "workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}",
+      );
+      expect(workflow).not.toContain("service_account:");
+    }
   });
 });

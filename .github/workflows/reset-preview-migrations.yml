@@ -41,8 +41,7 @@ jobs:
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
       PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
       GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
-      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      GCP_PULUMI_STATE_SERVICE_ACCOUNT: ${{ vars.GCP_PULUMI_STATE_SERVICE_ACCOUNT }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
       # 実行時に選んだブランチをそのまま使う。migration・seed・deployの内容と、
@@ -106,7 +105,6 @@ jobs:
           required_gcp_variables=(
             GCP_STATE_PROJECT_ID
             GCP_WORKLOAD_IDENTITY_PROVIDER
-            GCP_PULUMI_STATE_SERVICE_ACCOUNT
           )
           for variable_name in "${required_gcp_variables[@]}"; do
             variable_value="${!variable_name}"
@@ -132,11 +130,10 @@ jobs:
           bun --cwd apps/web scripts/validate-liff-configuration.ts
 
       - name: Authenticate to Pulumi State on Google Cloud
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@v2
         with:
           project_id: ${{ env.GCP_STATE_PROJECT_ID }}
-          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.GCP_PULUMI_STATE_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: Install Pulumi CLI
         run: |
