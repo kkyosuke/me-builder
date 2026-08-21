@@ -27,7 +27,8 @@
     - `task lint:fix`: Biome によるコード Lint / フォーマットの自動修復
     - `task audit`: `bun audit` による既知脆弱性の検査
     - `task test`: Vitest による全テスト実行
-    - `bun run test:unit`: E2Eを除外したテスト実行（`test:pre-push`は同じもののpre-push向けの別名）
+    - `bun run test:unit`: E2Eを除外したテスト実行
+    - `bun run test:pre-push -- <files...>`: 指定ファイルを静的importで参照するE2E以外の関連テストだけを実行するpre-push向け検証。関連テストがなければ成功扱いとする
     - `bun run test:e2e`: E2EとWorker runtime E2Eだけのテスト実行
     - `task generate:api`: APIのOpenAPI documentとWeb UI用TypeScript型を再生成
     - `task ci`: 依存関係監査, 生成物差分, lint, 未使用export, Markdown lint, typecheck, test（E2Eを含む全体）, build の一括ローカル実行。`cd-production.yml`が本番デプロイ前に実行するものと同じで、リンク切れ確認は含みません（相対リンクは`ci.yml`、外部URLは`scheduled-checks.yml`が担当）
@@ -79,7 +80,7 @@
     - `tsconfig.json` の `incremental` は、この tsbuildinfo キャッシュを効かせるために有効化しています。無効化するとキャッシュが無意味になります。
   - パッケージの追加・削除はルートから `bun add <package> --cwd <workspace-dir>`（例: `bun add @line/liff --cwd apps/web`）を使用し、個別ディレクトリで `npm install` を実行しないこと。ルートで引数なしに `bun add <package>` を実行するとルートの `package.json` に入ってしまうため、対象ワークスペースを必ず指定します。
   - 上流パッケージが脆弱な推移依存を固定している場合は、ルート`package.json`の`overrides`で修正版を固定します。削除・緩和する前に`bun audit`が0件であることと`task ci`が通ることを確認してください。
-  - pre-pushではブランチ名、型、E2E以外のテストを検証します。ローカルD1などを使うE2Eはpushの必須条件にせず、`task test`と`task ci`、GitHub Actionsでは`e2e`ラベル付きPRの`ci-e2e.yml`と`cd-production.yml`が実行します。
+  - pre-pushではブランチ名、型、push対象のJavaScript・TypeScript・SQLファイルを静的importで参照するE2E以外の関連テストを検証します。対象のコードファイルがない場合は関連テストの探索自体をスキップします。設定・依存関係の変更や動的importなどで関連テストを特定できない場合も、pre-pushでは全テストへフォールバックしません。ローカルD1などを使うE2Eと差分判定では拾えない回帰はpushの必須条件にせず、`task test`と`task ci`、GitHub Actionsでは`ci.yml`、`e2e`ラベル付きPRの`ci-e2e.yml`、`cd-production.yml`が検証します。
   - `postinstall`の`lefthook install`はGitHub Actions上でもhookを設置するため、ワークフロー内でcommit / pushするstepには`LEFTHOOK: "0"`を設定してhookを無効化します。hookはローカル開発者向けの検証であり、ワークフロー側は`bun run ci`などで同じ検証を明示的に実行します。
   - ワークフローが`GITHUB_TOKEN`で作成したPRは`pull_request`イベントを発火せず、`ci.yml`が起動しません。自動PRをテスト結果で条件付きにマージする場合は、GitHubのauto-mergeやrequired status checksに頼らず、PRを作った同じjobで検証を実行してからマージします。
   - 環境変数を読む設定関数のテストで「未設定ならundefined」を検証する場合は、`vi.stubEnv(<name>, undefined)`で実行環境の値を消します。`getEnv`はCloudflare Workersの`env`に無いキーを`process.env`から補うため、GitHub Actionsのjob levelの`env`が混ざるとローカルだけ通るテストになります。

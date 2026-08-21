@@ -25,7 +25,7 @@
     "test": "vitest run && bun --filter @me-builder/worker test:runtime",
     "test:unit": "vitest run --exclude '**/{e2e/**,runtime-e2e/**,*.e2e.test.*}'",
     "test:e2e": "vitest run --dir . e2e && bun --filter @me-builder/worker test:runtime",
-    "test:pre-push": "bun run test:unit",
+    "test:pre-push": "vitest related --run --passWithNoTests --exclude '**/{e2e/**,runtime-e2e/**,*.e2e.test.*}'",
     "ci": "bun run audit && bun run check:generated && bun run lint && bun run lint:exports && bun run lint:md && bun run typecheck && bun run test && bun run build",
     "task": "task",
     "deploy:preview": "bun --filter '*' deploy:preview",
