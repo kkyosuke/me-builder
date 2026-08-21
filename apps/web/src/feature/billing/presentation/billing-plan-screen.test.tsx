@@ -109,8 +109,11 @@ describe("BillingPlanScreen", () => {
     expect(screen.getByText("約17%OFF")).toBeTruthy();
     expect(screen.getByText(/月あたり約.*650.*利用できます/)).toBeTruthy();
     expect(screen.getByText(/年間.*1,560.*お得/, { selector: "footer p" })).toBeTruthy();
-    expect(screen.getByText(/自動更新/)).toBeTruthy();
+    expect(screen.getAllByText(/自動更新/).length).toBeGreaterThan(0);
     expect(screen.getByText(/期間末解約/)).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "特定商取引法に基づく表記" }).getAttribute("href"),
+    ).toBe("/commercial-transactions");
     const purchaseButton = screen.getByRole("button", { name: /プランを変更する/ });
     expect(purchaseButton.closest("footer")?.className).toContain("fixed");
     fireEvent.click(purchaseButton);
@@ -207,6 +210,7 @@ describe("BillingPlanScreen", () => {
     );
 
     expect(screen.getByText(/初回.*14日間無料/)).toBeTruthy();
+    expect(screen.getByText(/開始時に支払方法を登録/)).toBeTruthy();
     expect(screen.getByText(/本日開始した場合.*まで無料/)).toBeTruthy();
     expect(screen.getByText(/終了後は.*780.*毎月自動更新/)).toBeTruthy();
   });

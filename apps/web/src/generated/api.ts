@@ -1329,6 +1329,7 @@ export interface operations {
             | "/terms"
             | "/privacy"
             | "/contact"
+            | "/commercial-transactions"
             | "/diagnosis"
             | "/diagnosis/:diagnosisId/answers"
             | "/compatibility"

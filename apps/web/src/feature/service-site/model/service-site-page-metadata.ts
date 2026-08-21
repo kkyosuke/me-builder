@@ -9,6 +9,12 @@ export type ServiceSitePageMetadata = Readonly<{
 }>;
 
 export const serviceSitePageMetadata = {
+  "commercial-transactions": {
+    pathname: "/commercial-transactions",
+    title: "特定商取引法に基づく表記｜かがみ",
+    description: "かがみの有料プランに関する料金、支払、解約、返金条件をご案内します。",
+    robots: "index,follow",
+  },
   contact: {
     pathname: "/contact",
     title: "お問い合わせ｜かがみ",

@@ -96,7 +96,7 @@ describe("StripeBillingProvider", () => {
     expect(list).toHaveBeenCalledWith({ customer: "cus_secret", limit: 1 });
   });
 
-  it("初回対象のCheckoutだけ14日間trialをStripeへ指定する", async () => {
+  it("初回対象のCheckoutへ14日間trialと決済手段の事前登録を指定する", async () => {
     const create = vi.fn().mockResolvedValue({
       id: "cs_trial",
       url: "https://checkout.stripe.test/session",
@@ -118,7 +118,10 @@ describe("StripeBillingProvider", () => {
     );
 
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ subscription_data: { trial_period_days: 14 } }),
+      expect.objectContaining({
+        payment_method_collection: "always",
+        subscription_data: { trial_period_days: 14 },
+      }),
       { idempotencyKey: "checkout-key" },
     );
   });

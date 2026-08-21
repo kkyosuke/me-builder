@@ -21,6 +21,9 @@ export function ServiceSiteFooter() {
           <a className="font-semibold hover:underline" href="/privacy">
             プライバシーポリシー
           </a>
+          <a className="font-semibold hover:underline" href="/commercial-transactions">
+            特定商取引法に基づく表記
+          </a>
           <a className="font-semibold hover:underline" href="/contact">
             お問い合わせ
           </a>

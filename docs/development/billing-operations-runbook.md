@@ -39,6 +39,8 @@ flowchart TD
 
 売上、返金、手数料はStripe Dashboard、Plan別の有料Account数は管理者課金healthと共有D1の運用集計で確認します。カード情報、日記、診断、AI相談内容を集計へ含めません。
 
+当面は同じサービス管理者が監視、`support@kagami.kyosuke.dev`の問い合わせ、DLQ復旧を担当します。対応はベストエフォートで、営業時間、回答期限、可用性を保証しません。売上、返金、契約数、支払失敗はStripe Dashboardを正本とし、30日・90日の独自集計へ複製しません。
+
 ## 3. 代表的な復旧
 
 ### 3.1 projection遅延・誤Plan

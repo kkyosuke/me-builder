@@ -77,7 +77,7 @@ flowchart LR
 
 ### 3.6 SNS共有表示をデプロイ環境で確認する
 
-CDはデプロイ直後に、`/`、`/terms`、`/privacy`、`/contact`の非JavaScript初期HTMLと、本人向けWebアプリ・管理者画面の`X-Robots-Tag: noindex, nofollow`を自動検査します。次の実サービス確認は引き続き必要です。
+CDはデプロイ直後に、`/`、`/terms`、`/privacy`、`/commercial-transactions`、`/contact`の非JavaScript初期HTMLと、本人向けWebアプリ・管理者画面の`X-Robots-Tag: noindex, nofollow`を自動検査します。次の実サービス確認は引き続き必要です。
 
 - SNS共有時にタイトル、説明、共有画像が個人データを含まず表示されることを確認する
 - 正式なプライバシーポリシーと窓口の公開後だけ、対応ページを検索対象へ変更する

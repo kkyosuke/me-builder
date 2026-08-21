@@ -123,7 +123,7 @@ docs/
 - [診断回答形式の実装境界](development/diagnosis-format-remaining-tasks.md) — 標準2択と例外5段階の形式、score、保存、UI、互換性の確定事項
 - [ネイティブアプリ提供境界](development/native-app-remaining-tasks.md) — iOS・Androidを提供せず、LINEとWebへ機能を分担する確定方針
 - [Subscription Plan機能のPreview検証](development/subscription-preview-plan-verification.md) — 決済サービスなしでPlan切替、利用上限、本人データ、安全案内、Family境界を確認する手順
-- [SubscriptionのProduction段階公開](development/subscription-production-rollout.md) — 新規購入の段階公開、緊急停止・再開、実取引、30日・90日価格検証の手順
+- [SubscriptionのProduction段階公開](development/subscription-production-rollout.md) — 新規購入の段階公開、緊急停止・再開、実取引、Stripe Dashboard確認の手順
 - [サービス紹介サイト残タスク](development/service-site-remaining-tasks.md) — サービス紹介サイトで未完了の意思決定、法務確認、実環境検証と完了条件
 - [サブスクリプション実装残タスク](development/subscription-remaining-tasks.md) — AccountとPlanの紐付け前後をA・B系列に分けた番号付きPR単位の残作業
 - [Stripe課金環境セットアップ](development/stripe-billing-setup.md) — Stripe商品catalog、Portal、Webhookの再現と環境設定

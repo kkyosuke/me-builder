@@ -200,6 +200,17 @@ describe("setupStripeBillingCatalog", () => {
       enabled: true,
       mode: "at_period_end",
     });
+    expect(params).toMatchObject({
+      business_profile: {
+        headline: "かがみの契約とお支払い",
+        privacy_policy_url: "https://example.test/privacy",
+        terms_of_service_url: "https://example.test/terms",
+      },
+      features: {
+        invoice_history: { enabled: true },
+        payment_method_update: { enabled: true },
+      },
+    });
     const reset = billingPortalConfigurationParams({
       webBaseUrl: "https://example.test",
       metadata: { managed_by: "test", portal_mode: "reset" },

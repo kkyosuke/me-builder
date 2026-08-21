@@ -470,7 +470,7 @@ export const billingPortalConfigurationParams = (
   name: "me-builder billing portal",
   default_return_url: spec.webBaseUrl,
   business_profile: {
-    headline: "me-builderの契約とお支払い",
+    headline: "かがみの契約とお支払い",
     privacy_policy_url: `${spec.webBaseUrl}/privacy`,
     terms_of_service_url: `${spec.webBaseUrl}/terms`,
   },
