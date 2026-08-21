@@ -28,6 +28,7 @@ export type EntitlementPolicy = Readonly<{
   goalFollowUp: "none" | "selected-one" | "relevant-active";
   selfCareContext: "general" | "confirmed" | "personalized-history";
   concurrentRelationshipLimit: number;
+  familyPackRelationshipsIncluded: boolean;
   familySeatLimit: number;
   features: Readonly<Record<EntitlementFeature, boolean>>;
 }>;
@@ -41,6 +42,7 @@ const policies = {
     goalFollowUp: "none",
     selfCareContext: "general",
     concurrentRelationshipLimit: 0,
+    familyPackRelationshipsIncluded: false,
     familySeatLimit: 0,
     features: {
       "weekly-reflection": false,
@@ -58,6 +60,7 @@ const policies = {
     goalFollowUp: "selected-one",
     selfCareContext: "confirmed",
     concurrentRelationshipLimit: 1,
+    familyPackRelationshipsIncluded: false,
     familySeatLimit: 0,
     features: {
       "weekly-reflection": true,
@@ -75,6 +78,7 @@ const policies = {
     goalFollowUp: "relevant-active",
     selfCareContext: "personalized-history",
     concurrentRelationshipLimit: 5,
+    familyPackRelationshipsIncluded: false,
     familySeatLimit: 0,
     features: {
       "weekly-reflection": true,
@@ -92,6 +96,7 @@ const policies = {
     goalFollowUp: "relevant-active",
     selfCareContext: "personalized-history",
     concurrentRelationshipLimit: 5,
+    familyPackRelationshipsIncluded: true,
     familySeatLimit: 4,
     features: {
       "weekly-reflection": true,

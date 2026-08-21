@@ -112,6 +112,8 @@ snapshotは現在月と前月の2か月分だけを保持し、次の月のsnaps
 
 利用できるPlanと関係数は[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md#41-機能一覧)を正とします。`CompatibilityData`は現在の割り当て元Accountだけを関係の状態として持ち、Plan、契約、残り枠を保存しません。各`AccountData`は本人が利用権限を割り当てた関係IDを持ち、本人の同時利用数を直列に予約します。クライアントが送ったPlanや上限値は使わず、API Serverが共通Entitlementから解決した上限だけを予約commandへ渡します。
 
+共通Entitlementは、外部関係へ割り当てられる`concurrentRelationshipLimit`、同じfamily pack参加者間を外部枠へ数えない`familyPackRelationshipsIncluded`、支払者が管理できる`familySeatLimit`を別々に返します。Free／Lite／Full／family支払者／family参加者のmatrixは、Stripe非依存のcontract testに加え、共有D1の契約projectionとfamily席継承を通すE2Eで固定します。基本の相性シートはこの割り当て上限で制限しません。
+
 ```mermaid
 sequenceDiagram
     actor U as 利用権限を持つ本人
