@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { serviceSitePageMetadata } from "../src/feature/service-site/model/service-site-page-metadata";
-import { renderServiceSiteDocument } from "./generate-service-site-entrypoints";
+import {
+  renderServiceSiteDocument,
+  serviceSiteEntrypointFilename,
+} from "./generate-service-site-entrypoints";
 
 const source = "<!doctype html><html><head><title>かがみ</title>  </head><body></body></html>";
 
 describe("renderServiceSiteDocument", () => {
+  it.each([
+    ["/", "index.html"],
+    ["/terms", "terms.html"],
+    ["/privacy", "privacy.html"],
+    ["/contact", "contact.html"],
+  ])("%sを末尾slashへのredirectが不要なentrypointへ変換する", (pathname, expected) => {
+    expect(serviceSiteEntrypointFilename(pathname)).toBe(expected);
+  });
+
   it("初期HTMLへ検索・共有メタデータを埋め込む", () => {
     const result = renderServiceSiteDocument(
       source,
