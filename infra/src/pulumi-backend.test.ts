@@ -97,7 +97,8 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage buckets");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");
     expect(resetWorkflow).toContain("environment: infra-dev");
-    expect(resetWorkflow).toContain('[ "${REF_NAME}" != "main" ]');
+    expect(resetWorkflow).toContain('expected_confirmation="reset-preview:${RESET_REF}"');
+    expect(resetWorkflow).toContain('[ "${REF_TYPE}" != "branch" ]');
     expect(stripeWorkflow).toContain("inputs.environment == 'dev' && 'infra-dev' || 'stripe-prd'");
     for (const workflow of [gcpPlatformWorkflow, resetWorkflow]) {
       expect(workflow).toContain("uses: google-github-actions/auth@v2");

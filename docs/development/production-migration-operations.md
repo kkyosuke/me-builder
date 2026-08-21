@@ -161,3 +161,17 @@ class削除はnamespaceと保存データを恒久的に削除し、Worker rollb
 - [ ] Queue、alarm、未起動DO instanceに残る旧形式を扱える
 - [ ] 失敗時に戻すコードversionと、前進修復の担当を決めた
 - [ ] データ復元が必要な変更では、D1とDOそれぞれの利用可能な復旧手段を確認した
+
+## 8. 復旧演習とdrift検知
+
+本番データを意図的に破損させる演習は行いません。代わりに、通常CIでmigrationの旧schema互換性とデプロイ順序を検証し、週次のScheduled Checksで本番Cloudflare resourceを読み取り専用で照合します。照合対象はD1のmanifest ID、Private R2、session KV、全Queue、Vectorizeの次元・距離、Worker・API・MCPの存在です。欠落、同名resourceへの置換、設定差分、API検査失敗のいずれも成功へ丸めません。
+
+部分デプロイの演習では、D1 migration後にコードデプロイが止まった状態を想定します。CIが直前schemaから全migrationを適用して既存データを保持できること、旧形式Queue messageを現行consumerが処理できること、Production workflowがmigrationより後にコードをデプロイすることを検証します。復旧手順は[6.2](#62-d1-migration成功後にコードデプロイが失敗した)に従い、schema rollbackではなく直前の安定版または修正版へコードを揃えます。
+
+破壊的なPreview再構築は選択branchを含む確認文字列と実行理由を必須にし、破壊前にactor、対象、run URL、理由をGitHub Actions summaryへ記録します。Productionを全消去するtaskやworkflowは提供しません。
+
+## 9. 復旧責任とサービス水準
+
+復旧判断と実行のownerはサービス管理者1名です。GitHub Actionsの失敗通知を検知入口とし、確認後にこの文書のforward-only手順でbest effortに復旧します。個人運営サービスとして復旧時間（RTO）と復旧時点（RPO）の対外保証は設けず、固定時間内の復旧や無損失を約束しません。D1 Time TravelやDO PITRなど事故時点で利用可能なCloudflareの保持範囲を確認し、安全な復旧を急いだ破壊操作より優先します。
+
+この方針は無期限の放置を許すものではありません。障害を確認した管理者は影響する入口と自動再実行を止め、対象versionと保存先を記録し、復旧・停止継続・利用者告知のいずれかを判断します。復旧完了時はworkflow run、対象commit、実施内容、検証結果をIssueまたは運用記録へ残します。

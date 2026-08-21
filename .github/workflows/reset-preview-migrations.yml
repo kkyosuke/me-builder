@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: '全 Preview データを削除するには "reset-preview" と入力'
+        description: '全 Preview データを削除するには "reset-preview:<選択branch>" と入力'
+        required: true
+        type: string
+      reason:
+        description: '実行理由（200文字以内。監査記録へ保存）'
         required: true
         type: string
 
@@ -24,17 +28,24 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CONFIRMATION: ${{ inputs.confirmation }}
-      REF_NAME: ${{ github.ref_name }}
+      REASON: ${{ inputs.reason }}
+      RESET_REF: ${{ github.ref_name }}
       REF_TYPE: ${{ github.ref_type }}
     steps:
-      - name: Validate Main and Confirmation
+      - name: Validate Branch, Confirmation, and Reason
         run: |
-          if [ "${CONFIRMATION}" != "reset-preview" ]; then
-            echo '::error::確認文字列が一致しません。"reset-preview" と入力してください。'
+          expected_confirmation="reset-preview:${RESET_REF}"
+          if [ "${CONFIRMATION}" != "${expected_confirmation}" ]; then
+            echo "::error::確認文字列が一致しません。reset-preview:<選択branch> を入力してください。"
             exit 1
           fi
-          if [ "${REF_TYPE}" != "branch" ] || [ "${REF_NAME}" != "main" ]; then
-            echo "::error::Preview resetはmainブランチからだけ実行できます。"
+          reason_without_space="${REASON//[[:space:]]/}"
+          if [ -z "${reason_without_space}" ] || [ "${#REASON}" -gt 200 ]; then
+            echo "::error::実行理由は空白以外を含む200文字以内で入力してください。"
+            exit 1
+          fi
+          if [ "${REF_TYPE}" != "branch" ]; then
+            echo "::error::ブランチを選んで実行してください。tagからは reset できません。"
             exit 1
           fi
 
@@ -73,7 +84,7 @@ jobs:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
-      # 検証済みmainだけを使い、resource IDは後段で専用PRへ反映する。
+      # 選択branchと確認文字列を一致させ、resource IDは後段で専用PRへ反映する。
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-bun-workspace
@@ -144,6 +155,26 @@ jobs:
             exit 1
           fi
           bun --cwd apps/web scripts/validate-liff-configuration.ts
+
+      # 後続の破壊操作が失敗しても、対象・実行者・理由・run URLを先に証跡へ残す。
+      - name: Record Authorized Reset
+        env:
+          RESET_ACTOR: ${{ github.actor }}
+          RESET_REASON: ${{ inputs.reason }}
+          RESET_REF: ${{ github.ref_name }}
+        run: |
+          reason_one_line="$(printf '%s' "${RESET_REASON}" | tr '\r\n' '  ')"
+          {
+            echo "### Authorized Preview reset"
+            echo
+            echo "- Actor: \`${RESET_ACTOR}\`"
+            echo "- Target branch: \`${RESET_REF}\`"
+            echo "- Target environment: \`dev / Preview\`"
+            echo "- Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Reason:"
+            echo
+            echo "    ${reason_one_line}"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Authenticate to Pulumi State on Google Cloud
         uses: google-github-actions/auth@v2
