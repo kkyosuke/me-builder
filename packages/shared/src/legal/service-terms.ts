@@ -222,15 +222,17 @@ export function getServiceTermsNotice(
   const announcementByVersion = new Map(
     announcements.map((announcement) => [announcement.documentVersion, announcement]),
   );
-  const upcoming = [...documents].reverse().find((document) => {
-    const announcement = announcementByVersion.get(document.version);
-    return (
-      document.requiresReacceptance &&
-      announcement !== undefined &&
-      Date.parse(announcement.announcedAt) <= now &&
-      now < Date.parse(document.publishedAt)
-    );
-  });
+  const upcoming = documents
+    .filter((document) => {
+      const announcement = announcementByVersion.get(document.version);
+      return (
+        document.requiresReacceptance &&
+        announcement !== undefined &&
+        Date.parse(announcement.announcedAt) <= now &&
+        now < Date.parse(document.publishedAt)
+      );
+    })
+    .sort((left, right) => Date.parse(left.publishedAt) - Date.parse(right.publishedAt))[0];
   if (upcoming) {
     return {
       type: "important-upcoming",

@@ -286,8 +286,7 @@ export async function deleteAccount(
     }),
     db.query.accountIdentities.findMany({
       columns: { id: true },
-      where: (table, { and, eq }) =>
-        and(eq(table.accountId, accountId), eq(table.isDeleted, false)),
+      where: (table, { eq }) => eq(table.accountId, accountId),
     }),
     db.query.accountProfiles.findFirst({
       columns: { avatarObjectKey: true },

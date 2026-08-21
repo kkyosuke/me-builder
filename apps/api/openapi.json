@@ -1447,27 +1447,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "kind": "schema",
                 "type": "object",
-                "expects": "Object",
-                "async": false,
-                "entries": {
+                "additionalProperties": false,
+                "properties": {
                   "confirmed": {
-                    "kind": "schema",
-                    "type": "literal",
-                    "expects": "true",
-                    "async": false,
-                    "literal": true,
-                    "~standard": {
-                      "version": 1,
-                      "vendor": "valibot"
-                    }
+                    "type": "boolean",
+                    "const": true
                   }
                 },
-                "~standard": {
-                  "version": 1,
-                  "vendor": "valibot"
-                }
+                "required": ["confirmed"]
               }
             }
           }

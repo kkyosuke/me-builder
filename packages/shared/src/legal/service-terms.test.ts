@@ -225,6 +225,33 @@ describe("service terms documents", () => {
     ).toBeNull();
   });
 
+  it("複数の重要改定を事前公開しても直近の適用予定だけを告知する", () => {
+    const first = {
+      ...currentServiceTerms,
+      version: "2026-09-10",
+      contentHash: `sha256:${"8".repeat(64)}` as const,
+      publishedAt: "2026-09-10T00:00:00+09:00",
+    };
+    const second = {
+      ...currentServiceTerms,
+      version: "2026-10-01",
+      contentHash: `sha256:${"9".repeat(64)}` as const,
+      publishedAt: "2026-10-01T00:00:00+09:00",
+    };
+    const announcements = [
+      { documentVersion: first.version, announcedAt: "2026-08-20T00:00:00+09:00" },
+      { documentVersion: second.version, announcedAt: "2026-08-20T00:00:00+09:00" },
+    ];
+
+    expect(
+      getServiceTermsNotice(
+        [currentServiceTerms, first, second],
+        announcements,
+        new Date("2026-08-21T00:00:00+09:00"),
+      ),
+    ).toMatchObject({ type: "important-upcoming", document: first });
+  });
+
   it("軽微改定を適用日から30日間だけ非阻害通知にする", () => {
     const minor = {
       ...currentServiceTerms,

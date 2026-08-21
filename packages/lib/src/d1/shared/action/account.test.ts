@@ -171,11 +171,15 @@ describe("deleteAccount", () => {
       provider: "line_login",
       providerAccountId: "U_delete_me",
     });
-    await linkIdentity(db, {
+    const previouslyUnlinked = await linkIdentity(db, {
       accountId: created.account.id,
       provider: "line",
       providerAccountId: "U_delete_me",
     });
+    await db
+      .update(schema.accountIdentities)
+      .set({ isDeleted: true, deletedAt: new Date("2026-08-21T00:30:00.000Z") })
+      .where(eq(schema.accountIdentities.id, previouslyUnlinked.id));
     await acceptCurrentTerms(db, created.account.id);
     await db.insert(schema.accountProfiles).values({
       accountId: created.account.id,

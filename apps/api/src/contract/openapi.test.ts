@@ -43,7 +43,10 @@ type OpenApiOperation = {
   tags?: string[];
   summary?: string;
   security?: SecurityRequirement[];
-  requestBody?: { required?: boolean };
+  requestBody?: {
+    required?: boolean;
+    content?: Record<string, { schema?: Record<string, unknown> }>;
+  };
   responses?: Record<string, OpenApiResponse>;
 };
 type OpenApiDocument = {
@@ -130,6 +133,20 @@ describe("GET /api/openapi.json", () => {
     });
     expect(document.paths["/api/auth/session"]?.delete).toMatchObject({
       security: [{ applicationSession: [], csrfToken: [] }],
+    });
+    expect(document.paths["/api/account"]?.delete).toMatchObject({
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: { confirmed: { type: "boolean", const: true } },
+              required: ["confirmed"],
+            },
+          },
+        },
+      },
     });
     expect(document.paths["/api/compatibility/share-consent"]?.get).toBeDefined();
     expect(document.paths["/api/compatibility/share-content"]?.get).toBeDefined();

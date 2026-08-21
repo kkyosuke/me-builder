@@ -3,7 +3,7 @@ import {
   getServiceTermsDocumentsSatisfyingCurrentRequirement,
   serviceTermsDocuments,
 } from "@me-builder/shared";
-import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, min, or } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 import { accountAgreementAcceptances } from "../schema/agreement";
@@ -33,9 +33,9 @@ export async function listPendingTermsLineRecipients(
     input.at ?? new Date(),
   );
   const rows = await db
-    .selectDistinct({
+    .select({
       accountId: accounts.id,
-      providerAccountId: accountIdentities.providerAccountId,
+      providerAccountId: min(accountIdentities.providerAccountId),
     })
     .from(accounts)
     .innerJoin(accountIdentities, eq(accountIdentities.accountId, accounts.id))
@@ -68,10 +68,14 @@ export async function listPendingTermsLineRecipients(
         ...(input.afterAccountId ? [gt(accounts.id, input.afterAccountId)] : []),
       ),
     )
+    .groupBy(accounts.id)
     .orderBy(asc(accounts.id))
     .limit(limit)
     .all();
-  return rows;
+  return rows.map(({ accountId, providerAccountId }) => {
+    if (!providerAccountId) throw new Error("Terms notification recipient identity is missing");
+    return { accountId, providerAccountId };
+  });
 }
 
 export async function recordTermsLineNotification(

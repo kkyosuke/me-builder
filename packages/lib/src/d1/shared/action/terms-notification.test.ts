@@ -33,6 +33,12 @@ describe("terms notification", () => {
       provider: "line",
       providerAccountId: "U_notice",
     });
+    await db.insert(schema.accountIdentities).values({
+      id: "second-active-line-identity",
+      accountId: target.account.id,
+      provider: "line",
+      providerAccountId: "U_notice_secondary",
+    });
     await acceptCurrentTerms(db, target.account.id);
     await upsertIdentity(db, { provider: "line", providerAccountId: "U_unaccepted" });
 
