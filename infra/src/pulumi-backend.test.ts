@@ -44,6 +44,7 @@ describe("requirePulumiGcsBackend", () => {
       cloudflareProject,
       gcpPlatformProject,
       gcpPlatformProgram,
+      gcpPlatformScript,
       gcpPlatformWorkflow,
       resetWorkflow,
       stripeWorkflow,
@@ -51,6 +52,7 @@ describe("requirePulumiGcsBackend", () => {
       readFile(new URL("../Pulumi.yaml", import.meta.url), "utf8"),
       readFile(new URL("../gcp-platform/Pulumi.yaml", import.meta.url), "utf8"),
       readFile(new URL("../gcp-platform/index.ts", import.meta.url), "utf8"),
+      readFile(new URL("../scripts/gcp-platform.ts", import.meta.url), "utf8"),
       readFile(new URL("../../.github/workflows/deploy-gcp-platform.yml", import.meta.url), "utf8"),
       readFile(
         new URL("../../.github/workflows/reset-preview-migrations.yml", import.meta.url),
@@ -69,6 +71,9 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain("...(standaloneProject ? { import: projectId } : {})");
     expect(gcpPlatformProgram).toContain(
       "...(!standaloneProject ? { autoCreateNetwork: false } : {})",
+    );
+    expect(gcpPlatformScript).toContain(
+      'await run(["pulumi", "-C", "gcp-platform", "whoami", "--verbose"]);',
     );
     expect(gcpPlatformWorkflow).toContain(`pulumi login ${pulumiGcsBackends.gcpPlatform}`);
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:preview:${TARGET}"');
