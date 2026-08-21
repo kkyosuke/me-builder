@@ -339,6 +339,21 @@ describe("subscription user journeys", () => {
       actor: actor(payerId),
       db,
     });
+    expect(payerView).toMatchObject({
+      type: "resolved",
+      role: "payer",
+      seats: expect.arrayContaining([
+        expect.objectContaining({
+          id: removedMemberInvitation.seat.id,
+          status: "removed",
+          displayName: null,
+        }),
+        expect.objectContaining({
+          id: invitation.seat.id,
+          status: "active",
+        }),
+      ]),
+    });
     expect(JSON.stringify(payerView)).not.toContain(memberId);
     expect(JSON.stringify(payerView)).not.toContain(removedMemberId);
     expect(JSON.stringify(payerView)).not.toContain("支払者には共有しない参加者の日記");
@@ -378,5 +393,14 @@ describe("subscription user journeys", () => {
       type: "resolved",
       records: [{ kind: "diary", value: "支払者には共有しない参加者の日記" }],
     });
+    const payerViewAfterLeave = await getFamilySeatManagement({ actor: actor(payerId), db });
+    expect(payerViewAfterLeave).toMatchObject({
+      type: "resolved",
+      seats: expect.arrayContaining([
+        expect.objectContaining({ id: invitation.seat.id, status: "left", displayName: null }),
+      ]),
+    });
+    expect(JSON.stringify(payerViewAfterLeave)).not.toContain(memberId);
+    expect(JSON.stringify(payerViewAfterLeave)).not.toContain("支払者には共有しない参加者の日記");
   });
 });

@@ -140,6 +140,25 @@ describe("family seat API authorization", () => {
     );
     expect(activeCandidates.filter(({ type }) => type === "resolved")).toHaveLength(1);
     expect(activeCandidates.filter(({ type }) => type === "no-membership")).toHaveLength(1);
+    const acceptedIndex = activeCandidates.findIndex(({ type }) => type === "resolved");
+    const acceptedAccountId = [firstCandidate, secondCandidate][acceptedIndex];
+    expect(acceptedAccountId).toBeTruthy();
+    await expect(
+      db.query.familySeatInvitations.findFirst({
+        where: (table, { eq }) => eq(table.seatId, issued.seat.id),
+      }),
+    ).resolves.toMatchObject({
+      status: "accepted",
+      claimedByAccountId: acceptedAccountId,
+    });
+    await expect(
+      db.query.familySeats.findFirst({
+        where: (table, { eq }) => eq(table.id, issued.seat.id),
+      }),
+    ).resolves.toMatchObject({
+      status: "active",
+      memberAccountId: acceptedAccountId,
+    });
   });
 
   it("支払者の削除と参加者の退出が競合しても席と利用権限を失った状態へ収束する", async () => {
@@ -163,13 +182,22 @@ describe("family seat API authorization", () => {
     await expect(getFamilySeatManagement(params(db, member))).resolves.toEqual({
       type: "no-membership",
     });
-    await expect(getFamilySeatManagement(params(db, payer))).resolves.toMatchObject({
+    const payerView = await getFamilySeatManagement(params(db, payer));
+    expect(payerView).toMatchObject({
       type: "resolved",
       role: "payer",
       seats: expect.arrayContaining([
         expect.objectContaining({ id: issued.seat.id, displayName: null }),
       ]),
     });
+    if (payerView.type !== "resolved") throw new Error("payer view was not resolved");
+    const terminatedSeat = payerView.seats.find(({ id }) => id === issued.seat.id);
+    expect(["left", "removed"]).toContain(terminatedSeat?.status);
+    await expect(
+      db.query.familySeats.findFirst({
+        where: (table, { eq }) => eq(table.id, issued.seat.id),
+      }),
+    ).resolves.toMatchObject({ memberAccountId: null, invitationId: null });
   });
 
   it("48時間を過ぎたtokenを失効し、辞退と退出を本人だけに許可する", async () => {
