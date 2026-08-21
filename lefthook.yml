@@ -21,7 +21,8 @@ pre-push:
     typecheck:
       run: bun run typecheck
     test:
-      run: bun run test:pre-push
+      glob: "*.{js,jsx,ts,tsx,mjs,mts,cjs,cts,sql}"
+      run: bun run test:pre-push -- "{push_files}"
 
 commit-msg:
   commands:
