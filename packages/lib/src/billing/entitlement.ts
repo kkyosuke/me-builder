@@ -27,7 +27,11 @@ export type EntitlementPolicy = Readonly<{
   monthlyChange: "none" | "brief" | "full";
   goalFollowUp: "none" | "selected-one" | "relevant-active";
   selfCareContext: "general" | "confirmed" | "personalized-history";
+  /** 同じfamily pack内を除く、同時に振り返りを割り当てられる外部関係数。 */
   concurrentRelationshipLimit: number;
+  /** 双方のpayerAccountIdが一致するfamily参加者間を、外部関係枠を消費せず利用対象に含める。 */
+  familyPackInternalRelationshipsIncluded: boolean;
+  /** 支払者が管理できるactiveなfamily席数。 */
   familySeatLimit: number;
   features: Readonly<Record<EntitlementFeature, boolean>>;
 }>;
@@ -41,6 +45,7 @@ const policies = {
     goalFollowUp: "none",
     selfCareContext: "general",
     concurrentRelationshipLimit: 0,
+    familyPackInternalRelationshipsIncluded: false,
     familySeatLimit: 0,
     features: {
       "weekly-reflection": false,
@@ -58,6 +63,7 @@ const policies = {
     goalFollowUp: "selected-one",
     selfCareContext: "confirmed",
     concurrentRelationshipLimit: 1,
+    familyPackInternalRelationshipsIncluded: false,
     familySeatLimit: 0,
     features: {
       "weekly-reflection": true,
@@ -75,6 +81,7 @@ const policies = {
     goalFollowUp: "relevant-active",
     selfCareContext: "personalized-history",
     concurrentRelationshipLimit: 5,
+    familyPackInternalRelationshipsIncluded: false,
     familySeatLimit: 0,
     features: {
       "weekly-reflection": true,
@@ -92,6 +99,7 @@ const policies = {
     goalFollowUp: "relevant-active",
     selfCareContext: "personalized-history",
     concurrentRelationshipLimit: 5,
+    familyPackInternalRelationshipsIncluded: true,
     familySeatLimit: 4,
     features: {
       "weekly-reflection": true,

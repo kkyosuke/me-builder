@@ -44,7 +44,7 @@ async function projectPlan(
     accountId: string;
     customerId: string;
     eventId: string;
-    plan: "full" | "family";
+    plan: "lite" | "full" | "family";
     status: "active" | "canceled";
     at: Date;
   }>,
@@ -129,6 +129,92 @@ async function storeDiary(
 
 describe("subscription user journeys", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("Free・Lite・Full・Familyの相性振り返り割当と席上限を正本から解決する", async () => {
+    const db = createSharedDb();
+    const freeId = await createAccount(db, "matrix-free");
+    const liteId = await createAccount(db, "matrix-lite");
+    const fullId = await createAccount(db, "matrix-full");
+    const familyPayerId = await createAccount(db, "matrix-family-payer");
+    const familyMemberId = await createAccount(db, "matrix-family-member");
+    const at = new Date("2026-08-16T00:00:00.000Z");
+
+    await projectPlan(db, {
+      accountId: liteId,
+      customerId: "cus-matrix-lite",
+      eventId: "evt-matrix-lite",
+      plan: "lite",
+      status: "active",
+      at,
+    });
+    await projectPlan(db, {
+      accountId: fullId,
+      customerId: "cus-matrix-full",
+      eventId: "evt-matrix-full",
+      plan: "full",
+      status: "active",
+      at,
+    });
+    await projectPlan(db, {
+      accountId: familyPayerId,
+      customerId: "cus-matrix-family",
+      eventId: "evt-matrix-family",
+      plan: "family",
+      status: "active",
+      at,
+    });
+    await D1.shared.action.familySeat.createFamilyPack(
+      db,
+      familyPayerId,
+      new Date("2026-08-16T00:00:01.000Z"),
+    );
+    const invitation = await issueFamilySeatInvitation(
+      { actor: actor(familyPayerId), db },
+      { now: () => new Date("2026-08-16T00:01:00.000Z") },
+    );
+    if (invitation.type !== "created") throw new Error("Family invitation was not created");
+    await expect(
+      acceptFamilyInvitation(
+        { actor: actor(familyMemberId), db, token: invitation.token },
+        { now: () => new Date("2026-08-16T00:01:30.000Z") },
+      ),
+    ).resolves.toMatchObject({ type: "updated", seat: { status: "active" } });
+
+    const entitlements = new billing.EntitlementService(effectiveAssignments(db));
+    const cases = [
+      [freeId, "free", "free", null, false, 0, false, 0],
+      [liteId, "lite", "subscription", liteId, false, 1, false, 0],
+      [fullId, "full", "subscription", fullId, false, 5, false, 0],
+      [familyPayerId, "family", "subscription", familyPayerId, false, 5, true, 4],
+      [familyMemberId, "family", "family-seat", familyPayerId, true, 5, true, 4],
+    ] as const;
+
+    for (const [
+      accountId,
+      plan,
+      source,
+      payerAccountId,
+      grantedByFamily,
+      relationshipLimit,
+      familyPackInternalRelationshipsIncluded,
+      seatLimit,
+    ] of cases) {
+      await expect(
+        entitlements.resolve(accountId, new Date("2026-08-16T00:02:00.000Z")),
+      ).resolves.toMatchObject({
+        plan,
+        source,
+        payerAccountId,
+        grantedByFamily,
+        policy: {
+          concurrentRelationshipLimit: relationshipLimit,
+          familyPackInternalRelationshipsIncluded,
+          familySeatLimit: seatLimit,
+          features: { "relationship-reflection": relationshipLimit > 0 },
+        },
+      });
+    }
+  });
 
   it("Full利用者が解約後も保存済みの日記を確認し、本人データを書き出せる", async () => {
     const db = createSharedDb();
