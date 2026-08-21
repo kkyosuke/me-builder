@@ -16,9 +16,9 @@ export type PrivacyPolicyDocument = Readonly<{
 
 /** 公開ページに表示する最新のプライバシーポリシー正本。 */
 export const currentPrivacyPolicy: PrivacyPolicyDocument = {
-  version: "2026-08-20",
-  publishedAt: "2026-08-20T00:00:00+09:00",
-  effectiveAt: "2026-08-20T00:00:00+09:00",
+  version: "2026-08-21",
+  publishedAt: "2026-08-21T00:00:00+09:00",
+  effectiveAt: "2026-08-21T00:00:00+09:00",
   title: "かがみ プライバシーポリシー",
   operator: "サービス運用者",
   contact: "support@kagami.kyosuke.dev",
@@ -64,6 +64,7 @@ export const currentPrivacyPolicy: PrivacyPolicyDocument = {
       heading: "5. 保存と安全管理",
       paragraphs: [
         "情報は利用目的、機能の提供、法令上の必要性に応じて保持し、不要になったものを削除します。問い合わせ本文はサービス運用者だけが確認し、対応に不要となった時点で手動削除します。Cloudflareのアクセスログは同社の標準保持期間だけ保持し、外部ログ基盤やR2へ複製しません。",
+        "利用規約の重要改定へ同意していないことだけを理由に、保存済みの本人データを自動削除しません。主機能から利用できない状態で保護を続け、本人は規約へ同意せずAccountと本人データを削除できます。削除後も規約同意、請求、監査に必要な最小限の記録は法令と説明責任に必要な期間だけ保持します。",
         "通信の暗号化、認証・権限分離、保存先の分離、secretの限定、本文を含めない運用ログ等の合理的な安全管理措置を講じます。ただし、あらゆる危険を完全に防止できることは保証しません。",
       ],
     },
@@ -89,7 +90,7 @@ export const currentPrivacyPolicy: PrivacyPolicyDocument = {
     {
       heading: "9. 改定",
       paragraphs: [
-        "このページでは最新の版、制定日、適用日を公開します。利用者の権利やデータ取扱いに重要な変更がある場合はアプリ内で通知し、必要に応じて改めて同意を求めます。",
+        "このページでは最新の版、制定日、適用日を公開します。利用者の権利やデータ取扱いに重要な変更がある場合は、適用日の14日以上前からWeb／LIFFで通知し、対象者へLINEで1回知らせ、必要に応じて適用日から改めて同意を求めます。意味を変えない軽微な変更はWeb／LIFFで30日間通知します。",
       ],
     },
     {

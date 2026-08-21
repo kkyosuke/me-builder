@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   retry: vi.fn(),
   fetchStatus: vi.fn(),
   accept: vi.fn(),
+  deleteOwnAccount: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({
@@ -22,6 +23,7 @@ vi.mock("../infrastructure/service-terms-api", () => ({
   ServiceTermsVersionConflictError: class extends Error {},
   fetchServiceTermsStatus: mocks.fetchStatus,
   acceptServiceTerms: mocks.accept,
+  deleteOwnAccount: mocks.deleteOwnAccount,
 }));
 
 const document = {
@@ -44,6 +46,7 @@ describe("ServiceTermsGate", () => {
       version: document.version,
       documentHash: document.contentHash,
     });
+    mocks.deleteOwnAccount.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -72,6 +75,28 @@ describe("ServiceTermsGate", () => {
     await waitFor(() => expect(screen.getByText("主機能")).toBeTruthy());
     expect(mocks.accept).toHaveBeenCalledWith(undefined, document.version);
     expect(window.location.pathname).toBe("/me");
+  });
+
+  it("未同意でも明示確認後にAccountを削除できる", async () => {
+    mocks.fetchStatus.mockResolvedValue({
+      document,
+      notice: null,
+      acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
+    });
+    render(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(await screen.findByText("同意せずAccountを削除する")).toBeTruthy();
+    fireEvent.click(screen.getByText("同意せずAccountを削除する"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Accountと本人データ/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Accountを完全に削除する" }));
+
+    expect(await screen.findByRole("heading", { name: "Accountを削除しました" })).toBeTruthy();
+    expect(mocks.deleteOwnAccount).toHaveBeenCalledWith(undefined);
+    expect(mocks.accept).not.toHaveBeenCalled();
   });
 
   it("共有リンクからの初回同意後は元の招待画面へ復帰する", async () => {

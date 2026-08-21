@@ -352,6 +352,10 @@ export type AccountDataActions = {
   "conversation.markTurnDelivered": DomainAction<typeof diary.markTurnDelivered>;
   "conversation.markTurnFailed": DomainAction<typeof diary.markTurnFailed>;
   "diagnosis.deleteAccountData": RpcAction<[], typeof diagnosis.deleteAccountDiagnosisData>;
+  "account.deleteAllData": RpcAction<
+    [resetEpoch: number, at?: Date],
+    typeof development.deleteAllDevelopmentAccountData
+  >;
   "development.deleteAllAccountData": RpcAction<
     [resetEpoch: number, at?: Date],
     typeof development.deleteAllDevelopmentAccountData

@@ -216,6 +216,12 @@ const actions = {
     DO.account.action.brain.resetAllFailedBrainVectorSyncJobs(db, at),
   "diagnosis.deleteAccountData": (db: DO.account.Database, accountId: string) =>
     DO.account.action.diagnosis.deleteAccountDiagnosisData(db, accountId),
+  "account.deleteAllData": (
+    db: DO.account.Database,
+    accountId: string,
+    resetEpoch: number,
+    at?: Date,
+  ) => DO.account.action.development.deleteAllDevelopmentAccountData(db, accountId, resetEpoch, at),
   "development.deleteAllAccountData": (
     db: DO.account.Database,
     accountId: string,

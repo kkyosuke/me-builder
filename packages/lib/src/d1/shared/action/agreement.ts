@@ -1,12 +1,18 @@
 import {
   currentServiceTerms,
-  serviceTermsDocumentsSatisfyingCurrentRequirement,
+  getEffectiveServiceTerms,
+  getServiceTermsDocumentsSatisfyingCurrentRequirement,
+  serviceTermsDocuments,
 } from "@me-builder/shared";
 import { and, desc, eq } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountAgreementAcceptances } from "../schema/agreement";
 
-export async function findCurrentTermsAcceptance(db: SharedD1Client, accountId: string) {
+export async function findCurrentTermsAcceptance(
+  db: SharedD1Client,
+  accountId: string,
+  at = new Date(),
+) {
   const acceptances = await db
     .select()
     .from(accountAgreementAcceptances)
@@ -18,7 +24,11 @@ export async function findCurrentTermsAcceptance(db: SharedD1Client, accountId: 
       ),
     )
     .all();
-  for (const document of [...serviceTermsDocumentsSatisfyingCurrentRequirement].reverse()) {
+  const satisfyingDocuments = getServiceTermsDocumentsSatisfyingCurrentRequirement(
+    serviceTermsDocuments,
+    at,
+  );
+  for (const document of [...satisfyingDocuments].reverse()) {
     const acceptance = acceptances.find(
       (candidate) =>
         candidate.documentVersion === document.version &&
@@ -32,8 +42,9 @@ export async function findCurrentTermsAcceptance(db: SharedD1Client, accountId: 
 export async function hasAcceptedCurrentTerms(
   db: SharedD1Client,
   accountId: string,
+  at = new Date(),
 ): Promise<boolean> {
-  return (await findCurrentTermsAcceptance(db, accountId)) !== undefined;
+  return (await findCurrentTermsAcceptance(db, accountId, at)) !== undefined;
 }
 
 /** 本人の利用規約同意を、無効化済みを含めて新しい順に返す。 */
@@ -59,17 +70,19 @@ export async function acceptCurrentTerms(
   db: SharedD1Client,
   accountId: string,
   acceptedAt = new Date(),
+  effectiveAt = new Date(),
 ) {
-  const existing = await findCurrentTermsAcceptance(db, accountId);
+  const currentDocument = getEffectiveServiceTerms(serviceTermsDocuments, effectiveAt);
+  const existing = await findCurrentTermsAcceptance(db, accountId, effectiveAt);
   if (existing) return existing;
 
   const now = new Date();
   const acceptance: typeof accountAgreementAcceptances.$inferInsert = {
     id: crypto.randomUUID(),
     accountId,
-    documentKey: currentServiceTerms.documentKey,
-    documentVersion: currentServiceTerms.version,
-    documentHash: currentServiceTerms.contentHash,
+    documentKey: currentDocument.documentKey,
+    documentVersion: currentDocument.version,
+    documentHash: currentDocument.contentHash,
     acceptedAt: acceptedAt.toISOString(),
     createdAt: now,
     updatedAt: now,
@@ -77,7 +90,7 @@ export async function acceptCurrentTerms(
     isDeleted: false,
   };
   await db.insert(accountAgreementAcceptances).values(acceptance).onConflictDoNothing();
-  const persisted = await findCurrentTermsAcceptance(db, accountId);
+  const persisted = await findCurrentTermsAcceptance(db, accountId, effectiveAt);
   if (!persisted) {
     throw new Error("Failed to persist current terms acceptance");
   }

@@ -3,6 +3,7 @@ import { logger, toSafeOperationalErrorFields } from "@me-builder/shared";
 import { getCloudflareBindings, getWorkerConfig } from "../config";
 import { cleanupAvatarOrphansFromCloudflare } from "../job/avatar-orphan-cleanup";
 import { enqueueDailyPrompts, toTokyoLocalDate, toTokyoLocalHour } from "../job/daily-prompt";
+import { notifyUpcomingServiceTerms } from "../job/service-terms-notification";
 import type { Env } from "../types";
 
 /** 09:00・11:00・12:00 UTCのCronを18・20・21時のDaily Prompt Queueへfan-outする。 */
@@ -15,6 +16,42 @@ export async function scheduledHandler(
   const workerConfig = getWorkerConfig(env as unknown as Record<string, unknown>);
   const cf = getCloudflareBindings(env);
   if (toTokyoLocalHour(controller.scheduledTime) === 18) {
+    try {
+      const completedCount = await notifyUpcomingServiceTerms({
+        db: cf.d1,
+        config: workerConfig,
+        now: new Date(controller.scheduledTime),
+      });
+      logger.info(
+        {
+          event: "service-terms.notification.completed",
+          service: "worker",
+          environment: workerConfig.environment,
+          component: "service-terms-notification",
+          outcome: "succeeded",
+          completedCount,
+        },
+        `[Service terms notification] completed ${completedCount} account(s)`,
+      );
+    } catch (error) {
+      logger.error(
+        {
+          event: "service-terms.notification.failed",
+          service: "worker",
+          environment: workerConfig.environment,
+          component: "service-terms-notification",
+          outcome: "failed",
+          disposition: "retry-next-schedule",
+          ...toSafeOperationalErrorFields(error, {
+            code: "SERVICE_TERMS_NOTIFICATION_FAILED",
+            category: "dependency",
+            stage: "service-terms.notification",
+            retryable: true,
+          }),
+        },
+        "[Service terms notification] failed",
+      );
+    }
     try {
       const deletedCount = await D1.shared.action.developmentAudit.pruneDevelopmentOperationAudits(
         cf.d1,

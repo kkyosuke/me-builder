@@ -11,6 +11,12 @@ type ServiceTerms = Readonly<{
 
 export type ServiceTermsStatus = Readonly<{
   document: ServiceTerms;
+  notice: Readonly<{
+    type: "important-upcoming" | "minor-update";
+    document: ServiceTerms;
+    effectiveAt: string;
+    displayUntil: string;
+  }> | null;
   acceptance: Readonly<{
     required: boolean;
     acceptedVersion: string | null;

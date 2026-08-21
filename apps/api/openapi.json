@@ -1431,6 +1431,153 @@
         }
       }
     },
+    "/api/account": {
+      "delete": {
+        "operationId": "deleteAccount",
+        "tags": ["Account"],
+        "summary": "本人のAccountと個人データを削除する",
+        "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "kind": "schema",
+                "type": "object",
+                "expects": "Object",
+                "async": false,
+                "entries": {
+                  "confirmed": {
+                    "kind": "schema",
+                    "type": "literal",
+                    "expects": "true",
+                    "async": false,
+                    "literal": true,
+                    "~standard": {
+                      "version": 1,
+                      "vendor": "valibot"
+                    }
+                  }
+                },
+                "~standard": {
+                  "version": 1,
+                  "vendor": "valibot"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Accountと本人データを削除した"
+          },
+          "400": {
+            "description": "明示確認を含むリクエストではない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Invalid request"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionを検証できない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "直近10分以内の本人確認がない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "対応するAccountが存在しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Account not found"
+                    },
+                    "reason": {
+                      "const": "friendship_required"
+                    }
+                  },
+                  "required": ["error", "reason"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "D1 bindingが設定されていない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/account-recovery/codes": {
       "post": {
         "operationId": "issueAccountRecoveryCode",
@@ -2858,6 +3005,92 @@
                         "sections"
                       ]
                     },
+                    "notice": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "enum": ["important-upcoming", "minor-update"],
+                              "type": "string"
+                            },
+                            "document": {
+                              "type": "object",
+                              "properties": {
+                                "documentKey": {
+                                  "const": "terms_of_service"
+                                },
+                                "version": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "contentHash": {
+                                  "type": "string",
+                                  "pattern": "^sha256:[0-9a-f]{64}$"
+                                },
+                                "requiresReacceptance": {
+                                  "type": "boolean"
+                                },
+                                "publishedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "summary": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "sections": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "heading": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "paragraphs": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        }
+                                      }
+                                    },
+                                    "required": ["heading", "paragraphs"]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "documentKey",
+                                "version",
+                                "contentHash",
+                                "requiresReacceptance",
+                                "publishedAt",
+                                "title",
+                                "summary",
+                                "sections"
+                              ]
+                            },
+                            "effectiveAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "displayUntil": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": ["type", "document", "effectiveAt", "displayUntil"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "acceptance": {
                       "type": "object",
                       "properties": {
@@ -2901,7 +3134,7 @@
                       "required": ["required", "acceptedVersion", "documentHash", "acceptedAt"]
                     }
                   },
-                  "required": ["document", "acceptance"]
+                  "required": ["document", "notice", "acceptance"]
                 }
               }
             }

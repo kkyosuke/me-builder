@@ -3,6 +3,17 @@ import { BillingProviderError } from "./provider";
 import { StripeBillingProvider, classifyStripeError } from "./stripe-adapter";
 
 describe("StripeBillingProvider", () => {
+  it("Account削除時にStripe Customerを冪等key付きで削除する", async () => {
+    const del = vi.fn().mockResolvedValue({ id: "cus_delete", deleted: true });
+    const provider = new StripeBillingProvider({ customers: { del } } as never);
+
+    await expect(provider.deleteCustomer("cus_delete", "account-delete:key")).resolves.toEqual({
+      id: "cus_delete",
+      deleted: true,
+    });
+    expect(del).toHaveBeenCalledWith("cus_delete", { idempotencyKey: "account-delete:key" });
+  });
+
   it("creates checkout with selection metadata and maps the latest session", async () => {
     const create = vi.fn().mockResolvedValue({
       id: "cs_test_new",

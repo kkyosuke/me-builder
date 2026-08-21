@@ -40,6 +40,7 @@ export async function getServiceTermsContents(c: Context<AppEnv>): Promise<Respo
   return c.json(
     v.parse(ServiceTermsStatusResponseSchema, {
       document: outcome.document,
+      notice: outcome.notice,
       acceptance: outcome.acceptance,
     }),
   );

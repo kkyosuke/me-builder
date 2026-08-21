@@ -48,6 +48,7 @@ const progression = {
 };
 const acceptedTermsStatus = {
   document: currentServiceTerms,
+  notice: null,
   acceptance: {
     required: false,
     acceptedVersion: currentServiceTerms.version,

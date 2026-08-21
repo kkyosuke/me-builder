@@ -17,7 +17,7 @@
 - 利用規約の版管理と法務判断
 - 動画、音声など将来mediaの具体的な設計
 
-写真の確定仕様は[LINE写真日記入力設計](../architecture/photo-diary-input-design.md)、Plan別容量は[サブスクリプション・料金プラン設計 §4.6](../product/subscription-plan-design.md#46-写真保存容量)、規約と法務の残作業は[サービス利用規約・同意残タスク §2.5](service-terms-remaining-tasks.md#25-検討必須media入力の法務確認と規約改定を完了する)を正とします。
+写真の確定仕様は[LINE写真日記入力設計](../architecture/photo-diary-input-design.md)、Plan別容量は[サブスクリプション・料金プラン設計 §4.6](../product/subscription-plan-design.md#46-写真保存容量)、規約と法務の残作業は[サービス利用規約・同意残タスク §2.3](service-terms-remaining-tasks.md#23-検討必須media入力の法務確認と規約改定を完了する)を正とします。
 
 ## 2. 現在の安全境界
 
@@ -43,7 +43,7 @@
 
 ### 3.1 【検討必須】Production公開前の法務・規約gate
 
-[サービス利用規約・同意残タスク §2.5](service-terms-remaining-tasks.md#25-検討必須media入力の法務確認と規約改定を完了する)を完了し、承認済みの重要改定へ再同意済みのAccountだけから写真を取得します。このgateが未完了ならPreviewで技術検証できてもProduction flagを有効にしません。
+[サービス利用規約・同意残タスク §2.3](service-terms-remaining-tasks.md#23-検討必須media入力の法務確認と規約改定を完了する)を完了し、承認済みの重要改定へ再同意済みのAccountだけから写真を取得します。このgateが未完了ならPreviewで技術検証できてもProduction flagを有効にしません。
 
 ## 4. AI利用段階
 

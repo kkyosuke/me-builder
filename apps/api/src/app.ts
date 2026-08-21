@@ -10,6 +10,7 @@ import { generateSpecs } from "hono-openapi";
 import { cors } from "hono/cors";
 import * as v from "valibot";
 import { getConfig } from "./config";
+import { deleteAccountRoute } from "./contract/account";
 import {
   accountRecoveryCodeRoute,
   accountRecoveryCompleteRoute,
@@ -129,6 +130,7 @@ import {
   assertRuntimeResponseContract,
 } from "./contract/runtime-response";
 import { InternalServerErrorSchema } from "./contract/shared/errors";
+import { deleteAccount } from "./controller/account";
 import {
   postAccountRecoveryCode,
   postAccountRecoveryComplete,
@@ -395,6 +397,7 @@ app.delete(
   logoutApplicationSessionRoute,
   deleteApplicationSession,
 );
+app.delete("/api/account", requireAuthentication, deleteAccountRoute, deleteAccount);
 app.post(
   "/api/account-recovery/codes",
   requireAuthentication,

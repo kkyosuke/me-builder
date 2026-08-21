@@ -16,6 +16,7 @@ const status: ServiceTermsStatus = {
     summary: "サービスの説明",
     sections: [{ heading: "1. 規約への同意", paragraphs: ["規約本文です。"] }],
   },
+  notice: null,
   acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
 };
 

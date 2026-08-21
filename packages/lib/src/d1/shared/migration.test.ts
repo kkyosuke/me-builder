@@ -15,6 +15,7 @@ const SHARED_D1_TABLES = [
   "account_recovery_audits",
   "account_recovery_credentials",
   "account_recovery_rate_limits",
+  "account_terms_notifications",
   "accounts",
   "admin_account_list_audits",
   "billing_customers",

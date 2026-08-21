@@ -4,6 +4,7 @@ import { requireAuthentication } from "./middleware/authentication";
 import { requireCurrentTerms } from "./middleware/authorization";
 
 const unconsentedAuthenticatedAllowlist = [
+  "DELETE /api/account",
   "DELETE /api/auth/session",
   "DELETE /api/auth/sso/identity",
   "GET /api/auth/session",

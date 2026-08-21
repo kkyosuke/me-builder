@@ -47,6 +47,7 @@ const progressionProjectionOperations = new Set<AccountDataOperation>([
   "diagnosisProjection.processLatest",
   "conversation.applyDiaryBrainCheckpoint",
   "development.deleteAllAccountData",
+  "account.deleteAllData",
   "progression.read",
 ]);
 

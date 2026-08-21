@@ -11,6 +11,7 @@ import {
 const HTTP_METHODS = ["get", "put", "post", "delete", "options", "head", "patch", "trace"] as const;
 
 const BODYLESS_RESPONSE_FIXTURES = new Set([
+  "delete /api/account 204",
   "post /api/observability/web-errors 204",
   "post /api/observability/web-errors 400",
   "post /api/observability/web-errors 413",

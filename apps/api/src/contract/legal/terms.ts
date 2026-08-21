@@ -24,6 +24,14 @@ const ServiceTermsDocumentSchema = v.object({
 
 export const ServiceTermsStatusResponseSchema = v.object({
   document: ServiceTermsDocumentSchema,
+  notice: v.nullable(
+    v.object({
+      type: v.picklist(["important-upcoming", "minor-update"]),
+      document: ServiceTermsDocumentSchema,
+      effectiveAt: v.pipe(v.string(), v.isoTimestamp()),
+      displayUntil: v.pipe(v.string(), v.isoTimestamp()),
+    }),
+  ),
   acceptance: v.object({
     required: v.boolean(),
     acceptedVersion: v.nullable(NonEmptyStringSchema),

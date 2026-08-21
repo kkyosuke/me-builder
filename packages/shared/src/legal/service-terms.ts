@@ -14,6 +14,24 @@ export type ServiceTermsDocument = Readonly<{
   sections: readonly ServiceTermsSection[];
 }>;
 
+export type ServiceTermsAnnouncement = Readonly<{
+  documentVersion: string;
+  announcedAt: string;
+}>;
+
+export type ServiceTermsNotice = Readonly<{
+  type: "important-upcoming" | "minor-update";
+  document: ServiceTermsDocument;
+  effectiveAt: string;
+  displayUntil: string;
+}>;
+
+export const SERVICE_TERMS_IMPORTANT_NOTICE_DAYS = 14;
+export const SERVICE_TERMS_MINOR_NOTICE_DAYS = 30;
+export const SERVICE_TERMS_NOTICE_POLICY_STARTED_AT = "2026-08-21T00:00:00+09:00";
+
+const DAY_MS = 24 * 60 * 60 * 1_000;
+
 const initialServiceTermsDocument = {
   documentKey: "terms_of_service",
   version: "2026-08-15",
@@ -174,24 +192,92 @@ export const serviceTermsDocuments = [
   },
 ] as const satisfies readonly ServiceTermsDocument[];
 
+/**
+ * 重要改定を適用日前に公開するときの告知日時。
+ * 2026-08-21より後に適用する重要改定は、本文と同じ変更でここへ追加する。
+ */
+export const serviceTermsAnnouncements: readonly ServiceTermsAnnouncement[] = [];
+
 export const currentServiceTerms =
   serviceTermsDocuments[serviceTermsDocuments.length - 1] ?? serviceTermsDocuments[0];
+
+/** 指定時刻までに適用済みの最新規約を返す。将来版を事前公開しても同意gateを早めない。 */
+export function getEffectiveServiceTerms(
+  documents: readonly ServiceTermsDocument[],
+  at: Date,
+): ServiceTermsDocument {
+  const effective = documents.filter(
+    (document) => Date.parse(document.publishedAt) <= at.getTime(),
+  );
+  return effective[effective.length - 1] ?? documents[0] ?? currentServiceTerms;
+}
+
+/** Web／LIFFへ表示する、適用前の重要改定または適用後30日以内の軽微改定を返す。 */
+export function getServiceTermsNotice(
+  documents: readonly ServiceTermsDocument[],
+  announcements: readonly ServiceTermsAnnouncement[],
+  at: Date,
+): ServiceTermsNotice | null {
+  const now = at.getTime();
+  const announcementByVersion = new Map(
+    announcements.map((announcement) => [announcement.documentVersion, announcement]),
+  );
+  const upcoming = [...documents].reverse().find((document) => {
+    const announcement = announcementByVersion.get(document.version);
+    return (
+      document.requiresReacceptance &&
+      announcement !== undefined &&
+      Date.parse(announcement.announcedAt) <= now &&
+      now < Date.parse(document.publishedAt)
+    );
+  });
+  if (upcoming) {
+    return {
+      type: "important-upcoming",
+      document: upcoming,
+      effectiveAt: upcoming.publishedAt,
+      displayUntil: upcoming.publishedAt,
+    };
+  }
+
+  const minor = [...documents].reverse().find((document) => {
+    const effectiveAt = Date.parse(document.publishedAt);
+    return (
+      !document.requiresReacceptance &&
+      effectiveAt <= now &&
+      now < effectiveAt + SERVICE_TERMS_MINOR_NOTICE_DAYS * DAY_MS
+    );
+  });
+  if (!minor) return null;
+  return {
+    type: "minor-update",
+    document: minor,
+    effectiveAt: minor.publishedAt,
+    displayUntil: new Date(
+      Date.parse(minor.publishedAt) + SERVICE_TERMS_MINOR_NOTICE_DAYS * DAY_MS,
+    ).toISOString(),
+  };
+}
 
 /** 最後の重要改定以降に公開された、現在の利用条件を満たす同意対象を返す。 */
 export function getServiceTermsDocumentsSatisfyingCurrentRequirement(
   documents: readonly ServiceTermsDocument[],
+  at = new Date(),
 ): readonly ServiceTermsDocument[] {
-  if (documents.length === 0) return [];
+  const effectiveDocuments = documents.filter(
+    (document) => Date.parse(document.publishedAt) <= at.getTime(),
+  );
+  if (effectiveDocuments.length === 0) return [];
   let requiredDocumentIndex = 0;
-  for (const [index, document] of documents.entries()) {
+  for (const [index, document] of effectiveDocuments.entries()) {
     if (document.requiresReacceptance) requiredDocumentIndex = index;
   }
-  return documents.slice(requiredDocumentIndex);
+  return effectiveDocuments.slice(requiredDocumentIndex);
 }
 
 /** 既存利用者が現在の利用条件を満たす同意対象。新規同意は常に最新versionへ記録する。 */
 export const serviceTermsDocumentsSatisfyingCurrentRequirement =
-  getServiceTermsDocumentsSatisfyingCurrentRequirement(serviceTermsDocuments);
+  getServiceTermsDocumentsSatisfyingCurrentRequirement(serviceTermsDocuments, new Date());
 
 export const currentRequiredServiceTerms =
   serviceTermsDocumentsSatisfyingCurrentRequirement[0] ?? currentServiceTerms;

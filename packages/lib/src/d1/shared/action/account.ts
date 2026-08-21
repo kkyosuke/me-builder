@@ -1,12 +1,16 @@
 import {
   currentServiceTerms,
+  getServiceTermsDocumentsSatisfyingCurrentRequirement,
   logger,
-  serviceTermsDocumentsSatisfyingCurrentRequirement,
+  serviceTermsDocuments,
 } from "@me-builder/shared";
 import { and, asc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
+import { accountRecoveryCredentials } from "../schema/account-recovery";
 import { accountAgreementAcceptances } from "../schema/agreement";
+import { accountProfiles } from "../schema/profile";
+import { accountProgressionProjections } from "../schema/progression";
 
 /**
  * ログイン手段の提供元。
@@ -261,6 +265,75 @@ export async function stopAccount(
   return stopped !== undefined;
 }
 
+export type DeleteAccountResult = Readonly<{
+  deleted: boolean;
+  avatarObjectKey: string | null;
+}>;
+
+/**
+ * 本人コンテンツの削除後に、共有D1のログイン情報と表示用個人情報を削除する。
+ * 規約同意・請求・監査記録は説明責任に必要な最小限の記録として保持する。
+ */
+export async function deleteAccount(
+  db: SharedD1Client,
+  accountId: string,
+  now = new Date(),
+): Promise<DeleteAccountResult> {
+  const [account, identities, profile] = await Promise.all([
+    db.query.accounts.findFirst({
+      columns: { id: true, isDeleted: true },
+      where: (table, { eq }) => eq(table.id, accountId),
+    }),
+    db.query.accountIdentities.findMany({
+      columns: { id: true },
+      where: (table, { and, eq }) =>
+        and(eq(table.accountId, accountId), eq(table.isDeleted, false)),
+    }),
+    db.query.accountProfiles.findFirst({
+      columns: { avatarObjectKey: true },
+      where: (table, { eq }) => eq(table.accountId, accountId),
+    }),
+  ]);
+  if (!account || account.isDeleted) return { deleted: false, avatarObjectKey: null };
+
+  const statements = [
+    db.delete(accountProfiles).where(eq(accountProfiles.accountId, accountId)),
+    db
+      .delete(accountProgressionProjections)
+      .where(eq(accountProgressionProjections.accountId, accountId)),
+    db
+      .delete(accountRecoveryCredentials)
+      .where(eq(accountRecoveryCredentials.accountId, accountId)),
+    ...identities.map(({ id }) =>
+      db
+        .update(accountIdentities)
+        .set({
+          providerAccountId: `deleted:${id}`,
+          isDeleted: true,
+          deletedAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(accountIdentities.id, id), eq(accountIdentities.accountId, accountId))),
+    ),
+    db
+      .update(accounts)
+      .set({
+        status: "stopped",
+        role: "user",
+        sessionVersion: sql`${accounts.sessionVersion} + 1`,
+        lastActivityAt: null,
+        isDeleted: true,
+        deletedAt: now,
+        updatedAt: now,
+      })
+      .where(and(eq(accounts.id, accountId), eq(accounts.isDeleted, false))),
+  ];
+  const [first, ...rest] = statements;
+  if (!first) throw new Error("Account deletion statement is missing");
+  await db.batch([first, ...rest]);
+  return { deleted: true, avatarObjectKey: profile?.avatarObjectKey ?? null };
+}
+
 /**
  * 既存の identity が期待した Account に属していることを確認します。
  *
@@ -448,12 +521,16 @@ export async function findLineIdentityByAccountId(
 /** CronがDaily Prompt Queueへ投入するactiveなLINE Account IDだけをページング取得する。 */
 export async function listActiveLineAccountIds(
   db: SharedD1Client,
-  input: Readonly<{ afterAccountId?: string; limit?: number }> = {},
+  input: Readonly<{ afterAccountId?: string; limit?: number; at?: Date }> = {},
 ): Promise<string[]> {
   const limit = input.limit ?? 100;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
     throw new Error("Active LINE Account page limit must be between 1 and 100");
   }
+  const satisfyingDocuments = getServiceTermsDocumentsSatisfyingCurrentRequirement(
+    serviceTermsDocuments,
+    input.at ?? new Date(),
+  );
   const filters = [
     eq(accountIdentities.provider, "line"),
     eq(accountIdentities.isDeleted, false),
@@ -461,7 +538,7 @@ export async function listActiveLineAccountIds(
     eq(accounts.isDeleted, false),
     eq(accountAgreementAcceptances.documentKey, currentServiceTerms.documentKey),
     or(
-      ...serviceTermsDocumentsSatisfyingCurrentRequirement.map((document) =>
+      ...satisfyingDocuments.map((document) =>
         and(
           eq(accountAgreementAcceptances.documentVersion, document.version),
           eq(accountAgreementAcceptances.documentHash, document.contentHash),
