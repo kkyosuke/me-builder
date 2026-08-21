@@ -40,25 +40,35 @@ describe("requirePulumiGcsBackend", () => {
   });
 
   it("Pulumi projectとbootstrap workflowの固定backendを一致させる", async () => {
-    const [cloudflareProject, gcpPlatformProject, bootstrapWorkflow, resetWorkflow] =
-      await Promise.all([
-        readFile(new URL("../Pulumi.yaml", import.meta.url), "utf8"),
-        readFile(new URL("../gcp-platform/Pulumi.yaml", import.meta.url), "utf8"),
-        readFile(
-          new URL("../../.github/workflows/setup-pulumi-state.yml", import.meta.url),
-          "utf8",
-        ),
-        readFile(
-          new URL("../../.github/workflows/reset-preview-migrations.yml", import.meta.url),
-          "utf8",
-        ),
-      ]);
+    const [
+      cloudflareProject,
+      gcpPlatformProject,
+      bootstrapWorkflow,
+      resetWorkflow,
+      stripeWorkflow,
+    ] = await Promise.all([
+      readFile(new URL("../Pulumi.yaml", import.meta.url), "utf8"),
+      readFile(new URL("../gcp-platform/Pulumi.yaml", import.meta.url), "utf8"),
+      readFile(new URL("../../.github/workflows/setup-pulumi-state.yml", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../.github/workflows/reset-preview-migrations.yml", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../.github/workflows/setup-stripe-billing.yml", import.meta.url),
+        "utf8",
+      ),
+    ]);
 
     expect(cloudflareProject).toContain(`url: ${pulumiGcsBackends.cloudflare}`);
     expect(gcpPlatformProject).toContain(`url: ${pulumiGcsBackends.gcpPlatform}`);
     expect(bootstrapWorkflow).toContain('bucket_uri="gs://kagami-infra"');
     expect(bootstrapWorkflow).toContain("--default-storage-class=STANDARD");
     expect(bootstrapWorkflow).not.toContain("NEARLINE");
+    expect(bootstrapWorkflow).toContain("environment: infra-dev");
+    expect(resetWorkflow).toContain("environment: infra-dev");
+    expect(resetWorkflow).toContain('[ "${REF_NAME}" != "main" ]');
+    expect(stripeWorkflow).toContain("inputs.environment == 'dev' && 'infra-dev' || 'stripe-prd'");
     for (const workflow of [bootstrapWorkflow, resetWorkflow]) {
       expect(workflow).toContain("uses: google-github-actions/auth@v2");
       expect(workflow).toContain(

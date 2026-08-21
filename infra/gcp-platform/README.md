@@ -75,7 +75,7 @@ task infra:gcp-platform:preview:production
 ALLOW_GCP_PLATFORM_UP=production task infra:gcp-platform:up:production
 ```
 
-Use `folderId` instead of `organizationId` when the projects belong under a folder. Project creation requires Project Creator and Billing Account User. The deploy principal also needs permission to manage project organization policies. Pulumi explicitly enforces Google's block on service-account-bound API keys while runtime credentials are disabled, switches only this project to an exception when they are enabled, and leaves the parent policy unchanged.
+Use `folderId` instead of `organizationId` when the projects belong under a folder. Project creation requires Project Creator and Billing Account User. The deploy principal also needs permission to manage project organization policies. Pulumi explicitly enforces Google's block on service-account-bound API keys while runtime credentials are disabled. When enabled, the constraint remains enforced and its `allowedServices` parameter permits only `aiplatform.googleapis.com`; it does not open authorization-key creation for other services and leaves the parent policy unchanged.
 
 The `platform` Stack output contains the active keys as Pulumi secrets. Copy `identityPlatformApiKey` to `GOOGLE_IDENTITY_PLATFORM_API_KEY`, copy `vertexAiApiKey` to `GOOGLE_VERTEX_AI_API_KEY`, copy the client ID to `GOOGLE_OAUTH_CLIENT_ID`, and distribute the original client secret as `GOOGLE_OAUTH_CLIENT_SECRET` in the matching GitHub Environment. Never print secret outputs in CI logs. `vertexAiApiKey` remains absent until both spend-cap configs are true.
 

@@ -115,7 +115,10 @@ export function createGoogleCloudIdentityPlatformSsoClient(
     }
   }
 
-  async function exchangeWithIdentityPlatform(googleIdToken: string): Promise<string> {
+  async function exchangeWithIdentityPlatform(
+    googleIdToken: string,
+    identityProvisioning: "allow" | "existing-only",
+  ): Promise<string> {
     const endpoint = new URL(IDENTITY_PLATFORM_SIGN_IN_ENDPOINT);
     endpoint.searchParams.set("key", configuration.identityPlatformApiKey);
     let response: Response;
@@ -131,8 +134,9 @@ export function createGoogleCloudIdentityPlatformSsoClient(
           }).toString(),
           returnSecureToken: true,
           returnIdpCredential: false,
-          // link-only期間は、公開login callbackからIdentity Platform userを作らない。
-          autoCreate: false,
+          // linkは認証済みAccountへ接続するためIdentity Platform userの初回作成を許可する。
+          // 公開loginでは既存userだけを許可し、未知userをIdentity Platformへ増やさない。
+          ...(identityProvisioning === "existing-only" ? { autoCreate: false } : {}),
         }),
         signal: AbortSignal.timeout(SSO_PROVIDER_TIMEOUT_MS),
       });
@@ -142,8 +146,10 @@ export function createGoogleCloudIdentityPlatformSsoClient(
     if (!response.ok) throw new SsoProviderError("provider_rejected");
     try {
       const exchanged = v.parse(IdentityPlatformResponseSchema, await response.json());
-      // autoCreateが上流で無視・変更された場合も未知userを認証済みIdentityとして扱わない。
-      if (exchanged.isNewUser) throw new SsoProviderError("provider_rejected");
+      // existing-onlyでautoCreateが上流に無視されても、公開loginの未知userは拒否する。
+      if (identityProvisioning === "existing-only" && exchanged.isNewUser) {
+        throw new SsoProviderError("provider_rejected");
+      }
       return exchanged.localId;
     } catch {
       throw new SsoProviderError("provider_rejected");
@@ -166,7 +172,7 @@ export function createGoogleCloudIdentityPlatformSsoClient(
       return url;
     },
 
-    async exchangeAuthorizationCode({ code, codeVerifier, expectedNonce }) {
+    async exchangeAuthorizationCode({ code, codeVerifier, expectedNonce, identityProvisioning }) {
       let response: Response;
       try {
         response = await fetcher(GOOGLE_TOKEN_ENDPOINT, {
@@ -195,7 +201,7 @@ export function createGoogleCloudIdentityPlatformSsoClient(
       }
 
       const googleIdentity = await verifyGoogleIdToken(googleIdToken, expectedNonce);
-      const localId = await exchangeWithIdentityPlatform(googleIdToken);
+      const localId = await exchangeWithIdentityPlatform(googleIdToken, identityProvisioning);
       return {
         providerKey: GOOGLE_CLOUD_IDENTITY_PLATFORM_PROVIDER_KEY,
         subject: localId,

@@ -21,7 +21,7 @@ jobs:
   bootstrap:
     name: Bootstrap Pulumi State on GCS
     runs-on: ubuntu-latest
-    environment: dev
+    environment: infra-dev
     env:
       GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -50,7 +50,7 @@ jobs:
           for variable_name in "${required_variables[@]}"; do
             variable_value="${!variable_name}"
             if [ -z "${variable_value//[[:space:]]/}" ]; then
-              echo "::error::${variable_name} がGitHub Environment devに設定されていません。"
+              echo "::error::${variable_name} がGitHub Environment infra-devに設定されていません。"
               exit 1
             fi
           done

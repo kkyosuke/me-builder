@@ -372,7 +372,7 @@ OpenAPIのsecurity schemeは`liffIdToken`からprovider非依存のアプリケ�
 | provider key | 全環境で`gcp_identity_platform`。共有D1自体を環境分離するためGCP project IDをprovider keyへ埋め込まない |
 | 登録policy | `link-only`。SSO Identityだけを根拠に新規Accountを作らない |
 
-API Serverは検証済みGoogle ID tokenをIdentity Platformの`accounts:signInWithIdp`へ`autoCreate=false`で渡し、返された`localId`だけをIdentityのsubjectとして保存します。`isNewUser=true`の応答は防御的に拒否し、公開callbackを経由した未知Identity Platform userの作成を許しません。Google ID tokenの`sub`とemailはAccount照合やIdentity保存に使いません。Identity Platform上でuserを削除・再作成して`localId`が変わった場合は別Identityとして扱い、email一致で既存Accountへ自動統合しません。
+API Serverは検証済みGoogle ID tokenをIdentity Platformの`accounts:signInWithIdp`へ渡し、返された`localId`だけをIdentityのsubjectとして保存します。認証済みAccountから開始したlink transactionではIdentity Platform userの初回作成を許可し、その`localId`を開始時Accountへ接続します。公開login transactionでは`autoCreate=false`を指定し、上流が作成した`isNewUser=true`の応答も防御的に拒否します。この区別により、プロフィールからの初回連携を成立させつつ、未知のGoogle Identityだけを根拠にme-builder Accountを作成しません。Google ID tokenの`sub`とemailはAccount照合やIdentity保存に使いません。Identity Platform上でuserを削除・再作成して`localId`が変わった場合は別Identityとして扱い、email一致で既存Accountへ自動統合しません。
 
 Firebase Web SDKは導入しません。このアプリではprovider認証を一度だけme-builderのHttpOnly application sessionへ交換するため、API Serverが公式OAuth endpointとIdentity Platform REST APIを直接利用します。これにより、Firebaseのブラウザsessionを併設せず、Cloudflare Pagesのcustom domainでredirect helperやstorage制限へ依存しません。将来、クライアント側のFirebase token継続利用、メール認証、MFA等が必要になった時点でSDK採用を再評価します。
 

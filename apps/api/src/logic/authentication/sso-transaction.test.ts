@@ -144,6 +144,7 @@ describe("SSO authentication transaction", () => {
       code: "authorization-code",
       codeVerifier: "verifier",
       expectedNonce: "nonce",
+      identityProvisioning: "existing-only",
     });
     await expect(
       completeSsoAuthentication({ state: "state", code: "code", store, client }),
@@ -328,6 +329,12 @@ describe("SSO authentication transaction", () => {
       }),
     ).resolves.toEqual({ purpose: "login", session: { token: "session" }, returnTo: "/admin" });
     expect(identityLinker.link).not.toHaveBeenCalled();
+    expect(client.exchangeAuthorizationCode).toHaveBeenCalledWith({
+      code: "code",
+      codeVerifier: "verifier",
+      expectedNonce: "nonce",
+      identityProvisioning: "existing-only",
+    });
   });
 
   it("共通callbackはlink transactionを開始時Accountへだけ接続する", async () => {
@@ -366,6 +373,12 @@ describe("SSO authentication transaction", () => {
       returnTo: "/profile",
     });
     expect(sessionIssuer.issue).not.toHaveBeenCalled();
+    expect(client.exchangeAuthorizationCode).toHaveBeenCalledWith({
+      code: "code",
+      codeVerifier: "verifier",
+      expectedNonce: "nonce",
+      identityProvisioning: "allow",
+    });
   });
 
   it("割合対象外の既知Identityへsessionを発行しない", async () => {
@@ -461,6 +474,12 @@ describe("SSO authentication transaction", () => {
       providerKey: "fixture_provider",
       subject: "identity-platform-uid-1",
     });
+    expect(client.exchangeAuthorizationCode).toHaveBeenCalledWith({
+      code: "code",
+      codeVerifier: "verifier",
+      expectedNonce: "nonce",
+      identityProvisioning: "allow",
+    });
     await expect(
       completeSsoIdentityLinking({
         state: "link-state",
@@ -516,6 +535,7 @@ describe("SSO authentication transaction", () => {
       reason: "transaction_purpose_mismatch",
       callback: { returnTo: "/" },
     });
+    expect(client.exchangeAuthorizationCode).not.toHaveBeenCalled();
   });
 
   it.each([

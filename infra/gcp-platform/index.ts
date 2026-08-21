@@ -1,5 +1,6 @@
 import * as gcp from "@pulumi/gcp";
 import * as pulumi from "@pulumi/pulumi";
+import { authorizationKeyPolicyRule } from "../src/gcp-authorization-key-policy";
 import { pulumiGcsBackends, requirePulumiGcsBackend } from "../src/pulumi-backend";
 
 requirePulumiGcsBackend(process.env, pulumiGcsBackends.gcpPlatform);
@@ -265,7 +266,7 @@ const authorizationKeyPolicy =
         {
           parent: pulumi.interpolate`projects/${project.number}`,
           name: pulumi.interpolate`projects/${project.number}/policies/iam.managed.disableServiceAccountApiKeyCreation`,
-          spec: { rules: [{ enforce: vertexRuntimeCredentialsEnabled ? "FALSE" : "TRUE" }] },
+          spec: { rules: [authorizationKeyPolicyRule(vertexRuntimeCredentialsEnabled)] },
           deletionPolicy: "PREVENT",
         },
         { dependsOn: services, protect },

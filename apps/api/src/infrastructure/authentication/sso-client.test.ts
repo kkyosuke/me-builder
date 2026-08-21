@@ -113,6 +113,7 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
         code: "authorization-code",
         codeVerifier: "verifier",
         expectedNonce: "expected-nonce",
+        identityProvisioning: "existing-only",
       }),
     ).resolves.toEqual({
       providerKey: "gcp_identity_platform",
@@ -150,6 +151,7 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
         code: "code",
         codeVerifier: "verifier",
         expectedNonce: "expected-nonce",
+        identityProvisioning: "existing-only",
       }),
     ).rejects.toEqual(new SsoProviderError("token_invalid"));
     expect(fetcher.mock.calls.some(([url]) => String(url).includes("identitytoolkit"))).toBe(false);
@@ -172,6 +174,7 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
         code: "code",
         codeVerifier: "verifier",
         expectedNonce: "expected-nonce",
+        identityProvisioning: "existing-only",
       }),
     ).rejects.toEqual(new SsoProviderError("token_invalid"));
   });
@@ -224,11 +227,44 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
         code: "code",
         codeVerifier: "verifier",
         expectedNonce: "expected-nonce",
+        identityProvisioning: "existing-only",
       }),
     ).rejects.toEqual(new SsoProviderError("provider_rejected"));
   });
 
-  it("Identity Platformが未知userを作成した応答を防御的に拒否する", async () => {
+  it("認証済みAccountへのlinkではIdentity Platform userの初回作成を許可する", async () => {
+    const signed = await googleToken({});
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "https://oauth2.googleapis.com/token") {
+        return Response.json({ id_token: signed.token });
+      }
+      if (url === "https://www.googleapis.com/oauth2/v3/certs") {
+        return Response.json(signed.jwks);
+      }
+      expect(JSON.parse(String(init?.body))).not.toHaveProperty("autoCreate");
+      return Response.json({
+        localId: "new-identity-platform-user",
+        providerId: "google.com",
+        isNewUser: true,
+      });
+    });
+    const client = createGoogleCloudIdentityPlatformSsoClient(configuration, {
+      fetch: fetcher,
+      now: () => new Date("2026-08-16T00:01:00.000Z"),
+    });
+
+    await expect(
+      client.exchangeAuthorizationCode({
+        code: "code",
+        codeVerifier: "verifier",
+        expectedNonce: "expected-nonce",
+        identityProvisioning: "allow",
+      }),
+    ).resolves.toMatchObject({ subject: "new-identity-platform-user" });
+  });
+
+  it("公開loginではIdentity Platformが未知userを作成した応答を防御的に拒否する", async () => {
     const signed = await googleToken({});
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -254,6 +290,7 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
         code: "code",
         codeVerifier: "verifier",
         expectedNonce: "expected-nonce",
+        identityProvisioning: "existing-only",
       }),
     ).rejects.toEqual(new SsoProviderError("provider_rejected"));
   });

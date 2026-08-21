@@ -21,7 +21,7 @@ The GCP platform project additionally requires Application Default Credentials, 
 
 The state project is a bootstrap prerequisite and is not created or deleted by either Pulumi project in this repository. Create the bucket and managed folders once with the manual [`Setup / Pulumi State Backend`](../.github/workflows/setup-pulumi-state.yml) workflow. The workflow is idempotent: it preserves an existing bucket, verifies its immutable location, and reconciles its mutable security, storage-class, and versioning settings.
 
-Configure these values in the protected GitHub Environment `dev`:
+Configure these values in the approval-protected GitHub Environment `infra-dev`. This Environment is the shared approval gate for Development infrastructure operations, including Stripe test-mode synchronization; normal Preview CD continues to use `dev` without waiting for infrastructure approval.
 
 | Kind | Name | Value |
 | --- | --- | --- |
@@ -30,13 +30,24 @@ Configure these values in the protected GitHub Environment `dev`:
 
 The workflow cannot create the identity that it uses to authenticate. Create the Workload Identity Pool/Provider and direct IAM bindings once from an existing project administrator session before the first run. These are authentication prerequisites only; the bucket and managed folders remain workflow-owned.
 
-The workflow uses Direct Workload Identity Federation and does not impersonate a service account. Configure `google.subject=assertion.sub` and `attribute.repository=assertion.repository`, and restrict the Provider to `assertion.repository=='kkyosuke/me-builder'`. Because access is granted by the mapped repository attribute, use this exact principal set:
+The workflow uses Direct Workload Identity Federation and does not impersonate a service account. Repository-only trust is not sufficient because a different workflow in the same repository could request an ID token. Map the immutable repository ID and workflow reference, and restrict the Provider to the reviewed workflows on `main` with their expected Environments:
 
-```text
-principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloadIdentityPools/github-actions/attribute.repository/kkyosuke/me-builder
+```bash
+gcloud iam workload-identity-pools providers update-oidc github-actions-provider \
+  --project=gen-lang-client-0647422425 \
+  --location=global \
+  --workload-identity-pool=github-actions \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.workflow_ref=assertion.workflow_ref" \
+  --attribute-condition="assertion.repository_id=='1309307514' && assertion.ref=='refs/heads/main' && ((assertion.workflow_ref.endsWith('/.github/workflows/setup-pulumi-state.yml@refs/heads/main') && assertion.environment=='infra-dev') || (assertion.workflow_ref.endsWith('/.github/workflows/reset-preview-migrations.yml@refs/heads/main') && assertion.environment=='dev'))"
 ```
 
-`principal://.../attribute.repository/...` is invalid: `principal://` is only for one mapped `subject`, while a mapped attribute requires `principalSet://`. Grant this principal set `storage.buckets.create`, `storage.buckets.get`, `storage.buckets.update`, `storage.buckets.setIamPolicy`, `storage.managedFolders.create`, and `storage.managedFolders.get` in the state project. Prefer a bootstrap-specific custom role; if `roles/storage.admin` is granted temporarily, replace it with `roles/storage.objectAdmin` on `kagami/cloudflare/` after the first successful run. Do not create or store a service-account JSON key.
+Grant access by the immutable repository ID rather than the reusable repository name:
+
+```text
+principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloadIdentityPools/github-actions/attribute.repository_id/1309307514
+```
+
+`principal://.../attribute.repository_id/...` is invalid: `principal://` is only for one mapped `subject`, while a mapped attribute requires `principalSet://`. Add this repository-ID principal before removing the former `attribute.repository/kkyosuke/me-builder` binding. Grant it `storage.buckets.create`, `storage.buckets.get`, `storage.buckets.update`, `storage.buckets.setIamPolicy`, `storage.managedFolders.create`, and `storage.managedFolders.get` in the state project. Prefer a bootstrap-specific custom role; if `roles/storage.admin` is granted temporarily, replace it with `roles/storage.objectAdmin` on `kagami/cloudflare/` after the first successful run. Do not create or store a service-account JSON key.
 
 After this workflow is merged to the default branch, run it from the Actions screen on `main` with confirmation `bootstrap-kagami-infra`, or use:
 
@@ -80,7 +91,7 @@ pulumi login gs://kagami-infra/kagami/cloudflare
 
 For local operations, `gcloud auth application-default login` supplies credentials for the GCS backend. The operator must have access to the relevant managed folder and the cloud resources being managed. Do not create a service-account JSON key.
 
-The `Reset / Preview Migrations` workflow authenticates with GitHub OIDC and Workload Identity Federation. Configure these GitHub Actions values at repository level or in Environment `dev` before running it:
+The `Reset / Preview Migrations` workflow first requires approval through `infra-dev`, then authenticates from its `dev` job with GitHub OIDC and Workload Identity Federation. It runs only from the reviewed `main` workflow. Configure these GitHub Actions values in Environment `dev` before running it:
 
 | Kind | Name | Value |
 | --- | --- | --- |
@@ -108,4 +119,4 @@ Normal Preview CD creates the named private avatar bucket and application-sessio
 
 `infra:preview:clean` is only for the one-time adoption of an existing unmanaged Preview environment. It also removes orphaned `me-builder-*-preview` queues that are no longer declared by the Pulumi program. Preview destruction empties the private avatar bucket before Pulumi removes it. Both destructive commands require `ALLOW_PREVIEW_DESTROY=preview`; there is no Production destroy command.
 
-The `Reset / Preview Migrations` manual workflow performs the clean recreation and application redeployment from the selected branch. Because recreation changes Cloudflare resource IDs, the workflow also commits the updated manifest and generated TOML files according to the branch rules documented in the workflow. Normal Preview CD runs `infra:preview:sync` before migrations so deployment remains valid while generated changes are awaiting merge.
+The `Reset / Preview Migrations` manual workflow performs the clean recreation and application redeployment only from reviewed `main`, after `infra-dev` approval. Because recreation changes Cloudflare resource IDs, the workflow opens a dedicated PR containing the updated manifest and generated TOML files, verifies it, and merges it when verification succeeds. Normal Preview CD runs `infra:preview:sync` before migrations so deployment remains valid while generated changes are awaiting merge.

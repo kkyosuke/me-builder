@@ -36,10 +36,11 @@ function identityPlatformFixture(): ExternalSsoProvider {
       url.searchParams.set("code_challenge_method", "S256");
       return url;
     },
-    async exchangeAuthorizationCode({ code, codeVerifier, expectedNonce }) {
+    async exchangeAuthorizationCode({ code, codeVerifier, expectedNonce, identityProvisioning }) {
       expect(code).toBe("authorization-code");
       expect(codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/u);
       expect(expectedNonce).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+      expect(identityProvisioning).toBe("existing-only");
       return {
         providerKey: "gcp_identity_platform",
         subject: "identity-platform-fixture-user",

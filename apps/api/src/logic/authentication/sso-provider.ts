@@ -9,6 +9,8 @@ export interface ExternalSsoProvider {
     code: string;
     codeVerifier: string;
     expectedNonce: string;
+    /** linkではIdP側Identityの初回作成を許可し、公開loginでは既存Identityだけを許可する。 */
+    identityProvisioning: "allow" | "existing-only";
   }): Promise<SsoVerifiedIdentity>;
 }
 

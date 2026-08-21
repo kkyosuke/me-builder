@@ -215,7 +215,7 @@ APIとMCPがブラウザへ返すCORSヘッダは、環境manifestのベース�
 
 ### 6.2 GCP共通リソースの宣言境界
 
-`infra/gcp-platform/`はCloudflare基盤と別のPulumi projectとし、`development`と`production`のStackを持ちます。各Stackは環境別GCP project、Cloud Billing接続、Identity Platform設定、Google provider、Identity Toolkit APIだけへ制限したAPI keyを所有します。同じStackでVertex AI API、推論だけを許す専用service account、`GenerateContent`と`EmbedContent`だけへ制限したservice-account-bound authorization keyを所有します。Productionだけでなく認証データを持つDevelopment projectも削除保護します。authorization keyのorganization policyはproject単位でPulumi管理し、runtime credentialを無効にした状態では作成を明示的に禁止し、有効化時だけ例外へ切り替えます。organization配下にないprojectではauthorization keyを作りません。
+`infra/gcp-platform/`はCloudflare基盤と別のPulumi projectとし、`development`と`production`のStackを持ちます。各Stackは環境別GCP project、Cloud Billing接続、Identity Platform設定、Google provider、Identity Toolkit APIだけへ制限したAPI keyを所有します。同じStackでVertex AI API、推論だけを許す専用service account、`GenerateContent`と`EmbedContent`だけへ制限したservice-account-bound authorization keyを所有します。Productionだけでなく認証データを持つDevelopment projectも削除保護します。authorization keyのorganization policyはproject単位でPulumi管理し、runtime credentialを無効にした状態では作成を明示的に禁止します。有効化後も制約自体は維持し、`allowedServices`で`aiplatform.googleapis.com`だけを許可します。organization配下にないprojectではauthorization keyを作りません。
 
 API keyは`primary`と`secondary`のrotation slotを持ち、平常時はactive slotだけを作成します。Stack configに非active slotのgenerationを追加して移行期間だけ2 keyを併存させ、配布先の切り替え後に旧slotを`null`へ戻して削除します。key自体へ削除保護を付けず、project、Identity Platform、IAM、予算などの永続的な基盤だけを削除保護します。これにより、固定名の長期credentialを壊さずに置換できない状態と、不要な予備credentialの常設をともに避けます。
 

@@ -201,6 +201,7 @@ export async function startSsoIdentityLinking(
 
 async function consumeAndVerifySsoTransaction(
   input: CompleteSsoAuthenticationInput,
+  expectedPurpose?: SsoAuthenticationTransaction["purpose"],
 ): Promise<{ identity: SsoVerifiedIdentity; transaction: SsoAuthenticationTransaction }> {
   if (!input.state || !input.code) throw new SsoAuthenticationError("invalid_callback");
 
@@ -209,6 +210,10 @@ async function consumeAndVerifySsoTransaction(
   if (transaction.expiresAt <= (input.now?.() ?? Date.now())) {
     throw new SsoAuthenticationError("transaction_expired", callbackContext(transaction));
   }
+  // callback用途の取り違えでIdP側に副作用を起こす前に拒否する。
+  if (expectedPurpose && transaction.purpose !== expectedPurpose) {
+    throw new SsoAuthenticationError("transaction_purpose_mismatch", callbackContext(transaction));
+  }
 
   let identity: SsoVerifiedIdentity;
   try {
@@ -216,6 +221,7 @@ async function consumeAndVerifySsoTransaction(
       code: input.code,
       codeVerifier: transaction.codeVerifier,
       expectedNonce: transaction.nonce,
+      identityProvisioning: transaction.purpose === "link" ? "allow" : "existing-only",
     });
   } catch (error) {
     throw new SsoCallbackCompletionError(callbackContext(transaction), error);
@@ -227,7 +233,7 @@ async function consumeAndVerifySsoTransaction(
 export async function completeSsoAuthentication(
   input: CompleteSsoAuthenticationInput,
 ): Promise<{ identity: SsoVerifiedIdentity; returnTo: string; traceId?: string }> {
-  const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  const { identity, transaction } = await consumeAndVerifySsoTransaction(input, "login");
   if (transaction.purpose !== "login") {
     throw new SsoAuthenticationError("transaction_purpose_mismatch", callbackContext(transaction));
   }
@@ -387,7 +393,7 @@ export async function completeSsoIdentityLinking(
   returnTo: string;
   traceId?: string;
 }> {
-  const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  const { identity, transaction } = await consumeAndVerifySsoTransaction(input, "link");
   if (transaction.purpose !== "link") {
     throw new SsoAuthenticationError("transaction_purpose_mismatch", callbackContext(transaction));
   }
