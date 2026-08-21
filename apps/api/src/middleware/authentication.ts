@@ -14,6 +14,7 @@ import {
   CSRF_HEADER,
   createApplicationSessionService,
 } from "../infrastructure/authentication/application-session-runtime";
+import { isActiveSsoIdentityProvider } from "../infrastructure/authentication/sso-provider-runtime";
 import type { AuthenticatedActor, AuthenticationResult } from "../logic/authentication/types";
 import type { AppEnv } from "../types";
 
@@ -35,7 +36,7 @@ async function resolveRequestAuthentication(c: Context<AppEnv>): Promise<Authent
   });
   if (!verified) return { type: "unauthenticated", reason: "credential_invalid" };
 
-  const [account, profile] = await Promise.all([
+  const [account, profile, authenticatedIdentity] = await Promise.all([
     applicationSession.db.query.accounts.findFirst({
       columns: { role: true },
       where: (table, { eq }) => eq(table.id, verified.actor.accountId),
@@ -44,8 +45,23 @@ async function resolveRequestAuthentication(c: Context<AppEnv>): Promise<Authent
       columns: { displayName: true },
       where: (table, { eq }) => eq(table.accountId, verified.actor.accountId),
     }),
+    verified.authenticatedIdentityId
+      ? applicationSession.db.query.accountIdentities.findFirst({
+          columns: { provider: true, isDeleted: true },
+          where: (table, { eq }) => eq(table.id, verified.authenticatedIdentityId),
+        })
+      : undefined,
   ]);
   if (!account) return { type: "unauthenticated", reason: "credential_invalid" };
+  if (
+    verified.authenticatedIdentityId &&
+    (!authenticatedIdentity ||
+      authenticatedIdentity.isDeleted ||
+      (verified.actor.authenticationMethod === "sso" &&
+        !isActiveSsoIdentityProvider(authenticatedIdentity.provider)))
+  ) {
+    return { type: "unauthenticated", reason: "credential_invalid" };
+  }
   const config = getConfig(c.env);
   if (
     config.environment === "production" &&

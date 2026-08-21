@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSsoRolloutAuthorizer } from "../infrastructure/authentication/sso-rollout";
+import type { ExternalSsoProvider } from "../logic/authentication/sso-provider";
 import {
   SsoAuthenticationError,
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
-  type SsoServerClient,
   completeSsoLogin,
   startSsoAuthentication,
 } from "../logic/authentication/sso-transaction";
@@ -26,23 +26,24 @@ function memoryStore(): SsoAuthenticationTransactionStore & {
   };
 }
 
-function auth0Fixture(): SsoServerClient {
+function identityPlatformFixture(): ExternalSsoProvider {
   return {
     async createAuthorizationUrl({ state, nonce, codeChallenge }) {
-      const url = new URL("https://tenant.auth0.test/authorize");
+      const url = new URL("https://accounts.google.test/o/oauth2/v2/auth");
       url.searchParams.set("state", state);
       url.searchParams.set("nonce", nonce);
       url.searchParams.set("code_challenge", codeChallenge);
       url.searchParams.set("code_challenge_method", "S256");
       return url;
     },
-    async exchangeAuthorizationCode({ code, codeVerifier, expectedNonce }) {
+    async exchangeAuthorizationCode({ code, codeVerifier, expectedNonce, identityProvisioning }) {
       expect(code).toBe("authorization-code");
       expect(codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/u);
       expect(expectedNonce).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+      expect(identityProvisioning).toBe("existing-only");
       return {
-        providerKey: "auth0",
-        subject: "auth0|fixture-user",
+        providerKey: "gcp_identity_platform",
+        subject: "identity-platform-fixture-user",
         authenticationMethod: "sso",
         authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
       };
@@ -50,7 +51,7 @@ function auth0Fixture(): SsoServerClient {
   };
 }
 
-async function startFlow(store: SsoAuthenticationTransactionStore, client: SsoServerClient) {
+async function startFlow(store: SsoAuthenticationTransactionStore, client: ExternalSsoProvider) {
   let seed = 0;
   const authorizationUrl = await startSsoAuthentication({
     traceId: "00000000-0000-4000-8000-000000000099",
@@ -64,9 +65,9 @@ async function startFlow(store: SsoAuthenticationTransactionStore, client: SsoSe
 }
 
 describe("SSO authentication E2E", () => {
-  it("Auth0開始から既知Identityのsession発行と要求path復元までを一度だけ完了する", async () => {
+  it("Google認証開始から既知Identityのsession発行と要求path復元までを一度だけ完了する", async () => {
     const store = memoryStore();
-    const client = auth0Fixture();
+    const client = identityPlatformFixture();
     const state = await startFlow(store, client);
     const sessionIssuer = { issue: vi.fn(async () => ({ cookie: "opaque-session" })) };
 
@@ -79,7 +80,7 @@ describe("SSO authentication E2E", () => {
         identityResolver: {
           findAccount: vi.fn(async () => ({
             accountId: "admin-account",
-            authenticatedIdentityId: "identity-auth0-admin",
+            authenticatedIdentityId: "identity-platform-admin",
             role: "admin" as const,
           })),
         },
@@ -94,7 +95,7 @@ describe("SSO authentication E2E", () => {
     });
     expect(sessionIssuer.issue).toHaveBeenCalledWith({
       accountId: "admin-account",
-      authenticatedIdentityId: "identity-auth0-admin",
+      authenticatedIdentityId: "identity-platform-admin",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
     });
@@ -113,12 +114,12 @@ describe("SSO authentication E2E", () => {
   });
 
   it("0%の一般Accountと未知Identityではsessionを発行せず、100%の既知Accountだけ許可する", async () => {
-    const client = auth0Fixture();
+    const client = identityPlatformFixture();
     const sessionIssuer = { issue: vi.fn(async () => ({ cookie: "opaque-session" })) };
     const knownUser = {
       findAccount: vi.fn(async () => ({
         accountId: "known-user",
-        authenticatedIdentityId: "identity-auth0-user",
+        authenticatedIdentityId: "identity-platform-user",
         role: "user" as const,
       })),
     };
@@ -185,11 +186,11 @@ describe("SSO authentication E2E", () => {
   it("同じemailを持つ既存Accountがあっても別subjectのIdentityを統合しない", async () => {
     const store = memoryStore();
     const client = {
-      ...auth0Fixture(),
+      ...identityPlatformFixture(),
       async exchangeAuthorizationCode() {
         return {
-          providerKey: "auth0" as const,
-          subject: "auth0|different-subject",
+          providerKey: "gcp_identity_platform" as const,
+          subject: "identity-platform-different-subject",
           authenticationMethod: "sso" as const,
           authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
           displayProfile: { displayName: "same-address@example.test" },
@@ -222,15 +223,15 @@ describe("SSO authentication E2E", () => {
       }),
     ).rejects.toMatchObject({ reason: "identity_unlinked" });
     expect(findAccount).toHaveBeenCalledWith({
-      providerKey: "auth0",
-      subject: "auth0|different-subject",
+      providerKey: "gcp_identity_platform",
+      subject: "identity-platform-different-subject",
     });
     expect(sessionIssuer.issue).not.toHaveBeenCalled();
   });
 
   it("session issuer障害ではcallbackを完了せずtransaction再送も拒否する", async () => {
     const store = memoryStore();
-    const client = auth0Fixture();
+    const client = identityPlatformFixture();
     const state = await startFlow(store, client);
     const input = {
       state,
@@ -240,7 +241,7 @@ describe("SSO authentication E2E", () => {
       identityResolver: {
         findAccount: vi.fn(async () => ({
           accountId: "known-user",
-          authenticatedIdentityId: "identity-auth0-user",
+          authenticatedIdentityId: "identity-platform-user",
           role: "user" as const,
         })),
       },

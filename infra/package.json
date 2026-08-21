@@ -12,7 +12,11 @@
     "preview:clean": "bun scripts/preview-clean.ts",
     "preview:destroy": "bun scripts/preview-destroy.ts",
     "preview:sync": "bun scripts/preview-sync.ts",
-    "preview:up": "bun scripts/preview-up.ts"
+    "preview:up": "bun scripts/preview-up.ts",
+    "gcp-platform:preview:development": "bun scripts/gcp-platform.ts preview development",
+    "gcp-platform:preview:production": "bun scripts/gcp-platform.ts preview production",
+    "gcp-platform:up:development": "bun scripts/gcp-platform.ts up development",
+    "gcp-platform:up:production": "bun scripts/gcp-platform.ts up production"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -21,6 +25,7 @@
   },
   "dependencies": {
     "@pulumi/cloudflare": "^6.19.0",
+    "@pulumi/gcp": "^9.29.0",
     "@pulumi/pulumi": "^3.256.0"
   }
 }

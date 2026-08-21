@@ -44,7 +44,7 @@ export async function establishSsoAuthSession(
   const response = await createAuthenticatedHttpClient(apiUrl, globalThis.fetch, {
     authentication: false,
   }).request(ssoLoginPath(returnTo), { method: "POST", signal });
-  if (!response.ok) throw new Error("SSO認証を開始できませんでした。");
+  if (!response.ok) throw new Error("Googleログインを開始できませんでした。");
   const { authorizationUrl } = v.parse(SsoAuthorizationUrlSchema, await response.json());
   navigate(authorizationUrl);
   return { redirecting: true };

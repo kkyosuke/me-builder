@@ -54,7 +54,7 @@ export const startSsoIdentityLinkRoute = describeRoute({
   security: applicationSessionMutationSecurity,
   parameters: [returnToParameter],
   responses: {
-    200: jsonResponse("同じbrowserで開くAuth0認可URL", SsoAuthorizationUrlSchema),
+    200: jsonResponse("同じbrowserで開くGoogle認可URL", SsoAuthorizationUrlSchema),
     ...csrfValidationError,
     ...commonErrors,
   },
@@ -67,7 +67,7 @@ export const startSsoLoginRoute = describeRoute({
   security: [],
   parameters: [returnToParameter],
   responses: {
-    200: jsonResponse("同じbrowserで開くAuth0認可URL", SsoAuthorizationUrlSchema),
+    200: jsonResponse("同じbrowserで開くGoogle認可URL", SsoAuthorizationUrlSchema),
     503: jsonResponse("SSOまたはstorage bindingが未設定", ServiceUnavailableErrorSchema),
     ...internalServerError,
   },

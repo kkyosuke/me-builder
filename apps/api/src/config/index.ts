@@ -95,9 +95,10 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     lineLoginChannelId: liffConfiguration.lineLoginChannelId,
     ssoRolloutMode: getEnv("SSO_ROLLOUT_MODE", env)?.trim() || undefined,
     ssoRolloutPercent: Number(getEnv("SSO_ROLLOUT_PERCENT", env) ?? 0),
-    ssoIssuerUrl: getEnv("SSO_ISSUER_URL", env)?.trim() || undefined,
-    ssoClientId: getEnv("SSO_CLIENT_ID", env)?.trim() || undefined,
-    ssoClientSecret: getEnv("SSO_CLIENT_SECRET", env)?.trim() || undefined,
+    googleIdentityPlatformApiKey:
+      getEnv("GOOGLE_IDENTITY_PLATFORM_API_KEY", env)?.trim() || undefined,
+    googleOAuthClientId: getEnv("GOOGLE_OAUTH_CLIENT_ID", env)?.trim() || undefined,
+    googleOAuthClientSecret: getEnv("GOOGLE_OAUTH_CLIENT_SECRET", env)?.trim() || undefined,
     ssoCallbackUrl:
       rawBaseUrl && rawBaseUrl !== "/"
         ? `${rawBaseUrl.replace(/\/$/u, "")}/api/auth/sso/callback`
@@ -108,14 +109,14 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   const parsed = v.parse(ConfigSchema, rawConfig);
   if (
     parsed.ssoRolloutMode !== "disabled" &&
-    (!parsed.ssoIssuerUrl ||
-      !parsed.ssoClientId ||
-      !parsed.ssoClientSecret ||
+    (!parsed.googleIdentityPlatformApiKey ||
+      !parsed.googleOAuthClientId ||
+      !parsed.googleOAuthClientSecret ||
       !parsed.ssoCallbackUrl ||
       !parsed.webOrigin)
   ) {
     throw new Error(
-      "SSO_ISSUER_URL, SSO_CLIENT_ID, SSO_CLIENT_SECRET, BASE_URL, and WEB_ORIGIN are required when SSO is enabled",
+      "GOOGLE_IDENTITY_PLATFORM_API_KEY, GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, BASE_URL, and WEB_ORIGIN are required when SSO is enabled",
     );
   }
   return parsed;

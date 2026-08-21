@@ -283,31 +283,59 @@ describe("linkIdentity", () => {
     );
   });
 
-  it("Auth0 Identityを既存Accountへ追加し、subjectを公開せずproviderを列挙すること", async () => {
+  it("Identity Platform Identityを既存Accountへ追加し、subjectを公開せずproviderを列挙すること", async () => {
     const db = createTestDb();
     const { account } = await upsertIdentity(db, {
       provider: "line_login",
-      providerAccountId: "U_auth0_link",
+      providerAccountId: "U_identity_platform_link",
     });
 
     await linkIdentity(db, {
       accountId: account.id,
-      provider: "auth0",
-      providerAccountId: "auth0|private-subject",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-private-uid",
     });
 
-    await expect(findAccountByIdentity(db, "auth0", "auth0|private-subject")).resolves.toEqual(
+    await expect(
+      findAccountByIdentity(db, "gcp_identity_platform", "identity-platform-private-uid"),
+    ).resolves.toEqual(
       expect.objectContaining({ account: expect.objectContaining({ id: account.id }) }),
     );
     await expect(listLoginIdentityProviders(db, account.id)).resolves.toEqual([
-      "auth0",
+      "gcp_identity_platform",
       "line_login",
     ]);
   });
 });
 
 describe("unlinkLoginIdentityProvider", () => {
-  it("複数あるログイン手段からAuth0だけを解除できること", async () => {
+  it("Messaging API identityを代替ログイン手段として扱わないこと", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_messaging_only",
+    });
+    await linkIdentity(db, {
+      accountId: account.id,
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-with-messaging",
+    });
+
+    await expect(listLoginIdentityProviders(db, account.id)).resolves.toEqual([
+      "gcp_identity_platform",
+    ]);
+    await expect(
+      unlinkLoginIdentityProvider(db, {
+        accountId: account.id,
+        provider: "gcp_identity_platform",
+      }),
+    ).rejects.toThrow("last login identity");
+    await expect(
+      findAccountByIdentity(db, "gcp_identity_platform", "identity-platform-with-messaging"),
+    ).resolves.toBeDefined();
+  });
+
+  it("複数あるログイン手段からIdentity Platformだけを解除できること", async () => {
     const db = createTestDb();
     const { account } = await upsertIdentity(db, {
       provider: "line_login",
@@ -315,52 +343,67 @@ describe("unlinkLoginIdentityProvider", () => {
     });
     await linkIdentity(db, {
       accountId: account.id,
-      provider: "auth0",
-      providerAccountId: "auth0|unlink",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-unlink",
     });
 
-    await unlinkLoginIdentityProvider(db, { accountId: account.id, provider: "auth0" });
+    await unlinkLoginIdentityProvider(db, {
+      accountId: account.id,
+      provider: "gcp_identity_platform",
+    });
 
     await expect(listLoginIdentityProviders(db, account.id)).resolves.toEqual(["line_login"]);
-    await expect(findAccountByIdentity(db, "auth0", "auth0|unlink")).resolves.toBeUndefined();
+    await expect(
+      findAccountByIdentity(db, "gcp_identity_platform", "identity-platform-unlink"),
+    ).resolves.toBeUndefined();
   });
 
   it("最後のIdentityは解除せず、再送しても他Accountへ影響しないこと", async () => {
     const db = createTestDb();
     const first = await upsertIdentity(db, {
-      provider: "auth0",
-      providerAccountId: "auth0|only",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-only",
     });
     const other = await upsertIdentity(db, {
-      provider: "auth0",
-      providerAccountId: "auth0|other",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-other",
     });
 
     await expect(
-      unlinkLoginIdentityProvider(db, { accountId: first.account.id, provider: "auth0" }),
+      unlinkLoginIdentityProvider(db, {
+        accountId: first.account.id,
+        provider: "gcp_identity_platform",
+      }),
     ).rejects.toThrow("last login identity");
-    await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual(["auth0"]);
-    await expect(listLoginIdentityProviders(db, other.account.id)).resolves.toEqual(["auth0"]);
+    await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual([
+      "gcp_identity_platform",
+    ]);
+    await expect(listLoginIdentityProviders(db, other.account.id)).resolves.toEqual([
+      "gcp_identity_platform",
+    ]);
   });
 
   it("同じproviderのIdentityが複数あってもログイン手段をすべて解除しないこと", async () => {
     const db = createTestDb();
     const first = await upsertIdentity(db, {
-      provider: "auth0",
-      providerAccountId: "auth0|first",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-first",
     });
     await linkIdentity(db, {
       accountId: first.account.id,
-      provider: "auth0",
-      providerAccountId: "auth0|second",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-second",
     });
 
     await expect(
-      unlinkLoginIdentityProvider(db, { accountId: first.account.id, provider: "auth0" }),
+      unlinkLoginIdentityProvider(db, {
+        accountId: first.account.id,
+        provider: "gcp_identity_platform",
+      }),
     ).rejects.toThrow("last login identity");
     await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual([
-      "auth0",
-      "auth0",
+      "gcp_identity_platform",
+      "gcp_identity_platform",
     ]);
   });
 
@@ -368,20 +411,23 @@ describe("unlinkLoginIdentityProvider", () => {
     const db = createTestDb();
     const first = await upsertIdentity(db, {
       provider: "line_login",
-      providerAccountId: "U_multiple_auth0",
+      providerAccountId: "U_multiple_identity_platform",
     });
     await linkIdentity(db, {
       accountId: first.account.id,
-      provider: "auth0",
-      providerAccountId: "auth0|first",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-first",
     });
     await linkIdentity(db, {
       accountId: first.account.id,
-      provider: "auth0",
-      providerAccountId: "auth0|second",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-second",
     });
 
-    await unlinkLoginIdentityProvider(db, { accountId: first.account.id, provider: "auth0" });
+    await unlinkLoginIdentityProvider(db, {
+      accountId: first.account.id,
+      provider: "gcp_identity_platform",
+    });
 
     await expect(listLoginIdentityProviders(db, first.account.id)).resolves.toEqual(["line_login"]);
   });

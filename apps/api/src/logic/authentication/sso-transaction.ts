@@ -1,17 +1,8 @@
+import type { ExternalSsoProvider, SsoVerifiedIdentity } from "./sso-provider";
+
 const SSO_TRANSACTION_TTL_SECONDS = 10 * 60;
 const MAX_RETURN_TO_LENGTH = 2048;
 const RANDOM_VALUE_BYTES = 32;
-
-export type SsoVerifiedIdentity = {
-  providerKey: "auth0";
-  subject: string;
-  authenticationMethod: "sso";
-  authenticatedAt: Date;
-  displayProfile?: {
-    displayName?: string;
-    pictureUrl?: string;
-  };
-};
 
 type SsoAuthenticationTransactionBase = {
   /** OAuth stateや本人識別子とは独立した運用ログ用の相関ID。 */
@@ -34,19 +25,6 @@ export type SsoAuthenticationTransaction = SsoAuthenticationTransactionBase &
 export interface SsoAuthenticationTransactionStore {
   put(state: string, transaction: SsoAuthenticationTransaction, ttlSeconds: number): Promise<void>;
   consume(state: string): Promise<SsoAuthenticationTransaction | undefined>;
-}
-
-export interface SsoServerClient {
-  createAuthorizationUrl(input: {
-    state: string;
-    nonce: string;
-    codeChallenge: string;
-  }): Promise<URL>;
-  exchangeAuthorizationCode(input: {
-    code: string;
-    codeVerifier: string;
-    expectedNonce: string;
-  }): Promise<SsoVerifiedIdentity>;
 }
 
 export type SsoAuthenticationFailure =
@@ -94,7 +72,7 @@ type StartSsoAuthenticationInput = {
   traceId?: string;
   returnTo: string;
   store: SsoAuthenticationTransactionStore;
-  client: SsoServerClient;
+  client: ExternalSsoProvider;
   now?: () => number;
   randomBytes?: (size: number) => Uint8Array;
 };
@@ -103,7 +81,7 @@ type CompleteSsoAuthenticationInput = {
   state: string;
   code: string;
   store: SsoAuthenticationTransactionStore;
-  client: SsoServerClient;
+  client: ExternalSsoProvider;
   now?: () => number;
 };
 
@@ -134,7 +112,7 @@ export interface SsoApplicationSessionIssuer<SessionResult> {
 export interface SsoIdentityLinker {
   link(input: {
     accountId: string;
-    providerKey: "auth0";
+    providerKey: string;
     subject: string;
   }): Promise<string>;
 }
@@ -205,12 +183,12 @@ async function startSsoTransaction(
   return authorizationUrl;
 }
 
-/** state・nonce・PKCEをlogin transactionへ保存し、Auth0の認可URLを返す。 */
+/** state・nonce・PKCEをlogin transactionへ保存し、Googleの認可URLを返す。 */
 export async function startSsoAuthentication(input: StartSsoAuthenticationInput): Promise<URL> {
   return await startSsoTransaction(input, { purpose: "login" });
 }
 
-/** 認証済みAccountを固定したlink transactionを保存し、Auth0の認可URLを返す。 */
+/** 認証済みAccountを固定したlink transactionを保存し、Googleの認可URLを返す。 */
 export async function startSsoIdentityLinking(
   input: StartSsoAuthenticationInput & { initiatingAccountId: string },
 ): Promise<URL> {
@@ -223,6 +201,7 @@ export async function startSsoIdentityLinking(
 
 async function consumeAndVerifySsoTransaction(
   input: CompleteSsoAuthenticationInput,
+  expectedPurpose?: SsoAuthenticationTransaction["purpose"],
 ): Promise<{ identity: SsoVerifiedIdentity; transaction: SsoAuthenticationTransaction }> {
   if (!input.state || !input.code) throw new SsoAuthenticationError("invalid_callback");
 
@@ -231,6 +210,10 @@ async function consumeAndVerifySsoTransaction(
   if (transaction.expiresAt <= (input.now?.() ?? Date.now())) {
     throw new SsoAuthenticationError("transaction_expired", callbackContext(transaction));
   }
+  // callback用途の取り違えでIdP側に副作用を起こす前に拒否する。
+  if (expectedPurpose && transaction.purpose !== expectedPurpose) {
+    throw new SsoAuthenticationError("transaction_purpose_mismatch", callbackContext(transaction));
+  }
 
   let identity: SsoVerifiedIdentity;
   try {
@@ -238,6 +221,7 @@ async function consumeAndVerifySsoTransaction(
       code: input.code,
       codeVerifier: transaction.codeVerifier,
       expectedNonce: transaction.nonce,
+      identityProvisioning: transaction.purpose === "link" ? "allow" : "existing-only",
     });
   } catch (error) {
     throw new SsoCallbackCompletionError(callbackContext(transaction), error);
@@ -249,7 +233,7 @@ async function consumeAndVerifySsoTransaction(
 export async function completeSsoAuthentication(
   input: CompleteSsoAuthenticationInput,
 ): Promise<{ identity: SsoVerifiedIdentity; returnTo: string; traceId?: string }> {
-  const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  const { identity, transaction } = await consumeAndVerifySsoTransaction(input, "login");
   if (transaction.purpose !== "login") {
     throw new SsoAuthenticationError("transaction_purpose_mismatch", callbackContext(transaction));
   }
@@ -323,7 +307,7 @@ export async function completeSsoCallback<SessionResult>(
       authenticatedIdentityId: string;
       authenticationMethod: "sso";
       authenticatedAt: Date;
-      providerKey: "auth0";
+      providerKey: string;
       returnTo: string;
       traceId?: string;
     }
@@ -397,7 +381,7 @@ export async function completeSsoCallback<SessionResult>(
   };
 }
 
-/** 開始時のAccountへだけ検証済みAuth0 Identityを追加する。 */
+/** 開始時のAccountへだけ検証済みIdentity Platform Identityを追加する。 */
 export async function completeSsoIdentityLinking(
   input: CompleteSsoAuthenticationInput & { identityLinker: SsoIdentityLinker },
 ): Promise<{
@@ -405,11 +389,11 @@ export async function completeSsoIdentityLinking(
   authenticatedIdentityId: string;
   authenticationMethod: "sso";
   authenticatedAt: Date;
-  providerKey: "auth0";
+  providerKey: string;
   returnTo: string;
   traceId?: string;
 }> {
-  const { identity, transaction } = await consumeAndVerifySsoTransaction(input);
+  const { identity, transaction } = await consumeAndVerifySsoTransaction(input, "link");
   if (transaction.purpose !== "link") {
     throw new SsoAuthenticationError("transaction_purpose_mismatch", callbackContext(transaction));
   }

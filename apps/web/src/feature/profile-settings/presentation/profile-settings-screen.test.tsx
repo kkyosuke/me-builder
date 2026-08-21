@@ -182,7 +182,7 @@ describe("ProfileSettingsScreen", () => {
     expect(onOpenPersonalData).toHaveBeenCalledOnce();
   });
 
-  it("未接続のSSOを現在のAccountへ追加できる", async () => {
+  it("未接続のGoogleログインを現在のAccountへ追加できる", async () => {
     const onLinkSsoIdentity = vi.fn().mockResolvedValue(undefined);
     render(
       <ProfileSettingsScreen
@@ -199,16 +199,16 @@ describe("ProfileSettingsScreen", () => {
       />,
     );
 
-    expect(screen.getByText(/現在のAccountへSSOを追加/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "SSOを接続" }));
+    expect(screen.getByText(/現在のAccountへGoogleログインを追加/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Googleと連携" }));
     expect(onLinkSsoIdentity).toHaveBeenCalledOnce();
   });
 
   it.each([
-    ["linked", "SSOを接続しました。"],
-    ["cancelled", "SSO接続をキャンセルしました。"],
-    ["error", "SSOを接続できませんでした。"],
-  ] as const)("SSO Identity連携callbackの%s結果を表示する", (result, message) => {
+    ["linked", "Googleと連携しました。"],
+    ["cancelled", "Google連携をキャンセルしました。"],
+    ["error", "Googleと連携できませんでした。"],
+  ] as const)("Google Identity連携callbackの%s結果を表示する", (result, message) => {
     render(
       <ProfileSettingsScreen
         avatar={null}
@@ -228,7 +228,7 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.getByText(new RegExp(message))).toBeTruthy();
   });
 
-  it("別のログイン方法がある場合だけSSOを解除する", async () => {
+  it("別のログイン方法がある場合だけGoogleログインを解除する", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const onUnlinkSsoIdentity = vi.fn().mockResolvedValue(undefined);
     const { rerender } = render(
@@ -246,8 +246,8 @@ describe("ProfileSettingsScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "SSO接続を解除" }));
-    expect(await screen.findByText("SSOを解除しました。")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Google連携を解除" }));
+    expect(await screen.findByText("Googleログインを解除しました。")).toBeTruthy();
     expect(onUnlinkSsoIdentity).toHaveBeenCalledOnce();
 
     rerender(
@@ -266,7 +266,7 @@ describe("ProfileSettingsScreen", () => {
     );
     expect(screen.getByText("最後のログイン方法は解除できません。")).toBeTruthy();
     expect(
-      (screen.getByRole("button", { name: "SSO接続を解除" }) as HTMLButtonElement).disabled,
+      (screen.getByRole("button", { name: "Google連携を解除" }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 

@@ -66,9 +66,14 @@ vi.mock("@me-builder/lib", async (importOriginal) => {
     },
   };
 });
-vi.mock("../infrastructure/authentication/sso-client", () => ({
+vi.mock("../infrastructure/authentication/sso-provider-runtime", () => ({
+  createConfiguredSsoProvider: mocks.createClient,
+  ssoIdentityProviderPolicy: {
+    activeProviderKey: "gcp_identity_platform",
+  },
+}));
+vi.mock("../logic/authentication/sso-provider", () => ({
   SsoProviderError: mocks.SsoProviderError,
-  createAuth0SsoClient: mocks.createClient,
 }));
 vi.mock("../infrastructure/authentication/application-session-runtime", () => ({
   APPLICATION_SESSION_COOKIE: "__Host-me_builder_session",
@@ -112,9 +117,9 @@ const env = {
   WEB_ORIGIN: "https://stg.example.com",
   BASE_URL: "https://api.stg.example.com",
   SSO_ROLLOUT_MODE: "linking",
-  SSO_ISSUER_URL: "https://tenant.auth0.com/",
-  SSO_CLIENT_ID: "client-id",
-  SSO_CLIENT_SECRET: "client-secret",
+  GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+  GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
+  GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
   SESSION_STORE: {},
   DB: {},
 } as AppEnv["Bindings"];
@@ -156,14 +161,18 @@ describe("SSO identity controller", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ linked: true, canUnlink: true });
-    expect(mocks.getStatus).toHaveBeenCalledWith(expect.anything(), "account-at-start");
+    expect(mocks.getStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      "account-at-start",
+      expect.objectContaining({ activeProviderKey: "gcp_identity_platform" }),
+    );
   });
 
   it("認証済みAccountと相対returnToをlink transactionへ固定して認可URLを返す", async () => {
     vi.spyOn(crypto, "randomUUID").mockReturnValue("00000000-0000-4000-8000-000000000001");
     const log = vi.spyOn(logger, "info").mockImplementation(() => undefined);
     mocks.startLinking.mockResolvedValue(
-      new URL("https://tenant.auth0.com/authorize?state=opaque"),
+      new URL("https://accounts.google.com/o/oauth2/v2/auth?state=opaque"),
     );
     const response = await testApp("/api/auth/sso/link", postSsoIdentityLink).request(
       "https://api.example.com/api/auth/sso/link?returnTo=%2Fprofile",
@@ -173,7 +182,7 @@ describe("SSO identity controller", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      authorizationUrl: "https://tenant.auth0.com/authorize?state=opaque",
+      authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
     });
     expect(response.headers.get("set-cookie")).toContain(
       "__Host-me_builder_sso_callback_state=opaque",
@@ -197,7 +206,7 @@ describe("SSO identity controller", () => {
         purpose: "link",
         outcome: "succeeded",
       }),
-      "[SSO] succeeded at authorization.create -> auth0-redirect",
+      "[SSO] succeeded at authorization.create -> provider-redirect",
     );
     expect(JSON.stringify(log.mock.calls)).not.toContain("account-at-start");
   });
@@ -207,10 +216,10 @@ describe("SSO identity controller", () => {
     mocks.completeCallback.mockResolvedValue({
       purpose: "link",
       accountId: "account-at-start",
-      authenticatedIdentityId: "identity-auth0",
+      authenticatedIdentityId: "identity-platform-identity",
       authenticationMethod: "sso",
       authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
-      providerKey: "auth0",
+      providerKey: "gcp_identity_platform",
       returnTo: "/profile",
       traceId: "00000000-0000-4000-8000-000000000002",
     });
@@ -232,7 +241,7 @@ describe("SSO identity controller", () => {
         authenticationMethod: "sso",
         authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
       },
-      "identity-auth0",
+      "identity-platform-identity",
     );
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
     expect(response.headers.get("set-cookie")).toContain(
@@ -246,7 +255,7 @@ describe("SSO identity controller", () => {
       }),
       "[SSO] succeeded at identity.link -> web-redirect",
     );
-    expect(JSON.stringify(log.mock.calls)).not.toMatch(/opaque|code|auth0\|/u);
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/opaque|code|identity-platform-uid/u);
   });
 
   it("callback失敗を生の例外や認証parameterなしで固定分類へ記録する", async () => {
@@ -331,7 +340,9 @@ describe("SSO identity controller", () => {
   });
 
   it("linked-login公開時だけ外部ブラウザのSSOログインを開始する", async () => {
-    mocks.startLogin.mockResolvedValue(new URL("https://tenant.auth0.com/authorize?state=login"));
+    mocks.startLogin.mockResolvedValue(
+      new URL("https://accounts.google.com/o/oauth2/v2/auth?state=login"),
+    );
     const response = await testApp("/api/auth/sso/login", postSsoLogin).request(
       "https://api.example.com/api/auth/sso/login?returnTo=%2Fadmin",
       { method: "POST" },
@@ -340,7 +351,7 @@ describe("SSO identity controller", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      authorizationUrl: "https://tenant.auth0.com/authorize?state=login",
+      authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=login",
     });
     expect(mocks.startLogin).toHaveBeenCalledWith(expect.objectContaining({ returnTo: "/admin" }));
     expect(response.headers.get("set-cookie")).toContain(
@@ -397,6 +408,53 @@ describe("SSO identity controller", () => {
     expect(response.headers.get("set-cookie")).toContain("__Host-me_builder_session=sso-session");
   });
 
+  it("別Accountへのloginでは旧token自身のAccountを失効してから新sessionを発行する", async () => {
+    mocks.issueSession.mockResolvedValue({
+      sessionToken: "new-account-session",
+      csrfToken: "csrf-token",
+      expiresAt: new Date("2026-09-16T00:00:00.000Z"),
+    });
+    mocks.completeCallback.mockImplementation(
+      async (input: {
+        sessionIssuer: {
+          issue(actor: {
+            accountId: string;
+            authenticatedIdentityId: string;
+            authenticationMethod: "sso";
+            authenticatedAt: Date;
+          }): Promise<unknown>;
+        };
+      }) => ({
+        purpose: "login" as const,
+        session: await input.sessionIssuer.issue({
+          accountId: "new-account",
+          authenticatedIdentityId: "new-identity",
+          authenticationMethod: "sso",
+          authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+        }),
+        returnTo: "/profile",
+      }),
+    );
+
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=login&code=code",
+      {
+        headers: {
+          Cookie:
+            "__Host-me_builder_sso_callback_state=login; __Host-me_builder_session=old-account-session",
+        },
+      },
+      { ...env, SSO_ROLLOUT_MODE: "linked-login" },
+    );
+
+    expect(response.status).toBe(302);
+    expect(mocks.logoutSession).toHaveBeenCalledWith("old-account-session");
+    expect(mocks.logoutSession).not.toHaveBeenCalledWith("old-account-session", "new-account");
+    expect(mocks.logoutSession.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.issueSession.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
   it("session issuer障害ではapplication session cookieを発行しない", async () => {
     mocks.issueSession.mockResolvedValue(undefined);
     mocks.completeCallback.mockImplementation(
@@ -412,7 +470,7 @@ describe("SSO identity controller", () => {
       }) => {
         await input.sessionIssuer.issue({
           accountId: "account-at-start",
-          authenticatedIdentityId: "identity-auth0",
+          authenticatedIdentityId: "identity-platform-identity",
           authenticationMethod: "sso",
           authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
         });
@@ -561,7 +619,11 @@ describe("SSO identity controller", () => {
     );
 
     expect(response.status).toBe(204);
-    expect(mocks.unlink).toHaveBeenCalledWith(expect.anything(), "account-at-start");
+    expect(mocks.unlink).toHaveBeenCalledWith(
+      expect.anything(),
+      "account-at-start",
+      expect.objectContaining({ activeProviderKey: "gcp_identity_platform" }),
+    );
     expect(mocks.invalidateSessions).toHaveBeenCalledWith("account-at-start");
     expect(response.headers.get("set-cookie")).toContain("__Host-me_builder_session=");
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");

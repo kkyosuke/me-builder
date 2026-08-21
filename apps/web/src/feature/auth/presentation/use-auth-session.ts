@@ -62,7 +62,7 @@ export function useAuthSessionState() {
     const entry = await detectAuthEntryEnvironment(config.liffId);
     if (entry.kind === "error") {
       throw new Error(
-        `${entry.message} SSOへ自動切替はしません。再試行するか外部ブラウザで開いてください。`,
+        `${entry.message} Googleログインへ自動切替はしません。再試行するか外部ブラウザで開いてください。`,
       );
     }
 
@@ -85,8 +85,8 @@ export function useAuthSessionState() {
               reason: "credential-rejected",
               message:
                 callbackFailure === "cancelled"
-                  ? "SSO認証をキャンセルしました。必要な場合はもう一度お試しください。"
-                  : "SSO認証を完了できませんでした。時間をおいてもう一度お試しください。",
+                  ? "Googleログインをキャンセルしました。必要な場合はもう一度お試しください。"
+                  : "Googleログインを完了できませんでした。時間をおいてもう一度お試しください。",
             },
           };
         }

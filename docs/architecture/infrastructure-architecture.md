@@ -60,6 +60,7 @@ flowchart TD
     end
 
     Gemini["Google Vertex AI Express Mode<br/>(Gemini)"]
+    IdentityPlatform["Google Cloud Identity Platform<br/>(Google login)"]
 
     Web --> CF_Sec
     LINE --> CF_Sec
@@ -72,6 +73,7 @@ flowchart TD
     WorkersAPI --> Queues
     Queues --> WorkersWorker
     WorkersWorker --> Gemini
+    WorkersAPI --> IdentityPlatform
 
     WorkersAPI --> D1
     WorkersAPI --> R2
@@ -103,6 +105,7 @@ flowchart TD
 | **キー・バリュー / キャッシュ** | **Cloudflare KV** | 低遅延グローバルキー・バリューストア。認証トークン、一時セッション、アクセス制御キャッシュ、レート制限カウントを保持。 |
 | **状態管理 / ドメイン協調** | **Cloudflare Durable Objects** | 個人コンテンツのSSoT。1 Accountにつき1つのprivate SQLiteへ`Source`・`Brain`・`Diary`・`Diagnosis`回答・プロフィール要約を保存し、連投調停や相性関係の協調も担う。 |
 | **AI / 推論基盤** | **Vertex AI Express Mode (Gemini)** | Queue WorkerからAPI key認証でテキスト生成とEmbedding生成を実行。本文、生成結果、API keyをアプリケーションログへ残さない。 |
+| **外部認証** | **Google Cloud Identity Platform** | Googleの本人確認結果を環境別Identityへ正規化する。Accountとapplication sessionは所有せず、接続条件はWeb認証設計を正とする。 |
 | **セキュリティ & ネットワーク** | **Cloudflare Access / WAF** | DDoS防御、WAFルール適用、SSL/TLS証明書管理、管理画面等へのゼロトラストアクセス制御（Cloudflare Access）。 |
 
 ## 5. データ連携フロー原則
@@ -127,7 +130,7 @@ flowchart TD
 5. **外部LLMの呼び出し**
    - Vertex AI Express Mode の Gemini を利用する処理は、Queue Worker からGoogleへ直接呼び出します。
    - `@google/genai`は`vertexai: true`とAPI version `v1`で初期化し、プロジェクトやロケーションの指定を要しないExpress ModeのAPI key認証を使います。
-   - Vertex AI API key (`GOOGLE_VERTEX_AI_API_KEY`) は Worker の Secret として保持し、Web UI、APIレスポンス、ログへ露出させません。
+   - Vertex AI authorization key (`GOOGLE_VERTEX_AI_API_KEY`) は Worker の Secret として保持し、Web UI、APIレスポンス、ログへ露出させません。専用service accountへ推論に必要な`aiplatform.endpoints.predict`だけを付与し、API keyのtarget methodも`GenerateContent`と`EmbedContent`へ限定します。
    - 接続確認では、LINEへ `AI: 質問` と明示して送った本文だけをモデルへ渡し、生成結果を同じトークへ返信します。通常の日記と診断要求はモデルへ送りません。
    - モデルへ渡した本文と生成結果はアプリケーションログおよびデータベースへ保存しません。
    - 接続確認の失敗時は、設定不足、空応答、API例外を区別できる構造化ログを出力します。モデルへ渡した本文、生成結果、Google API key はエラーログにも含めません。
@@ -140,7 +143,7 @@ flowchart TD
 
   ```text
   me-builder/
-  ├── infra/              # PulumiによるCloudflare基盤リソースとWrangler設定の生成
+  ├── infra/              # Cloudflare基盤とGCP共通基盤の独立したPulumi project
   ├── Taskfile.yml       # タスクランナー定義 (task dev, task i, task deploy:preview 等)
   ├── package.json       # ルート設定 (workspaces 定義, wrangler devDependency)
   ├── tsconfig.json      # モノレポ共通 TypeScript 設定
@@ -210,7 +213,19 @@ GitHub Actionsの手動resetは常に最新`main`を対象にこのライフサ�
 
 APIとMCPがブラウザへ返すCORSヘッダは、環境manifestのベースドメインから生成したWeb UIのオリジンだけを許可します。LocalはVite開発サーバーのオリジンを使用し、設定が欠けている場合や一致しないOriginには`Access-Control-Allow-Origin`を返しません。
 
-### 6.2 APIドキュメントのCloudflare Access境界
+### 6.2 GCP共通リソースの宣言境界
+
+`infra/gcp-platform/`はCloudflare基盤と別のPulumi projectとし、`development`と`production`のStackを持ちます。各Stackは環境別GCP project、Cloud Billing接続、Identity Platform設定、Google provider、Identity Toolkit APIだけへ制限したAPI keyを所有します。同じStackでVertex AI API、推論だけを許す専用service account、`GenerateContent`と`EmbedContent`だけへ制限したservice-account-bound authorization keyを所有します。Productionだけでなく認証データを持つDevelopment projectも削除保護します。authorization keyのorganization policyはproject単位でPulumi管理し、runtime credentialを無効にした状態では作成を明示的に禁止します。有効化後も制約自体は維持し、`allowedServices`で`aiplatform.googleapis.com`だけを許可します。organization配下にないprojectではauthorization keyを作りません。
+
+API keyは`primary`と`secondary`のrotation slotを持ち、平常時はactive slotだけを作成します。Stack configに非active slotのgenerationを追加して移行期間だけ2 keyを併存させ、配布先の切り替え後に旧slotを`null`へ戻して削除します。key自体へ削除保護を付けず、project、Identity Platform、IAM、予算などの永続的な基盤だけを削除保護します。これにより、固定名の長期credentialを壊さずに置換できない状態と、不要な予備credentialの常設をともに避けます。
+
+各Stackはproject全体の月額Cloud Billing予算をPulumiで管理し、gross costの50%、80%、100%で警告します。通常の予算通知は利用を停止しないため、Vertex AIの実費上限にはGoogle Cloud Billingのservice別Spend capを併用します。Spend capは現行の公開Cloud Billing Budget APIとPulumi GCP providerから設定できないため、最初の基盤適用後にCloud Consoleで手動設定し、確認済みconfigがない限りPulumiはVertex AI authorization keyを作りません。DevelopmentとProductionは別の上限額を持ち、上限到達時にAI機能が停止することを可用性上の正常な縮退として扱います。
+
+Google Auth PlatformはOAuth同意画面と一般ユーザー向けWeb OAuth clientを所有します。Development clientにはLocalとPreviewの完全一致callback、Production clientにはProduction callbackだけを登録します。Web OAuth clientの作成はPulumi管理対象外とし、そのClient IDとSecretを環境別Pulumi configへ入力してIdentity PlatformのGoogle providerへ接続します。IAP用またはworkload用OAuth clientで代用しません。
+
+Pulumi Stack outputのactiveなIdentity Platform API keyとVertex AI authorization keyはsecretとして扱い、対応するGitHub Environmentから必要なCloudflare Workerだけへ配布します。OAuth Client SecretもPulumi configとGitHub Environmentの両方でsecretにし、Stack output、CIログ、artifactへ出力しません。CloudflareとGCPのPulumi projectはbootstrap済みのstate用GCP projectにある`gs://kagami-infra/`を使い、`kagami/cloudflare/`と`kagami/gcp-platform/`のManaged Folder、暗号化passphrase、IAM accessを分離します。Pulumi Cloudやlocal file backendへ状態を分岐させません。backendの認証・暗号化・初回adoptionは[`infra/README.md`](../../infra/README.md#one-time-state-backend-bootstrap)、GCP共通projectの適用手順は[`infra/gcp-platform/README.md`](../../infra/gcp-platform/README.md)を正とします。
+
+### 6.3 APIドキュメントのCloudflare Access境界
 
 PreviewとProductionでは、APIドキュメントを利用者向けAPIとは別のCloudflare Access Applicationで保護します。ApplicationはAPIホスト全体ではなく、次のパスだけを対象にします。
 
@@ -260,7 +275,7 @@ Applicationとpolicyは`scripts/setup-api-docs-access.ts`で冪等に作成・�
 
 ## 7. 関連ドキュメント
 
-LIFFと将来のSSOを同じAccountおよびアプリケーションセッションへ収束させる境界は、[Web認証・アプリケーションセッション設計](web-authentication-design.md)を正とします。
+LIFFとGoogleログインを同じAccountおよびアプリケーションセッションへ収束させる境界は、[Web認証・アプリケーションセッション設計](web-authentication-design.md)を正とします。
 
 - [Agent向けガイド](../../.agents/README.md)
 - [開発運用ルール](../../.agents/rules/development.md)

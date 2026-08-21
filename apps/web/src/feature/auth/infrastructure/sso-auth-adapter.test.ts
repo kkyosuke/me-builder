@@ -17,11 +17,11 @@ describe("SSO auth adapter", () => {
 
   it("同一browserからPOSTで開始して返された認可URLへだけ遷移する", async () => {
     const navigate = vi.fn();
-    const fetcher = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        Response.json({ authorizationUrl: "https://tenant.auth0.com/authorize?state=opaque" }),
-      );
+    const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
+        authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
+      }),
+    );
 
     await expect(
       establishSsoAuthSession(
@@ -35,7 +35,9 @@ describe("SSO auth adapter", () => {
       "https://api.example.com/api/auth/sso/login?returnTo=%2Fadmin",
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
-    expect(navigate).toHaveBeenCalledWith("https://tenant.auth0.com/authorize?state=opaque");
+    expect(navigate).toHaveBeenCalledWith(
+      "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
+    );
   });
 
   it.each(["cancelled", "error"] as const)(

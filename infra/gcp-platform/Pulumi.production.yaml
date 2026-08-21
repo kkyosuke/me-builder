@@ -1,0 +1,15 @@
+config:
+  me-builder-gcp-platform:environment: production
+  me-builder-gcp-platform:budgetCurrencyCode: USD
+  me-builder-gcp-platform:monthlyBudgetAmount: 50
+  me-builder-gcp-platform:vertexSpendCapAmount: 50
+  me-builder-gcp-platform:vertexSpendCapConfirmed: false
+  me-builder-gcp-platform:vertexRuntimeCredentialsEnabled: false
+  me-builder-gcp-platform:activeCredentialSlot: primary
+  me-builder-gcp-platform:credentialGenerations:
+    primary: v1
+    secondary: null
+  me-builder-gcp-platform:authorizedDomains:
+    - api.kagami.kyosuke.dev
+  me-builder-gcp-platform:oauthRedirectUris:
+    - https://api.kagami.kyosuke.dev/api/auth/sso/callback

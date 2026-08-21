@@ -4,5 +4,5 @@
     "allowImportingTsExtensions": true,
     "types": ["bun"]
   },
-  "include": ["index.ts", "src/**/*.ts", "scripts/**/*.ts"]
+  "include": ["index.ts", "gcp-platform/**/*.ts", "src/**/*.ts", "scripts/**/*.ts"]
 }

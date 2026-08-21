@@ -62,10 +62,10 @@ flowchart TD
 次をすべて満たすまで完了にしません。
 
 - 同じstackのPreview Web、API、D1、session storeをdeployし、[LIFF交換・アプリケーションセッション境界検証Runbook](application-session-boundary-verification.md)を完了する
-- Auth0 Preview tenantを使い、普段使うスマートフォンのLINE内ブラウザと外部ブラウザ、PCの主要ブラウザ1つで確認する
+- 開発用GCP projectのIdentity PlatformとGoogle providerを使い、普段使うスマートフォンのLINE内ブラウザと外部ブラウザ、PCの主要ブラウザ1つで確認する
 - 各環境でlogin、cancel、logout、`SSO_ROLLOUT_MODE=disabled`への停止後もLIFFが使えることを確認する
 - 代表ブラウザでnegative、同時callback、別ブラウザ、期限切れ、Identity解除を確認する
-- 同じemailを返す異なるAuth0 subjectを用意し、未linkのsubjectが既存Accountへ統合されず`identity_unlinked`になることを確認する
+- 未linkのGoogleアカウントが表示名やemailで既存Accountへ統合されず`identity_unlinked`になることを確認する
 - token、Cookie、state、code、subject、Account ID、email、個人内容を証跡へ残さない
 
 iPhone、Android、Chrome、Safariの全組み合わせは必須にしません。利用できる端末が増えたときに追加確認します。実IdP、実cookie、実端末を使っていない自動テスト結果だけで、このゲートを完了扱いにしません。
@@ -84,7 +84,7 @@ iPhone、Android、Chrome、Safariの全組み合わせは必須にしません�
 - 既存LIFFとapplication sessionを継続できることを確認する
 - 全体公開時の案内と問い合わせ手順を更新する
 
-Production tenant、実データ、サービス管理者を使った結果がない状態で、このゲートを完了扱いにしません。
+ProductionのGCP project、実データ、サービス管理者を使った結果がない状態で、このゲートを完了扱いにしません。
 
 ## 6. 更新ルール
 

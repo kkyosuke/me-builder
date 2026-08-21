@@ -4,7 +4,7 @@ import {
   logger,
   serviceTermsDocuments,
 } from "@me-builder/shared";
-import { and, asc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { SharedD1Client } from "../client";
 import { accountIdentities, accounts } from "../schema/account";
 import { accountRecoveryCredentials } from "../schema/account-recovery";
@@ -22,7 +22,21 @@ import { accountProgressionProjections } from "../schema/progression";
  * LINE Login チャネルが同一プロバイダー配下なら両者は同じ値になります。その場合
  * `line` の identity をそのまま引けます（[resolveAccountByLineLogin](#) の手順 2）。
  */
-export type IdentityProvider = "line" | "line_login" | "google" | "auth0";
+export type IdentityProvider = "line" | "line_login" | "google" | "gcp_identity_platform";
+export type LoginIdentityProvider = Exclude<IdentityProvider, "line">;
+
+const LOGIN_IDENTITY_PROVIDERS = [
+  "line_login",
+  "google",
+  "gcp_identity_platform",
+] as const satisfies readonly LoginIdentityProvider[];
+
+function loginIdentityProviderSqlList() {
+  return sql.join(
+    LOGIN_IDENTITY_PROVIDERS.map((provider) => sql`${provider}`),
+    sql`, `,
+  );
+}
 
 export class CannotUnlinkLastIdentityError extends Error {
   constructor() {
@@ -87,7 +101,7 @@ export async function findAccountByIdentity(
 export async function listLoginIdentityProviders(
   db: SharedD1Client,
   accountId: string,
-): Promise<IdentityProvider[]> {
+): Promise<LoginIdentityProvider[]> {
   const identities = await db
     .select({ provider: accountIdentities.provider })
     .from(accountIdentities)
@@ -97,17 +111,18 @@ export async function listLoginIdentityProviders(
         eq(accountIdentities.accountId, accountId),
         eq(accountIdentities.isDeleted, false),
         eq(accounts.isDeleted, false),
+        inArray(accountIdentities.provider, LOGIN_IDENTITY_PROVIDERS),
       ),
     )
     .orderBy(asc(accountIdentities.provider))
     .all();
-  return identities.map(({ provider }) => provider as IdentityProvider);
+  return identities.map(({ provider }) => provider as LoginIdentityProvider);
 }
 
 /** 別providerのログイン手段を残す条件を同じUPDATE文で評価してIdentityを解除します。 */
 export async function unlinkLoginIdentityProvider(
   db: SharedD1Client,
-  input: { accountId: string; provider: IdentityProvider },
+  input: { accountId: string; provider: LoginIdentityProvider },
 ): Promise<void> {
   const now = new Date();
   const unlinked = await db
@@ -124,6 +139,7 @@ export async function unlinkLoginIdentityProvider(
           WHERE active_identity.account_id = ${input.accountId}
             AND active_identity.is_deleted = 0
             AND active_identity.provider <> ${input.provider}
+            AND active_identity.provider IN (${loginIdentityProviderSqlList()})
         ) > 0`,
       ),
     )

@@ -116,7 +116,7 @@ describe("getConfig & ConfigSchema", () => {
     ).toThrow("must match");
   });
 
-  it("SSO無効時はAuth0 secretを要求しないこと", () => {
+  it("SSO無効時はIdentity Platform設定を要求しないこと", () => {
     const conf = getConfig({ SSO_ROLLOUT_MODE: "disabled" });
     expect(conf.ssoRolloutMode).toBe("disabled");
     expect(conf.ssoRolloutPercent).toBe(0);
@@ -126,24 +126,24 @@ describe("getConfig & ConfigSchema", () => {
     const conf = getConfig({
       SSO_ROLLOUT_MODE: "",
       SSO_ROLLOUT_PERCENT: "",
-      SSO_ISSUER_URL: "",
-      SSO_CLIENT_ID: "",
-      SSO_CLIENT_SECRET: "",
+      GOOGLE_IDENTITY_PLATFORM_API_KEY: "",
+      GOOGLE_OAUTH_CLIENT_ID: "",
+      GOOGLE_OAUTH_CLIENT_SECRET: "",
     });
 
     expect(conf.ssoRolloutMode).toBe("disabled");
     expect(conf.ssoRolloutPercent).toBe(0);
-    expect(conf.ssoIssuerUrl).toBeUndefined();
-    expect(conf.ssoClientId).toBeUndefined();
-    expect(conf.ssoClientSecret).toBeUndefined();
+    expect(conf.googleIdentityPlatformApiKey).toBeUndefined();
+    expect(conf.googleOAuthClientId).toBeUndefined();
+    expect(conf.googleOAuthClientSecret).toBeUndefined();
   });
 
-  it("SSO有効時はAuth0設定と固定callback URLを解決すること", () => {
+  it("SSO有効時はIdentity Platform設定と固定callback URLを解決すること", () => {
     const conf = getConfig({
       SSO_ROLLOUT_MODE: "linking",
-      SSO_ISSUER_URL: "https://tenant.auth0.com/",
-      SSO_CLIENT_ID: "client-id",
-      SSO_CLIENT_SECRET: "client-secret",
+      GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+      GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
+      GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
       SSO_ROLLOUT_PERCENT: "5",
       BASE_URL: "https://api.example.com/",
       WEB_ORIGIN: "https://example.com",
@@ -152,9 +152,9 @@ describe("getConfig & ConfigSchema", () => {
     expect(conf).toEqual(
       expect.objectContaining({
         ssoRolloutMode: "linking",
-        ssoIssuerUrl: "https://tenant.auth0.com/",
-        ssoClientId: "client-id",
-        ssoClientSecret: "client-secret",
+        googleIdentityPlatformApiKey: "identity-platform-api-key",
+        googleOAuthClientId: "google-client-id",
+        googleOAuthClientSecret: "google-client-secret",
         ssoRolloutPercent: 5,
         ssoCallbackUrl: "https://api.example.com/api/auth/sso/callback",
       }),
@@ -165,14 +165,12 @@ describe("getConfig & ConfigSchema", () => {
     expect(() =>
       getConfig({
         SSO_ROLLOUT_MODE: "linked-login",
-        SSO_ISSUER_URL: "https://tenant.auth0.com/",
+        GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
       }),
-    ).toThrow("SSO_CLIENT_ID");
+    ).toThrow("GOOGLE_OAUTH_CLIENT_ID");
   });
 
   it.each([
-    { SSO_ISSUER_URL: "http://tenant.auth0.com/" },
-    { SSO_ISSUER_URL: "https://tenant.auth0.com/oauth" },
     { BASE_URL: "http://api.example.com" },
     { BASE_URL: "https://api.example.com/prefix" },
     { WEB_ORIGIN: "https://example.com/app" },
@@ -181,9 +179,9 @@ describe("getConfig & ConfigSchema", () => {
     expect(() =>
       getConfig({
         SSO_ROLLOUT_MODE: "linked-login",
-        SSO_ISSUER_URL: "https://tenant.auth0.com/",
-        SSO_CLIENT_ID: "client-id",
-        SSO_CLIENT_SECRET: "client-secret",
+        GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+        GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
+        GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
         BASE_URL: "https://api.example.com",
         WEB_ORIGIN: "https://example.com",
         ...override,
@@ -197,9 +195,9 @@ describe("getConfig & ConfigSchema", () => {
       expect(() =>
         getConfig({
           SSO_ROLLOUT_MODE: "linking",
-          SSO_ISSUER_URL: "https://tenant.auth0.com/",
-          SSO_CLIENT_ID: "client-id",
-          SSO_CLIENT_SECRET: "client-secret",
+          GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+          GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
+          GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
           BASE_URL: `http://${hostname}:3000`,
           WEB_ORIGIN: `http://${hostname}:5173`,
         }),

@@ -25,3 +25,4 @@ export namespace D1 {
 
 export { DIAGNOSIS_CATALOG_ID } from "./shared/schema/catalog";
 export type { DiagnosisDetail, DiagnosisDetailResult } from "./shared/action/catalog";
+export type { IdentityProvider, LoginIdentityProvider } from "./shared/action/account";

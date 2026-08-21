@@ -54,8 +54,8 @@ jobs:
     name: Approve Stripe Billing Sync (${{ inputs.environment }})
     needs: validate-request
     runs-on: ubuntu-latest
-    # Stripe専用Environmentに承認を分離し、通常のdev / prdデプロイは停止させない。
-    environment: stripe-${{ inputs.environment }}
+    # Developmentの基盤操作はinfra-devへ承認を集約し、Productionは専用承認を維持する。
+    environment: ${{ inputs.environment == 'dev' && 'infra-dev' || 'stripe-prd' }}
     steps:
       - name: Record Approval
         run: echo "Stripe billing sync to ${TARGET_ENVIRONMENT} was approved."

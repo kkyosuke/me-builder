@@ -8,8 +8,12 @@ import {
 } from "./sso-identity-repository";
 
 const db = {} as D1.shared.Client;
+type Provider = "line_login" | "gcp_identity_platform";
+const policy = {
+  activeProviderKey: "gcp_identity_platform",
+} as const;
 
-function dependencies(providers: Array<"line_login" | "auth0"> = []) {
+function dependencies(providers: Provider[] = []) {
   return {
     findAccountByIdentity: vi.fn(),
     linkIdentity: vi.fn(),
@@ -19,22 +23,29 @@ function dependencies(providers: Array<"line_login" | "auth0"> = []) {
 }
 
 describe("SSO identity repository adapters", () => {
-  it("既知Auth0 Identityだけを段階公開判定用のAccountとIdentity IDへ解決する", async () => {
+  it("既知Identity Platform Identityだけを段階公開判定用のAccountとIdentity IDへ解決する", async () => {
     const deps = dependencies();
     deps.findAccountByIdentity.mockResolvedValue({
       account: { id: "account-1", role: "admin" },
-      identity: { id: "identity-auth0" },
+      identity: { id: "identity-google" },
     });
-    const resolver = createSsoExistingIdentityResolver(db, deps as never);
+    const resolver = createSsoExistingIdentityResolver(db, policy, deps as never);
 
     await expect(
-      resolver.findAccount({ providerKey: "auth0", subject: "auth0|subject" }),
+      resolver.findAccount({
+        providerKey: "gcp_identity_platform",
+        subject: "identity-platform-uid",
+      }),
     ).resolves.toEqual({
       accountId: "account-1",
-      authenticatedIdentityId: "identity-auth0",
+      authenticatedIdentityId: "identity-google",
       role: "admin",
     });
-    expect(deps.findAccountByIdentity).toHaveBeenCalledWith(db, "auth0", "auth0|subject");
+    expect(deps.findAccountByIdentity).toHaveBeenCalledWith(
+      db,
+      "gcp_identity_platform",
+      "identity-platform-uid",
+    );
   });
 
   it("未知Identityを作成せずundefinedで返す", async () => {
@@ -42,60 +53,67 @@ describe("SSO identity repository adapters", () => {
     deps.findAccountByIdentity.mockResolvedValue(undefined);
 
     await expect(
-      createSsoExistingIdentityResolver(db, deps as never).findAccount({
-        providerKey: "auth0",
+      createSsoExistingIdentityResolver(db, policy, deps as never).findAccount({
+        providerKey: "gcp_identity_platform",
         subject: "unknown",
       }),
     ).resolves.toBeUndefined();
     expect(deps.linkIdentity).not.toHaveBeenCalled();
   });
 
-  it("開始時のAccountへ検証済みsubjectをlinkIdentityで追加する", async () => {
+  it("composition policyと異なるproviderをD1境界へ渡さない", async () => {
     const deps = dependencies();
-    deps.linkIdentity.mockResolvedValue({ id: "identity-auth0" });
 
     await expect(
-      createSsoIdentityLinker(db, deps as never).link({
-        accountId: "account-1",
-        providerKey: "auth0",
-        subject: "auth0|subject",
+      createSsoExistingIdentityResolver(db, policy, deps as never).findAccount({
+        providerKey: "future_provider",
+        subject: "unexpected-subject",
       }),
-    ).resolves.toBe("identity-auth0");
+    ).rejects.toThrow("Unexpected SSO identity provider");
+    expect(deps.findAccountByIdentity).not.toHaveBeenCalled();
+  });
+
+  it("開始時のAccountへ検証済みlocalIdをlinkIdentityで追加する", async () => {
+    const deps = dependencies();
+    deps.linkIdentity.mockResolvedValue({ id: "identity-google" });
+
+    await expect(
+      createSsoIdentityLinker(db, policy, deps as never).link({
+        accountId: "account-1",
+        providerKey: "gcp_identity_platform",
+        subject: "identity-platform-uid",
+      }),
+    ).resolves.toBe("identity-google");
 
     expect(deps.linkIdentity).toHaveBeenCalledWith(db, {
       accountId: "account-1",
-      provider: "auth0",
-      providerAccountId: "auth0|subject",
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-uid",
     });
   });
 
   it("subjectを返さずlink状態と最後のIdentity解除可否だけを返す", async () => {
-    const linked = dependencies(["line_login", "auth0"]);
-    const only = dependencies(["auth0"]);
-    const duplicateOnly = dependencies(["auth0", "auth0"]);
+    const linked = dependencies(["line_login", "gcp_identity_platform"]);
+    const only = dependencies(["gcp_identity_platform"]);
 
-    await expect(getSsoIdentityStatus(db, "account-1", linked as never)).resolves.toEqual({
+    await expect(getSsoIdentityStatus(db, "account-1", policy, linked as never)).resolves.toEqual({
       linked: true,
       canUnlink: true,
     });
-    await expect(getSsoIdentityStatus(db, "account-2", only as never)).resolves.toEqual({
-      linked: true,
-      canUnlink: false,
-    });
-    await expect(getSsoIdentityStatus(db, "account-3", duplicateOnly as never)).resolves.toEqual({
+    await expect(getSsoIdentityStatus(db, "account-2", policy, only as never)).resolves.toEqual({
       linked: true,
       canUnlink: false,
     });
   });
 
-  it("Auth0だけを解除repositoryへ委譲する", async () => {
-    const deps = dependencies(["line_login", "auth0"]);
+  it("Identity Platform Identityだけを解除repositoryへ委譲する", async () => {
+    const deps = dependencies(["line_login", "gcp_identity_platform"]);
 
-    await unlinkSsoIdentity(db, "account-1", deps as never);
+    await unlinkSsoIdentity(db, "account-1", policy, deps as never);
 
     expect(deps.unlinkIdentity).toHaveBeenCalledWith(db, {
       accountId: "account-1",
-      provider: "auth0",
+      provider: "gcp_identity_platform",
     });
   });
 });

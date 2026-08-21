@@ -133,6 +133,26 @@ tasks:
     cmds:
       - bun --cwd infra preview:clean
 
+  infra:gcp-platform:preview:development:
+    desc: 'Preview the Development GCP platform Pulumi stack'
+    cmds:
+      - bun --cwd infra gcp-platform:preview:development
+
+  infra:gcp-platform:up:development:
+    desc: 'Create or update the Development GCP platform Pulumi stack'
+    cmds:
+      - bun --cwd infra gcp-platform:up:development
+
+  infra:gcp-platform:preview:production:
+    desc: 'Preview the Production GCP platform Pulumi stack'
+    cmds:
+      - bun --cwd infra gcp-platform:preview:production
+
+  infra:gcp-platform:up:production:
+    desc: 'Create or update the Production GCP platform Pulumi stack'
+    cmds:
+      - bun --cwd infra gcp-platform:up:production
+
   db:setup:
     desc: 'Automatically create missing remote D1 databases and update wrangler.toml files'
     cmds:

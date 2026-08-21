@@ -21,22 +21,6 @@ function isSecureOrigin(value: string): boolean {
   }
 }
 
-function isSsoIssuer(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      !url.username &&
-      !url.password &&
-      url.pathname === "/" &&
-      !url.search &&
-      !url.hash
-    );
-  } catch {
-    return false;
-  }
-}
-
 function isSsoCallback(value: string): boolean {
   try {
     const url = new URL(value);
@@ -79,12 +63,11 @@ export const ConfigSchema = v.object({
     v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
     0,
   ),
-  /** Auth0 tenantのOIDC issuer。末尾slashを含む。 */
-  ssoIssuerUrl: v.optional(
-    v.pipe(v.string(), v.url(), v.check(isSsoIssuer, "SSO_ISSUER_URL must be a HTTPS origin")),
-  ),
-  ssoClientId: v.optional(v.pipe(v.string(), v.nonEmpty())),
-  ssoClientSecret: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  /** Identity Platform REST APIの環境別Web API key。 */
+  googleIdentityPlatformApiKey: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  /** Identity PlatformのGoogle providerへ登録した環境別OAuth client。 */
+  googleOAuthClientId: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  googleOAuthClientSecret: v.optional(v.pipe(v.string(), v.nonEmpty())),
   ssoCallbackUrl: v.optional(
     v.pipe(
       v.string(),

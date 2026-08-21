@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
   pull-requests: write
 
 # Preview のデプロイと同時に変更しない。実行中の reset/deploy は中断させない。
@@ -18,8 +19,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-reset-request:
+    name: Validate Preview Reset Request
+    runs-on: ubuntu-latest
+    env:
+      CONFIRMATION: ${{ inputs.confirmation }}
+      REF_NAME: ${{ github.ref_name }}
+      REF_TYPE: ${{ github.ref_type }}
+    steps:
+      - name: Validate Main and Confirmation
+        run: |
+          if [ "${CONFIRMATION}" != "reset-preview" ]; then
+            echo '::error::確認文字列が一致しません。"reset-preview" と入力してください。'
+            exit 1
+          fi
+          if [ "${REF_TYPE}" != "branch" ] || [ "${REF_NAME}" != "main" ]; then
+            echo "::error::Preview resetはmainブランチからだけ実行できます。"
+            exit 1
+          fi
+
+  approve-preview-reset:
+    name: Approve Preview Infrastructure Reset
+    needs: validate-reset-request
+    runs-on: ubuntu-latest
+    environment: infra-dev
+    steps:
+      - name: Record Approval
+        run: echo "Preview infrastructure reset was approved."
+
   reset-preview:
     name: Reset Preview D1 and Durable Objects
+    needs: approve-preview-reset
     runs-on: ubuntu-latest
     environment: dev
     env:
@@ -33,15 +63,17 @@ jobs:
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       LIFF_ID: ${{ vars.LIFF_ID }}
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
-      SSO_ISSUER_URL: ${{ vars.SSO_ISSUER_URL }}
-      SSO_CLIENT_ID: ${{ vars.SSO_CLIENT_ID }}
-      SSO_CLIENT_SECRET: ${{ secrets.SSO_CLIENT_SECRET }}
+      GOOGLE_IDENTITY_PLATFORM_API_KEY: ${{ secrets.GOOGLE_IDENTITY_PLATFORM_API_KEY }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
+      PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+      GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
-      # 実行時に選んだブランチをそのまま使う。migration・seed・deployの内容と、
-      # resource IDのcommit先を同じブランチへ揃えるため、refは固定しない。
+      # 検証済みmainだけを使い、resource IDは後段で専用PRへ反映する。
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-bun-workspace
@@ -52,20 +84,8 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       # 削除後に復元不能にならないよう、破壊的操作より前に必要値をすべて検証する。
-      - name: Validate Reset Request
-        env:
-          CONFIRMATION: ${{ inputs.confirmation }}
-          REF_TYPE: ${{ github.ref_type }}
+      - name: Validate Restore Configuration
         run: |
-          if [ "${CONFIRMATION}" != "reset-preview" ]; then
-            echo '::error::確認文字列が一致しません。"reset-preview" と入力してください。'
-            exit 1
-          fi
-          # resource IDのcommit先が必要なため、tagからは実行させない。
-          if [ "${REF_TYPE}" != "branch" ]; then
-            echo "::error::ブランチを選んで実行してください。tagからは reset できません。"
-            exit 1
-          fi
           if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
             echo "::error::CLOUDFLARE_ACCOUNT_ID が GitHub Environment dev に設定されていません。"
             exit 1
@@ -94,6 +114,21 @@ jobs:
             echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Environment dev に設定されていません。"
             exit 1
           fi
+          if [ -z "${PULUMI_CONFIG_PASSPHRASE//[[:space:]]/}" ]; then
+            echo "::error::PULUMI_CONFIG_PASSPHRASE がGitHub Environment devに設定されていません。"
+            exit 1
+          fi
+          required_gcp_variables=(
+            GCP_STATE_PROJECT_ID
+            GCP_WORKLOAD_IDENTITY_PROVIDER
+          )
+          for variable_name in "${required_gcp_variables[@]}"; do
+            variable_value="${!variable_name}"
+            if [ -z "${variable_value//[[:space:]]/}" ]; then
+              echo "::error::${variable_name} がGitHub Environment devに設定されていません。"
+              exit 1
+            fi
+          done
           sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
           sso_percent="${SSO_ROLLOUT_PERCENT:-0}"
           case "${sso_mode}" in
@@ -104,11 +139,17 @@ jobs:
             echo "::error::SSO_ROLLOUT_PERCENT は0から100の整数で指定してください。"
             exit 1
           fi
-          if [ "${sso_mode}" != "disabled" ] && { [ -z "${SSO_ISSUER_URL}" ] || [ -z "${SSO_CLIENT_ID}" ] || [ -z "${SSO_CLIENT_SECRET}" ]; }; then
-            echo "::error::SSOを有効にするにはSSO_ISSUER_URL、SSO_CLIENT_ID、SSO_CLIENT_SECRETが必要です。"
+          if [ "${sso_mode}" != "disabled" ] && { [ -z "${GOOGLE_IDENTITY_PLATFORM_API_KEY}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; }; then
+            echo "::error::SSOを有効にするにはGOOGLE_IDENTITY_PLATFORM_API_KEY、GOOGLE_OAUTH_CLIENT_ID、GOOGLE_OAUTH_CLIENT_SECRETが必要です。"
             exit 1
           fi
           bun --cwd apps/web scripts/validate-liff-configuration.ts
+
+      - name: Authenticate to Pulumi State on Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.GCP_STATE_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: Install Pulumi CLI
         run: |
@@ -151,7 +192,8 @@ jobs:
             );
             await Bun.write(process.env.API_SECRETS_FILE, JSON.stringify({
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
-              ...(process.env.SSO_CLIENT_SECRET ? { SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET } : {}),
+              ...(process.env.GOOGLE_IDENTITY_PLATFORM_API_KEY ? { GOOGLE_IDENTITY_PLATFORM_API_KEY: process.env.GOOGLE_IDENTITY_PLATFORM_API_KEY } : {}),
+              ...(process.env.GOOGLE_OAUTH_CLIENT_SECRET ? { GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET } : {}),
               ...optionalSecrets,
               ...apiConfiguration,
             }));
@@ -165,8 +207,7 @@ jobs:
           sso_mode="${SSO_ROLLOUT_MODE:-disabled}"
           sso_percent="${SSO_ROLLOUT_PERCENT:-0}"
           api_sso_vars=(--var "SSO_ROLLOUT_MODE:${sso_mode}" --var "SSO_ROLLOUT_PERCENT:${sso_percent}")
-          if [ -n "${SSO_ISSUER_URL}" ]; then api_sso_vars+=(--var "SSO_ISSUER_URL:${SSO_ISSUER_URL}"); fi
-          if [ -n "${SSO_CLIENT_ID}" ]; then api_sso_vars+=(--var "SSO_CLIENT_ID:${SSO_CLIENT_ID}"); fi
+          if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ]; then api_sso_vars+=(--var "GOOGLE_OAUTH_CLIENT_ID:${GOOGLE_OAUTH_CLIENT_ID}"); fi
           bun --cwd apps/api wrangler deploy --env preview --secrets-file "${api_secrets_file}" "${api_sso_vars[@]}"
           bun --filter @me-builder/mcp deploy:preview
 
@@ -181,7 +222,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LEFTHOOK: "0"
-          RESET_REF: ${{ github.ref_name }}
         run: |
           git add \
             infra/environments/preview.json \
@@ -200,35 +240,25 @@ jobs:
           # commitlint (config-conventional) のsubject-caseに従い、subjectは小文字で始める。
           message="chore(infra): preview resource IDを更新"
 
-          # mainはrulesetで直接pushできないため、PRを作って検証後にマージする。
-          if [ "${RESET_REF}" = "main" ]; then
-            # ブランチ名はリポジトリの命名規約 (feature|bugfix|hotfix|chore|docs|refactor|test|usagi) に合わせる。
-            branch="chore/preview-resource-ids-${GITHUB_RUN_ID}"
-            git switch -c "${branch}"
-            git commit -m "${message}"
-            git push origin "${branch}"
-            body="$(printf '%s\n\n%s\n' \
-              "Preview環境の再構築で変更されたD1、Private R2、Queueの情報を、Pulumi stack outputから生成したmanifestとWrangler TOMLへ反映します。" \
-              "Generated by workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")"
-            gh pr create \
-              --base main \
-              --head "${branch}" \
-              --title "${message}" \
-              --body "${body}"
-            echo "mode=pr" >> "${GITHUB_OUTPUT}"
-            echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
-          else
-            # 作業中のブランチで実行した場合は、そのブランチへ直接commitする。
-            # ブランチの持ち主がそのままpushやPRを続けられるようにするため、PRは作らない。
-            git commit -m "${message}"
-            git push origin "HEAD:refs/heads/${RESET_REF}"
-            echo "mode=direct" >> "${GITHUB_OUTPUT}"
-            echo "branch=${RESET_REF}" >> "${GITHUB_OUTPUT}"
-          fi
+          # mainはrulesetで直接pushできないため、専用branchのPRを作って検証後にマージする。
+          # ブランチ名はリポジトリの命名規約 (feature|bugfix|hotfix|chore|docs|refactor|test|usagi) に合わせる。
+          branch="chore/preview-resource-ids-${GITHUB_RUN_ID}"
+          git switch -c "${branch}"
+          git commit -m "${message}"
+          git push origin "${branch}"
+          body="$(printf '%s\n\n%s\n' \
+            "Preview環境の再構築で変更されたD1、Private R2、Queueの情報を、Pulumi stack outputから生成したmanifestとWrangler TOMLへ反映します。" \
+            "Generated by workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}")"
+          gh pr create \
+            --base main \
+            --head "${branch}" \
+            --title "${message}" \
+            --body "${body}"
+          echo "mode=pr" >> "${GITHUB_OUTPUT}"
+          echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
 
       # GITHUB_TOKENで作成したPRはpull_requestイベントを発火せず、ci.ymlが走らない。
       # マージ前の検証が空になるのを避けるため、同じjobで`bun run ci`を実行する。
-      # 直接commitした場合はマージ判定が無く、課金分を払うだけになるので実行しない。
       - name: Validate Resource ID Pull Request
         if: steps.resource-ids.outputs.mode == 'pr'
         run: bun run ci
@@ -255,15 +285,12 @@ jobs:
             echo "ブランチ \`${RESET_REF}\` のコミット \`${RESET_SHA:0:7}\` を使って、Preview の D1 migration と全 Durable Object storage をリセットしました。"
             echo
             echo "- PreviewのD1、Private R2、Queue/DLQ、Worker/DOを削除し、Pulumiで基盤を再作成しました。"
-            echo "- 現在のブランチのD1 migrationと診断seedを適用しました。"
+            echo "- mainのD1 migrationと診断seedを適用しました。"
             echo "- Workerで構成された全 Durable Object namespaceを再作成しました。"
             echo "- Preview Worker、API、MCPを再デプロイし、外部接続を検証しました。"
             case "${RESOURCE_ID_MODE}" in
               pr)
                 echo "- 変更されたresource IDの反映PRを作成し、\`bun run ci\`が通ったのでsquash mergeしました。"
-                ;;
-              direct)
-                echo "- 変更されたresource IDをブランチ \`${RESET_REF}\` へ直接commitしました。"
                 ;;
               *)
                 echo "- resource IDに変更がなかったため、commitしていません。"

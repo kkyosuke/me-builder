@@ -1,4 +1,5 @@
-import { D1 } from "@me-builder/lib";
+import { D1, type LoginIdentityProvider } from "@me-builder/lib";
+import type { SsoIdentityProviderPolicy } from "../../logic/authentication/sso-provider";
 import type {
   SsoExistingIdentityResolver,
   SsoIdentityLinker,
@@ -20,13 +21,17 @@ const defaultDependencies: Dependencies = {
 
 export function createSsoExistingIdentityResolver(
   db: D1.shared.Client,
+  policy: SsoIdentityProviderPolicy<LoginIdentityProvider>,
   dependencies: Dependencies = defaultDependencies,
 ): SsoExistingIdentityResolver {
   return {
     async findAccount(identity) {
+      if (identity.providerKey !== policy.activeProviderKey) {
+        throw new Error("Unexpected SSO identity provider");
+      }
       const found = await dependencies.findAccountByIdentity(
         db,
-        identity.providerKey,
+        policy.activeProviderKey,
         identity.subject,
       );
       return found
@@ -42,13 +47,17 @@ export function createSsoExistingIdentityResolver(
 
 export function createSsoIdentityLinker(
   db: D1.shared.Client,
+  policy: SsoIdentityProviderPolicy<LoginIdentityProvider>,
   dependencies: Dependencies = defaultDependencies,
 ): SsoIdentityLinker {
   return {
     async link(identity) {
+      if (identity.providerKey !== policy.activeProviderKey) {
+        throw new Error("Unexpected SSO identity provider");
+      }
       const linked = await dependencies.linkIdentity(db, {
         accountId: identity.accountId,
-        provider: identity.providerKey,
+        provider: policy.activeProviderKey,
         providerAccountId: identity.subject,
       });
       return linked.id;
@@ -56,23 +65,35 @@ export function createSsoIdentityLinker(
   };
 }
 
-/** subjectをresponseへ含めず、本人のAuth0接続状態だけを返す。 */
+/** subjectをresponseへ含めず、本人のIdentity Platform接続状態だけを返す。 */
 export async function getSsoIdentityStatus(
   db: D1.shared.Client,
   accountId: string,
+  policy: SsoIdentityProviderPolicy<LoginIdentityProvider>,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<{ linked: boolean; canUnlink: boolean }> {
   const providers = await dependencies.listLoginIdentityProviders(db, accountId);
   return {
-    linked: providers.includes("auth0"),
-    canUnlink: providers.includes("auth0") && providers.some((provider) => provider !== "auth0"),
+    linked: providers.includes(policy.activeProviderKey),
+    canUnlink:
+      providers.includes(policy.activeProviderKey) &&
+      providers.some((provider) => provider !== policy.activeProviderKey),
   };
 }
 
 export async function unlinkSsoIdentity(
   db: D1.shared.Client,
   accountId: string,
+  policy: SsoIdentityProviderPolicy<LoginIdentityProvider>,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<void> {
-  await dependencies.unlinkIdentity(db, { accountId, provider: "auth0" });
+  const providers = await dependencies.listLoginIdentityProviders(db, accountId);
+  const hasUsableAlternative = providers.some((provider) => provider !== policy.activeProviderKey);
+  if (providers.includes(policy.activeProviderKey) && !hasUsableAlternative) {
+    throw new D1.shared.action.account.CannotUnlinkLastIdentityError();
+  }
+  await dependencies.unlinkIdentity(db, {
+    accountId,
+    provider: policy.activeProviderKey,
+  });
 }

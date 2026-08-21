@@ -1,0 +1,163 @@
+name: Setup / Pulumi State Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'state backendを構築するには "bootstrap-kagami-infra" と入力'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+# 共有state backendへの同時変更を避け、開始済みのbootstrapは中断しない。
+concurrency:
+  group: pulumi-state-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Bootstrap Pulumi State on GCS
+    runs-on: ubuntu-latest
+    environment: infra-dev
+    env:
+      GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      REF_NAME: ${{ github.ref_name }}
+      REF_TYPE: ${{ github.ref_type }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Environment承認後、GCPへ接続する前に対象と設定値を検証する。
+      - name: Validate Bootstrap Request
+        run: |
+          if [ "${CONFIRMATION}" != "bootstrap-kagami-infra" ]; then
+            echo '::error::確認文字列が一致しません。"bootstrap-kagami-infra" と入力してください。'
+            exit 1
+          fi
+          if [ "${REF_TYPE}" != "branch" ] || [ "${REF_NAME}" != "main" ]; then
+            echo "::error::state backendの初期構築はmainブランチからだけ実行できます。"
+            exit 1
+          fi
+          required_variables=(
+            GCP_STATE_PROJECT_ID
+            GCP_WORKLOAD_IDENTITY_PROVIDER
+          )
+          for variable_name in "${required_variables[@]}"; do
+            variable_value="${!variable_name}"
+            if [ -z "${variable_value//[[:space:]]/}" ]; then
+              echo "::error::${variable_name} がGitHub Environment infra-devに設定されていません。"
+              exit 1
+            fi
+          done
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.GCP_STATE_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set Up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Create or Verify State Backend
+        run: |
+          bucket_uri="gs://kagami-infra"
+          if gcloud storage buckets describe "${bucket_uri}" \
+            --project="${GCP_STATE_PROJECT_ID}" >/dev/null 2>&1; then
+            echo "${bucket_uri} already exists; reconciling its mutable settings."
+          else
+            gcloud storage buckets create "${bucket_uri}" \
+              --project="${GCP_STATE_PROJECT_ID}" \
+              --default-storage-class=STANDARD \
+              --location=ASIA \
+              --uniform-bucket-level-access \
+              --public-access-prevention
+          fi
+
+          location="$(gcloud storage buckets describe "${bucket_uri}" \
+            --project="${GCP_STATE_PROJECT_ID}" \
+            --format='value(location)')"
+          if [ "${location^^}" != "ASIA" ]; then
+            echo "::error::${bucket_uri} のlocationはASIAである必要があります。現在値: ${location}"
+            exit 1
+          fi
+
+          gcloud storage buckets update "${bucket_uri}" \
+            --project="${GCP_STATE_PROJECT_ID}" \
+            --default-storage-class=STANDARD \
+            --uniform-bucket-level-access \
+            --public-access-prevention \
+            --versioning
+
+          managed_folders=(
+            "${bucket_uri}/kagami/cloudflare/"
+            "${bucket_uri}/kagami/gcp-platform/"
+          )
+          for managed_folder in "${managed_folders[@]}"; do
+            if gcloud storage managed-folders describe "${managed_folder}" \
+              --project="${GCP_STATE_PROJECT_ID}" >/dev/null 2>&1; then
+              echo "${managed_folder} already exists."
+            else
+              gcloud storage managed-folders create "${managed_folder}" \
+                --project="${GCP_STATE_PROJECT_ID}"
+            fi
+          done
+
+      - name: Verify State Backend
+        run: |
+          bucket_uri="gs://kagami-infra"
+          storage_class="$(gcloud storage buckets describe "${bucket_uri}" \
+            --project="${GCP_STATE_PROJECT_ID}" \
+            --format='value(storageClass)')"
+          uniform_access="$(gcloud storage buckets describe "${bucket_uri}" \
+            --project="${GCP_STATE_PROJECT_ID}" \
+            --format='value(iamConfiguration.uniformBucketLevelAccess.enabled)')"
+          public_access_prevention="$(gcloud storage buckets describe "${bucket_uri}" \
+            --project="${GCP_STATE_PROJECT_ID}" \
+            --format='value(iamConfiguration.publicAccessPrevention)')"
+          versioning="$(gcloud storage buckets describe "${bucket_uri}" \
+            --project="${GCP_STATE_PROJECT_ID}" \
+            --format='value(versioning.enabled)')"
+
+          if [ "${storage_class^^}" != "STANDARD" ]; then
+            echo "::error::default storage classの検証に失敗しました: ${storage_class}"
+            exit 1
+          fi
+          if [ "${uniform_access,,}" != "true" ]; then
+            echo "::error::uniform bucket-level accessが有効ではありません。"
+            exit 1
+          fi
+          if [ "${public_access_prevention,,}" != "enforced" ]; then
+            echo "::error::public access preventionがenforcedではありません。"
+            exit 1
+          fi
+          if [ "${versioning,,}" != "true" ]; then
+            echo "::error::object versioningが有効ではありません。"
+            exit 1
+          fi
+
+          gcloud storage managed-folders describe \
+            "${bucket_uri}/kagami/cloudflare/" \
+            --project="${GCP_STATE_PROJECT_ID}" >/dev/null
+          gcloud storage managed-folders describe \
+            "${bucket_uri}/kagami/gcp-platform/" \
+            --project="${GCP_STATE_PROJECT_ID}" >/dev/null
+
+      - name: Publish Bootstrap Summary
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "### Pulumi state backend is ready"
+            echo
+            echo "- Bucket: \`gs://kagami-infra\`"
+            echo "- Location: \`ASIA\`"
+            echo "- Default storage class: \`STANDARD\`"
+            echo "- Managed folders: \`kagami/cloudflare/\`, \`kagami/gcp-platform/\`"
+            echo "- Workflow run: [open run](${RUN_URL})"
+          } >> "${GITHUB_STEP_SUMMARY}"
