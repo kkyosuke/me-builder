@@ -18,6 +18,10 @@ describe("resolveServiceSiteRoute", () => {
     expect(resolveServiceSiteRoute("/contact")).toBe("contact");
   });
 
+  it("特定商取引法に基づく表記を公開ページとして扱う", () => {
+    expect(resolveServiceSiteRoute("/commercial-transactions")).toBe("commercial-transactions");
+  });
+
   it.each(["/app", "/diagnosis", "/me", "/compatibility/invitations/example"])(
     "%sは本人向けアプリとして扱う",
     (pathname) => {

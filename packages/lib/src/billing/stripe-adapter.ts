@@ -84,6 +84,7 @@ export class StripeBillingProvider implements BillingProvider {
           mode: "subscription",
           customer: input.customerId,
           line_items: [{ price: input.priceId, quantity: 1 }],
+          payment_method_collection: "always",
           success_url: input.successUrl,
           cancel_url: input.cancelUrl,
           client_reference_id: input.accountId,

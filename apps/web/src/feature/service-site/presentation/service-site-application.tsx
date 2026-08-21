@@ -1,5 +1,6 @@
 import type { ServiceSiteRoute } from "../model/service-site-route";
 import { ServiceSiteLayout } from "./components/service-site-layout";
+import { ServiceSiteCommercialTransactionsScreen } from "./service-site-commercial-transactions-screen";
 import { ServiceSiteContactScreen } from "./service-site-contact-screen";
 import { ServiceSiteHomeScreen } from "./service-site-home-screen";
 import { ServiceSitePrivacyScreen } from "./service-site-privacy-screen";
@@ -12,6 +13,7 @@ export function ServiceSiteApplication({ route }: { route: ServiceSiteRoute }) {
       {route === "terms" && <ServiceSiteTermsScreen />}
       {route === "privacy" && <ServiceSitePrivacyScreen />}
       {route === "contact" && <ServiceSiteContactScreen />}
+      {route === "commercial-transactions" && <ServiceSiteCommercialTransactionsScreen />}
     </ServiceSiteLayout>
   );
 }

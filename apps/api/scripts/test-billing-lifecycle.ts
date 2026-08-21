@@ -253,6 +253,7 @@ async function assertCheckoutSession(client: Stripe, priceId: string): Promise<v
       mode: "subscription",
       customer: customer.id,
       line_items: [{ price: priceId, quantity: 1 }],
+      payment_method_collection: "always",
       success_url:
         "https://stg.kagami.kyosuke.dev/profile/billing?billing=checkout-return&session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://stg.kagami.kyosuke.dev/profile/billing?billing=checkout-cancel",
@@ -261,6 +262,9 @@ async function assertCheckoutSession(client: Stripe, priceId: string): Promise<v
       subscription_data: { trial_period_days: 14 },
     });
     if (!session.url) throw new Error("Checkout Session URL was missing");
+    if (session.payment_method_collection !== "always") {
+      throw new Error("Checkout Session did not require a payment method");
+    }
     await client.checkout.sessions.expire(session.id);
     logger.info(
       {

@@ -55,6 +55,7 @@ export const WEB_CLIENT_ROUTES = [
   "/terms",
   "/privacy",
   "/contact",
+  "/commercial-transactions",
   "/diagnosis",
   "/diagnosis/:diagnosisId/answers",
   "/compatibility",

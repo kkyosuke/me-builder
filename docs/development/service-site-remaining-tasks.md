@@ -14,11 +14,11 @@
 ### 所有しない概念
 
 - 公開サイトの目的、サイトマップ、画面構成、CTA、受け入れ条件
-- 利用規約とプライバシーポリシーの本文
+- 利用規約、プライバシーポリシー、特定商取引法に基づく表記の本文
 - LINE、LIFF、本人向けWebアプリの画面遷移
 - 共通のデプロイ手順
 
-公開サイトの要件は[サービス紹介サイト設計](../product/service-site-design.md)、料金プランは[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md)、規約と同意は[サービス利用規約・同意体験設計](../product/service-terms-consent-experience.md)、LINEとWebの遷移は[全体画面遷移設計](../product/screen-navigation.md)を正とします。
+公開サイトの要件は[サービス紹介サイト設計](../product/service-site-design.md)、料金プランは[サブスクリプション・料金プラン設計](../product/subscription-plan-design.md)、規約と同意は[サービス利用規約・同意体験設計](../product/service-terms-consent-experience.md)を正とします。公開する正確な取引条件は[`commercial-transactions.ts`](../../packages/shared/src/legal/commercial-transactions.ts)、LINEとWebの遷移は[全体画面遷移設計](../product/screen-navigation.md)を正とします。
 
 ## 2. 公開までの進め方
 
@@ -77,7 +77,7 @@ flowchart LR
 
 ### 3.6 SNS共有表示をデプロイ環境で確認する
 
-CDはデプロイ直後に、`/`、`/terms`、`/privacy`、`/contact`の非JavaScript初期HTMLと、本人向けWebアプリ・管理者画面の`X-Robots-Tag: noindex, nofollow`を自動検査します。次の実サービス確認は引き続き必要です。
+CDはデプロイ直後に、`/`、`/terms`、`/privacy`、`/commercial-transactions`、`/contact`の非JavaScript初期HTMLと、本人向けWebアプリ・管理者画面の`X-Robots-Tag: noindex, nofollow`を自動検査します。次の実サービス確認は引き続き必要です。
 
 - SNS共有時にタイトル、説明、共有画像が個人データを含まず表示されることを確認する
 - 正式なプライバシーポリシーと窓口の公開後だけ、対応ページを検索対象へ変更する

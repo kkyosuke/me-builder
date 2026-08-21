@@ -371,8 +371,8 @@ export function BillingPlanScreen({
                       <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
                         <p className="font-bold">初回{selected.trialDays}日間無料トライアル</p>
                         <p className="mt-1">
-                          本日開始した場合は{expectedTrialEndDate(selected.trialDays)}まで無料です。
-                          終了後は
+                          開始時に支払方法を登録します。本日開始した場合は
+                          {expectedTrialEndDate(selected.trialDays)}まで無料です。終了後は
                           {formatBillingAmount(billingPlanPrice(selected, interval).amount)}を
                           {interval === "month" ? "毎月" : "毎年"}自動更新します。
                         </p>
@@ -414,6 +414,16 @@ export function BillingPlanScreen({
                     <p className="mt-3 flex gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
                       カード情報はStripeが扱い、me-builderには保存されません。
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      申込みにより、料金・自動更新・解約・返金について
+                      <a
+                        className="mx-1 font-bold text-violet-700 underline dark:text-violet-300"
+                        href="/commercial-transactions"
+                      >
+                        特定商取引法に基づく表記
+                      </a>
+                      の条件が適用されます。
                     </p>
                   </article>
                 )}

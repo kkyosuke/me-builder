@@ -42,7 +42,7 @@ unset PREVIEW_BILLING_ID_TOKEN
 1. stack最上位PRへ`deploy`と`e2e`ラベルを付け、Preview CDと外部接続なしE2Eを完了する
 2. `Setup / Stripe Billing`を対象branch、`dev`、確認文字列`sync-dev`で実行する
 3. 同じbranchの`Scheduled Checks`を手動実行し、Stripe sandbox lifecycleを完了する
-4. Preview LIFFを検証用Accountで開き、公開Planと初回trial表示を確認する
+4. Preview LIFFを検証用Accountで開き、公開Plan、初回trial、決済手段の開始時登録、特定商取引法に基づく表記を確認する
 5. 購入ボタンからLINEのアプリ内ブラウザにStripe Checkoutが開くことを確認する。開かない場合の直接リンクも確認してから、sandboxの支払方法だけを使ってCheckoutを完了し、復帰画面がqueryだけで成功せず、projection反映後に現在Planを表示することを確認する
 
 Stripe同期はPlanごとの3 Product、月額・年額の6 Price、Webhook endpoint、Customer Portal configuration、Cloudflare secretsを同時に更新します。Customer Portalが要求する「1 Product内で課金間隔が一意」を満たしつつ、3 Productすべてを即時upgrade候補へ登録します。異なるProduct間の期間末downgradeはAPIがSubscription Scheduleを作成します。旧ProductのPrice IDは既存契約がなくなるまでPlan mapへ残します。
@@ -51,7 +51,7 @@ Stripe同期はPlanごとの3 Product、月額・年額の6 Price、Webhook endp
 
 | 検証番号 | 操作 | 合格条件 |
 | --- | --- | --- |
-| `PREVIEW-BILLING-001` | Free Accountで料金プランを開く | 3 Plan、月額・年額、14日trial、終了後価格、自動更新、解約条件が表示される |
+| `PREVIEW-BILLING-001` | Free Accountで料金プランを開く | 3 Plan、月額・年額、14日trial、決済手段の開始時登録、終了後価格、自動更新、解約・返金条件へのリンクが表示される |
 | `PREVIEW-BILLING-002` | LiteをCheckoutで開始して復帰する | projection反映前は待機し、反映後だけLiteと契約管理導線を表示する |
 | `PREVIEW-BILLING-003` | PortalでFullへupgradeする | Stripe確定額の支払成功後にFullへ収束し、失敗時はLiteを維持する |
 | `PREVIEW-BILLING-004` | Liteへdowngradeする | APIがLite ProductのPriceへのSubscription Scheduleを作成し、予約完了と適用日を表示する。期間末まではFullを維持する |
@@ -60,6 +60,7 @@ Stripe同期はPlanごとの3 Product、月額・年額の6 Price、Webhook endp
 | `PREVIEW-BILLING-007` | 同じWebhookを再送し、古いeventを後着させる | 重複通知を1回だけ処理し、古いeventで新しいPlanへ巻き戻らない |
 | `PREVIEW-BILLING-008` | 使用済みAccountで再購入する | CustomerやPlan付与元を変えても2回目のtrialを付けない |
 | `PREVIEW-BILLING-009` | 別Accountから契約管理を開く | 他AccountのCustomer、契約、請求履歴へ到達できない |
+| `PREVIEW-BILLING-010` | trial開始・請求・支払失敗・解約を確認する | StripeメールとWebだけに課金情報が表示され、LINEへ課金内容が送信されない。Portalで通常の請求書・領収書を確認でき、適格請求書とは表示されない |
 
 支払失敗の実Account確認はアクセス制限されたStripe sandboxで検証用Customerの支払方法を変更し、識別子を検証記録へ写さずに行います。期間移動とカード失敗そのものの回帰はTest Clock E2Eを正とし、共有PreviewではWebhookからprojectionと画面へ収束する境界を確認します。
 
