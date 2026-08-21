@@ -125,6 +125,32 @@ describe("StripeBillingProvider", () => {
     });
   });
 
+  it("未知のsubscription statusを有料権限へ変換しない", async () => {
+    const retrieve = vi.fn().mockResolvedValue({
+      id: "sub_unknown_status",
+      customer: "cus_secret",
+      status: "future_paid_status",
+      cancel_at_period_end: false,
+      trial_end: null,
+      created: 1_754_006_400,
+      items: {
+        data: [
+          {
+            price: { id: "price_full" },
+            current_period_start: 1_754_006_400,
+            current_period_end: 1_756_684_800,
+          },
+        ],
+      },
+    });
+    const provider = new StripeBillingProvider({ subscriptions: { retrieve } } as never);
+
+    await expect(provider.retrieveSubscription("sub_unknown_status")).resolves.toMatchObject({
+      status: "unknown",
+      priceId: "price_full",
+    });
+  });
+
   it("異なるProductへの期間末変更を冪等なSubscription Scheduleとして作成する", async () => {
     const create = vi.fn().mockResolvedValue({
       id: "sub_sched_secret",

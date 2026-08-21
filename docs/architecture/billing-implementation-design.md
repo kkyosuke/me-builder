@@ -78,7 +78,7 @@ AI返信はChat Turn ID、プロフィール要約はGeneration IDをrequest ID�
 
 AI返信の月次枠は、FreeではUTC暦月、契約Planでは`AccountPlanAssignment.effectiveAt`を起点とする月ごとの期間です。プロフィール要約には月次枠を設けず、入力または生成形式の変更と前回生成から7日経過の両方、および処理中の生成要求がないことをAccountDataで判定します。意味検索は共通Entitlementの期間をAccountDataの最終再認可へ渡し、Freeは30日、Liteは365日、Fullとファミリーは期間制限なしで候補を絞ります。
 
-本人向けの`GET /api/profile/entitlement`はPlan、付与元、適用開始、利用可能期限と、AI返信・まとめ生成の上限、確定量、予約量、残量、次回更新日時だけを返します。支払者Account IDや決済事業者の識別子は返しません。provider障害時は`safe-default`としてFree権限を表示し、有料権限を推測しません。
+本人向けの`GET /api/profile/entitlement`はPlan、付与元、適用開始、利用可能期限と、AI返信・まとめ生成の上限、確定量、予約量、残量、次回更新日時だけを返します。支払者Account IDや決済事業者の識別子は返しません。provider障害時は`safe-default`としてFree権限を適用し、有料権限を推測しません。WebはFreeへ契約変更されたとは表示せず、契約状態の再確認、問い合わせ、新しい購入の停止を同時に提示します。
 
 ### 3.4 ファミリー席の保存境界
 
@@ -100,7 +100,7 @@ Webの`/profile/family`は、支払者には4つの固定席と招待リンク�
 
 ## 4. 状態の変換
 
-有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`は最初の失敗eventから7日間か契約期間末の早い方まで支払失敗前のPlanを維持し、失敗したupgrade先の権限は付与しません。回復時に失敗開始日時と退避したPlanを消し、支払成功後のPlanへ収束します。猶予を過ぎた`past_due`と`unpaid`、`paused`、`canceled`、未知status、未知Priceは有料権限を付与しません。契約終了、返金、chargebackで既存データを削除せずFreeへ戻します。
+有効な`trialing`または`active`契約はPrice catalogでPlanへ変換します。期間末解約予約中も期限までは現在Planを維持します。`past_due`は最初の失敗eventから7日間か契約期間末の早い方まで支払失敗前のPlanを維持し、失敗したupgrade先の権限は付与しません。回復時に失敗開始日時と退避したPlanを消し、支払成功後のPlanへ収束します。猶予を過ぎた`past_due`と`unpaid`、`paused`、`canceled`、未知status、未知Priceは有料権限を付与しません。Stripeが未知statusを返した場合は既知statusへ偽装せず、固定した`unknown`としてprojectionと運用集計へ残し、契約変更も拒否します。契約終了、返金、chargebackで既存データを削除せずFreeへ戻します。
 
 Plan変更では、即時請求が必要なupgradeと月額から年額への変更だけをCustomer Portalの`subscription_update_confirm`へdeep linkします。下位Planへの変更と年額から月額への変更は、Stripe Customer Portalが異なるProduct間の期間末変更を扱えないため、APIが本人のSubscriptionに期間末のSubscription Scheduleを作成し、適用日時をWebへ返します。現在期間中のPriceと権限は変更せず、期間末のStripe eventを受けたprojectionで変更後Planへ収束します。Portal configurationの期間末変更条件には依存しません。
 

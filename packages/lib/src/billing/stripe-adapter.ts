@@ -1,3 +1,4 @@
+import { logger } from "@me-builder/shared";
 import Stripe from "stripe";
 import type {
   BillingCheckoutSession,
@@ -352,7 +353,18 @@ function billingSubscriptionStatus(status: string): BillingSubscriptionStatus {
     case "paused":
       return status;
     default:
-      throw new BillingProviderError("provider", false);
+      logger.warn(
+        {
+          event: "billing.subscription.unknown-status",
+          service: "lib",
+          provider: "stripe",
+          providerStatus: status,
+          outcome: "degraded",
+          disposition: "free-plan-fallback",
+        },
+        "[Billing provider] unknown subscription status -> Free fallback",
+      );
+      return "unknown";
   }
 }
 

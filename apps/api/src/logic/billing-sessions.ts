@@ -179,6 +179,10 @@ function isTerminalSubscription(status: billing.BillingSubscriptionStatus): bool
   return status === "canceled" || status === "incomplete_expired";
 }
 
+function canChangeBillingPlan(status: billing.BillingSubscriptionStatus): boolean {
+  return status === "active" || status === "trialing" || status === "past_due";
+}
+
 export async function createBillingPortalSession(
   params: BaseParams,
 ): Promise<SessionFailure | { type: "created"; url: string }> {
@@ -222,7 +226,7 @@ export async function createBillingPlanChangeSession(
     !subscription.itemId ||
     !subscription.priceId ||
     !subscription.interval ||
-    isTerminalSubscription(subscription.status)
+    !canChangeBillingPlan(subscription.status)
   ) {
     return { type: "unavailable", reason: "subscription_not_found" };
   }

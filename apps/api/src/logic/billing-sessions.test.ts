@@ -472,6 +472,72 @@ describe("billing sessions", () => {
     expect(createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it("Stripeが未知の契約状態を返した場合はPlan変更を開始しない", async () => {
+    const { db, owner, actor } = await setup();
+    await D1.shared.action.billing.linkBillingCustomer(db, {
+      accountId: owner.id,
+      providerCustomerId: "cus_unknown_status",
+    });
+    await D1.shared.action.billing.applyBillingProjection(db, {
+      accountId: owner.id,
+      event: {
+        id: "evt_before_unknown_status",
+        type: "customer.subscription.created",
+        objectId: "sub_unknown_status",
+        createdAt: new Date("2026-08-01T00:00:00Z"),
+      },
+      subscription: {
+        id: "sub_unknown_status",
+        customerId: "cus_unknown_status",
+        status: "active",
+        priceId: "price_full",
+        currentPeriodStart: "2026-08-01T00:00:00.000Z",
+        currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+        trialEnd: null,
+        createdAt: "2026-08-01T00:00:00.000Z",
+      },
+      planCode: "full",
+    });
+    const findPriceIdByLookupKey = vi.fn();
+    const createPortalSession = vi.fn();
+    const scheduleSubscriptionChange = vi.fn();
+    const provider = new billing.FakeBillingProvider({
+      retrieveSubscription: async () => ({
+        id: "sub_unknown_status",
+        itemId: "si_unknown_status",
+        customerId: "cus_unknown_status",
+        status: "unknown",
+        priceId: "price_full",
+        interval: "month",
+        currentPeriodStart: "2026-08-01T00:00:00.000Z",
+        currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+        trialEnd: null,
+        createdAt: "2026-08-01T00:00:00.000Z",
+      }),
+      findPriceIdByLookupKey,
+      createPortalSession,
+      scheduleSubscriptionChange,
+    });
+
+    await expect(
+      createBillingPlanChangeSession({
+        actor,
+        db,
+        provider,
+        webOrigin: "https://app.example.test",
+        plan: "lite",
+        interval: "month",
+        portalPlanChangeAvailable: true,
+        portalResetAvailable: true,
+      }),
+    ).resolves.toEqual({ type: "unavailable", reason: "subscription_not_found" });
+    expect(findPriceIdByLookupKey).not.toHaveBeenCalled();
+    expect(createPortalSession).not.toHaveBeenCalled();
+    expect(scheduleSubscriptionChange).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["lite", "month", "lite", "year", "now"],
     ["lite", "month", "full", "year", "now"],
