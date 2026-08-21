@@ -99,8 +99,11 @@ export function AccountRecoveryScreen() {
         href="/contact"
         className="mt-8 text-center text-sm font-bold text-sky-700 underline dark:text-sky-300"
       >
-        復旧コードがない場合の解約・問い合わせ
+        復旧コードがない場合の期間末解約・問い合わせ
       </a>
+      <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+        問い合わせを復旧コードの代わりにして、同じAccountへ再接続したり、保存済みデータへ再アクセスしたりすることはできません。
+      </p>
     </main>
   );
 }

@@ -61,11 +61,11 @@ flowchart TD
 
 ### 3.3 二重請求疑い・解約不能
 
-Stripe Dashboardで請求事実を確認し、同一Accountに複数Subscriptionがある場合は新しい課金操作を停止します。返金・Subscription取消は商取引条件に基づく運営者の明示操作とし、再照合APIから自動実行しません。Customer Portalを開けない場合も、本人確認後に運営経路から期間末解約を受け付けます。
+Stripe Dashboardで請求事実を確認し、同一Accountに複数Subscriptionがある場合は新しい課金操作を停止します。返金・Subscription取消は商取引条件に基づく運営者の明示操作とし、再照合APIから自動実行しません。Customer Portalを開けない場合も、請求上の本人確認後に運営経路から期間末解約を受け付けます。この確認をAccount復旧、Identity移動、Accountへのアクセス付与へ流用しません。
 
 ### 3.4 Account復旧
 
-StripeのメールアドレスやCustomer IDだけでは本人と判定しません。[Account復旧設計](../architecture/account-recovery-design.md)の確認を完了し、既存AccountへIdentityを追加した後、同じ`AccountPlanAssignment`へ到達することを確認します。
+有効な復旧コードがある場合だけ、[Account復旧設計](../architecture/account-recovery-design.md)の確認を完了し、既存AccountへIdentityを追加した後、同じ`AccountPlanAssignment`へ到達することを確認します。復旧コードがない場合は、Stripeのメールアドレス、Customer ID、請求上の本人確認を根拠にIdentityを追加しません。期間末解約だけを希望する場合は、§3.3の経路でAccount復旧と分離して扱います。
 
 ## 4. Secret rotation
 

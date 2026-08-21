@@ -1,4 +1,13 @@
-import { ArrowLeft, Bug, HelpCircle, Mail, MailQuestion, Scale, ShieldAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  Bug,
+  CreditCard,
+  HelpCircle,
+  Mail,
+  MailQuestion,
+  Scale,
+  ShieldAlert,
+} from "lucide-react";
 import { DocumentMetadata } from "../../../components/document-metadata";
 import { config } from "../../../config";
 import { serviceSitePageMetadata } from "../model/service-site-page-metadata";
@@ -15,6 +24,12 @@ const contactCategories = [
     description: "画面が開かない、操作を完了できないなどの技術的な問題について",
   },
   {
+    icon: CreditCard,
+    title: "契約・請求",
+    description:
+      "契約管理（Customer Portal）を利用できない場合の有料契約の期間末解約や、請求について",
+  },
+  {
     icon: Mail,
     title: "データとプライバシー",
     description: "プライバシーポリシーやデータの取扱いについて",
@@ -27,7 +42,7 @@ const contactCategories = [
 ] as const;
 
 const sensitiveInformation = [
-  "認証token、アクセストークン、パスワード",
+  "復旧コード、認証token、アクセストークン、パスワード",
   "LINE user IDやAccount ID",
   "日記や診断回答の原文",
   "本人確認書類や、第三者の個人情報",
@@ -97,6 +112,19 @@ export function ServiceSiteContactScreen() {
                 メールはサービス運用者だけが確認し、対応に不要となった時点で手動削除します。
               </p>
             </div>
+          </section>
+
+          <section
+            aria-labelledby="recovery-boundary-heading"
+            className="mt-6 rounded-3xl border border-sky-200 bg-sky-50 p-5 text-sky-950 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100"
+          >
+            <h2 id="recovery-boundary-heading" className="font-bold">
+              復旧コードがない場合
+            </h2>
+            <p className="mt-2 text-sm leading-7">
+              問い合わせを復旧コードの代わりにして、同じAccountへ再接続したり、保存済みデータへ再アクセスしたりすることはできません。契約管理（Customer
+              Portal）を利用できない場合は、現在の契約期間の終了時に解約する手続きをAccount復旧と分けて受け付けます。
+            </p>
           </section>
 
           <section aria-labelledby="categories-heading" className="mt-12">
