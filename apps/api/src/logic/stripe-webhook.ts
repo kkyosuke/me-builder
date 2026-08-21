@@ -20,9 +20,9 @@ export async function receiveStripeWebhook(input: {
   if (!input.webhookSecret || !input.provider || !input.queue) return { type: "not-configured" };
   if (!input.signature) return { type: "invalid-signature" };
 
-  let event: ReturnType<billing.BillingProvider["constructWebhookEvent"]>;
+  let event: Awaited<ReturnType<billing.BillingProvider["constructWebhookEvent"]>>;
   try {
-    event = input.provider.constructWebhookEvent(
+    event = await input.provider.constructWebhookEvent(
       input.rawBody,
       input.signature,
       input.webhookSecret,

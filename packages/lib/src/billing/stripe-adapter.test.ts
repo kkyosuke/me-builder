@@ -14,6 +14,40 @@ describe("StripeBillingProvider", () => {
     expect(del).toHaveBeenCalledWith("cus_delete", { idempotencyKey: "account-delete:key" });
   });
 
+  it("Cloudflare Web Cryptoで利用できる非同期APIでWebhook署名を検証する", async () => {
+    const constructEvent = vi.fn();
+    const constructEventAsync = vi.fn().mockResolvedValue({
+      id: "evt_fixture",
+      type: "customer.subscription.updated",
+      created: 1_786_723_200,
+      data: {
+        object: {
+          id: "sub_fixture",
+          object: "subscription",
+          customer: "cus_fixture",
+        },
+      },
+    });
+    const provider = new StripeBillingProvider({
+      webhooks: { constructEvent, constructEventAsync },
+    } as never);
+
+    await expect(
+      provider.constructWebhookEvent("raw-body", "stripe-signature", "whsec_fixture"),
+    ).resolves.toMatchObject({
+      id: "evt_fixture",
+      objectId: "sub_fixture",
+      subscriptionId: "sub_fixture",
+      customerId: "cus_fixture",
+    });
+    expect(constructEventAsync).toHaveBeenCalledWith(
+      "raw-body",
+      "stripe-signature",
+      "whsec_fixture",
+    );
+    expect(constructEvent).not.toHaveBeenCalled();
+  });
+
   it("creates checkout with selection metadata and maps the latest session", async () => {
     const create = vi.fn().mockResolvedValue({
       id: "cs_test_new",

@@ -92,7 +92,7 @@ export interface BillingProvider {
     rawBody: string,
     signature: string,
     webhookSecret: string,
-  ): BillingWebhookEvent;
+  ): Promise<BillingWebhookEvent>;
 }
 
 export type BillingProviderErrorKind =
