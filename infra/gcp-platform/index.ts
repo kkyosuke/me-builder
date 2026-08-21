@@ -1,6 +1,7 @@
 import * as gcp from "@pulumi/gcp";
 import * as pulumi from "@pulumi/pulumi";
 import { authorizationKeyPolicyRule } from "../src/gcp-authorization-key-policy.ts";
+import { verifyExistingGcpProject } from "../src/gcp-existing-project.ts";
 import { pulumiGcsBackends, requirePulumiGcsBackend } from "../src/pulumi-backend.ts";
 
 requirePulumiGcsBackend(process.env, pulumiGcsBackends.gcpPlatform);
@@ -19,14 +20,12 @@ if (pulumi.getStack() !== environment) {
 }
 
 const projectId = config.require("projectId");
-const projectName = config.get("projectName") ?? `me-builder platform ${environment}`;
 const billingAccount = config.require("billingAccount");
 const organizationId = config.get("organizationId");
 const folderId = config.get("folderId");
 if (organizationId && folderId) {
   throw new Error("Set only one of organizationId or folderId");
 }
-const standaloneProject = !organizationId && !folderId;
 
 const budgetCurrencyCode = config.require("budgetCurrencyCode");
 if (!/^[A-Z]{3}$/u.test(budgetCurrencyCode)) {
@@ -111,30 +110,27 @@ if (
 }
 const protect = true;
 
-const project = new gcp.organizations.Project(
-  "platformProject",
-  {
-    projectId,
-    name: projectName,
-    billingAccount,
-    deletionPolicy: "PREVENT",
-    // Do not delete or otherwise adopt the networking configuration of an imported project.
-    ...(!standaloneProject ? { autoCreateNetwork: false } : {}),
-    labels: {
-      application: "me-builder",
-      environment,
-      component: "platform",
-    },
-    ...(organizationId ? { orgId: organizationId } : {}),
-    ...(folderId ? { folderId } : {}),
-  },
-  {
-    protect,
-    // External identities cannot create standalone projects. A personal-account project is
-    // therefore pre-existing, then adopted into Pulumi on the first update.
-    ...(standaloneProject ? { import: projectId } : {}),
-  },
-);
+const existingProject = gcp.organizations.getProjectOutput({ projectId });
+const verifiedProject = pulumi
+  .all({
+    projectId: existingProject.projectId,
+    number: existingProject.number,
+    billingAccount: existingProject.billingAccount,
+    orgId: existingProject.orgId,
+    folderId: existingProject.folderId,
+  })
+  .apply((actual) =>
+    verifyExistingGcpProject(
+      { projectId, billingAccount, organizationId, folderId },
+      {
+        projectId: actual.projectId,
+        number: actual.number,
+        billingAccount: actual.billingAccount,
+        orgId: actual.orgId,
+        folderId: actual.folderId,
+      },
+    ),
+  );
 
 const enabledServices = [
   "aiplatform.googleapis.com",
@@ -150,19 +146,19 @@ const services = enabledServices.map(
     new gcp.projects.Service(
       service.replaceAll(".", "-"),
       {
-        project: project.projectId,
+        project: verifiedProject.projectId,
         service,
         disableDependentServices: false,
         disableOnDestroy: false,
       },
-      { dependsOn: project, protect },
+      { protect },
     ),
 );
 
 const identityPlatform = new gcp.identityplatform.Config(
   "identityPlatform",
   {
-    project: project.projectId,
+    project: verifiedProject.projectId,
     authorizedDomains,
     autodeleteAnonymousUsers: true,
     signIn: {
@@ -182,7 +178,7 @@ const googleProvider =
     ? new gcp.identityplatform.DefaultSupportedIdpConfig(
         "googleProvider",
         {
-          project: project.projectId,
+          project: verifiedProject.projectId,
           idpId: "google.com",
           enabled: true,
           clientId: googleOAuthClientId,
@@ -211,7 +207,7 @@ const projectBudget = new gcp.billing.Budget(
     budgetFilter: {
       calendarPeriod: "MONTH",
       creditTypesTreatment: "EXCLUDE_ALL_CREDITS",
-      projects: [pulumi.interpolate`projects/${project.number}`],
+      projects: [pulumi.interpolate`projects/${verifiedProject.projectNumber}`],
     },
     thresholdRules: [0.5, 0.8, 1].map((thresholdPercent) => ({
       thresholdPercent,
@@ -226,7 +222,7 @@ const projectBudget = new gcp.billing.Budget(
 const vertexServiceAccount = new gcp.serviceaccount.Account(
   "vertexRuntime",
   {
-    project: project.projectId,
+    project: verifiedProject.projectId,
     accountId: `me-builder-vertex-${environment}`,
     displayName: `me-builder Vertex AI ${environment}`,
   },
@@ -236,7 +232,7 @@ const vertexServiceAccount = new gcp.serviceaccount.Account(
 const vertexInferenceRole = new gcp.projects.IAMCustomRole(
   "vertexInferenceRole",
   {
-    project: project.projectId,
+    project: verifiedProject.projectId,
     roleId: "meBuilderVertexInference",
     title: "me-builder Vertex inference",
     description: "Invoke Gemini generation and embedding without Vertex resource administration",
@@ -249,7 +245,7 @@ const vertexInferenceRole = new gcp.projects.IAMCustomRole(
 const vertexInferenceBinding = new gcp.projects.IAMMember(
   "vertex-inference-binding",
   {
-    project: project.projectId,
+    project: verifiedProject.projectId,
     role: vertexInferenceRole.name,
     member: pulumi.interpolate`serviceAccount:${vertexServiceAccount.email}`,
   },
@@ -259,7 +255,7 @@ const vertexInferenceBinding = new gcp.projects.IAMMember(
 const vertexServiceUsageBinding = new gcp.projects.IAMMember(
   "vertex-service-usage-binding",
   {
-    project: project.projectId,
+    project: verifiedProject.projectId,
     role: "roles/serviceusage.serviceUsageConsumer",
     member: pulumi.interpolate`serviceAccount:${vertexServiceAccount.email}`,
   },
@@ -271,8 +267,8 @@ const authorizationKeyPolicy =
     ? new gcp.orgpolicy.Policy(
         "allowRestrictedServiceAccountApiKeys",
         {
-          parent: pulumi.interpolate`projects/${project.number}`,
-          name: pulumi.interpolate`projects/${project.number}/policies/iam.managed.disableServiceAccountApiKeyCreation`,
+          parent: pulumi.interpolate`projects/${verifiedProject.projectNumber}`,
+          name: pulumi.interpolate`projects/${verifiedProject.projectNumber}/policies/iam.managed.disableServiceAccountApiKeyCreation`,
           spec: { rules: [authorizationKeyPolicyRule(vertexRuntimeCredentialsEnabled)] },
           deletionPolicy: "PREVENT",
         },
@@ -287,7 +283,7 @@ const identityPlatformApiKeys = Object.fromEntries(
     const key = new gcp.projects.ApiKey(
       `identityPlatformApiKey-${slot}`,
       {
-        project: project.projectId,
+        project: verifiedProject.projectId,
         name: `me-builder-identity-${environment}-${slot}-${generation}`,
         displayName: `me-builder Identity Platform ${environment} ${slot} ${generation}`,
         deletionPolicy: "DELETE",
@@ -314,7 +310,7 @@ function createVertexAiApiKeys(authorizationKeyPolicy: gcp.orgpolicy.Policy) {
       const key = new gcp.projects.ApiKey(
         `vertexAiApiKey-${slot}`,
         {
-          project: project.projectId,
+          project: verifiedProject.projectId,
           name: `me-builder-vertex-${environment}-${slot}-${generation}`,
           displayName: `me-builder Vertex AI ${environment} ${slot} ${generation}`,
           deletionPolicy: "DELETE",
@@ -354,8 +350,8 @@ if (vertexRuntimeCredentialsEnabled && !activeVertexAiApiKey) {
 
 export const platform = {
   environment,
-  projectId: project.projectId,
-  projectNumber: project.number,
+  projectId: verifiedProject.projectId,
+  projectNumber: verifiedProject.projectNumber,
   billingAccount,
   budgetCurrencyCode,
   monthlyBudgetAmount,

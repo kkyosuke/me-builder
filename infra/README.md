@@ -3,7 +3,7 @@
 `infra/` contains two independent Pulumi projects:
 
 - the root project manages the Cloudflare D1 database, private avatar R2 bucket, KV namespace, and Queue resources
-- [`gcp-platform/`](./gcp-platform/) manages separate development and production GCP projects for Identity Platform and Vertex AI
+- [`gcp-platform/`](./gcp-platform/) manages Identity Platform and Vertex AI resources inside separate existing development and production GCP projects
 
 Wrangler still deploys Worker bundles, secrets, bindings, and Durable Object migrations. The ownership boundary and deletion order are defined in [the infrastructure architecture](../docs/architecture/infrastructure-architecture.md#61-cloudflareリソースの宣言とデプロイ境界).
 
@@ -15,7 +15,7 @@ Wrangler still deploys Worker bundles, secrets, bindings, and Durable Object mig
 - an existing Google Cloud state project and manually configured `gs://kagami-infra/` bucket
 - a non-empty `PULUMI_CONFIG_PASSPHRASE`, supplied from a password manager locally and from GitHub Secrets in CI
 
-The GCP platform project additionally requires Application Default Credentials, project creation permission, Billing Account User permission, and permission to manage service accounts, IAM bindings, and API keys. See its [setup guide](./gcp-platform/README.md).
+The GCP platform project additionally requires existing application projects with Cloud Billing already connected, Application Default Credentials, project read access, and permission to manage the child resources declared by its Stack. It never creates or updates the application project itself. See its [setup guide](./gcp-platform/README.md).
 
 ## One-time state backend bootstrap
 

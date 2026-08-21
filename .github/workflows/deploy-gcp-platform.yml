@@ -44,7 +44,6 @@ jobs:
       REF_TYPE: ${{ github.ref_type }}
       GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
       GCP_PLATFORM_PROJECT_ID: ${{ vars.GCP_PLATFORM_PROJECT_ID }}
-      GCP_PLATFORM_PROJECT_NAME: ${{ vars.GCP_PLATFORM_PROJECT_NAME }}
       GCP_BILLING_ACCOUNT: ${{ vars.GCP_BILLING_ACCOUNT }}
       GCP_ORGANIZATION_ID: ${{ vars.GCP_ORGANIZATION_ID }}
       GCP_FOLDER_ID: ${{ vars.GCP_FOLDER_ID }}
@@ -120,7 +119,6 @@ jobs:
           pulumi -C infra/gcp-platform stack select "${TARGET}" --create --non-interactive
           pulumi -C infra/gcp-platform config set environment "${TARGET}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set projectId "${GCP_PLATFORM_PROJECT_ID}" --stack "${TARGET}"
-          pulumi -C infra/gcp-platform config set projectName "${GCP_PLATFORM_PROJECT_NAME:-me-builder platform ${TARGET}}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set billingAccount "${GCP_BILLING_ACCOUNT}" --stack "${TARGET}"
 
           remove_config_if_present() {
@@ -128,6 +126,9 @@ jobs:
               pulumi -C infra/gcp-platform config rm "$1" --stack "${TARGET}"
             fi
           }
+
+          # 旧Stack configを残してもprojectは更新しないが、管理対象外になった値は除去する。
+          remove_config_if_present projectName
 
           if [ -n "${GCP_ORGANIZATION_ID}" ]; then
             remove_config_if_present folderId
@@ -162,11 +163,11 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -n "${GCP_ORGANIZATION_ID}" ]; then
-            project_parent="Organization"
+            project_parent="Existing project in Organization"
           elif [ -n "${GCP_FOLDER_ID}" ]; then
-            project_parent="Folder"
+            project_parent="Existing project in Folder"
           else
-            project_parent="No organization (existing project import)"
+            project_parent="Existing standalone project"
           fi
           {
             echo "### GCP platform ${OPERATION}: ${TARGET}"
