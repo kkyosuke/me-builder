@@ -28,6 +28,19 @@ describe("AccountRecoveryScreen", () => {
       .mockResolvedValue({ status: "recovered", alreadyRecovered: false });
   });
 
+  it("復旧コードがない場合の境界と期間末解約の導線を入力前に示す", () => {
+    render(<AccountRecoveryScreen />);
+
+    expect(
+      screen
+        .getByRole("link", { name: "復旧コードがない場合の期間末解約・問い合わせ" })
+        .getAttribute("href"),
+    ).toBe("/contact");
+    expect(
+      screen.getByText(/問い合わせを復旧コードの代わりにして、同じAccountへ再接続/u),
+    ).toBeTruthy();
+  });
+
   it("復旧コードをアプリセッションで送り、更新後の同じAccountへの接続完了を表示する", async () => {
     render(<AccountRecoveryScreen />);
     fireEvent.change(screen.getByLabelText("復旧コード"), {
@@ -40,14 +53,6 @@ describe("AccountRecoveryScreen", () => {
     );
     expect(retryAuthSession).toHaveBeenCalledOnce();
     expect(screen.getByText("同じAccountへ接続しました")).toBeTruthy();
-    expect(
-      screen
-        .getByRole("link", { name: "復旧コードがない場合の契約停止・問い合わせ" })
-        .getAttribute("href"),
-    ).toBe("/contact");
-    expect(
-      screen.getByText(/問い合わせでもAccountや保存済みデータの復旧は行いません/u),
-    ).toBeTruthy();
   });
 
   it("復旧完了後に新しいセッションを確認できなければ旧セッションで完了表示しない", async () => {

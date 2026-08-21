@@ -136,7 +136,7 @@ flowchart TD
 
 - LINE Accountを失った場合の本人確認、Identity追加、既存Accountへの再接続を設計する
 - StripeのメールアドレスやCustomer IDだけをAccount所有の証明にしない
-- 不正な乗っ取り、重複Account、復旧不能時の解約・問い合わせ経路を定義する
+- 不正な乗っ取り、重複Account、復旧不能時の期間末解約・問い合わせ経路を定義する
 
 完了条件は、認可境界、監査対象、失敗時の安全な結果がSSoTで決まっていることです。
 
@@ -242,7 +242,7 @@ flowchart TD
 - 復旧後も同じAccount IDと`AccountPlanAssignment`へ接続する
 - 他Accountへの誤接続と再送による二重統合をnegative testで防ぐ
 
-完了条件は、LINE Account喪失を想定したE2Eで、有料契約を復旧または解約できることです。
+完了条件は、LINE Account喪失を想定したE2Eで、事前コードがある場合は同じ有料契約を復旧でき、コードがない場合はAccountを復旧せず期間末解約の経路へ到達できることです。
 
 ## 10. ブランチB: Lite・Fullの継続価値
 

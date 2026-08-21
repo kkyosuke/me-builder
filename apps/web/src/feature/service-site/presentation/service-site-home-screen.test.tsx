@@ -48,9 +48,11 @@ describe("ServiceSiteHomeScreen", () => {
 
     expect(screen.getByText(/事前に発行・保存した一回限りの復旧コード/u)).toBeTruthy();
     expect(
-      screen.getByText(/コードがない場合、Accountと保存済みデータは復旧できません/u),
+      screen.getByText(/問い合わせを復旧コードの代わりにして、同じAccountへ再接続/u),
     ).toBeTruthy();
-    expect(screen.getByText(/契約の停止はAccount復旧と分けて/u)).toBeTruthy();
+    expect(
+      screen.getByText(/契約管理（Customer Portal）を利用できない有料契約の期間末解約/u),
+    ).toBeTruthy();
     expect(screen.queryByText(/現在の仕組みでは、Accountを復旧できないことがあります/u)).toBeNull();
   });
 });
