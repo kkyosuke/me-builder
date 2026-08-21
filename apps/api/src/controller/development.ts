@@ -32,15 +32,24 @@ export async function deleteDevelopmentAccountData(c: Context<AppEnv>): Promise<
   if (!hasRecentDevelopmentAuthentication(c)) {
     return c.json(v.parse(ForbiddenErrorSchema, { error: "Forbidden" }), 403);
   }
-  if (!c.env?.DB || !c.env.ACCOUNT_DATA || !c.env.CONVERSATION_COORDINATOR) {
+  if (
+    !c.env?.DB ||
+    !c.env.ACCOUNT_DATA ||
+    !c.env.CONVERSATION_COORDINATOR ||
+    !c.env.PHOTO_DIARY_BUCKET
+  ) {
     logger.error({ path: c.req.path }, "Development account data reset binding is not configured");
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
+  const photoDiaryBucket = c.env.PHOTO_DIARY_BUCKET;
 
   const outcome = await resetDevelopmentAccountData({
     actor: authenticatedActor(c),
     accountData: c.env.ACCOUNT_DATA,
     conversationCoordinator: c.env.CONVERSATION_COORDINATOR,
+    deletePhotoObjects: async (objectKeys) => {
+      if (objectKeys.length > 0) await photoDiaryBucket.delete([...objectKeys]);
+    },
   });
   const deletedContentCount =
     outcome.deletedDiagnosisResponseCount +

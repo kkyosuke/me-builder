@@ -1,4 +1,4 @@
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import type { AccountDataNamespace, ConversationCoordinatorNamespace } from "@me-builder/lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
@@ -50,6 +50,7 @@ vi.mock("../middleware/authorization", async (importOriginal) => {
 const dummyDb = {} as D1Database;
 const dummyAccountData = {} as AccountDataNamespace;
 const dummyCoordinator = {} as ConversationCoordinatorNamespace;
+const dummyPhotoDiaryBucket = {} as R2Bucket;
 const LIFF_ID = "2010850319-Yl63upAR";
 const resetOutcome = (value: ResetDevelopmentAccountDataOutcome) =>
   resetDevelopmentAccountData.mockResolvedValue(value);
@@ -77,6 +78,7 @@ describe("DELETE /api/dev/account-data", () => {
               DB: dummyDb,
               ACCOUNT_DATA: dummyAccountData,
               CONVERSATION_COORDINATOR: dummyCoordinator,
+              PHOTO_DIARY_BUCKET: dummyPhotoDiaryBucket,
             }
           : {}),
       },

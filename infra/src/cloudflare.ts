@@ -31,9 +31,8 @@ function encodeR2ObjectKey(key: string): string {
   return key.split("/").map(encodeURIComponent).join("/");
 }
 
-async function emptyPreviewAvatarBucket(): Promise<void> {
+async function emptyPreviewBucket(bucketName: string): Promise<void> {
   const { accountId } = requireCloudflareEnvironment();
-  const bucketName = resourceNames("preview").avatarBucket;
   const remote = await cloudflare<{ buckets?: { name?: string }[] }>(
     `/accounts/${accountId}/r2/buckets?per_page=1000&name_contains=${bucketName}`,
   );
@@ -90,7 +89,8 @@ export async function deletePreviewDependents() {
   const { accountId } = requireCloudflareEnvironment();
   await deleteWorker("me-builder-api-preview");
   await deleteWorker("me-builder-mcp-preview");
-  await emptyPreviewAvatarBucket();
+  await emptyPreviewBucket(resourceNames("preview").avatarBucket);
+  await emptyPreviewBucket(resourceNames("preview").photoDiaryBucket);
 
   const queues = await cloudflare<{ queue_id: string; queue_name: string }[]>(
     `/accounts/${accountId}/queues?per_page=100`,
@@ -136,14 +136,16 @@ export async function deleteUnmanagedPreviewFoundation() {
     console.info(`Deleted unmanaged D1 database: ${database.name}`);
   }
 
-  const remoteBuckets = await cloudflare<{ buckets?: { name?: string }[] }>(
-    `/accounts/${accountId}/r2/buckets?per_page=1000&name_contains=${names.avatarBucket}`,
-  );
-  if (remoteBuckets.buckets?.some(({ name }) => name === names.avatarBucket)) {
-    await cloudflare(`/accounts/${accountId}/r2/buckets/${names.avatarBucket}`, {
-      method: "DELETE",
-    });
-    console.info(`Deleted unmanaged R2 bucket: ${names.avatarBucket}`);
+  for (const bucketName of [names.avatarBucket, names.photoDiaryBucket]) {
+    const remoteBuckets = await cloudflare<{ buckets?: { name?: string }[] }>(
+      `/accounts/${accountId}/r2/buckets?per_page=1000&name_contains=${bucketName}`,
+    );
+    if (remoteBuckets.buckets?.some(({ name }) => name === bucketName)) {
+      await cloudflare(`/accounts/${accountId}/r2/buckets/${bucketName}`, {
+        method: "DELETE",
+      });
+      console.info(`Deleted unmanaged R2 bucket: ${bucketName}`);
+    }
   }
 }
 
@@ -161,6 +163,15 @@ export async function discoverPreviewInfrastructure(baseDomain: string) {
   );
   const avatarBucket = remoteBuckets.buckets?.find(({ name }) => name === names.avatarBucket);
   if (!avatarBucket?.name) throw new Error(`Missing Avatar R2 bucket: ${names.avatarBucket}`);
+  const remotePhotoBuckets = await cloudflare<{ buckets?: { name?: string }[] }>(
+    `/accounts/${accountId}/r2/buckets?per_page=1000&name_contains=${names.photoDiaryBucket}`,
+  );
+  const photoDiaryBucket = remotePhotoBuckets.buckets?.find(
+    ({ name }) => name === names.photoDiaryBucket,
+  );
+  if (!photoDiaryBucket?.name) {
+    throw new Error(`Missing Photo Diary R2 bucket: ${names.photoDiaryBucket}`);
+  }
 
   const namespaces = await cloudflare<{ id: string; title: string }[]>(
     `/accounts/${accountId}/storage/kv/namespaces?per_page=1000`,
@@ -176,6 +187,7 @@ export async function discoverPreviewInfrastructure(baseDomain: string) {
     baseDomain,
     database: { id: database.uuid, name: database.name },
     avatarBucket: { name: avatarBucket.name },
+    photoDiaryBucket: { name: photoDiaryBucket.name },
     sessionStore: { id: sessionStore.id, name: sessionStore.title },
     queues: Object.fromEntries(
       Object.entries(names.queues).map(([key, name]) => {

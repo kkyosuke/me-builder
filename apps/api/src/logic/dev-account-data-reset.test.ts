@@ -29,6 +29,7 @@ describe("resetDevelopmentAccountData", () => {
       order.push("account-data");
       return deleted;
     });
+    const listPhotoObjectKeys = vi.fn(async () => ["photo/original", "photo/thumbnail"]);
 
     await expect(
       resetDevelopmentAccountData(
@@ -36,14 +37,18 @@ describe("resetDevelopmentAccountData", () => {
           actor,
           accountData,
           conversationCoordinator,
+          deletePhotoObjects: async () => {
+            order.push("photo-objects");
+          },
         },
         {
           resetCoordinator,
           deleteAccountData,
+          listPhotoObjectKeys,
         },
       ),
     ).resolves.toEqual({ type: "resolved", ...deleted });
-    expect(order).toEqual(["coordinator", "account-data"]);
+    expect(order).toEqual(["coordinator", "photo-objects", "account-data"]);
     expect(resetCoordinator).toHaveBeenCalledWith(conversationCoordinator, "account-1");
     expect(deleteAccountData).toHaveBeenCalledWith(accountData, "account-1", 7);
   });

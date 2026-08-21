@@ -10,8 +10,14 @@ function vectorize(environment: string, prefix = "") {
   return `[[${prefix}vectorize]]\nbinding = "BRAIN_VECTOR_INDEX"\nindex_name = "me-builder-brain-${environment}"`;
 }
 
-function queueConsumer(prefix: string, queue: string, deadLetterQueue: string, retries: number) {
-  return `[[${prefix}queues.consumers]]\nqueue = "${queue}"\ndead_letter_queue = "${deadLetterQueue}"\nmax_retries = ${retries}`;
+function queueConsumer(
+  prefix: string,
+  queue: string,
+  deadLetterQueue: string,
+  retries: number,
+  retryDelay?: number,
+) {
+  return `[[${prefix}queues.consumers]]\nqueue = "${queue}"\ndead_letter_queue = "${deadLetterQueue}"\nmax_retries = ${retries}${retryDelay ? `\nretry_delay = ${retryDelay}` : ""}`;
 }
 
 function queueProducer(prefix: string, queue: string, binding: string) {
@@ -25,8 +31,12 @@ function durableObject(prefix: string, name: string, scriptName?: string) {
     .replace(/(^|_)([a-z])/g, (_, _separator, letter: string) => letter.toUpperCase())}"${script}`;
 }
 
-function r2(bucket: InfrastructureManifest["avatarBucket"], prefix = "") {
-  return `[[${prefix}r2_buckets]]\nbinding = "AVATAR_BUCKET"\nbucket_name = "${bucket.name}"`;
+function r2(bucket: { name: string }, binding: string, prefix = "") {
+  return `[[${prefix}r2_buckets]]\nbinding = "${binding}"\nbucket_name = "${bucket.name}"`;
+}
+
+function images(prefix = "") {
+  return `[${prefix}images]\nbinding = "IMAGES"`;
 }
 
 function kv(namespace: NonNullable<InfrastructureManifest["sessionStore"]>, prefix = "") {
@@ -56,6 +66,7 @@ function apiVars(baseDomain: string, environment: string) {
     'SSO_ROLLOUT_PERCENT = "0"',
     `MCP_RESOURCE_URL = "https://mcp.${baseDomain}/mcp"`,
     'MCP_FEATURE_ENABLED = "false"',
+    'PHOTO_DIARY_STORAGE_ENABLED = "false"',
   ];
 }
 
@@ -70,7 +81,15 @@ function workerEnvironment(manifest: InfrastructureManifest) {
     `[env.${env}.triggers]`,
     'crons = ["0 9,11,12 * * *"]',
     "",
-    queueConsumer(prefix, q.webhook.name, q.webhookDeadLetter.name, 3),
+    queueConsumer(prefix, q.webhook.name, q.webhookDeadLetter.name, 6),
+    "",
+    queueConsumer(
+      prefix,
+      q.photoDiaryDeletion.name,
+      q.photoDiaryDeletionDeadLetter.name,
+      47,
+      1_800,
+    ),
     "",
     queueConsumer(prefix, q.billing.name, q.billingDeadLetter.name, 5),
     "",
@@ -85,6 +104,8 @@ function workerEnvironment(manifest: InfrastructureManifest) {
     queueConsumer(prefix, q.dailyPrompt.name, q.dailyPromptDeadLetter.name, 5),
     "",
     queueProducer(prefix, q.chatTurn.name, "CHAT_TURN_QUEUE"),
+    "",
+    queueProducer(prefix, q.photoDiaryDeletion.name, "PHOTO_DIARY_DELETION_QUEUE"),
     "",
     queueProducer(prefix, q.brainCheckpoint.name, "BRAIN_CHECKPOINT_QUEUE"),
     "",
@@ -102,13 +123,18 @@ function workerEnvironment(manifest: InfrastructureManifest) {
     "",
     d1(manifest.database, prefix),
     "",
-    r2(manifest.avatarBucket, prefix),
+    r2(manifest.avatarBucket, "AVATAR_BUCKET", prefix),
+    "",
+    r2(manifest.photoDiaryBucket, "PHOTO_DIARY_BUCKET", prefix),
+    "",
+    images(prefix),
     "",
     vectorize(env, prefix),
     "",
     `[env.${env}.vars]`,
     `ENVIRONMENT = "${env}"`,
     'AVATAR_CLEANUP_MODE = "dry-run"',
+    'PHOTO_DIARY_STORAGE_ENABLED = "false"',
   ].join("\n");
 }
 
@@ -125,6 +151,8 @@ function apiEnvironment(manifest: InfrastructureManifest) {
     "",
     queueProducer(prefix, manifest.queues.webhook.name, "WEBHOOK_QUEUE"),
     "",
+    queueProducer(prefix, manifest.queues.photoDiaryDeletion.name, "PHOTO_DIARY_DELETION_QUEUE"),
+    "",
     queueProducer(prefix, manifest.queues.billing.name, "BILLING_QUEUE"),
     "",
     queueProducer(prefix, manifest.queues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
@@ -137,7 +165,9 @@ function apiEnvironment(manifest: InfrastructureManifest) {
   if (env !== "production") config.push("", vectorize(env, prefix));
   config.push(
     "",
-    r2(manifest.avatarBucket, prefix),
+    r2(manifest.avatarBucket, "AVATAR_BUCKET", prefix),
+    "",
+    r2(manifest.photoDiaryBucket, "PHOTO_DIARY_BUCKET", prefix),
     "",
     durableObject(prefix, "ACCOUNT_DATA", `me-builder-worker-${env}`),
     "",
@@ -166,6 +196,11 @@ export function renderWranglerConfigs(
   const localQueues = {
     webhook: { id: "local", name: "me-builder-webhook-queue-local" },
     webhookDeadLetter: { id: "local", name: "me-builder-webhook-dlq-local" },
+    photoDiaryDeletion: { id: "local", name: "me-builder-photo-diary-deletion-queue-local" },
+    photoDiaryDeletionDeadLetter: {
+      id: "local",
+      name: "me-builder-photo-diary-deletion-dlq-local",
+    },
     billing: { id: "local", name: "me-builder-billing-queue-local" },
     billingDeadLetter: { id: "local", name: "me-builder-billing-dlq-local" },
     chatTurn: { id: "local", name: "me-builder-chat-turn-queue-local" },
@@ -185,6 +220,7 @@ export function renderWranglerConfigs(
     baseDomain: "localhost",
     database: localDatabase,
     avatarBucket: { name: "me-builder-avatar-local" },
+    photoDiaryBucket: { name: "me-builder-photo-diary-local" },
     sessionStore: { id: "me-builder-session-local-id", name: "me-builder-session-local" },
     queues: localQueues,
   };
@@ -204,7 +240,15 @@ export function renderWranglerConfigs(
     "[triggers]",
     'crons = ["0 9,11,12 * * *"]',
     "",
-    queueConsumer("", localQueues.webhook.name, localQueues.webhookDeadLetter.name, 3),
+    queueConsumer("", localQueues.webhook.name, localQueues.webhookDeadLetter.name, 6),
+    "",
+    queueConsumer(
+      "",
+      localQueues.photoDiaryDeletion.name,
+      localQueues.photoDiaryDeletionDeadLetter.name,
+      47,
+      1_800,
+    ),
     "",
     queueConsumer("", localQueues.billing.name, localQueues.billingDeadLetter.name, 5),
     "",
@@ -229,6 +273,8 @@ export function renderWranglerConfigs(
     queueConsumer("", localQueues.dailyPrompt.name, localQueues.dailyPromptDeadLetter.name, 5),
     "",
     queueProducer("", localQueues.chatTurn.name, "CHAT_TURN_QUEUE"),
+    "",
+    queueProducer("", localQueues.photoDiaryDeletion.name, "PHOTO_DIARY_DELETION_QUEUE"),
     "",
     queueProducer("", localQueues.brainCheckpoint.name, "BRAIN_CHECKPOINT_QUEUE"),
     "",
@@ -263,13 +309,18 @@ export function renderWranglerConfigs(
     "",
     d1(localDatabase),
     "",
-    r2(localManifest.avatarBucket),
+    r2(localManifest.avatarBucket, "AVATAR_BUCKET"),
+    "",
+    r2(localManifest.photoDiaryBucket, "PHOTO_DIARY_BUCKET"),
+    "",
+    images(),
     "",
     vectorize("local"),
     "",
     "[vars]",
     'ENVIRONMENT = "local"',
     'AVATAR_CLEANUP_MODE = "dry-run"',
+    'PHOTO_DIARY_STORAGE_ENABLED = "false"',
     "",
     workerEnvironment(localManifest),
     "",
@@ -285,6 +336,8 @@ export function renderWranglerConfigs(
     "",
     queueProducer("env.local.", localQueues.webhook.name, "WEBHOOK_QUEUE"),
     "",
+    queueProducer("env.local.", localQueues.photoDiaryDeletion.name, "PHOTO_DIARY_DELETION_QUEUE"),
+    "",
     queueProducer("env.local.", localQueues.billing.name, "BILLING_QUEUE"),
     "",
     queueProducer("env.local.", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
@@ -297,7 +350,9 @@ export function renderWranglerConfigs(
     "",
     vectorize("local", "env.local."),
     "",
-    r2(localManifest.avatarBucket, "env.local."),
+    r2(localManifest.avatarBucket, "AVATAR_BUCKET", "env.local."),
+    "",
+    r2(localManifest.photoDiaryBucket, "PHOTO_DIARY_BUCKET", "env.local."),
     "",
     durableObject("env.local.", "ACCOUNT_DATA", "me-builder-worker-local"),
     "",
@@ -310,6 +365,7 @@ export function renderWranglerConfigs(
     'WEB_ORIGIN = "http://localhost:5173"',
     'SSO_ROLLOUT_MODE = "disabled"',
     'SSO_ROLLOUT_PERCENT = "0"',
+    'PHOTO_DIARY_STORAGE_ENABLED = "false"',
   ].join("\n");
   const api = [
     header,
@@ -326,6 +382,8 @@ export function renderWranglerConfigs(
     "",
     queueProducer("", localQueues.webhook.name, "WEBHOOK_QUEUE"),
     "",
+    queueProducer("", localQueues.photoDiaryDeletion.name, "PHOTO_DIARY_DELETION_QUEUE"),
+    "",
     queueProducer("", localQueues.billing.name, "BILLING_QUEUE"),
     "",
     queueProducer("", localQueues.profileSummary.name, "PROFILE_SUMMARY_QUEUE"),
@@ -338,7 +396,9 @@ export function renderWranglerConfigs(
     "",
     vectorize("local"),
     "",
-    r2(localManifest.avatarBucket),
+    r2(localManifest.avatarBucket, "AVATAR_BUCKET"),
+    "",
+    r2(localManifest.photoDiaryBucket, "PHOTO_DIARY_BUCKET"),
     "",
     durableObject("", "ACCOUNT_DATA", "me-builder-worker-local"),
     "",
@@ -351,6 +411,7 @@ export function renderWranglerConfigs(
     'WEB_ORIGIN = "http://localhost:5173"',
     'SSO_ROLLOUT_MODE = "disabled"',
     'SSO_ROLLOUT_PERCENT = "0"',
+    'PHOTO_DIARY_STORAGE_ENABLED = "false"',
     "",
     apiLocal,
     "",

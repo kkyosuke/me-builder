@@ -32,6 +32,7 @@ export async function postLineWebhook(c: Context<AppEnv>): Promise<Response> {
     channelSecret: currentConfig.lineChannelSecret,
     queue: currentConfig.webhookQueue,
     environment: currentConfig.environment,
+    photoDiaryStorageEnabled: currentConfig.photoDiaryStorageEnabled,
     startChatLoading: lineClient
       ? (chatId) => lineClient.showLoadingAnimation({ chatId, loadingSeconds: 60 })
       : undefined,

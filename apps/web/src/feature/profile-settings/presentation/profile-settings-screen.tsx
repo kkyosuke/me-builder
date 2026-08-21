@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CreditCard,
   FileText,
+  Images,
   Moon,
   Plug,
   RefreshCw,
@@ -61,6 +62,7 @@ export function ProfileSettingsScreen({
   onOpenAdmin,
   onOpenMcp,
   onOpenAvatar,
+  onOpenPhotoDiary = () => undefined,
   onOpenBillingPortal,
   onOpenBillingPlans,
   onOpenPersonalData,
@@ -82,7 +84,7 @@ export function ProfileSettingsScreen({
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
   isInactive?: boolean;
-  inactiveFocusTarget?: "avatar" | "brain-items" | "billing" | "mcp";
+  inactiveFocusTarget?: "avatar" | "brain-items" | "billing" | "mcp" | "photos";
   isProfileLoading?: boolean;
   profileError?: string | null;
   entitlement?: AsyncState<ProfileEntitlement>;
@@ -93,6 +95,7 @@ export function ProfileSettingsScreen({
   onOpenAdmin?: () => void;
   onOpenMcp?: () => void;
   onOpenAvatar: () => void;
+  onOpenPhotoDiary?: () => void;
   onOpenBillingPortal?: () => Promise<void>;
   onOpenBillingPlans?: () => void;
   onOpenPersonalData?: () => void;
@@ -114,6 +117,7 @@ export function ProfileSettingsScreen({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
+  const photoDiaryButtonRef = useRef<HTMLButtonElement>(null);
   const brainItemsLinkRef = useRef<HTMLAnchorElement>(null);
   const billingPlansButtonRef = useRef<HTMLButtonElement>(null);
   const mcpLinkRef = useRef<HTMLAnchorElement>(null);
@@ -186,7 +190,9 @@ export function ProfileSettingsScreen({
     }
 
     if (wasInactiveRef.current) {
-      if (inactiveFocusTargetRef.current === "mcp") {
+      if (inactiveFocusTargetRef.current === "photos") {
+        photoDiaryButtonRef.current?.focus();
+      } else if (inactiveFocusTargetRef.current === "mcp") {
         mcpLinkRef.current?.focus();
       } else if (inactiveFocusTargetRef.current === "billing") {
         billingPlansButtonRef.current?.focus();
@@ -396,6 +402,32 @@ export function ProfileSettingsScreen({
             )}
           </section>
         )}
+
+        <section aria-labelledby="photo-diary-setting-heading" className="mt-6">
+          <h2
+            id="photo-diary-setting-heading"
+            className="px-1 text-sm font-bold tracking-wider text-slate-500 dark:text-slate-400"
+          >
+            日記データ
+          </h2>
+          <button
+            ref={photoDiaryButtonRef}
+            type="button"
+            onClick={onOpenPhotoDiary}
+            className="mt-3 flex min-h-16 w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200">
+              <Images className="size-5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold text-slate-950 dark:text-white">写真日記</span>
+              <span className="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                LINEで保存した写真の閲覧と削除
+              </span>
+            </span>
+            <ChevronRight className="size-5 text-slate-400" aria-hidden="true" />
+          </button>
+        </section>
 
         <section aria-labelledby="avatar-setting-heading" className="mt-6">
           <h2

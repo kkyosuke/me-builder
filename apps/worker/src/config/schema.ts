@@ -26,6 +26,7 @@ export const WorkerConfigSchema = v.object({
   stripeSecretKey: v.optional(v.string()),
   billingPricePlanMap: v.optional(v.record(v.string(), v.picklist(["lite", "full", "family"])), {}),
   avatarCleanupMode: v.optional(v.picklist(["dry-run", "delete"]), "dry-run"),
+  photoDiaryStorageEnabled: v.optional(v.boolean(), false),
 });
 
 export type WorkerConfig = v.InferOutput<typeof WorkerConfigSchema>;

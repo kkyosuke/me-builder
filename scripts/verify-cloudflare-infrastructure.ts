@@ -31,7 +31,7 @@ export async function verifyCloudflareInfrastructure(
     ),
     cloudflareRequest<{ buckets?: { name?: string }[] }>(
       fetcher,
-      `${endpoint}/r2/buckets?per_page=1000&name_contains=${encodeURIComponent(expected.avatarBucket)}`,
+      `${endpoint}/r2/buckets?per_page=1000`,
       headers,
     ),
     cloudflareRequest<{ id: string; title: string }[]>(
@@ -62,6 +62,10 @@ export async function verifyCloudflareInfrastructure(
     `R2 bucket is missing: ${expected.avatarBucket}`,
   );
   assert(
+    buckets.buckets?.some(({ name }) => name === expected.photoDiaryBucket),
+    `R2 bucket is missing: ${expected.photoDiaryBucket}`,
+  );
+  assert(
     namespaces.some(({ title }) => title === expected.sessionStore),
     `KV namespace is missing: ${expected.sessionStore}`,
   );
@@ -88,7 +92,7 @@ export async function verifyCloudflareInfrastructure(
   return {
     checks: [
       "d1-manifest-id",
-      "private-r2-bucket",
+      "private-r2-buckets",
       "session-kv",
       "queue-set",
       "vectorize-schema",

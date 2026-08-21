@@ -5,6 +5,7 @@ import type {
   ChatTurnQueueMessage,
   DailyPromptQueueMessage,
   DiaryBrainCheckpointQueueMessage,
+  PhotoDiaryDeletionQueueMessage,
   ReflectionGenerationQueueMessage,
 } from "@me-builder/shared";
 
@@ -23,10 +24,18 @@ export type Env = Omit<
   | "ENVIRONMENT"
   | "AVATAR_BUCKET"
   | "AVATAR_CLEANUP_MODE"
+  | "PHOTO_DIARY_BUCKET"
+  | "IMAGES"
+  | "PHOTO_DIARY_STORAGE_ENABLED"
+  | "PHOTO_DIARY_DELETION_QUEUE"
 > & {
   ENVIRONMENT?: string;
   AVATAR_BUCKET?: WorkerBindings["AVATAR_BUCKET"];
   AVATAR_CLEANUP_MODE?: "dry-run" | "delete";
+  PHOTO_DIARY_BUCKET?: WorkerBindings["PHOTO_DIARY_BUCKET"];
+  IMAGES?: WorkerBindings["IMAGES"];
+  PHOTO_DIARY_STORAGE_ENABLED?: string;
+  PHOTO_DIARY_DELETION_QUEUE?: Queue<PhotoDiaryDeletionQueueMessage>;
   BASE_DOMAIN?: string;
   BASE_URL?: string;
   API_URL?: string;

@@ -9,6 +9,7 @@ import {
   type FlowKey,
   type Message,
   type MessageBatch,
+  type PhotoDiaryDeletionQueueMessage,
   type ProfileSummaryGenerationQueueMessage,
   type WebhookQueueMessage,
   type WeeklyReflectionGenerationQueueMessage,
@@ -26,6 +27,7 @@ import {
   DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
   processDiaryBrainCheckpointMessage,
 } from "../handler/diary-brain-checkpoint";
+import { processPhotoDiaryDeletionMessage } from "../handler/photo-diary-deletion";
 import {
   PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
   processProfileSummaryGenerationMessage,
@@ -36,8 +38,9 @@ import {
 } from "../handler/weekly-reflection-generation";
 import { processLineWebhook } from "./feature/line";
 
-/** max_retries = 3では初回と3回の再試行を合わせて4 attemptsになる。 */
-const WEBHOOK_QUEUE_MAX_ATTEMPTS = 4;
+/** 写真取得を含むため、約1時間内に初回と6回の配送機会を持つ。 */
+export const WEBHOOK_QUEUE_MAX_ATTEMPTS = 7;
+const WEBHOOK_RETRY_DELAYS_SECONDS = [10, 30, 120, 300, 900, 1_800] as const;
 
 /**
  * 初回配送を含む最大試行回数。wrangler.tomlのmax_retriesと揃える。
@@ -51,6 +54,7 @@ const MAX_ATTEMPTS_BY_FLOW: Record<FlowKey, number | undefined> = {
   "profile-summary-generation": PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
   "weekly-reflection-generation": WEEKLY_REFLECTION_MAX_ATTEMPTS,
   "daily-prompt": DAILY_PROMPT_MAX_ATTEMPTS,
+  "photo-diary-deletion": 48,
   billing: BILLING_QUEUE_MAX_ATTEMPTS,
   "queue-dispatch": undefined,
 };
@@ -65,7 +69,8 @@ function flowOf(
     | ProfileSummaryGenerationQueueMessage
     | WeeklyReflectionGenerationQueueMessage
     | DailyPromptQueueMessage
-    | BillingQueueMessage,
+    | BillingQueueMessage
+    | PhotoDiaryDeletionQueueMessage,
 ): FlowKey {
   if (!("type" in body)) return "line-webhook";
   if (body.type === "chat-turn") return "chat-turn";
@@ -74,6 +79,7 @@ function flowOf(
   if (body.type === "profile-summary-generation") return "profile-summary-generation";
   if (body.type === "weekly-reflection-generation") return "weekly-reflection-generation";
   if (body.type === "daily-prompt") return "daily-prompt";
+  if (body.type === "photo-diary-deletion") return "photo-diary-deletion";
   if (body.type === "billing-event") return "billing";
   return "queue-dispatch";
 }
@@ -87,7 +93,9 @@ async function processWebhookMessage(
 ): Promise<void> {
   const startedAt = Date.now();
   const traceId = message.body.traceId ?? message.body.id ?? message.id;
-  const messageCount = line.webhook.extractMessages(message.body.payload).length;
+  const messageCount = line.webhook
+    .parseEvents(message.body.payload)
+    .filter(({ type }) => type === "message").length;
   try {
     const result =
       message.body.source === "line"
@@ -99,6 +107,8 @@ async function processWebhookMessage(
             cf?.do.accountData,
             message.body.routing,
             traceId,
+            cf,
+            message.attempts >= WEBHOOK_QUEUE_MAX_ATTEMPTS,
           )
         : {
             outcome: "discarded" as const,
@@ -152,8 +162,14 @@ async function processWebhookMessage(
         ? "dead-letter"
         : "retry"
       : "ack";
-    if (safeError.retryable) message.retry();
-    else message.ack();
+    if (safeError.retryable) {
+      message.retry({
+        delaySeconds:
+          WEBHOOK_RETRY_DELAYS_SECONDS[
+            Math.min(message.attempts - 1, WEBHOOK_RETRY_DELAYS_SECONDS.length - 1)
+          ] ?? 1_800,
+      });
+    } else message.ack();
     const durationMs = Date.now() - startedAt;
     logger.error(
       {
@@ -196,6 +212,7 @@ export async function handleQueueBatch(
     | WeeklyReflectionGenerationQueueMessage
     | DailyPromptQueueMessage
     | BillingQueueMessage
+    | PhotoDiaryDeletionQueueMessage
   >,
   db: D1.shared.Client,
   workerConfig?: WorkerConfig,
@@ -259,6 +276,12 @@ export async function handleQueueBatch(
           db,
           workerConfig,
           cf?.do.accountData,
+        );
+      } else if ("type" in message.body && message.body.type === "photo-diary-deletion") {
+        if (!cf) throw new Error("Photo diary bindings are not configured");
+        await processPhotoDiaryDeletionMessage(
+          message as Message<PhotoDiaryDeletionQueueMessage>,
+          cf,
         );
       } else {
         await processWebhookMessage(

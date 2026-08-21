@@ -27,6 +27,7 @@ type Params = Readonly<{
   conversationCoordinator: ConversationCoordinatorNamespace;
   billingProvider?: billing.BillingProvider;
   deleteAvatarObject: (objectKey: string) => Promise<void>;
+  deletePhotoObjects: (objectKeys: readonly string[]) => Promise<void>;
   now?: Date;
 }>;
 
@@ -36,6 +37,10 @@ type Dependencies = Readonly<{
     namespace: AccountDataNamespace,
     accountId: string,
   ) => Promise<AccountDataResult<"compatibility.listVisibleReferences">>;
+  listPhotoObjectKeys: (
+    namespace: AccountDataNamespace,
+    accountId: string,
+  ) => Promise<AccountDataResult<"photoDiary.listObjectKeys">>;
   cancelCompatibility: typeof cancelCompatibilityInvitationWithReference;
   endCompatibility: typeof endCompatibilityRelationshipWithReferences;
   leaveFamily: typeof D1.shared.action.familySeat.leaveFamilySeat;
@@ -58,6 +63,8 @@ const defaultDependencies: Dependencies = {
   findBillingCustomer: D1.shared.action.billing.findBillingCustomerByAccount,
   listCompatibilityReferences: (namespace, accountId) =>
     accountDataFor(namespace, accountId).execute("compatibility.listVisibleReferences"),
+  listPhotoObjectKeys: (namespace, accountId) =>
+    accountDataFor(namespace, accountId).execute("photoDiary.listObjectKeys"),
   cancelCompatibility: cancelCompatibilityInvitationWithReference,
   endCompatibility: endCompatibilityRelationshipWithReferences,
   leaveFamily: D1.shared.action.familySeat.leaveFamilySeat,
@@ -128,7 +135,10 @@ export async function deleteOwnAccount(
   await dependencies.leaveFamily(params.db, accountId, now);
   await dependencies.endFamily(params.db, accountId, now);
   const avatar = await dependencies.getAvatar(params.db, accountId);
+  const photoObjectKeys = await dependencies.listPhotoObjectKeys(params.accountData, accountId);
   const resetEpoch = await dependencies.resetCoordinator(params.conversationCoordinator, accountId);
+  // 写真object keyはAccountDataにだけ保持する。先にR2を消して、失敗時に再試行可能にする。
+  await params.deletePhotoObjects(photoObjectKeys);
   const deletedContent = await dependencies.deleteAccountData(
     params.accountData,
     accountId,

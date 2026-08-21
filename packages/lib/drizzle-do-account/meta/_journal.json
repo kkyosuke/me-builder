@@ -239,6 +239,20 @@
       "when": 1787052347482,
       "tag": "0033_cloudy_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1787347434457,
+      "tag": "0034_bent_bruce_banner",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1787349232857,
+      "tag": "0035_shiny_kinsey_walden",
+      "breakpoints": true
     }
   ]
 }

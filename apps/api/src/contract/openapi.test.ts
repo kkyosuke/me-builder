@@ -29,6 +29,7 @@ const BODYLESS_RESPONSE_FIXTURES = new Set([
 
 const NON_JSON_RESPONSE_FIXTURES = new Map([
   ["get /api/profile/avatar 200", ["image/jpeg", "image/png", "image/webp"]],
+  ["get /api/diary/photos/{mediaId}/{variant} 200", ["image/jpeg", "image/png", "image/webp"]],
   [
     "get /api/compatibility/invitations/{relationshipId}/avatar 200",
     ["image/jpeg", "image/png", "image/webp"],

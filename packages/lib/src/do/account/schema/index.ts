@@ -7,6 +7,7 @@ export * from "./identity";
 export * from "./goal-follow-up";
 export * from "./self-care-context";
 export * from "./personal-data-export";
+export * from "./photo-diary";
 export * from "./profile-summary";
 export * from "./weekly-reflection";
 export * from "./progression";

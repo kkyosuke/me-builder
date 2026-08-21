@@ -177,6 +177,10 @@ describe("AccountData alarm", () => {
       DO.account.action.weeklyReflection,
       "listUndispatchedWeeklyReflectionGenerationIds",
     ).mockResolvedValue([]);
+    vi.spyOn(
+      DO.account.action.photoDiary,
+      "listUndispatchedPhotoDiaryDeletionIds",
+    ).mockResolvedValue([]);
     vi.spyOn(meBuilderLib, "expireAiUsageReservations").mockResolvedValue(0);
   });
 
@@ -196,6 +200,12 @@ describe("AccountData alarm", () => {
     vi.mocked(
       DO.account.action.weeklyReflection.listUndispatchedWeeklyReflectionGenerationIds,
     ).mockResolvedValue(["weekly-generation-1"]);
+    vi.mocked(DO.account.action.photoDiary.listUndispatchedPhotoDiaryDeletionIds).mockResolvedValue(
+      ["photo-1"],
+    );
+    const markPhotoDeletionEnqueued = vi
+      .spyOn(DO.account.action.photoDiary, "markPhotoDiaryDeletionEnqueued")
+      .mockResolvedValue(true);
     vi.spyOn(DO.account.action.diary, "closeExpiredSessions").mockResolvedValue(0);
     vi.spyOn(
       DO.account.action.diagnosisBrainProjection,
@@ -222,7 +232,10 @@ describe("AccountData alarm", () => {
       operationTail: Promise.resolve(),
       repository: { client: {}, nextMaintenanceAt: () => null },
       ctx: { storage: { get: vi.fn().mockResolvedValue(false) } },
-      env: { PROFILE_SUMMARY_QUEUE: { send } },
+      env: {
+        PROFILE_SUMMARY_QUEUE: { send },
+        PHOTO_DIARY_DELETION_QUEUE: { send },
+      },
     });
 
     await expect(instance.alarm()).resolves.toBeUndefined();
@@ -238,6 +251,12 @@ describe("AccountData alarm", () => {
     });
     expect(markDispatched).toHaveBeenCalledWith({}, "account-1", "generation-1");
     expect(markWeeklyDispatched).toHaveBeenCalledWith({}, "account-1", "weekly-generation-1");
+    expect(send).toHaveBeenCalledWith({
+      type: "photo-diary-deletion",
+      accountId: "account-1",
+      mediaId: "photo-1",
+    });
+    expect(markPhotoDeletionEnqueued).toHaveBeenCalledWith({}, "account-1", "photo-1");
   });
 
   it("Queue投入失敗時も永続状態から次のalarmを明示的に設定する", async () => {

@@ -48,6 +48,7 @@ import {
   loadMainApplication,
   loadMcpManagementScreen,
   loadPersonalDataApplication,
+  loadPhotoDiaryScreen,
   loadProfileApplication,
   loadProfileSettingsScreen,
   preloadAvatarSettingsScreen,
@@ -67,6 +68,7 @@ const FamilySeatApplication = lazy(loadFamilySeatApplication);
 const BillingPlanApplication = lazy(loadBillingPlanApplication);
 const DevelopmentBrainItemsApplication = lazy(loadDevelopmentBrainItemsApplication);
 const McpManagementScreen = lazy(loadMcpManagementScreen);
+const PhotoDiaryScreen = lazy(loadPhotoDiaryScreen);
 
 type ProfileView =
   | "closed"
@@ -76,7 +78,8 @@ type ProfileView =
   | "brain-items"
   | "family"
   | "billing"
-  | "mcp";
+  | "mcp"
+  | "photos";
 type MainRoute = "compatibility" | "diagnosis" | "me";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
@@ -85,6 +88,7 @@ const PROFILE_HISTORY_STATE_KEY = "me-builder-profile-view";
 const PROFILE_RETURN_PATHNAME_STATE_KEY = "me-builder-profile-return-pathname";
 
 function resolveProfileView(pathname: string): ProfileView {
+  if (pathname.startsWith("/profile/photos")) return "photos";
   if (pathname.startsWith("/profile/mcp")) return "mcp";
   if (pathname.startsWith("/profile/billing")) return "billing";
   if (pathname.startsWith("/profile/family")) return "family";
@@ -108,7 +112,8 @@ function historyProfileView(state: unknown): Exclude<ProfileView, "closed"> | nu
     value === "brain-items" ||
     value === "family" ||
     value === "billing" ||
-    value === "mcp"
+    value === "mcp" ||
+    value === "photos"
     ? value
     : null;
 }
@@ -430,6 +435,11 @@ function AppContents() {
     setNavigation((current) => ({ ...current, profileView: "avatar" }));
   };
 
+  const openPhotoDiary = () => {
+    window.history.pushState({ [PROFILE_HISTORY_STATE_KEY]: "photos" }, "", "/profile/photos");
+    setNavigation((current) => ({ ...current, profileView: "photos" }));
+  };
+
   const openBrainItems = () => {
     window.history.pushState(
       { [PROFILE_HISTORY_STATE_KEY]: "brain-items" },
@@ -470,6 +480,16 @@ function AppContents() {
       return;
     }
 
+    window.history.replaceState({}, "", "/profile");
+    setNavigation((current) => ({ ...current, profileView: "profile" }));
+  };
+
+  const closePhotoDiary = () => {
+    if (historyProfileView(window.history.state) === "photos") {
+      setNavigation((current) => ({ ...current, profileView: "profile" }));
+      window.history.back();
+      return;
+    }
     window.history.replaceState({}, "", "/profile");
     setNavigation((current) => ({ ...current, profileView: "profile" }));
   };
@@ -635,13 +655,15 @@ function AppContents() {
               }
               isInactive={profileView !== "profile"}
               inactiveFocusTarget={
-                profileView === "mcp"
-                  ? "mcp"
-                  : profileView === "billing"
-                    ? "billing"
-                    : profileView === "brain-items"
-                      ? "brain-items"
-                      : "avatar"
+                profileView === "photos"
+                  ? "photos"
+                  : profileView === "mcp"
+                    ? "mcp"
+                    : profileView === "billing"
+                      ? "billing"
+                      : profileView === "brain-items"
+                        ? "brain-items"
+                        : "avatar"
               }
               isProfileLoading={profileReadState.status === "loading"}
               profileError={profileReadState.status === "error" ? profileReadState.message : null}
@@ -653,6 +675,7 @@ function AppContents() {
               onOpenAdmin={openAdmin}
               onOpenMcp={openMcp}
               onOpenAvatar={openAvatar}
+              onOpenPhotoDiary={openPhotoDiary}
               onOpenBillingPortal={openBillingPortal}
               {...(DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")
                 ? {
@@ -695,6 +718,15 @@ function AppContents() {
               onBack={closeAvatar}
               onSave={saveAvatar}
             />
+          </Suspense>
+        </RouteErrorBoundary>
+      )}
+      {profileView === "photos" && (
+        <RouteErrorBoundary>
+          <Suspense
+            fallback={<LoadingState message="写真日記を読み込んでいます..." variant="overlay" />}
+          >
+            <PhotoDiaryScreen onBack={closePhotoDiary} />
           </Suspense>
         </RouteErrorBoundary>
       )}

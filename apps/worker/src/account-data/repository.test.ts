@@ -1,4 +1,8 @@
-import { DO, PROFILE_SUMMARY_DISPATCH_RECOVERY_MS } from "@me-builder/lib";
+import {
+  DO,
+  PHOTO_DIARY_DELETION_DISPATCH_RECOVERY_MS,
+  PROFILE_SUMMARY_DISPATCH_RECOVERY_MS,
+} from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
@@ -173,6 +177,54 @@ describe("AccountDataRepository", () => {
       repository.client,
       "account-1",
       new Date(reservedAt.getTime() + DO.account.action.aiUsage.AI_USAGE_RESERVATION_TTL_MS),
+    );
+    expect(repository.nextMaintenanceAt()).toBeNull();
+  });
+
+  it("Queue未配送の写真削除要求を30秒後のmaintenanceとして返す", async () => {
+    const repository = createRepository();
+    await repository.initialize();
+    repository.bindAccount("account-1");
+    const requestedAt = new Date("2026-08-22T01:00:00.000Z");
+    const reserved = await DO.account.action.photoDiary.reservePhotoDiaryMedia(
+      repository.client,
+      "account-1",
+      {
+        webhookEventId: "event-photo-maintenance",
+        lineMessageId: "message-photo-maintenance",
+        mimeType: "image/jpeg",
+        byteSize: 1_000,
+        thumbnailByteSize: 100,
+        storageByteSize: 1_100,
+        width: 800,
+        height: 600,
+        capturedAt: requestedAt,
+        storageLimitBytes: 2_000,
+      },
+      requestedAt,
+    );
+    if (reserved.type === "capacity-exceeded") throw new Error("fixture reservation failed");
+    await DO.account.action.photoDiary.completePhotoDiaryMedia(
+      repository.client,
+      "account-1",
+      reserved.media.id,
+      requestedAt,
+    );
+    await DO.account.action.photoDiary.markPhotoDiaryDeleting(
+      repository.client,
+      "account-1",
+      reserved.media.id,
+      requestedAt,
+    );
+
+    expect(repository.nextMaintenanceAt()).toBe(
+      requestedAt.getTime() + PHOTO_DIARY_DELETION_DISPATCH_RECOVERY_MS,
+    );
+    await DO.account.action.photoDiary.markPhotoDiaryDeletionEnqueued(
+      repository.client,
+      "account-1",
+      reserved.media.id,
+      requestedAt,
     );
     expect(repository.nextMaintenanceAt()).toBeNull();
   });

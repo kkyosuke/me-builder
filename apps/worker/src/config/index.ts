@@ -106,6 +106,7 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
     billingPricePlanMap: parseBillingPricePlanMap(getEnv("BILLING_PRICE_PLAN_MAP", env)),
     avatarCleanupMode:
       getEnv("AVATAR_CLEANUP_MODE", env)?.trim() === "delete" ? "delete" : "dry-run",
+    photoDiaryStorageEnabled: getEnv("PHOTO_DIARY_STORAGE_ENABLED", env)?.trim() === "true",
   };
 
   return v.parse(WorkerConfigSchema, rawConfig);

@@ -19,6 +19,7 @@ import type * as diagnosis from "./action/diagnosis";
 import type * as diagnosisBrainProjection from "./action/diagnosis-brain-projection";
 import type * as diary from "./action/diary";
 import type * as goalFollowUp from "./action/goal-follow-up";
+import type * as photoDiary from "./action/photo-diary";
 import type * as profileSummary from "./action/profile-summary";
 import type * as progression from "./action/progression";
 import type * as selfCareContext from "./action/self-care-context";
@@ -41,6 +42,46 @@ type DomainAction<TAction extends (...args: never[]) => unknown> = RpcAction<
 >;
 
 export type AccountDataActions = {
+  "photoDiary.reserve": RpcAction<
+    [input: photoDiary.ReservePhotoDiaryInput, at?: Date],
+    typeof photoDiary.reservePhotoDiaryMedia
+  >;
+  "photoDiary.complete": RpcAction<
+    [mediaId: string, at?: Date],
+    typeof photoDiary.completePhotoDiaryMedia
+  >;
+  "photoDiary.releaseReservation": RpcAction<
+    [mediaId: string],
+    typeof photoDiary.releasePhotoDiaryReservation
+  >;
+  "photoDiary.list": RpcAction<[limit?: number], typeof photoDiary.listPhotoDiaryMedia>;
+  "photoDiary.findByLineMessage": RpcAction<
+    [lineMessageId: string],
+    typeof photoDiary.findPhotoDiaryMediaByLineMessage
+  >;
+  "photoDiary.readStorageUsage": RpcAction<[], typeof photoDiary.readPhotoDiaryStorageUsage>;
+  "photoDiary.listObjectKeys": RpcAction<[], typeof photoDiary.listPhotoDiaryObjectKeys>;
+  "photoDiary.get": RpcAction<[mediaId: string], typeof photoDiary.getPhotoDiaryMedia>;
+  "photoDiary.markDeleting": RpcAction<
+    [mediaId: string, at?: Date],
+    typeof photoDiary.markPhotoDiaryDeleting
+  >;
+  "photoDiary.listUndispatchedDeletionIds": RpcAction<
+    [],
+    typeof photoDiary.listUndispatchedPhotoDiaryDeletionIds
+  >;
+  "photoDiary.markDeletionEnqueued": RpcAction<
+    [mediaId: string, at?: Date],
+    typeof photoDiary.markPhotoDiaryDeletionEnqueued
+  >;
+  "photoDiary.getDeleting": RpcAction<
+    [mediaId: string],
+    typeof photoDiary.getDeletingPhotoDiaryMedia
+  >;
+  "photoDiary.completeDeletion": RpcAction<
+    [mediaId: string, at?: Date],
+    typeof photoDiary.completePhotoDiaryDeletion
+  >;
   "aiUsage.reserve": RpcAction<
     [input: aiUsage.ReserveAiUsageInput, at?: Date],
     typeof aiUsage.reserveAiUsage

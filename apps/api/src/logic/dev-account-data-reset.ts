@@ -17,6 +17,7 @@ type Params = {
   actor: AuthenticatedActor;
   accountData: AccountDataNamespace;
   conversationCoordinator: ConversationCoordinatorNamespace;
+  deletePhotoObjects: (objectKeys: readonly string[]) => Promise<void>;
 };
 
 type Dependencies = {
@@ -29,6 +30,10 @@ type Dependencies = {
     accountId: string,
     resetEpoch: number,
   ) => ReturnType<typeof DO.account.action.development.deleteAllDevelopmentAccountData>;
+  listPhotoObjectKeys: (
+    namespace: AccountDataNamespace,
+    accountId: string,
+  ) => Promise<readonly string[]>;
 };
 
 const defaultDependencies: Dependencies = {
@@ -36,6 +41,8 @@ const defaultDependencies: Dependencies = {
     conversationCoordinatorFor(namespace, accountId).resetAccountData(accountId),
   deleteAccountData: (namespace, accountId, resetEpoch) =>
     accountDataFor(namespace, accountId).execute("development.deleteAllAccountData", resetEpoch),
+  listPhotoObjectKeys: (namespace, accountId) =>
+    accountDataFor(namespace, accountId).execute("photoDiary.listObjectKeys"),
 };
 
 /** 本人確認後に、進行中の日記処理を止めてAccountData個人コンテンツを物理削除する。 */
@@ -44,7 +51,9 @@ export async function resetDevelopmentAccountData(
   dependencies: Dependencies = defaultDependencies,
 ): Promise<ResetDevelopmentAccountDataOutcome> {
   const accountId = params.actor.accountId;
+  const photoObjectKeys = await dependencies.listPhotoObjectKeys(params.accountData, accountId);
   const resetEpoch = await dependencies.resetCoordinator(params.conversationCoordinator, accountId);
+  await params.deletePhotoObjects(photoObjectKeys);
   const deleted = await dependencies.deleteAccountData(params.accountData, accountId, resetEpoch);
   return { type: "resolved", ...deleted };
 }

@@ -32,6 +32,8 @@ import m0030 from "./0030_fine_silk_fever.sql";
 import m0031 from "./0031_shiny_orphan.sql";
 import m0032 from "./0032_quick_mandrill.sql";
 import m0033 from "./0033_cloudy_ben_grimm.sql";
+import m0034 from "./0034_bent_bruce_banner.sql";
+import m0035 from "./0035_shiny_kinsey_walden.sql";
 import journal from "./meta/_journal.json";
 
 export default {
@@ -71,5 +73,7 @@ export default {
     m0031,
     m0032,
     m0033,
+    m0034,
+    m0035,
   },
 };

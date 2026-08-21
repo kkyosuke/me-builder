@@ -109,6 +109,7 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
         ? `https://mcp.${rawBaseDomain.replace(/^https?:\/\//, "")}/mcp`
         : undefined),
     mcpFeatureEnabled: getEnv("MCP_FEATURE_ENABLED", env)?.trim() === "true",
+    photoDiaryStorageEnabled: getEnv("PHOTO_DIARY_STORAGE_ENABLED", env)?.trim() === "true",
     adminLineUserIds,
   };
 
