@@ -17,12 +17,16 @@ const PRIVATE_ROUTES = [
   "/admin",
 ] as const;
 
+const DEFAULT_ATTEMPTS = 31;
+
 export async function verifyServiceSiteDeployment(
   input: VerificationInput,
 ): Promise<Readonly<{ checks: string[] }>> {
   const origin = secureOrigin(input.baseDomain);
   const fetcher = input.fetcher ?? fetch;
-  const attempts = input.attempts ?? 5;
+  // Cloudflare Pagesのdeployment URLよりcustom domainの切り替えが遅れる場合があるため、
+  // redirectを許可せずに最大約60秒間、新しいdeploymentの反映を待つ。
+  const attempts = input.attempts ?? DEFAULT_ATTEMPTS;
   const retryIntervalMs = input.retryIntervalMs ?? 2_000;
   const sleep =
     input.sleep ??
