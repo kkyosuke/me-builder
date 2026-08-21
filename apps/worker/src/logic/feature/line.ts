@@ -9,7 +9,7 @@ import {
 import * as v from "valibot";
 import type { CloudflareBindings, WorkerConfig } from "../../config";
 import { replyLineText } from "../../infrastructure/line-delivery";
-import { processPhotoDiaryImage } from "../photo-diary";
+import { notifyPhotoDiaryUnavailable, processPhotoDiaryImage } from "../photo-diary";
 
 export const classifyLineText = line.text.classify;
 
@@ -188,6 +188,12 @@ export async function processLineWebhook(
     }
     if (isLineImageMessage) {
       if (!workerConfig.photoDiaryStorageEnabled) {
+        await notifyPhotoDiaryUnavailable(
+          workerConfig,
+          resolved.account.id,
+          providerAccountId,
+          event.message.id,
+        );
         result = mergeResult(result, {
           outcome: "discarded",
           stage: "photo.feature-gate",

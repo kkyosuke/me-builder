@@ -20,6 +20,8 @@ const PHOTO_INVALID_REPLY =
 const PHOTO_CAPACITY_REPLY =
   "写真の保存容量がいっぱいです。Webの写真日記から不要な写真を削除するか、Planを変更してから送り直してね。";
 const PHOTO_FAILED_REPLY = "写真を保存できませんでした。時間をおいて、写真をもう一度送ってね。";
+const PHOTO_UNAVAILABLE_REPLY =
+  "写真日記はまだ準備中です。いまは写真を保存していないので、日記はテキストで送ってね。";
 
 type LineImageEvent = Readonly<{
   webhookEventId?: string;
@@ -186,6 +188,16 @@ async function notify(
     texts: [text],
     retryKey,
   });
+}
+
+/** 保存flagが無効な環境ではcontentへ触れず、同じmessageへ一度だけ固定案内を送る。 */
+export async function notifyPhotoDiaryUnavailable(
+  config: WorkerConfig,
+  accountId: string,
+  to: string,
+  messageId: string,
+): Promise<void> {
+  await notify(config, accountId, to, messageId, PHOTO_UNAVAILABLE_REPLY);
 }
 
 export type PhotoDiaryProcessingResult = "stored" | "duplicate" | "invalid" | "capacity-exceeded";
