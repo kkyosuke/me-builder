@@ -19,7 +19,8 @@ pre-push:
           exit 1
         fi
     typecheck:
-      run: bun run typecheck
+      glob: "*.{js,jsx,ts,tsx,mjs,mts,cjs,cts}"
+      run: bun run typecheck:pre-push -- "{push_files}"
     test:
       glob: "*.{js,jsx,ts,tsx,mjs,mts,cjs,cts,sql}"
       run: bun run test:pre-push -- "{push_files}"
