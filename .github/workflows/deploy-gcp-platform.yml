@@ -1,0 +1,158 @@
+name: Deploy / GCP Platform
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Pulumi Stack
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+      operation:
+        description: Pulumi operation
+        required: true
+        type: choice
+        options:
+          - preview
+          - apply
+      confirmation:
+        description: '"preview-development"など、操作と対象をハイフンでつないで入力'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+# Stack単位で直列化し、開始済みのGCP更新は中断しない。
+concurrency:
+  group: gcp-platform-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: ${{ inputs.operation }} GCP platform (${{ inputs.target }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target == 'development' && 'infra-dev' || 'infra-prd' }}
+    env:
+      TARGET: ${{ inputs.target }}
+      OPERATION: ${{ inputs.operation }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      REF_NAME: ${{ github.ref_name }}
+      REF_TYPE: ${{ github.ref_type }}
+      GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
+      GCP_PLATFORM_PROJECT_ID: ${{ vars.GCP_PLATFORM_PROJECT_ID }}
+      GCP_PLATFORM_PROJECT_NAME: ${{ vars.GCP_PLATFORM_PROJECT_NAME }}
+      GCP_BILLING_ACCOUNT: ${{ vars.GCP_BILLING_ACCOUNT }}
+      GCP_ORGANIZATION_ID: ${{ vars.GCP_ORGANIZATION_ID }}
+      GCP_FOLDER_ID: ${{ vars.GCP_FOLDER_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Environment承認後、外部状態へ接続する前に対象と全設定を検証する。
+      - name: Validate Deployment Request
+        run: |
+          expected_confirmation="${OPERATION}-${TARGET}"
+          if [ "${CONFIRMATION}" != "${expected_confirmation}" ]; then
+            echo "::error::確認文字列は ${expected_confirmation} である必要があります。"
+            exit 1
+          fi
+          if [ "${REF_TYPE}" != "branch" ] || [ "${REF_NAME}" != "main" ]; then
+            echo "::error::GCP platform操作はmainブランチからだけ実行できます。"
+            exit 1
+          fi
+
+          required_values=(
+            GCP_STATE_PROJECT_ID
+            GCP_PLATFORM_PROJECT_ID
+            GCP_BILLING_ACCOUNT
+            GCP_WORKLOAD_IDENTITY_PROVIDER
+            PULUMI_CONFIG_PASSPHRASE
+          )
+          for value_name in "${required_values[@]}"; do
+            value="${!value_name}"
+            if [ -z "${value//[[:space:]]/}" ]; then
+              echo "::error::${value_name} が対象のGitHub Environmentに設定されていません。"
+              exit 1
+            fi
+          done
+
+          if { [ -n "${GCP_ORGANIZATION_ID}" ] && [ -n "${GCP_FOLDER_ID}" ]; } ||
+            { [ -z "${GCP_ORGANIZATION_ID}" ] && [ -z "${GCP_FOLDER_ID}" ]; }; then
+            echo "::error::GCP_ORGANIZATION_IDまたはGCP_FOLDER_IDのどちらか一方だけを設定してください。"
+            exit 1
+          fi
+          if { [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ] && [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; } ||
+            { [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ] && [ -n "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; }; then
+            echo "::error::GOOGLE_OAUTH_CLIENT_IDとGOOGLE_OAUTH_CLIENT_SECRETは両方設定するか、両方未設定にしてください。"
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-bun-workspace
+
+      - uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.GCP_STATE_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Install Pulumi CLI
+        run: |
+          installer="${RUNNER_TEMP}/install-pulumi.sh"
+          curl --fail --silent --show-error --location --output "${installer}" https://get.pulumi.com
+          bash "${installer}" --version 3.256.0
+          echo "${HOME}/.pulumi/bin" >> "${GITHUB_PATH}"
+
+      - name: Configure Pulumi Stack
+        run: |
+          pulumi login gs://kagami-infra/kagami/gcp-platform
+          pulumi -C infra/gcp-platform stack select "${TARGET}" --create --non-interactive
+          pulumi -C infra/gcp-platform config set environment "${TARGET}" --stack "${TARGET}"
+          pulumi -C infra/gcp-platform config set projectId "${GCP_PLATFORM_PROJECT_ID}" --stack "${TARGET}"
+          pulumi -C infra/gcp-platform config set projectName "${GCP_PLATFORM_PROJECT_NAME:-me-builder platform ${TARGET}}" --stack "${TARGET}"
+          pulumi -C infra/gcp-platform config set billingAccount "${GCP_BILLING_ACCOUNT}" --stack "${TARGET}"
+
+          if [ -n "${GCP_ORGANIZATION_ID}" ]; then
+            pulumi -C infra/gcp-platform config set organizationId "${GCP_ORGANIZATION_ID}" --stack "${TARGET}"
+          else
+            pulumi -C infra/gcp-platform config set folderId "${GCP_FOLDER_ID}" --stack "${TARGET}"
+          fi
+
+          if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ]; then
+            pulumi -C infra/gcp-platform config set googleOAuthClientId "${GOOGLE_OAUTH_CLIENT_ID}" --stack "${TARGET}"
+            pulumi -C infra/gcp-platform config set --secret googleOAuthClientSecret "${GOOGLE_OAUTH_CLIENT_SECRET}" --stack "${TARGET}"
+          fi
+
+      - name: Run Pulumi
+        run: |
+          if [ "${OPERATION}" = "preview" ]; then
+            task "infra:gcp-platform:preview:${TARGET}"
+          else
+            ALLOW_GCP_PLATFORM_UP="${TARGET}" task "infra:gcp-platform:up:${TARGET}"
+          fi
+
+      - name: Publish Deployment Summary
+        if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "### GCP platform ${OPERATION}: ${TARGET}"
+            echo
+            echo "- Project ID: \`${GCP_PLATFORM_PROJECT_ID}\`"
+            echo "- Environment: \`${TARGET}\`"
+            echo "- Operation: \`${OPERATION}\`"
+            echo "- Workflow run: [open run](${RUN_URL})"
+          } >> "${GITHUB_STEP_SUMMARY}"

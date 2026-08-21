@@ -12,51 +12,14 @@ Wrangler still deploys Worker bundles, secrets, bindings, and Durable Object mig
 - Pulumi CLI
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN` with D1, R2, Queues, and Workers Scripts edit permissions
-- an existing Google Cloud state project; the bootstrap workflow creates `gs://kagami-infra/` and its managed folders
+- an existing Google Cloud state project and manually configured `gs://kagami-infra/` bucket
 - a non-empty `PULUMI_CONFIG_PASSPHRASE`, supplied from a password manager locally and from GitHub Secrets in CI
 
 The GCP platform project additionally requires Application Default Credentials, project creation permission, Billing Account User permission, and permission to manage service accounts, IAM bindings, and API keys. See its [setup guide](./gcp-platform/README.md).
 
 ## One-time state backend bootstrap
 
-The state project is a bootstrap prerequisite and is not created or deleted by either Pulumi project in this repository. Create the bucket and managed folders once with the manual [`Setup / Pulumi State Backend`](../.github/workflows/setup-pulumi-state.yml) workflow. The workflow is idempotent: it preserves an existing bucket, verifies its immutable location, and reconciles its mutable security, storage-class, and versioning settings.
-
-Configure these values in the approval-protected GitHub Environment `infra-dev`. This Environment is the shared approval gate for Development infrastructure operations, including Stripe test-mode synchronization; normal Preview CD continues to use `dev` without waiting for infrastructure approval.
-
-| Kind | Name | Value |
-| --- | --- | --- |
-| Variable | `GCP_STATE_PROJECT_ID` | the existing project that owns `gs://kagami-infra/` |
-| Secret | `GCP_WORKLOAD_IDENTITY_PROVIDER` | the full Workload Identity Provider resource name restricted to this repository and Environment |
-
-The workflow cannot create the identity that it uses to authenticate. Create the Workload Identity Pool/Provider and direct IAM bindings once from an existing project administrator session before the first run. These are authentication prerequisites only; the bucket and managed folders remain workflow-owned.
-
-The workflow uses Direct Workload Identity Federation and does not impersonate a service account. Repository-only trust is not sufficient because a different workflow in the same repository could request an ID token. Map the immutable repository ID and workflow reference, and restrict the Provider to the reviewed workflows on `main` with their expected Environments:
-
-```bash
-gcloud iam workload-identity-pools providers update-oidc github-actions-provider \
-  --project=gen-lang-client-0647422425 \
-  --location=global \
-  --workload-identity-pool=github-actions \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.workflow_ref=assertion.workflow_ref" \
-  --attribute-condition="assertion.repository_id=='1309307514' && assertion.ref=='refs/heads/main' && ((assertion.workflow_ref.endsWith('/.github/workflows/setup-pulumi-state.yml@refs/heads/main') && assertion.environment=='infra-dev') || (assertion.workflow_ref.endsWith('/.github/workflows/reset-preview-migrations.yml@refs/heads/main') && assertion.environment=='dev'))"
-```
-
-Grant access by the immutable repository ID rather than the reusable repository name:
-
-```text
-principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloadIdentityPools/github-actions/attribute.repository_id/1309307514
-```
-
-`principal://.../attribute.repository_id/...` is invalid: `principal://` is only for one mapped `subject`, while a mapped attribute requires `principalSet://`. Add this repository-ID principal before removing the former `attribute.repository/kkyosuke/me-builder` binding. Grant it `storage.buckets.create`, `storage.buckets.get`, `storage.buckets.update`, `storage.buckets.setIamPolicy`, `storage.managedFolders.create`, and `storage.managedFolders.get` in the state project. Prefer a bootstrap-specific custom role; if `roles/storage.admin` is granted temporarily, replace it with `roles/storage.objectAdmin` on `kagami/cloudflare/` after the first successful run. Do not create or store a service-account JSON key.
-
-After this workflow is merged to the default branch, run it from the Actions screen on `main` with confirmation `bootstrap-kagami-infra`, or use:
-
-```bash
-gh workflow run setup-pulumi-state.yml --ref main \
-  -f confirmation=bootstrap-kagami-infra
-```
-
-The workflow performs the equivalent of this initial construction procedure. Keep these commands as the break-glass manual reference; normal setup uses the workflow.
+The state project, `gs://kagami-infra/` bucket, and its managed folders are manual prerequisites. No repository workflow creates, updates, or deletes them. Run the following once from an interactive project administrator session:
 
 ```bash
 gcloud storage buckets create gs://kagami-infra \
@@ -69,6 +32,27 @@ gcloud storage managed-folders create gs://kagami-infra/kagami/cloudflare/
 gcloud storage managed-folders create gs://kagami-infra/kagami/gcp-platform/
 ```
 
+GitHub Actions uses Direct Workload Identity Federation and does not impersonate a service account. Repository-only trust is not sufficient because a different workflow in the same repository could request an ID token. Map the immutable repository ID, workflow reference, and Environment, then restrict the Provider to the reviewed workflows on `main`:
+
+```bash
+gcloud iam workload-identity-pools providers update-oidc github-actions-provider \
+  --project=gen-lang-client-0647422425 \
+  --location=global \
+  --workload-identity-pool=github-actions \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.workflow_ref=assertion.workflow_ref,attribute.environment=assertion.environment" \
+  --attribute-condition="assertion.repository_id=='1309307514' && assertion.ref=='refs/heads/main' && ((assertion.workflow_ref.endsWith('/.github/workflows/deploy-gcp-platform.yml@refs/heads/main') && assertion.environment in ['infra-dev', 'infra-prd']) || (assertion.workflow_ref.endsWith('/.github/workflows/reset-preview-migrations.yml@refs/heads/main') && assertion.environment=='dev'))"
+```
+
+Grant state access by mapped Environment so the GCP platform and Cloudflare workflows cannot cross-read each other's Pulumi state:
+
+```text
+principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloadIdentityPools/github-actions/attribute.environment/infra-dev
+principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloadIdentityPools/github-actions/attribute.environment/infra-prd
+principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloadIdentityPools/github-actions/attribute.environment/dev
+```
+
+`principal://.../attribute.environment/...` is invalid: `principal://` is only for one mapped `subject`, while a mapped attribute requires `principalSet://`. Grant `roles/storage.objectAdmin` to `infra-dev` and `infra-prd` only on `kagami/gcp-platform/`, and grant it to `dev` only on `kagami/cloudflare/`. Remove the former bucket-level `attribute.repository/kkyosuke/me-builder` binding after these bindings are verified. No GitHub Actions principal needs `storage.buckets.create`, `storage.buckets.update`, or `storage.buckets.setIamPolicy`. Do not create or store a service-account JSON key.
+
 Managed folders `kagami/cloudflare/` and `kagami/gcp-platform/` provide IAM boundaries for each state prefix.
 
 The backend URLs are fixed in each `Pulumi.yaml`; callers do not select them at runtime. A conflicting `PULUMI_BACKEND_URL` is rejected. Separate managed folders and passphrases prevent the Preview CI principal from reading, replacing, or deleting GCP application state.
@@ -77,8 +61,7 @@ No GCP service-account JSON key is required or accepted for this procedure. Keep
 
 | Operation | Required credential |
 | --- | --- |
-| state backend bootstrap workflow | GitHub OIDC / Direct Workload Identity Federation; no service account or JSON key |
-| break-glass manual bucket operation | the interactive `gcloud auth login` session |
+| one-time state backend bootstrap | the interactive `gcloud auth login` session |
 | local Pulumi state and GCP operations | ADC from `gcloud auth application-default login` |
 | Pulumi state decryption | a user-generated `PULUMI_CONFIG_PASSPHRASE`; use different values for Cloudflare and GCP |
 | Cloudflare resource operations | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` |

@@ -21,13 +21,38 @@ The development client must contain both callback URIs listed in `Pulumi.develop
 
 ## GCP deploy authentication
 
-Pulumi authenticates its infrastructure operations with Google Application Default Credentials (ADC); this is separate from the runtime API keys created by the Stack. For local setup, run `gcloud auth application-default login` with an operator that has the permissions described below. Do not create or commit a service-account JSON key for local deployment. If these Stacks are automated in CI later, use OIDC / Workload Identity Federation and short-lived credentials instead of a stored JSON key.
+The manual `Deploy / GCP Platform` GitHub Actions workflow authenticates with GitHub OIDC and Direct Workload Identity Federation. It uses short-lived credentials and does not impersonate a service account or accept a service-account JSON key. Local Pulumi operations use Google Application Default Credentials (ADC) from `gcloud auth application-default login`; this is separate from the runtime API keys created by the Stack.
 
 ## State backend and first deployment
 
 The existing state project, `gs://kagami-infra/` bucket, required bucket controls, and local ADC are defined by the parent [infrastructure state backend guide](../README.md#one-time-state-backend-bootstrap). This project uses the dedicated `kagami/gcp-platform/` managed folder and does not share a passphrase or IAM access with the Cloudflare project. The repository wrapper and Pulumi program require a non-empty `PULUMI_CONFIG_PASSPHRASE` before evaluating resources and reject any runtime backend override that differs from `Pulumi.yaml`. This prevents the OAuth Client Secret from entering local state or state encrypted with an empty passphrase.
 
 Application project IDs are globally unique. Use different values for the two Stacks and connect both to the same Billing Account used by Vertex AI. The projects must belong to an organization, directly or through a folder, because Google does not support service-account-bound authorization keys for projects without an organization.
+
+### GitHub Actions deployment
+
+Configure the approval-protected GitHub Environments `infra-dev` and `infra-prd`. Each Environment owns only its matching Stack values.
+
+| Kind | Name | Requirement |
+| --- | --- | --- |
+| Variable | `GCP_STATE_PROJECT_ID` | Existing project that owns `gs://kagami-infra/` |
+| Variable | `GCP_PLATFORM_PROJECT_ID` | Globally unique application project ID for the Stack |
+| Variable | `GCP_PLATFORM_PROJECT_NAME` | Optional display name; defaults from the Stack environment |
+| Variable | `GCP_BILLING_ACCOUNT` | Billing Account ID attached to the application project |
+| Variable | `GCP_ORGANIZATION_ID` | Organization parent; set this or `GCP_FOLDER_ID`, not both |
+| Variable | `GCP_FOLDER_ID` | Folder parent; set this or `GCP_ORGANIZATION_ID`, not both |
+| Variable | `GOOGLE_OAUTH_CLIENT_ID` | Optional until the manual Web OAuth client has been created |
+| Secret | `GCP_WORKLOAD_IDENTITY_PROVIDER` | Full Workload Identity Provider resource name |
+| Secret | `PULUMI_CONFIG_PASSPHRASE` | Stack-specific non-empty state encryption passphrase |
+| Secret | `GOOGLE_OAUTH_CLIENT_SECRET` | Required together with `GOOGLE_OAUTH_CLIENT_ID` |
+
+The WIF principal needs object administration only on the `kagami/gcp-platform/` managed folder for state. Separately, grant its deployment identity Project Creator on the selected organization or folder, Billing Account User on the Billing Account, and the IAM, Service Usage, API Keys, Identity Platform, Organization Policy, Budget, and service-account permissions required by this Pulumi program. Keep Development and Production bindings separate.
+
+Run [`deploy-gcp-platform.yml`](../../.github/workflows/deploy-gcp-platform.yml) from reviewed `main`. Choose `preview` or `apply`, choose the Stack, and enter the exact confirmation shown by the workflow. `apply` calls the repository's guarded `gcp-platform:up` command only after the matching GitHub Environment approval.
+
+The workflow creates the Pulumi Stack when it does not exist and reconstructs its environment-specific configuration before every operation. OAuth client ID and secret must either both be present or both be absent. Their absence is supported only for the first foundation deployment.
+
+### Local deployment
 
 ```bash
 export PULUMI_CONFIG_PASSPHRASE=<gcp-platform-value-from-password-manager>
@@ -93,7 +118,7 @@ Keys use `primary` and `secondary` slots, but only the active slot exists during
 
 ## Updates
 
-From the repository root, use the scripts exposed by the parent infrastructure package:
+Use the manual `Deploy / GCP Platform` workflow for normal reviewed updates. For local break-glass operations, use the scripts exposed by the parent infrastructure package:
 
 ```bash
 task infra:gcp-platform:preview:development
