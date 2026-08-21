@@ -146,7 +146,7 @@ describe("StripeBillingProvider", () => {
     const provider = new StripeBillingProvider({ subscriptions: { retrieve } } as never);
 
     await expect(provider.retrieveSubscription("sub_unknown_status")).resolves.toMatchObject({
-      status: "incomplete",
+      status: "unknown",
       priceId: "price_full",
     });
   });

@@ -1,4 +1,5 @@
 export type BillingSubscriptionStatus =
+  | "unknown"
   | "incomplete"
   | "incomplete_expired"
   | "trialing"

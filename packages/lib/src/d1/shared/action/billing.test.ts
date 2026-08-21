@@ -148,6 +148,7 @@ describe("billing projection", () => {
     ["active", true, "full", "full"],
     ["incomplete", false, "full", "free"],
     ["incomplete_expired", false, "full", "free"],
+    ["unknown", false, "full", "free"],
     ["active", false, null, "free"],
   ] as const)(
     "status=%s、期間末解約=%s、Plan=%sを期待する%s権限へ変換する",
@@ -176,6 +177,15 @@ describe("billing projection", () => {
           new Date("2026-08-03T00:00:00Z"),
         ),
       ).resolves.toMatchObject({ plan: expectedPlan });
+
+      if (status === "unknown") {
+        await expect(
+          getBillingOperationalSummary(db, {
+            now: new Date("2026-08-03T00:00:00Z"),
+            staleAfterMs: 15 * 60 * 1_000,
+          }),
+        ).resolves.toMatchObject({ statusCounts: { unknown: 1 } });
+      }
     },
   );
 

@@ -1,3 +1,4 @@
+import { logger } from "@me-builder/shared";
 import Stripe from "stripe";
 import type {
   BillingCheckoutSession,
@@ -352,8 +353,18 @@ function billingSubscriptionStatus(status: string): BillingSubscriptionStatus {
     case "paused":
       return status;
     default:
-      // Stripeがstatusを追加しても、既存の有料projectionを維持せず非権限状態へ閉じる。
-      return "incomplete";
+      logger.warn(
+        {
+          event: "billing.subscription.unknown-status",
+          service: "lib",
+          provider: "stripe",
+          providerStatus: status,
+          outcome: "degraded",
+          disposition: "free-plan-fallback",
+        },
+        "[Billing provider] unknown subscription status -> Free fallback",
+      );
+      return "unknown";
   }
 }
 

@@ -26,6 +26,7 @@ export const billingSubscriptionProjections = sqliteTable(
     providerCustomerId: text("provider_customer_id").notNull(),
     status: text("status", {
       enum: [
+        "unknown",
         "incomplete",
         "incomplete_expired",
         "trialing",

@@ -208,19 +208,21 @@ export function BillingPlanScreen({
             <output className="mt-2 block text-sm">
               Free契約へ変更されたことを示す表示ではありません。確認が終わるまで安全側の利用枠を適用し、重複購入を防ぐため購入操作を停止しています。
             </output>
-            <button
-              type="button"
-              onClick={onRetry}
-              className="mt-3 min-h-10 rounded-lg border border-amber-500 px-4 text-sm font-bold"
-            >
-              契約状態を再確認
-            </button>
-            <a
-              href="/contact"
-              className="ml-3 inline-flex min-h-10 items-center rounded-lg px-2 text-sm font-bold underline underline-offset-2"
-            >
-              解決しない場合は問い合わせる
-            </a>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onRetry}
+                className="min-h-10 rounded-lg border border-amber-500 px-4 text-sm font-bold"
+              >
+                契約状態を再確認
+              </button>
+              <a
+                href="/contact"
+                className="inline-flex min-h-10 items-center rounded-lg px-2 text-sm font-bold underline underline-offset-2"
+              >
+                解決しない場合は問い合わせる
+              </a>
+            </div>
           </section>
         )}
 
