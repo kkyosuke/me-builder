@@ -130,6 +130,25 @@ export const compatibilityShareCases = {
       },
     },
   },
+  acceptForwardedInvitationConcurrently: {
+    id: "COMPATIBILITY-INVITATION-FORWARDED-CONCURRENT-001",
+    name: "転送された同一招待を同時承諾しても1 Accountだけを受信者にすること",
+    in: {
+      method: "POST",
+      path: "/api/compatibility/invitations/:relationshipId/accept",
+      session: "two-recipient-tokens",
+      setup: ["送信者が招待を発行", "リンクを持つ2 Accountが同時に承諾"],
+    },
+    out: {
+      status: 200,
+      body: {
+        acceptedCount: 1,
+        rejectedCount: 1,
+        loserList: "empty",
+        loserDetailStatus: 404,
+      },
+    },
+  },
   acceptInvitation: {
     id: "COMPATIBILITY-INVITATION-ACCEPT-001",
     name: "受信者の共有同意で相性関係と双方の一覧参照を成立させること",

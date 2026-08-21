@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import { type AccountDataNamespace, D1, DO } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -87,6 +87,7 @@ function env() {
     DB: database,
     ACCOUNT_DATA: accountData,
     COMPATIBILITY_DATA: compatibilityDataStore.namespace,
+    AVATAR_BUCKET: {} as R2Bucket,
     ...sessionFixture.bindings,
     LIFF_ID: "1234567890-testliff",
     ENVIRONMENT: "test",
@@ -496,6 +497,10 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
       for (const request of [
         { path: `/api/compatibility/invitations/${relationshipId}`, method: "GET" },
         {
+          path: `/api/compatibility/invitations/${relationshipId}/avatar`,
+          method: "GET",
+        },
+        {
           path: `/api/compatibility/invitations/${relationshipId}/accept`,
           method: "POST",
         },
@@ -543,6 +548,96 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           },
         ],
       });
+
+      const acceptedRecipientList = await app.request(
+        "/api/compatibility/relationships",
+        { headers: sessionHeaders.thirdParty },
+        env(),
+      );
+      expect(await acceptedRecipientList.json()).toEqual({
+        items: [
+          {
+            relationshipId,
+            status: "accepted",
+            relationshipCategory: "partner",
+            partnerDisplayName: "あおい",
+            readiness: { status: "waiting", nextAction: "profile-summary" },
+          },
+        ],
+      });
+      const acceptedRecipientDetail = await app.request(
+        `/api/compatibility/relationships/${relationshipId}`,
+        { headers: sessionHeaders.thirdParty },
+        env(),
+      );
+      expect(acceptedRecipientDetail.status).toBe(200);
+      expect(await acceptedRecipientDetail.json()).toEqual({
+        relationshipId,
+        status: "waiting",
+        relationshipCategory: "partner",
+        nextAction: "profile-summary",
+      });
+    },
+    e2eTimeoutMs,
+  );
+
+  it(
+    `${compatibilityShareCases.acceptForwardedInvitationConcurrently.id}: ${compatibilityShareCases.acceptForwardedInvitationConcurrently.name}`,
+    async () => {
+      const relationshipId = await issueInvitationForInviter();
+      const candidateRoles = ["recipient", "thirdParty"] as const;
+      const responses = await Promise.all(
+        candidateRoles.map((role) =>
+          app.request(
+            `/api/compatibility/invitations/${relationshipId}/accept`,
+            { method: "POST", headers: sessionHeaders[role] },
+            env(),
+          ),
+        ),
+      );
+      const acceptedIndexes = responses.flatMap((response, index) =>
+        response.status === 200 ? [index] : [],
+      );
+      expect(acceptedIndexes).toHaveLength(1);
+      const acceptedIndex = acceptedIndexes[0];
+      if (acceptedIndex === undefined) throw new Error("accepted candidate was not resolved");
+      const rejectedIndex = acceptedIndex === 0 ? 1 : 0;
+      expect([404, 409]).toContain(responses[rejectedIndex]?.status);
+
+      const winnerRole = candidateRoles[acceptedIndex];
+      const loserRole = candidateRoles[rejectedIndex];
+      if (!winnerRole || !loserRole) throw new Error("candidate role was not resolved");
+      expect(compatibilityDataStore.relationships.get(relationshipId)).toMatchObject({
+        status: "accepted",
+        inviteeAccountId: participants[winnerRole].accountId,
+      });
+
+      const winnerList = await app.request(
+        "/api/compatibility/relationships",
+        { headers: sessionHeaders[winnerRole] },
+        env(),
+      );
+      expect(await winnerList.json()).toMatchObject({
+        items: [{ relationshipId, status: "accepted", partnerDisplayName: "あおい" }],
+      });
+      const loserList = await app.request(
+        "/api/compatibility/relationships",
+        { headers: sessionHeaders[loserRole] },
+        env(),
+      );
+      expect(await loserList.json()).toEqual({ items: [] });
+      const loserDetail = await app.request(
+        `/api/compatibility/relationships/${relationshipId}`,
+        { headers: sessionHeaders[loserRole] },
+        env(),
+      );
+      expect(loserDetail.status).toBe(404);
+      expect(loserDetail.headers.get("Cache-Control")).toBe("no-store");
+      expect(
+        stores[loserRole].raw
+          .prepare("SELECT COUNT(*) AS count FROM compatibility_references")
+          .get(),
+      ).toEqual({ count: 0 });
     },
     e2eTimeoutMs,
   );
