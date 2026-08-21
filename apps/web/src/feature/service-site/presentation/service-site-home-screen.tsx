@@ -89,7 +89,7 @@ const faqs = [
   {
     question: "LINE Accountを失った場合は？",
     answer:
-      "利用中のLINE Accountで事前に発行・保存した一回限りの復旧コードがあれば、新しいLINE Accountを同じAccountへ接続できます。コードがない場合は自動復旧できません。",
+      "利用中のLINE Accountで事前に発行・保存した一回限りの復旧コードがあれば、新しいLINE Accountを同じAccountへ接続できます。コードがない場合、Accountと保存済みデータは復旧できません。契約の停止はAccount復旧と分けてお問い合わせください。",
   },
   {
     question: "年齢制限はありますか？",

@@ -240,7 +240,7 @@ flowchart TD
     C --> B
 ```
 
-**確定**: 有料契約中に旧Identityで発行・保管した一回限りの復旧コードがある場合は、新しいLINE Identityで既存Accountへ再接続し、同じ本人データとPlanを継続できます。事前コードがない場合は自動再接続を行いません。例外的なサポート可否と本人確認手順は未決定であり、問い合わせだけでAccountを移動しません。認可条件と復旧不能時の境界は[Account復旧設計](../architecture/account-recovery-design.md)を正とします。
+**確定**: 有料契約中に旧Identityで発行・保管した一回限りの復旧コードがある場合は、新しいLINE Identityで既存Accountへ再接続し、同じ本人データとPlanを継続できます。事前コードがない場合、初期提供では自動・有人のどちらでもAccountを再接続せず、問い合わせだけでIdentityを移動したり、Account復旧として本人データを開示したりしません。有料契約の停止はAccount復旧と分離して受け付けます。認可条件と復旧不能時の境界は[Account復旧設計](../architecture/account-recovery-design.md)を正とします。
 
 生データを持ち出さずAPIで取得できる特徴の範囲は[Source Recordのライフサイクル設計 §8](../domain/source/source-record-lifecycle-design.md#8-apiによる特徴取得)で確定しています。
 

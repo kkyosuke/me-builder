@@ -61,7 +61,7 @@ flowchart TD
 
 ### 3.3 二重請求疑い・解約不能
 
-Stripe Dashboardで請求事実を確認し、同一Accountに複数Subscriptionがある場合は新しい課金操作を停止します。返金・Subscription取消は商取引条件に基づく運営者の明示操作とし、再照合APIから自動実行しません。Customer Portalを開けない場合も、本人確認後に運営経路から期間末解約を受け付けます。
+Stripe Dashboardで請求事実を確認し、同一Accountに複数Subscriptionがある場合は新しい課金操作を停止します。返金・Subscription取消は商取引条件に基づく運営者の明示操作とし、再照合APIから自動実行しません。Customer Portalを開けない場合も、請求上の本人確認後に運営経路から期間末解約を受け付けます。この確認をAccount復旧、Identity移動、本人データの開示へ流用しません。
 
 ### 3.4 Account復旧
 
