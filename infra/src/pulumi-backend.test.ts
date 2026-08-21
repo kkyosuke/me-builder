@@ -39,17 +39,19 @@ describe("requirePulumiGcsBackend", () => {
     ).toThrow("PULUMI_CONFIG_PASSPHRASE");
   });
 
-  it("Pulumi projectとbootstrap workflowの固定backendを一致させる", async () => {
+  it("Pulumi projectとGitHub Actionsの固定backendを一致させる", async () => {
     const [
       cloudflareProject,
       gcpPlatformProject,
-      bootstrapWorkflow,
+      gcpPlatformProgram,
+      gcpPlatformWorkflow,
       resetWorkflow,
       stripeWorkflow,
     ] = await Promise.all([
       readFile(new URL("../Pulumi.yaml", import.meta.url), "utf8"),
       readFile(new URL("../gcp-platform/Pulumi.yaml", import.meta.url), "utf8"),
-      readFile(new URL("../../.github/workflows/setup-pulumi-state.yml", import.meta.url), "utf8"),
+      readFile(new URL("../gcp-platform/index.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../.github/workflows/deploy-gcp-platform.yml", import.meta.url), "utf8"),
       readFile(
         new URL("../../.github/workflows/reset-preview-migrations.yml", import.meta.url),
         "utf8",
@@ -62,14 +64,28 @@ describe("requirePulumiGcsBackend", () => {
 
     expect(cloudflareProject).toContain(`url: ${pulumiGcsBackends.cloudflare}`);
     expect(gcpPlatformProject).toContain(`url: ${pulumiGcsBackends.gcpPlatform}`);
-    expect(bootstrapWorkflow).toContain('bucket_uri="gs://kagami-infra"');
-    expect(bootstrapWorkflow).toContain("--default-storage-class=STANDARD");
-    expect(bootstrapWorkflow).not.toContain("NEARLINE");
-    expect(bootstrapWorkflow).toContain("environment: infra-dev");
+    expect(gcpPlatformProgram).toContain("...(standaloneProject ? { import: projectId } : {})");
+    expect(gcpPlatformProgram).toContain(
+      "...(!standaloneProject ? { autoCreateNetwork: false } : {})",
+    );
+    expect(gcpPlatformWorkflow).toContain(`pulumi login ${pulumiGcsBackends.gcpPlatform}`);
+    expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:preview:${TARGET}"');
+    expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:up:${TARGET}"');
+    expect(gcpPlatformWorkflow).toContain(
+      "environment: ${{ inputs.target == 'development' && 'infra-dev' || 'infra-prd' }}",
+    );
+    expect(gcpPlatformWorkflow).toContain(
+      'if [ -n "${GCP_ORGANIZATION_ID}" ] && [ -n "${GCP_FOLDER_ID}" ]; then',
+    );
+    expect(gcpPlatformWorkflow).toContain("remove_config_if_present organizationId");
+    expect(gcpPlatformWorkflow).toContain("remove_config_if_present folderId");
+    expect(gcpPlatformWorkflow).toContain("No organization (existing project import)");
+    expect(gcpPlatformWorkflow).not.toContain("gcloud storage buckets");
+    expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");
     expect(resetWorkflow).toContain("environment: infra-dev");
     expect(resetWorkflow).toContain('[ "${REF_NAME}" != "main" ]');
     expect(stripeWorkflow).toContain("inputs.environment == 'dev' && 'infra-dev' || 'stripe-prd'");
-    for (const workflow of [bootstrapWorkflow, resetWorkflow]) {
+    for (const workflow of [gcpPlatformWorkflow, resetWorkflow]) {
       expect(workflow).toContain("uses: google-github-actions/auth@v2");
       expect(workflow).toContain(
         "workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}",

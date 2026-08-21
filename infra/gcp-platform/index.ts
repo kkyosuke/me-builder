@@ -26,6 +26,7 @@ const folderId = config.get("folderId");
 if (organizationId && folderId) {
   throw new Error("Set only one of organizationId or folderId");
 }
+const standaloneProject = !organizationId && !folderId;
 
 const budgetCurrencyCode = config.require("budgetCurrencyCode");
 if (!/^[A-Z]{3}$/u.test(budgetCurrencyCode)) {
@@ -117,7 +118,8 @@ const project = new gcp.organizations.Project(
     name: projectName,
     billingAccount,
     deletionPolicy: "PREVENT",
-    autoCreateNetwork: false,
+    // Do not delete or otherwise adopt the networking configuration of an imported project.
+    ...(!standaloneProject ? { autoCreateNetwork: false } : {}),
     labels: {
       application: "me-builder",
       environment,
@@ -126,7 +128,12 @@ const project = new gcp.organizations.Project(
     ...(organizationId ? { orgId: organizationId } : {}),
     ...(folderId ? { folderId } : {}),
   },
-  { protect },
+  {
+    protect,
+    // External identities cannot create standalone projects. A personal-account project is
+    // therefore pre-existing, then adopted into Pulumi on the first update.
+    ...(standaloneProject ? { import: projectId } : {}),
+  },
 );
 
 const enabledServices = [
