@@ -256,6 +256,32 @@ describe("linkIdentity", () => {
 });
 
 describe("unlinkLoginIdentityProvider", () => {
+  it("Messaging API identityを代替ログイン手段として扱わないこと", async () => {
+    const db = createTestDb();
+    const { account } = await upsertIdentity(db, {
+      provider: "line",
+      providerAccountId: "U_messaging_only",
+    });
+    await linkIdentity(db, {
+      accountId: account.id,
+      provider: "gcp_identity_platform",
+      providerAccountId: "identity-platform-with-messaging",
+    });
+
+    await expect(listLoginIdentityProviders(db, account.id)).resolves.toEqual([
+      "gcp_identity_platform",
+    ]);
+    await expect(
+      unlinkLoginIdentityProvider(db, {
+        accountId: account.id,
+        provider: "gcp_identity_platform",
+      }),
+    ).rejects.toThrow("last login identity");
+    await expect(
+      findAccountByIdentity(db, "gcp_identity_platform", "identity-platform-with-messaging"),
+    ).resolves.toBeDefined();
+  });
+
   it("複数あるログイン手段からIdentity Platformだけを解除できること", async () => {
     const db = createTestDb();
     const { account } = await upsertIdentity(db, {

@@ -130,7 +130,7 @@ flowchart TD
 5. **外部LLMの呼び出し**
    - Vertex AI Express Mode の Gemini を利用する処理は、Queue Worker からGoogleへ直接呼び出します。
    - `@google/genai`は`vertexai: true`とAPI version `v1`で初期化し、プロジェクトやロケーションの指定を要しないExpress ModeのAPI key認証を使います。
-   - Vertex AI API key (`GOOGLE_VERTEX_AI_API_KEY`) は Worker の Secret として保持し、Web UI、APIレスポンス、ログへ露出させません。
+   - Vertex AI authorization key (`GOOGLE_VERTEX_AI_API_KEY`) は Worker の Secret として保持し、Web UI、APIレスポンス、ログへ露出させません。専用service accountへ推論に必要な`aiplatform.endpoints.predict`だけを付与し、API keyのtarget methodも`GenerateContent`と`EmbedContent`へ限定します。
    - 接続確認では、LINEへ `AI: 質問` と明示して送った本文だけをモデルへ渡し、生成結果を同じトークへ返信します。通常の日記と診断要求はモデルへ送りません。
    - モデルへ渡した本文と生成結果はアプリケーションログおよびデータベースへ保存しません。
    - 接続確認の失敗時は、設定不足、空応答、API例外を区別できる構造化ログを出力します。モデルへ渡した本文、生成結果、Google API key はエラーログにも含めません。
@@ -215,11 +215,15 @@ APIとMCPがブラウザへ返すCORSヘッダは、環境manifestのベース�
 
 ### 6.2 GCP共通リソースの宣言境界
 
-`infra/gcp-platform/`はCloudflare基盤と別のPulumi projectとし、`development`と`production`のStackを持ちます。各Stackは環境別GCP project、Cloud Billing接続、Identity Platform設定、Google provider、Identity Toolkit APIだけへ制限したAPI keyを所有します。同じStackでVertex AI API、専用service account、Vertex AIだけへ制限したservice-account-bound authorization keyも所有します。Productionだけでなく認証データを持つDevelopment projectも削除保護します。
+`infra/gcp-platform/`はCloudflare基盤と別のPulumi projectとし、`development`と`production`のStackを持ちます。各Stackは環境別GCP project、Cloud Billing接続、Identity Platform設定、Google provider、Identity Toolkit APIだけへ制限したAPI keyを所有します。同じStackでVertex AI API、推論だけを許す専用service account、`GenerateContent`と`EmbedContent`だけへ制限したservice-account-bound authorization keyを所有します。Productionだけでなく認証データを持つDevelopment projectも削除保護します。authorization keyのorganization policyはproject単位でPulumi管理し、runtime credentialを無効にした状態では作成を明示的に禁止し、有効化時だけ例外へ切り替えます。organization配下にないprojectではauthorization keyを作りません。
+
+API keyは`primary`と`secondary`のrotation slotを持ち、平常時はactive slotだけを作成します。Stack configに非active slotのgenerationを追加して移行期間だけ2 keyを併存させ、配布先の切り替え後に旧slotを`null`へ戻して削除します。key自体へ削除保護を付けず、project、Identity Platform、IAM、予算などの永続的な基盤だけを削除保護します。これにより、固定名の長期credentialを壊さずに置換できない状態と、不要な予備credentialの常設をともに避けます。
+
+各Stackはproject全体の月額Cloud Billing予算をPulumiで管理し、gross costの50%、80%、100%で警告します。通常の予算通知は利用を停止しないため、Vertex AIの実費上限にはGoogle Cloud Billingのservice別Spend capを併用します。Spend capは現行の公開Cloud Billing Budget APIとPulumi GCP providerから設定できないため、最初の基盤適用後にCloud Consoleで手動設定し、確認済みconfigがない限りPulumiはVertex AI authorization keyを作りません。DevelopmentとProductionは別の上限額を持ち、上限到達時にAI機能が停止することを可用性上の正常な縮退として扱います。
 
 Google Auth PlatformはOAuth同意画面と一般ユーザー向けWeb OAuth clientを所有します。Development clientにはLocalとPreviewの完全一致callback、Production clientにはProduction callbackだけを登録します。Web OAuth clientの作成はPulumi管理対象外とし、そのClient IDとSecretを環境別Pulumi configへ入力してIdentity PlatformのGoogle providerへ接続します。IAP用またはworkload用OAuth clientで代用しません。
 
-Pulumi Stack outputのIdentity Platform API keyとVertex AI authorization keyはsecretとして扱い、対応するGitHub Environmentから必要なCloudflare Workerだけへ配布します。OAuth Client SecretもPulumi configとGitHub Environmentの両方でsecretにし、Stack output、CIログ、artifactへ出力しません。GCP共通projectの適用手順は[`infra/gcp-platform/README.md`](../../infra/gcp-platform/README.md)を正とします。
+Pulumi Stack outputのactiveなIdentity Platform API keyとVertex AI authorization keyはsecretとして扱い、対応するGitHub Environmentから必要なCloudflare Workerだけへ配布します。OAuth Client SecretもPulumi configとGitHub Environmentの両方でsecretにし、Stack output、CIログ、artifactへ出力しません。Pulumi backendは`PULUMI_BACKEND_URL`で明示した共有・永続backendを必須とし、暗黙のPulumi Cloudやlocal file backendへ状態を分岐させません。GCP共通projectの適用手順は[`infra/gcp-platform/README.md`](../../infra/gcp-platform/README.md)を正とします。
 
 ### 6.3 APIドキュメントのCloudflare Access境界
 

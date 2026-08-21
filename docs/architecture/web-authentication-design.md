@@ -372,7 +372,7 @@ OpenAPIのsecurity schemeは`liffIdToken`からprovider非依存のアプリケ�
 | provider key | 全環境で`gcp_identity_platform`。共有D1自体を環境分離するためGCP project IDをprovider keyへ埋め込まない |
 | 登録policy | `link-only`。SSO Identityだけを根拠に新規Accountを作らない |
 
-API Serverは検証済みGoogle ID tokenをIdentity Platformの`accounts:signInWithIdp`へ渡し、返された`localId`だけをIdentityのsubjectとして保存します。Google ID tokenの`sub`とemailはAccount照合やIdentity保存に使いません。Identity Platform上でuserを削除・再作成して`localId`が変わった場合は別Identityとして扱い、email一致で既存Accountへ自動統合しません。
+API Serverは検証済みGoogle ID tokenをIdentity Platformの`accounts:signInWithIdp`へ`autoCreate=false`で渡し、返された`localId`だけをIdentityのsubjectとして保存します。`isNewUser=true`の応答は防御的に拒否し、公開callbackを経由した未知Identity Platform userの作成を許しません。Google ID tokenの`sub`とemailはAccount照合やIdentity保存に使いません。Identity Platform上でuserを削除・再作成して`localId`が変わった場合は別Identityとして扱い、email一致で既存Accountへ自動統合しません。
 
 Firebase Web SDKは導入しません。このアプリではprovider認証を一度だけme-builderのHttpOnly application sessionへ交換するため、API Serverが公式OAuth endpointとIdentity Platform REST APIを直接利用します。これにより、Firebaseのブラウザsessionを併設せず、Cloudflare Pagesのcustom domainでredirect helperやstorage制限へ依存しません。将来、クライアント側のFirebase token継続利用、メール認証、MFA等が必要になった時点でSDK採用を再評価します。
 
@@ -410,7 +410,7 @@ OAuth Client IDは秘密値ではありませんが、環境を誤接続しな�
 
 SSO認証後もAUTH-A系列のapplication sessionだけを発行し、Identity PlatformまたはFirebaseのsessionは作りません。絶対期限は30日、idle期限は7日、認証transactionは10分とします。権限上昇、Identity追加、Account復旧ではsessionをrotationし、Account停止、Identity解除、復旧完了、local logoutでは対象sessionを即時失効します。
 
-`link-only`はPreviewの通し検証完了後も維持し、ProductionではSSO追加済みAccountだけを段階公開対象にします。SSOだけによる新規Account作成は別のプロダクト決定とし、この系列では有効化しません。
+`link-only`はPreviewの通し検証完了後も維持し、ProductionではSSO追加済みAccountだけを段階公開対象にします。SSOだけによる新規Account作成は別のプロダクト決定とし、この系列では有効化しません。Identity解除時に代替ログイン手段として数えるproviderは`line_login`、`google`、`gcp_identity_platform`だけです。Messaging APIの配送用Identityである`line`はログイン手段ではないため、`line`と解除対象しかないAccountの解除を拒否します。
 
 logoutの既定はme-builderのlocal logoutだけです。GoogleやIdentity Platformのlogoutは呼ばず、他アプリのGoogle sessionへ影響させません。local logoutでme-builderのapplication sessionを失効し、provider側sessionの継続は次回のGoogle認証画面に委ねます。
 

@@ -1,4 +1,4 @@
-import { D1, type IdentityProvider } from "@me-builder/lib";
+import { D1, type LoginIdentityProvider } from "@me-builder/lib";
 import type { SsoIdentityProviderPolicy } from "../../logic/authentication/sso-provider";
 import type {
   SsoExistingIdentityResolver,
@@ -21,7 +21,7 @@ const defaultDependencies: Dependencies = {
 
 export function createSsoExistingIdentityResolver(
   db: D1.shared.Client,
-  policy: SsoIdentityProviderPolicy<IdentityProvider>,
+  policy: SsoIdentityProviderPolicy<LoginIdentityProvider>,
   dependencies: Dependencies = defaultDependencies,
 ): SsoExistingIdentityResolver {
   return {
@@ -47,7 +47,7 @@ export function createSsoExistingIdentityResolver(
 
 export function createSsoIdentityLinker(
   db: D1.shared.Client,
-  policy: SsoIdentityProviderPolicy<IdentityProvider>,
+  policy: SsoIdentityProviderPolicy<LoginIdentityProvider>,
   dependencies: Dependencies = defaultDependencies,
 ): SsoIdentityLinker {
   return {
@@ -69,7 +69,7 @@ export function createSsoIdentityLinker(
 export async function getSsoIdentityStatus(
   db: D1.shared.Client,
   accountId: string,
-  policy: SsoIdentityProviderPolicy<IdentityProvider>,
+  policy: SsoIdentityProviderPolicy<LoginIdentityProvider>,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<{ linked: boolean; canUnlink: boolean }> {
   const providers = await dependencies.listLoginIdentityProviders(db, accountId);
@@ -84,7 +84,7 @@ export async function getSsoIdentityStatus(
 export async function unlinkSsoIdentity(
   db: D1.shared.Client,
   accountId: string,
-  policy: SsoIdentityProviderPolicy<IdentityProvider>,
+  policy: SsoIdentityProviderPolicy<LoginIdentityProvider>,
   dependencies: Dependencies = defaultDependencies,
 ): Promise<void> {
   const providers = await dependencies.listLoginIdentityProviders(db, accountId);

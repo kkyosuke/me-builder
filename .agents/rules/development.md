@@ -123,6 +123,8 @@
 - **Vertex AI Express Mode の Gemini 接続**:
   - Vertex AI Express Mode の呼び出しは `apps/worker/src/infrastructure/gemini-client.ts` に閉じ込め、`@google/genai` の `GoogleGenAI` を`vertexai: true`とAPI version `v1`で初期化してGoogleへ直接接続します。
   - `GOOGLE_VERTEX_AI_API_KEY`はWorker Secretだけに配布し、クライアントバンドル、`wrangler.toml`の`[vars]`、APIレスポンス、ログへ出力してはいけません。
+  - GCP側では専用service accountへ`aiplatform.endpoints.predict`だけを付与し、authorization keyを`GenerateContent`と`EmbedContent`へ制限します。keyは2 slotでrotationし、固定credentialを永続化しません。
+  - 環境別の月額予算をPulumiで管理し、Vertex AIのservice別Spend capをCloud Consoleで設定して確認済みになるまでauthorization keyを作成してはいけません。予算通知だけを利用料の上限として扱いません。
   - モデルは `GEMINI_MODEL` で上書きできます。未指定時は設定層の既定値を利用します。
   - ローカルの接続確認は `apps/worker/.env.example` を参照して環境変数を設定し、`bun run --cwd apps/worker check:gemini` を実行します。プロンプトはコマンド末尾の引数で変更できます。
 

@@ -93,6 +93,7 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
           requestUri: configuration.callbackUrl,
           returnSecureToken: true,
           returnIdpCredential: false,
+          autoCreate: false,
         });
         expect(new URLSearchParams(body.postBody)).toEqual(
           new URLSearchParams({ id_token: signed.token, providerId: "google.com" }),
@@ -212,6 +213,36 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
         return Response.json(signed.jwks);
       }
       return Response.json({ error: { message: "CONFIGURATION_NOT_FOUND" } }, { status: 400 });
+    });
+    const client = createGoogleCloudIdentityPlatformSsoClient(configuration, {
+      fetch: fetcher,
+      now: () => new Date("2026-08-16T00:01:00.000Z"),
+    });
+
+    await expect(
+      client.exchangeAuthorizationCode({
+        code: "code",
+        codeVerifier: "verifier",
+        expectedNonce: "expected-nonce",
+      }),
+    ).rejects.toEqual(new SsoProviderError("provider_rejected"));
+  });
+
+  it("Identity Platformが未知userを作成した応答を防御的に拒否する", async () => {
+    const signed = await googleToken({});
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "https://oauth2.googleapis.com/token") {
+        return Response.json({ id_token: signed.token });
+      }
+      if (url === "https://www.googleapis.com/oauth2/v3/certs") {
+        return Response.json(signed.jwks);
+      }
+      return Response.json({
+        localId: "unexpected-new-user",
+        providerId: "google.com",
+        isNewUser: true,
+      });
     });
     const client = createGoogleCloudIdentityPlatformSsoClient(configuration, {
       fetch: fetcher,

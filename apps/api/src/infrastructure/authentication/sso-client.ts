@@ -22,6 +22,7 @@ const GoogleTokenResponseSchema = v.object({
 const IdentityPlatformResponseSchema = v.object({
   localId: v.pipe(v.string(), v.nonEmpty()),
   providerId: v.literal("google.com"),
+  isNewUser: v.optional(v.boolean(), false),
 });
 
 export type GoogleCloudIdentityPlatformSsoConfiguration = {
@@ -130,6 +131,8 @@ export function createGoogleCloudIdentityPlatformSsoClient(
           }).toString(),
           returnSecureToken: true,
           returnIdpCredential: false,
+          // link-only期間は、公開login callbackからIdentity Platform userを作らない。
+          autoCreate: false,
         }),
         signal: AbortSignal.timeout(SSO_PROVIDER_TIMEOUT_MS),
       });
@@ -138,7 +141,10 @@ export function createGoogleCloudIdentityPlatformSsoClient(
     }
     if (!response.ok) throw new SsoProviderError("provider_rejected");
     try {
-      return v.parse(IdentityPlatformResponseSchema, await response.json()).localId;
+      const exchanged = v.parse(IdentityPlatformResponseSchema, await response.json());
+      // autoCreateが上流で無視・変更された場合も未知userを認証済みIdentityとして扱わない。
+      if (exchanged.isNewUser) throw new SsoProviderError("provider_rejected");
+      return exchanged.localId;
     } catch {
       throw new SsoProviderError("provider_rejected");
     }

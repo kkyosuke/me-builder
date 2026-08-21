@@ -1,5 +1,14 @@
 config:
   me-builder-gcp-platform:environment: development
+  me-builder-gcp-platform:budgetCurrencyCode: USD
+  me-builder-gcp-platform:monthlyBudgetAmount: 10
+  me-builder-gcp-platform:vertexSpendCapAmount: 10
+  me-builder-gcp-platform:vertexSpendCapConfirmed: false
+  me-builder-gcp-platform:vertexRuntimeCredentialsEnabled: false
+  me-builder-gcp-platform:activeCredentialSlot: primary
+  me-builder-gcp-platform:credentialGenerations:
+    primary: v1
+    secondary: null
   me-builder-gcp-platform:authorizedDomains:
     - localhost
     - api.stg.kagami.kyosuke.dev
