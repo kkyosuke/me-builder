@@ -67,11 +67,12 @@ describe("requirePulumiGcsBackend", () => {
     expect(cloudflareProject).toContain(`url: ${pulumiGcsBackends.cloudflare}`);
     expect(gcpPlatformProject).toContain(`url: ${pulumiGcsBackends.gcpPlatform}`);
     expect(gcpPlatformProgram).toContain('from "../src/gcp-authorization-key-policy.ts"');
+    expect(gcpPlatformProgram).toContain('from "../src/gcp-existing-project.ts"');
     expect(gcpPlatformProgram).toContain('from "../src/pulumi-backend.ts"');
-    expect(gcpPlatformProgram).toContain("...(standaloneProject ? { import: projectId } : {})");
-    expect(gcpPlatformProgram).toContain(
-      "...(!standaloneProject ? { autoCreateNetwork: false } : {})",
-    );
+    expect(gcpPlatformProgram).toContain("gcp.organizations.getProjectOutput({ projectId })");
+    expect(gcpPlatformProgram).not.toContain("new gcp.organizations.Project");
+    expect(gcpPlatformProgram).not.toContain("import: projectId");
+    expect(gcpPlatformProgram).not.toContain("autoCreateNetwork");
     expect(gcpPlatformScript).toContain(
       'await run(["pulumi", "-C", "gcp-platform", "whoami", "--verbose"]);',
     );
@@ -86,7 +87,9 @@ describe("requirePulumiGcsBackend", () => {
     );
     expect(gcpPlatformWorkflow).toContain("remove_config_if_present organizationId");
     expect(gcpPlatformWorkflow).toContain("remove_config_if_present folderId");
-    expect(gcpPlatformWorkflow).toContain("No organization (existing project import)");
+    expect(gcpPlatformWorkflow).toContain("Existing standalone project");
+    expect(gcpPlatformWorkflow).toContain("remove_config_if_present projectName");
+    expect(gcpPlatformWorkflow).not.toContain("GCP_PLATFORM_PROJECT_NAME");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage buckets");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");
     expect(resetWorkflow).toContain("environment: infra-dev");
