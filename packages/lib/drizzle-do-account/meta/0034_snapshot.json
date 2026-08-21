@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "bbb7a4a8-4fde-43ba-beb7-4b5cbdf74085",
+  "id": "617bde1a-6bf0-4060-93df-84ac4f90ba1d",
   "prevId": "260db539-bc44-4a25-987e-36917c7c17bd",
   "tables": {
     "ai_usage_records": {
@@ -3272,6 +3272,13 @@
         },
         "delete_due_at": {
           "name": "delete_due_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "deletion_enqueued_at": {
+          "name": "deletion_enqueued_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

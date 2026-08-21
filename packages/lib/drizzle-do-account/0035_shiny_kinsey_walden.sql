@@ -1,1 +1,0 @@
-ALTER TABLE `photo_diary_media` ADD `deletion_enqueued_at` integer;

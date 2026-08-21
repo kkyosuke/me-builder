@@ -22,6 +22,7 @@ CREATE TABLE `photo_diary_media` (
 	`reserved_at` integer NOT NULL,
 	`stored_at` integer,
 	`delete_due_at` integer,
+	`deletion_enqueued_at` integer,
 	FOREIGN KEY (`account_id`) REFERENCES `account_data_identity`(`account_id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`source_record_id`) REFERENCES `source_records`(`id`) ON UPDATE no action ON DELETE no action
 );
