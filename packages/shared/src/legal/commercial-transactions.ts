@@ -1,3 +1,5 @@
+import { publicBillingPlans } from "../billing/plan-catalog";
+
 export type CommercialTransactionEntry = Readonly<{
   label: string;
   value: string;
@@ -9,6 +11,22 @@ export type CommercialTransactionsDisclosure = Readonly<{
   contact: string;
   entries: readonly CommercialTransactionEntry[];
 }>;
+
+const yenFormatter = new Intl.NumberFormat("ja-JP", {
+  style: "currency",
+  currency: "JPY",
+  maximumFractionDigits: 0,
+});
+
+const paidPlanPrices = publicBillingPlans
+  .map((plan) => {
+    const monthly = plan.prices.find(({ interval }) => interval === "month");
+    const yearly = plan.prices.find(({ interval }) => interval === "year");
+    if (!monthly || !yearly) throw new Error(`Billing catalog is incomplete for ${plan.code}`);
+    return `${plan.name}：月額${yenFormatter.format(monthly.amount)}、年額${yenFormatter.format(yearly.amount)}`;
+  })
+  .join("。")
+  .concat("。");
 
 /** 日本向け有料提供で、購入前に認証なしで確認できる通信販売条件の正本。 */
 export const commercialTransactionsDisclosure = {
@@ -29,8 +47,7 @@ export const commercialTransactionsDisclosure = {
     },
     {
       label: "販売価格",
-      value:
-        "料金プラン画面とStripe Checkoutの最終確認画面に、支払総額を日本円で表示します。表示価格には消費税相当額を含みます。",
+      value: `${paidPlanPrices}いずれも消費税相当額を含む支払総額です。Stripe Checkoutの最終確認画面にも、選択した契約期間の支払総額を日本円で表示します。`,
     },
     {
       label: "販売価格以外の負担",

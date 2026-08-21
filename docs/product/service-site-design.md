@@ -305,7 +305,14 @@ Webアプリ
 
 正式本文は[`privacy-policy.ts`](../../packages/shared/src/legal/privacy-policy.ts)を正とし、公開画面はその最新1版を表示します。
 
-### 7.3 お問い合わせ
+### 7.3 特定商取引法に基づく表記
+
+- 認証せずに、販売価格、価格以外の負担、支払方法と時期、trial、自動更新、提供時期、Plan変更、解約、返金、請求書・領収書、課金通知を確認できる
+- 販売価格は[`plan-catalog.ts`](../../packages/shared/src/billing/plan-catalog.ts)から導出し、公開料金表やStripe catalogと異なる価格定義を持たない
+- 氏名、住所、電話番号を常時公開しない場合も、購入の判断に先立つ請求方法と連絡先を表示する
+- 公開する正確な本文は[`commercial-transactions.ts`](../../packages/shared/src/legal/commercial-transactions.ts)を正とし、画面や設計文書へ別本文を作らない
+
+### 7.4 お問い合わせ
 
 問い合わせ種別を少なくとも「サービスについて」「不具合」「契約・請求」「データとプライバシー」「権利侵害」に分けます。送信前に、返信に必要な連絡先と問い合わせ本文がどのように扱われるかを示します。
 
