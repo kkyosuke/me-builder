@@ -254,9 +254,13 @@ export class StripeBillingProvider implements BillingProvider {
     });
   }
 
-  constructWebhookEvent(rawBody: string, signature: string, webhookSecret: string) {
+  async constructWebhookEvent(rawBody: string, signature: string, webhookSecret: string) {
     try {
-      const event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      const event = await this.stripe.webhooks.constructEventAsync(
+        rawBody,
+        signature,
+        webhookSecret,
+      );
       const object = event.data.object as { id?: unknown };
       if (typeof object.id !== "string") throw new BillingProviderError("invalid-request", false);
       return {

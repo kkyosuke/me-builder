@@ -106,7 +106,7 @@ Plan変更では、即時請求が必要なupgradeと月額から年額への変
 
 ## 5. Webhookと収束
 
-APIはraw bodyで署名を検証し、許可したeventの最小メタデータをQueueへ渡して応答します。Workerはevent payloadを正本として上書きせず、対象CustomerまたはSubscriptionの現在状態をStripeから取得します。
+APIはraw bodyで署名を検証し、許可したeventの最小メタデータをQueueへ渡して応答します。Cloudflare WorkersのWeb Crypto実行環境に合わせ、署名検証は非同期APIで完了を待ってからQueueへ渡します。Workerはevent payloadを正本として上書きせず、対象CustomerまたはSubscriptionの現在状態をStripeから取得します。
 
 - event IDで再配送を冪等化する
 - Stripe objectの更新時刻とevent作成時刻を保存し、古い処理で新しいprojectionを巻き戻さない

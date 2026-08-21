@@ -127,7 +127,11 @@ export class FakeBillingProvider implements BillingProvider {
     return [];
   }
 
-  constructWebhookEvent(rawBody: string, signature: string, secret: string): BillingWebhookEvent {
+  async constructWebhookEvent(
+    rawBody: string,
+    signature: string,
+    secret: string,
+  ): Promise<BillingWebhookEvent> {
     if (this.handlers.constructWebhookEvent)
       return this.handlers.constructWebhookEvent(rawBody, signature, secret);
     throw new Error("Fake constructWebhookEvent handler is not configured");

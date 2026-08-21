@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { serviceSitePageMetadata } from "../src/feature/service-site/model/service-site-page-metadata";
 
 type Metadata = (typeof serviceSitePageMetadata)[keyof typeof serviceSitePageMetadata];
@@ -49,6 +49,11 @@ export function renderServiceSiteDocument(
     .replace("  </head>", `${tags}\n  </head>`);
 }
 
+export function serviceSiteEntrypointFilename(pathname: string): string {
+  if (pathname === "/") return "index.html";
+  return `${pathname.replace(/^\/+|\/+$/g, "")}.html`;
+}
+
 async function generateEntryPoints(): Promise<void> {
   const distUrl = new URL("../dist/", import.meta.url);
   const source = await readFile(new URL("index.html", distUrl), "utf8");
@@ -56,15 +61,7 @@ async function generateEntryPoints(): Promise<void> {
 
   for (const metadata of Object.values(serviceSitePageMetadata)) {
     const document = renderServiceSiteDocument(source, metadata, baseUrl);
-    if (metadata.pathname === "/") {
-      await writeFile(new URL("index.html", distUrl), document);
-      continue;
-    }
-
-    const routeDirectory = metadata.pathname.replace(/^\/+|\/+$/g, "");
-    const routeUrl = new URL(`${routeDirectory}/`, distUrl);
-    await mkdir(routeUrl, { recursive: true });
-    await writeFile(new URL("index.html", routeUrl), document);
+    await writeFile(new URL(serviceSiteEntrypointFilename(metadata.pathname), distUrl), document);
   }
 }
 

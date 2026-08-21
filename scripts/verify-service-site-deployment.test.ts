@@ -114,4 +114,31 @@ describe("verifyServiceSiteDeployment", () => {
       }),
     ).rejects.toThrow("Public route has a conflicting X-Robots-Tag boundary (/privacy)");
   });
+
+  it("custom domainへのdeployment反映が遅れた場合は検証をretryする", async () => {
+    const deployed = deployedFetch();
+    const fetcher = vi.fn<typeof fetch>();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      fetcher.mockRejectedValueOnce(new TypeError("UnexpectedRedirect"));
+    }
+    fetcher.mockImplementation(deployed);
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      verifyServiceSiteDeployment({
+        baseDomain: "kagami.example.com",
+        fetcher,
+        retryIntervalMs: 2_000,
+        sleep,
+      }),
+    ).resolves.toEqual({
+      checks: [
+        "public-document-metadata",
+        "public-route-indexable-header",
+        "private-route-noindex-header",
+      ],
+    });
+    expect(sleep).toHaveBeenCalledTimes(5);
+    expect(sleep).toHaveBeenCalledWith(2_000);
+  });
 });
