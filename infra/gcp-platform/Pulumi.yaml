@@ -5,3 +5,5 @@ runtime:
   options:
     packagemanager: bun
 main: index.ts
+backend:
+  url: gs://kagami-infra/kagami/gcp-platform

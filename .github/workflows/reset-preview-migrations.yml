@@ -39,7 +39,6 @@ jobs:
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
-      PULUMI_BACKEND_URL: ${{ vars.PULUMI_BACKEND_URL }}
       PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
       GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -100,10 +99,6 @@ jobs:
             echo "::error::BRAIN_VECTOR_HMAC_SECRET が GitHub Environment dev に設定されていません。"
             exit 1
           fi
-          case "${PULUMI_BACKEND_URL}" in
-            gs://?*) ;;
-            *) echo "::error::PULUMI_BACKEND_URL には既存のGCS bucketをgs://形式で設定してください。"; exit 1 ;;
-          esac
           if [ -z "${PULUMI_CONFIG_PASSPHRASE//[[:space:]]/}" ]; then
             echo "::error::PULUMI_CONFIG_PASSPHRASE がGitHub Environment devに設定されていません。"
             exit 1

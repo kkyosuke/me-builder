@@ -1,13 +1,13 @@
 import { resolve } from "node:path";
 import { parseManifest } from "./manifest";
 import { run } from "./process";
-import { requirePulumiGcsBackend } from "./pulumi-backend";
+import { pulumiGcsBackends, requirePulumiGcsBackend } from "./pulumi-backend";
 
 const infraRoot = resolve(import.meta.dir, "..");
 const pulumi = process.env.PULUMI_COMMAND || "pulumi";
 
 async function selectPreviewStack() {
-  const backendUrl = requirePulumiGcsBackend(process.env);
+  const backendUrl = requirePulumiGcsBackend(process.env, pulumiGcsBackends.cloudflare);
   await run([pulumi, "login", backendUrl]);
   try {
     await run([pulumi, "stack", "select", "preview", "--non-interactive"]);

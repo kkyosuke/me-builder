@@ -5,7 +5,6 @@ describe("gcpPlatformCommand", () => {
   it("GCS backendを明示したpreview commandを返す", () => {
     expect(
       gcpPlatformCommand("preview", "development", {
-        PULUMI_BACKEND_URL: "gs://me-builder-pulumi-state",
         PULUMI_CONFIG_PASSPHRASE: "test-only-passphrase",
       }),
     ).toEqual([
@@ -22,7 +21,6 @@ describe("gcpPlatformCommand", () => {
   it("対象環境と一致する明示確認なしのupを拒否する", () => {
     expect(() =>
       gcpPlatformCommand("up", "production", {
-        PULUMI_BACKEND_URL: "gs://me-builder-pulumi-state",
         PULUMI_CONFIG_PASSPHRASE: "test-only-passphrase",
         ALLOW_GCP_PLATFORM_UP: "development",
       }),
@@ -30,10 +28,8 @@ describe("gcpPlatformCommand", () => {
   });
 
   it("GCS backendへ暗号化設定なしでsecret stateを書かない", () => {
-    expect(() =>
-      gcpPlatformCommand("preview", "development", {
-        PULUMI_BACKEND_URL: "gs://me-builder-pulumi-state",
-      }),
-    ).toThrow("PULUMI_CONFIG_PASSPHRASE");
+    expect(() => gcpPlatformCommand("preview", "development", {})).toThrow(
+      "PULUMI_CONFIG_PASSPHRASE",
+    );
   });
 });

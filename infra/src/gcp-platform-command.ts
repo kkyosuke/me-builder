@@ -1,4 +1,4 @@
-import { requirePulumiGcsBackend } from "./pulumi-backend";
+import { pulumiGcsBackends, requirePulumiGcsBackend } from "./pulumi-backend";
 
 export const gcpPlatformEnvironments = ["development", "production"] as const;
 export type GcpPlatformEnvironment = (typeof gcpPlatformEnvironments)[number];
@@ -16,7 +16,7 @@ export function gcpPlatformCommand(
     throw new Error("GCP platform environment must be development or production");
   }
   const validatedEnvironment = environment as GcpPlatformEnvironment;
-  requirePulumiGcsBackend(env);
+  requirePulumiGcsBackend(env, pulumiGcsBackends.gcpPlatform);
   if (operation === "up" && env.ALLOW_GCP_PLATFORM_UP !== validatedEnvironment) {
     throw new Error(`Set ALLOW_GCP_PLATFORM_UP=${validatedEnvironment} to apply this Stack`);
   }

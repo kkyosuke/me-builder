@@ -1,8 +1,8 @@
 import * as gcp from "@pulumi/gcp";
 import * as pulumi from "@pulumi/pulumi";
-import { requirePulumiGcsBackend } from "../src/pulumi-backend";
+import { pulumiGcsBackends, requirePulumiGcsBackend } from "../src/pulumi-backend";
 
-requirePulumiGcsBackend(process.env);
+requirePulumiGcsBackend(process.env, pulumiGcsBackends.gcpPlatform);
 
 const supportedEnvironments = ["development", "production"] as const;
 type Environment = (typeof supportedEnvironments)[number];

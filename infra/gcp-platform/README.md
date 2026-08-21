@@ -25,14 +25,13 @@ Pulumi authenticates its infrastructure operations with Google Application Defau
 
 ## State backend and first deployment
 
-The existing state project, GCP platform state bucket, required bucket controls, and local ADC are defined by the parent [infrastructure state backend guide](../README.md#state-backend). This project does not create its own backend and does not share a bucket or passphrase with the Cloudflare project. The repository wrapper and Pulumi program require a `gs://` backend and a non-empty `PULUMI_CONFIG_PASSPHRASE` before evaluating resources. This prevents the OAuth Client Secret from entering local state or state encrypted with an empty passphrase.
+The existing state project, `gs://kagami-infra/` bucket, required bucket controls, and local ADC are defined by the parent [infrastructure state backend guide](../README.md#one-time-state-backend-bootstrap). This project uses the dedicated `kagami/gcp-platform/` managed folder and does not share a passphrase or IAM access with the Cloudflare project. The repository wrapper and Pulumi program require a non-empty `PULUMI_CONFIG_PASSPHRASE` before evaluating resources and reject any runtime backend override that differs from `Pulumi.yaml`. This prevents the OAuth Client Secret from entering local state or state encrypted with an empty passphrase.
 
 Application project IDs are globally unique. Use different values for the two Stacks and connect both to the same Billing Account used by Vertex AI. The projects must belong to an organization, directly or through a folder, because Google does not support service-account-bound authorization keys for projects without an organization.
 
 ```bash
-export PULUMI_BACKEND_URL=gs://<existing-gcp-platform-state-bucket>/me-builder
 export PULUMI_CONFIG_PASSPHRASE=<gcp-platform-value-from-password-manager>
-pulumi login "$PULUMI_BACKEND_URL"
+pulumi login gs://kagami-infra/kagami/gcp-platform
 
 pulumi -C infra/gcp-platform stack init development
 pulumi -C infra/gcp-platform config set projectId <development-project-id> --stack development
