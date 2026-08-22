@@ -27,7 +27,6 @@ export async function deleteAccount(c: Context<AppEnv>): Promise<Response> {
   if (
     !c.env?.DB ||
     !c.env.ACCOUNT_DATA ||
-    !c.env.PHOTO_DIARY_BUCKET ||
     !c.env.COMPATIBILITY_DATA ||
     !c.env.CONVERSATION_COORDINATOR
   ) {
@@ -62,7 +61,9 @@ export async function deleteAccount(c: Context<AppEnv>): Promise<Response> {
       await c.env.AVATAR_BUCKET.delete(objectKey);
     },
     deletePhotoObjects: async (objectKeys) => {
-      if (objectKeys.length > 0) await photoDiaryBucket.delete([...objectKeys]);
+      if (objectKeys.length === 0) return;
+      if (!photoDiaryBucket) throw new Error("Photo diary bucket is required for Account deletion");
+      await photoDiaryBucket.delete([...objectKeys]);
     },
   });
   deleteCookie(c, APPLICATION_SESSION_COOKIE, {

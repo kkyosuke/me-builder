@@ -149,6 +149,7 @@ describe("photo diary controller", () => {
     );
 
     expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(value.execute).toHaveBeenCalledWith("account-1", "photoDiary.markDeleting", media.id);
     expect(value.execute).not.toHaveBeenCalledWith(
       "account-1",

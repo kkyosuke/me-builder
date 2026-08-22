@@ -302,6 +302,11 @@ export async function handleQueueBatch(
         retryable: true,
       });
       const flow = flowOf(message.body);
+      const maxAttempts = MAX_ATTEMPTS_BY_FLOW[flow];
+      const disposition =
+        maxAttempts !== undefined && message.attempts >= maxAttempts
+          ? "dead-letter"
+          : "platform-retry";
       const durationMs = Date.now() - startedAt;
       logger.error(
         {
@@ -317,17 +322,17 @@ export async function handleQueueBatch(
           queueMessageId: message.id,
           attempt: message.attempts,
           outcome: "failed",
-          disposition: "platform-retry",
+          disposition,
           ...safeError,
           durationMs,
         },
         describeQueueMessageResult({
           flow,
           outcome: "failed",
-          disposition: "platform-retry",
+          disposition,
           stage: safeError.stage,
           attempt: message.attempts,
-          maxAttempts: MAX_ATTEMPTS_BY_FLOW[flow],
+          maxAttempts,
           durationMs,
           error: safeError,
         }),

@@ -330,7 +330,13 @@ export async function processPhotoDiaryImage(
       .transform({ width: THUMBNAIL_WIDTH, fit: "scale-down" })
       .output({ format: "image/webp", quality: 80, anim: false });
     thumbnailBytes = new Uint8Array(await thumbnail.response().arrayBuffer());
-    if (thumbnailBytes.byteLength === 0) throw new Error("Thumbnail output was empty");
+    if (
+      thumbnailBytes.byteLength === 0 ||
+      detectedMimeType(thumbnailBytes) !== "image/webp" ||
+      isAnimated(thumbnailBytes, "image/webp")
+    ) {
+      throw new Error("Thumbnail output was not a static WebP image");
+    }
   } catch (error) {
     throw toOperationalError(error, {
       code: "PHOTO_DIARY_THUMBNAIL_FAILED",

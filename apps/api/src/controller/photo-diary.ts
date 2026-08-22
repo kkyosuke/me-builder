@@ -31,10 +31,10 @@ function dependencies(c: Context<AppEnv>) {
 }
 
 export async function getPhotoDiaries(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "private, no-store");
   const deps = dependencies(c);
   if (!deps) return unavailable(c);
   const media = await deps.accountData.execute("photoDiary.list", 50);
-  c.header("Cache-Control", "private, no-store");
   return c.json(
     v.parse(PhotoDiaryListResponseSchema, {
       items: media.map((item) => ({
@@ -52,6 +52,7 @@ export async function getPhotoDiaries(c: Context<AppEnv>): Promise<Response> {
 }
 
 export async function getPhotoDiaryImage(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "private, no-store");
   const deps = dependencies(c);
   if (!deps) return unavailable(c);
   const media = await deps.accountData.execute("photoDiary.get", c.req.param("mediaId") ?? "");
@@ -79,6 +80,7 @@ export async function getPhotoDiaryImage(c: Context<AppEnv>): Promise<Response> 
 }
 
 export async function deletePhotoDiary(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
   const deps = dependencies(c);
   if (!deps || !c.env.PHOTO_DIARY_DELETION_QUEUE) return unavailable(c);
   const mediaId = c.req.param("mediaId") ?? "";
@@ -91,6 +93,5 @@ export async function deletePhotoDiary(c: Context<AppEnv>): Promise<Response> {
   });
   const enqueued = await deps.accountData.execute("photoDiary.markDeletionEnqueued", mediaId);
   if (!enqueued) throw new Error("Photo diary deletion dispatch state could not be recorded");
-  c.header("Cache-Control", "no-store");
   return c.json(v.parse(PhotoDiaryDeletionResponseSchema, { deleted: true }));
 }

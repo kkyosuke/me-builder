@@ -279,35 +279,6 @@ export async function markPhotoDiaryDeleting(
   mediaId: string,
   at = new Date(),
 ): Promise<boolean> {
-  const tombstoneSource = async (sourceRecordId: string) => {
-    await db
-      .update(sourceRecords)
-      .set({ isDeleted: true, deletedAt: at, updatedAt: at })
-      .where(and(eq(sourceRecords.id, sourceRecordId), eq(sourceRecords.accountId, accountId)));
-  };
-  const updated = await db
-    .update(photoDiaryMedia)
-    .set({
-      storageStatus: "deleting",
-      isDeleted: true,
-      deletedAt: at,
-      deleteDueAt: new Date(at.getTime() + DELETE_DEADLINE_MS),
-      deletionEnqueuedAt: null,
-      updatedAt: at,
-    })
-    .where(
-      and(
-        eq(photoDiaryMedia.id, mediaId),
-        eq(photoDiaryMedia.accountId, accountId),
-        eq(photoDiaryMedia.storageStatus, "available"),
-        eq(photoDiaryMedia.isDeleted, false),
-      ),
-    )
-    .returning({ id: photoDiaryMedia.id, sourceRecordId: photoDiaryMedia.sourceRecordId });
-  if (updated[0]) {
-    await tombstoneSource(updated[0].sourceRecordId);
-    return true;
-  }
   const [existing] = await db
     .select({
       status: photoDiaryMedia.storageStatus,
@@ -316,8 +287,43 @@ export async function markPhotoDiaryDeleting(
     .from(photoDiaryMedia)
     .where(and(eq(photoDiaryMedia.id, mediaId), eq(photoDiaryMedia.accountId, accountId)))
     .limit(1);
-  if (existing?.status !== "deleting") return false;
-  await tombstoneSource(existing.sourceRecordId);
+  if (!existing) return false;
+  if (existing.status === "deleting") {
+    await db
+      .update(sourceRecords)
+      .set({ isDeleted: true, deletedAt: at, updatedAt: at })
+      .where(
+        and(eq(sourceRecords.id, existing.sourceRecordId), eq(sourceRecords.accountId, accountId)),
+      );
+    return true;
+  }
+  if (existing.status !== "available") return false;
+  await db.batch([
+    db
+      .update(photoDiaryMedia)
+      .set({
+        storageStatus: "deleting",
+        isDeleted: true,
+        deletedAt: at,
+        deleteDueAt: new Date(at.getTime() + DELETE_DEADLINE_MS),
+        deletionEnqueuedAt: null,
+        updatedAt: at,
+      })
+      .where(
+        and(
+          eq(photoDiaryMedia.id, mediaId),
+          eq(photoDiaryMedia.accountId, accountId),
+          eq(photoDiaryMedia.storageStatus, "available"),
+          eq(photoDiaryMedia.isDeleted, false),
+        ),
+      ),
+    db
+      .update(sourceRecords)
+      .set({ isDeleted: true, deletedAt: at, updatedAt: at })
+      .where(
+        and(eq(sourceRecords.id, existing.sourceRecordId), eq(sourceRecords.accountId, accountId)),
+      ),
+  ]);
   return true;
 }
 

@@ -109,6 +109,77 @@ describe("validatePhotoDiaryImage", () => {
 });
 
 describe("processPhotoDiaryImage retry", () => {
+  it("検証済み原本と静止WebP thumbnailを予約後に保存して確定する", async () => {
+    const original = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+    const thumbnail = new Uint8Array([
+      ...["R", "I", "F", "F"].map((value) => value.charCodeAt(0)),
+      4,
+      0,
+      0,
+      0,
+      ...["W", "E", "B", "P"].map((value) => value.charCodeAt(0)),
+    ]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response(original, "image/jpeg"));
+    const media = {
+      id: "media-new",
+      sourceRecordId: "source-new",
+      originalObjectKey: "photo-diary/media-new/original",
+      thumbnailObjectKey: "photo-diary/media-new/thumbnail.webp",
+      mimeType: "image/jpeg" as const,
+      byteSize: original.byteLength,
+      thumbnailByteSize: thumbnail.byteLength,
+      storageByteSize: original.byteLength + thumbnail.byteLength,
+      width: 800,
+      height: 600,
+      capturedAt: new Date("2026-08-22T01:00:00.000Z"),
+      storageStatus: "reserved" as const,
+      usageEligibility: "unreviewed" as const,
+    };
+    const execute = vi.fn(async (_accountId: string, operation: string) => {
+      if (operation === "photoDiary.findByLineMessage") return null;
+      if (operation === "photoDiary.readStorageUsage") return 0;
+      if (operation === "photoDiary.reserve") return { type: "reserved", media };
+      if (operation === "photoDiary.complete") return true;
+      throw new Error(`unexpected operation: ${operation}`);
+    });
+    const put = vi.fn().mockResolvedValue(undefined);
+    const output = vi.fn().mockResolvedValue({
+      response: () => new Response(Uint8Array.from(thumbnail).buffer),
+    });
+    const transform = vi.fn().mockReturnValue({ output });
+    const cf = {
+      d1: {},
+      do: { accountData: { getByName: () => ({ execute }) } as AccountDataNamespace },
+      photoDiaryBucket: { put },
+      images: {
+        info: vi.fn().mockResolvedValue({ format: "jpeg", width: 800, height: 600 }),
+        input: vi.fn().mockReturnValue({ transform }),
+      },
+      planAssignmentProvider: new billing.FakeAccountPlanAssignmentProvider(),
+    } as unknown as CloudflareBindings;
+
+    await expect(
+      processPhotoDiaryImage(
+        {
+          webhookEventId: "event-new",
+          timestamp: media.capturedAt.getTime(),
+          source: { type: "user", userId: "line-user" },
+          message: { id: "message-new", type: "image", contentProvider: { type: "line" } },
+        },
+        "account-1",
+        cf,
+        getWorkerConfig({ LINE_CHANNEL_ACCESS_TOKEN: "line-token" }),
+      ),
+    ).resolves.toBe("stored");
+    expect(put).toHaveBeenNthCalledWith(1, media.originalObjectKey, original, {
+      httpMetadata: { contentType: "image/jpeg" },
+    });
+    expect(put).toHaveBeenNthCalledWith(2, media.thumbnailObjectKey, thumbnail, {
+      httpMetadata: { contentType: "image/webp" },
+    });
+    expect(execute).toHaveBeenLastCalledWith("account-1", "photoDiary.complete", media.id);
+  });
+
   it("保存済みmessageの再配送では期限付きLINE contentを再取得しない", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     const execute = vi.fn(async (_accountId: string, operation: string) => {
