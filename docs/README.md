@@ -118,7 +118,7 @@ docs/
 - [LIFF交換・アプリケーションセッション境界検証Runbook](development/application-session-boundary-verification.md) — Cookie／Origin／CSRFのデプロイ後検査、実端末・2 Account／2タブ・障害時の検証、証跡形式
 - [SSO Preview検証Runbook](development/sso-preview-verification.md) — LIFF／SSOの成功・失敗経路、機微情報を残さない証跡、SSOだけの切り戻し手順
 - [SSO Production段階公開Runbook](development/sso-production-rollout.md) — 管理者、少数割合、全対象の公開phase、監視ゲート、即時停止・再開手順
-- [MCP実装残タスク](development/mcp-remaining-tasks.md) — 管理者限定MCPの認可・同意・監査・解除を実装し、501公開境界を解除するまでの依存順と検証
+- [MCP運用検証runbook](development/mcp-remaining-tasks.md) — 管理者限定MCPの環境別有効化、実client互換性、停止・再開と安全な証跡
 - [マルチモーダル入力実装残タスク](development/multimodal-input-remaining-tasks.md) — 写真の保存・AI利用を段階公開する依存順、法務・規約gate、将来mediaの分離
 - [診断回答形式の実装境界](development/diagnosis-format-remaining-tasks.md) — 標準2択と例外5段階の形式、score、保存、UI、互換性の確定事項
 - [ネイティブアプリ提供境界](development/native-app-remaining-tasks.md) — iOS・Androidを提供せず、LINEとWebへ機能を分担する確定方針

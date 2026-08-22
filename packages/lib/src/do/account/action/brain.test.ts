@@ -20,6 +20,7 @@ import {
   listFailedBrainVectorSyncJobs,
   loadBrainChatContextMemories,
   loadBrainSemanticDedupCandidates,
+  loadMcpBrainSearchResults,
   loadRelationshipDiagnosisContexts,
   readPersonalDataFeatureExport,
   resetAllFailedBrainVectorSyncJobs,
@@ -196,6 +197,7 @@ describe("saveBrainItem", () => {
       category: "preference",
       derivation: "ai",
       itemRevision: at.getTime(),
+      mcpOwnerEligible: false,
     });
     await expect(
       completeBrainVectorSyncJob(
@@ -1311,6 +1313,89 @@ describe("loadBrainChatContextMemories", () => {
     expect(memories).toHaveLength(2);
     expect(memories.flatMap(({ evidence: itemEvidence }) => itemEvidence)).toHaveLength(3);
     expect(memories.map(({ evidence: itemEvidence }) => itemEvidence.length)).toEqual([2, 1]);
+  });
+});
+
+describe("loadMcpBrainSearchResults", () => {
+  it("外部提供を許可したactive Itemだけを原文なしの最小projectionで返す", async () => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(
+      db,
+      createInput({
+        at,
+        item: {
+          ...createInput().item,
+          category: "memory",
+          statement: "本人が見た出来事",
+          externallyShareable: true,
+        },
+        accessLabels: [{ id: "access-work", label: "work", assignedBy: "owner" }],
+      }),
+    );
+    await db.insert(schema.brainVectorEntries).values({
+      id: "vector-allowed",
+      brainItemId: "brain-1",
+      itemRevision: at.getTime(),
+      createdAt: at,
+      updatedAt: at,
+    });
+    await db.insert(schema.sourceRecordTextPayloads).values({
+      sourceRecordId: "source-1",
+      body: "外部へ返してはいけないEvidence原文",
+      contentHash: "evidence-content-hash",
+      createdAt: at,
+    });
+
+    const result = await loadMcpBrainSearchResults(db, "account-1", ["vector-allowed"], at);
+
+    expect(result).toEqual([
+      {
+        brainItemId: "brain-1",
+        category: "memory",
+        statement: "本人が見た出来事",
+        perspective: "owner_observation",
+        derivation: "owner_explicit",
+        evidence: {
+          count: 1,
+          sourceKinds: ["user_input"],
+          firstObservedAt: expect.any(Date),
+          lastObservedAt: expect.any(Date),
+        },
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain("Evidence原文");
+    expect(JSON.stringify(result)).not.toContain("source-1");
+  });
+
+  it.each([
+    { name: "外部提供不可", shareable: false, sensitivity: "normal", label: "work" },
+    { name: "未分類", shareable: true, sensitivity: "normal", label: "unclassified" },
+    { name: "private", shareable: true, sensitivity: "normal", label: "private" },
+    { name: "高度機微", shareable: true, sensitivity: "highly_sensitive", label: "work" },
+  ])("$nameのItemを候補IDに含めても返さない", async ({ shareable, sensitivity, label }) => {
+    const db = createTestDb();
+    await insertAccountsAndSources(db);
+    const at = new Date("2026-08-10T00:00:00Z");
+    await saveBrainItem(
+      db,
+      createInput({
+        at,
+        item: { ...createInput().item, externallyShareable: shareable, sensitivity },
+        accessLabels: [{ id: "access-policy", label, assignedBy: "owner" }],
+      }),
+    );
+    await db.insert(schema.brainVectorEntries).values({
+      id: "vector-denied",
+      brainItemId: "brain-1",
+      itemRevision: at.getTime(),
+      createdAt: at,
+      updatedAt: at,
+    });
+    await expect(
+      loadMcpBrainSearchResults(db, "account-1", ["vector-denied"], at),
+    ).resolves.toEqual([]);
   });
 });
 

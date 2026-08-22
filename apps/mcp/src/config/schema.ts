@@ -11,6 +11,11 @@ export const McpConfigSchema = v.object({
   apiUrl: v.optional(v.string()),
   /** ブラウザからのCORSリクエストを許可するWeb UIのオリジン。 */
   webOrigin: v.optional(v.pipe(v.string(), v.url())),
+  featureEnabled: v.optional(v.boolean(), false),
+  googleVertexAiApiKey: v.optional(v.string()),
+  geminiEmbeddingModel: v.optional(v.string(), "gemini-embedding-001"),
+  brainVectorHmacSecret: v.optional(v.string()),
+  tokenHmacSecret: v.optional(v.string()),
 });
 
 export type McpConfig = v.InferOutput<typeof McpConfigSchema>;

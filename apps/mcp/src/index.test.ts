@@ -1,74 +1,68 @@
 import { describe, expect, it } from "vitest";
 import { app } from "./index";
 
-describe("MCP Server Error Handling", () => {
-  it("GET /health returns 200 ok", async () => {
-    const res = await app.request("/health");
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.status).toBe("ok");
+describe("MCP public boundary", () => {
+  it("feature flag無効時はPOST /mcpを501へ閉じる", async () => {
+    const response = await app.request(
+      "/mcp",
+      { method: "POST" },
+      { MCP_FEATURE_ENABLED: "false" },
+    );
+    expect(response.status).toBe(501);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toMatchObject({ code: "MCP_NOT_AVAILABLE" });
   });
 
-  it.each([
-    ["POST", "/mcp"],
-    ["GET", "/sse"],
-    ["POST", "/messages"],
-  ])("Phase 2開始前は%s %sを明示的な501へ閉じる", async (method, path) => {
-    const res = await app.request(path, { method });
+  it("有効時の未認証requestはresource metadata付き401にする", async () => {
+    const response = await app.request(
+      "/mcp",
+      { method: "POST" },
+      {
+        MCP_FEATURE_ENABLED: "true",
+        BASE_URL: "https://mcp.example",
+        API_URL: "https://api.example",
+        DB: {} as never,
+        ACCOUNT_DATA: {} as never,
+        BRAIN_VECTOR_INDEX: {} as never,
+        GOOGLE_VERTEX_AI_API_KEY: "gemini-secret",
+        BRAIN_VECTOR_HMAC_SECRET: "brain-secret",
+        MCP_TOKEN_HMAC_SECRET: "token-secret",
+      },
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toContain(
+      "https://mcp.example/.well-known/oauth-protected-resource/mcp",
+    );
+  });
 
-    expect(res.status).toBe(501);
-    expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(await res.json()).toEqual({
-      error: "Not Implemented",
-      code: "MCP_NOT_AVAILABLE",
-      phase: "phase_2",
+  it("Protected Resource Metadataは固定resourceとscopeだけを広告する", async () => {
+    const response = await app.request("/.well-known/oauth-protected-resource/mcp", undefined, {
+      BASE_URL: "https://mcp.example",
+      API_URL: "https://api.example",
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      resource: "https://mcp.example/mcp",
+      authorization_servers: ["https://api.example"],
+      scopes_supported: ["brain:search"],
     });
   });
 
-  it("allows CORS only from the configured Web origin", async () => {
-    const allowedOrigin = "https://stg.kagami.kyosuke.dev";
-    const allowed = await app.request(
-      "/health",
+  it("外部OriginからのMCP POSTは認証処理前に拒否する", async () => {
+    const response = await app.request(
+      "/mcp",
+      { method: "POST", headers: { Origin: "https://evil.example" } },
       {
-        method: "OPTIONS",
-        headers: {
-          Origin: allowedOrigin,
-          "Access-Control-Request-Method": "GET",
-          "Access-Control-Request-Headers": "Authorization, Content-Type",
-        },
+        MCP_FEATURE_ENABLED: "true",
+        BASE_URL: "https://mcp.example",
+        API_URL: "https://api.example",
       },
-      { WEB_ORIGIN: allowedOrigin },
     );
-    const denied = await app.request(
-      "/health",
-      {
-        method: "OPTIONS",
-        headers: {
-          Origin: "https://attacker.example",
-          "Access-Control-Request-Method": "GET",
-          "Access-Control-Request-Headers": "Authorization, Content-Type",
-        },
-      },
-      { WEB_ORIGIN: allowedOrigin },
-    );
-
-    expect(allowed.headers.get("Access-Control-Allow-Origin")).toBe(allowedOrigin);
-    expect(allowed.headers.get("Access-Control-Allow-Headers")).toBe("Authorization,Content-Type");
-    expect([...denied.headers.keys()].filter((name) => name.startsWith("access-control-"))).toEqual(
-      [],
-    );
+    expect(response.status).toBe(403);
   });
 
-  it("handles unhandled exception with 500 status using app.onError", async () => {
-    const testApp = new (await import("hono")).Hono();
-    testApp.onError((_err, c) => c.json({ error: "Internal Server Error" }, 500));
-    testApp.get("/test-error", () => {
-      throw new Error("Test error");
-    });
-
-    const res = await testApp.request("/test-error");
-    expect(res.status).toBe(500);
-    const data = await res.json();
-    expect(data).toEqual({ error: "Internal Server Error" });
+  it("旧SSE endpointは有効化後も501のままにする", async () => {
+    expect((await app.request("/sse")).status).toBe(501);
+    expect((await app.request("/messages", { method: "POST" })).status).toBe(501);
   });
 });

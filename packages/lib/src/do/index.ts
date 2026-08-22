@@ -26,6 +26,7 @@ export type {
   ActiveBrainVectorEntry,
   AppliedBrainVectorSync,
   BrainChatContextMemory,
+  McpBrainSearchResult,
   BrainSemanticDedupCandidate,
   DailyPromptWeekdayContext,
   FailedBrainVectorSyncJob,

@@ -41,6 +41,11 @@ export function getMcpConfig(env?: Record<string, unknown>): McpConfig {
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,
     webOrigin: rawWebOrigin,
+    featureEnabled: getEnv("MCP_FEATURE_ENABLED", env)?.trim() === "true",
+    googleVertexAiApiKey: getEnv("GOOGLE_VERTEX_AI_API_KEY", env)?.trim() || undefined,
+    geminiEmbeddingModel: getEnv("GEMINI_EMBEDDING_MODEL", env)?.trim() || "gemini-embedding-001",
+    brainVectorHmacSecret: getEnv("BRAIN_VECTOR_HMAC_SECRET", env)?.trim() || undefined,
+    tokenHmacSecret: getEnv("MCP_TOKEN_HMAC_SECRET", env)?.trim() || undefined,
   };
 
   return v.parse(McpConfigSchema, rawConfig);

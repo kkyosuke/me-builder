@@ -87,6 +87,41 @@ export async function scheduledHandler(
         "[Development operation audit cleanup] failed",
       );
     }
+    try {
+      const deletedCount = await D1.shared.action.mcp.pruneAuditRecords(
+        cf.d1,
+        new Date(controller.scheduledTime),
+      );
+      logger.info(
+        {
+          event: "mcp.audit.cleanup.completed",
+          service: "worker",
+          environment: workerConfig.environment,
+          component: "mcp-audit-cleanup",
+          outcome: "succeeded",
+          deletedCount,
+        },
+        "[MCP audit cleanup] completed",
+      );
+    } catch (error) {
+      logger.error(
+        {
+          event: "mcp.audit.cleanup.failed",
+          service: "worker",
+          environment: workerConfig.environment,
+          component: "mcp-audit-cleanup",
+          outcome: "failed",
+          disposition: "retry-next-schedule",
+          ...toSafeOperationalErrorFields(error, {
+            code: "MCP_AUDIT_CLEANUP_FAILED",
+            category: "dependency",
+            stage: "mcp.audit.cleanup",
+            retryable: true,
+          }),
+        },
+        "[MCP audit cleanup] failed",
+      );
+    }
   }
   try {
     if (!cf.queue.dailyPrompt) throw new Error("DAILY_PROMPT_QUEUE binding is not configured");

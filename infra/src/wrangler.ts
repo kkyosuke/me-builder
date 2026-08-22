@@ -37,8 +37,16 @@ function webErrorRateLimit(prefix: string, namespaceId: string) {
   return `[[${prefix}ratelimits]]\nname = "WEB_ERROR_RATE_LIMITER"\nnamespace_id = "${namespaceId}"\n\n[${prefix}ratelimits.simple]\nlimit = 300\nperiod = 60`;
 }
 
+function mcpRateLimit(prefix: string, namespaceId: string) {
+  return `[[${prefix}ratelimits]]\nname = "MCP_RATE_LIMITER"\nnamespace_id = "${namespaceId}"\n\n[${prefix}ratelimits.simple]\nlimit = 60\nperiod = 60`;
+}
+
 function webVars(baseDomain: string, environment: string) {
-  return [`ENVIRONMENT = "${environment}"`, `WEB_ORIGIN = "https://${baseDomain}"`];
+  return [
+    `ENVIRONMENT = "${environment}"`,
+    `BASE_DOMAIN = "${baseDomain}"`,
+    `WEB_ORIGIN = "https://${baseDomain}"`,
+  ];
 }
 
 function apiVars(baseDomain: string, environment: string) {
@@ -46,6 +54,8 @@ function apiVars(baseDomain: string, environment: string) {
     ...webVars(baseDomain, environment),
     'SSO_ROLLOUT_MODE = "disabled"',
     'SSO_ROLLOUT_PERCENT = "0"',
+    `MCP_RESOURCE_URL = "https://mcp.${baseDomain}/mcp"`,
+    'MCP_FEATURE_ENABLED = "false"',
   ];
 }
 
@@ -144,7 +154,8 @@ function apiEnvironment(manifest: InfrastructureManifest) {
 function mcpEnvironment(manifest: InfrastructureManifest) {
   const env = manifest.environment;
   const host = `mcp.${manifest.baseDomain}`;
-  return `[env.${env}]\nname = "me-builder-mcp-${env}"\nroutes = [\n  { pattern = "${host}", custom_domain = true }\n]\n\n${d1(manifest.database, `env.${env}.`)}\n\n[env.${env}.vars]\n${webVars(manifest.baseDomain, env).join("\n")}`;
+  const prefix = `env.${env}.`;
+  return `[env.${env}]\nname = "me-builder-mcp-${env}"\nroutes = [\n  { pattern = "${host}", custom_domain = true }\n]\n\n${d1(manifest.database, prefix)}\n\n${vectorize(env, prefix)}\n\n${durableObject(prefix, "ACCOUNT_DATA", `me-builder-worker-${env}`)}\n\n${mcpRateLimit(prefix, env === "preview" ? "12002" : "12003")}\n\n[env.${env}.vars]\n${webVars(manifest.baseDomain, env).join("\n")}\nMCP_FEATURE_ENABLED = "false"`;
 }
 
 export function renderWranglerConfigs(
@@ -349,7 +360,7 @@ export function renderWranglerConfigs(
     "",
   ].join("\n");
 
-  const mcp = `${header}\nname = "me-builder-mcp"\nmain = "src/index.ts"\ncompatibility_date = "2024-07-01"\ncompatibility_flags = ["nodejs_compat"]\n\n[observability]\nenabled = true\n\n${d1(localDatabase)}\n\n[vars]\nENVIRONMENT = "local"\nWEB_ORIGIN = "http://localhost:5173"\n\n[env.local]\nname = "me-builder-mcp-local"\n\n${d1(localDatabase, "env.local.")}\n\n[env.local.vars]\nENVIRONMENT = "local"\nWEB_ORIGIN = "http://localhost:5173"\n\n${mcpEnvironment(preview)}\n\n${mcpEnvironment(production)}\n`;
+  const mcp = `${header}\nname = "me-builder-mcp"\nmain = "src/index.ts"\ncompatibility_date = "2026-07-29"\ncompatibility_flags = ["nodejs_compat"]\n\n[observability]\nenabled = true\n\n${d1(localDatabase)}\n\n${vectorize("local")}\n\n${durableObject("", "ACCOUNT_DATA", "me-builder-worker-local")}\n\n${mcpRateLimit("", "12001")}\n\n[vars]\nENVIRONMENT = "local"\nWEB_ORIGIN = "http://localhost:5173"\nBASE_URL = "http://localhost:3001"\nAPI_URL = "http://localhost:3000"\nMCP_FEATURE_ENABLED = "false"\n\n[env.local]\nname = "me-builder-mcp-local"\n\n${d1(localDatabase, "env.local.")}\n\n${vectorize("local", "env.local.")}\n\n${durableObject("env.local.", "ACCOUNT_DATA", "me-builder-worker-local")}\n\n${mcpRateLimit("env.local.", "12001")}\n\n[env.local.vars]\nENVIRONMENT = "local"\nWEB_ORIGIN = "http://localhost:5173"\nBASE_URL = "http://localhost:3001"\nAPI_URL = "http://localhost:3000"\nMCP_FEATURE_ENABLED = "false"\n\n${mcpEnvironment(preview)}\n\n${mcpEnvironment(production)}\n`;
 
   const lib = `${header}\nname = "me-builder-lib"\n\n${d1(localDatabase)}\nmigrations_dir = "drizzle"\n\n[env.preview]\n${d1(preview.database, "env.preview.")}\nmigrations_dir = "drizzle"\n\n[env.production]\n${d1(production.database, "env.production.")}\nmigrations_dir = "drizzle"\n`;
   return { worker, api, mcp, lib };

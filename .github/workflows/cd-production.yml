@@ -27,6 +27,8 @@ jobs:
       GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
+      MCP_TOKEN_HMAC_SECRET: ${{ secrets.MCP_TOKEN_HMAC_SECRET }}
+      MCP_FEATURE_ENABLED: ${{ vars.MCP_FEATURE_ENABLED || 'false' }}
       BILLING_PROJECTION_STALE_AFTER_SECONDS: ${{ vars.BILLING_PROJECTION_STALE_AFTER_SECONDS }}
       CLOUDFLARE_ACCESS_ALLOWED_EMAILS: ${{ vars.CLOUDFLARE_ACCESS_ALLOWED_EMAILS }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
@@ -92,6 +94,10 @@ jobs:
           fi
           if [ "${sso_mode}" != "disabled" ] && { [ -z "${GOOGLE_IDENTITY_PLATFORM_API_KEY}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; }; then
             echo "::error::SSOを有効にするにはGOOGLE_IDENTITY_PLATFORM_API_KEY、GOOGLE_OAUTH_CLIENT_ID、GOOGLE_OAUTH_CLIENT_SECRETが必要です。"
+            configuration_invalid=1
+          fi
+          if [ "${MCP_FEATURE_ENABLED}" = "true" ] && [ -z "${MCP_TOKEN_HMAC_SECRET}" ]; then
+            echo "::error::MCPを有効にするにはMCP_TOKEN_HMAC_SECRETが必要です。"
             configuration_invalid=1
           fi
           if [ -n "${BILLING_PROJECTION_STALE_AFTER_SECONDS}" ] && { ! [[ "${BILLING_PROJECTION_STALE_AFTER_SECONDS}" =~ ^[0-9]+$ ]] || [ "${BILLING_PROJECTION_STALE_AFTER_SECONDS}" -lt 60 ]; }; then
@@ -163,9 +169,10 @@ jobs:
           secrets_dir="$(mktemp -d "${RUNNER_TEMP}/worker-secrets.XXXXXX")"
           api_secrets_file="${secrets_dir}/api.json"
           worker_secrets_file="${secrets_dir}/worker.json"
-          trap 'rm -f "${api_secrets_file}" "${worker_secrets_file}"; rmdir "${secrets_dir}"' EXIT
+          mcp_secrets_file="${secrets_dir}/mcp.json"
+          trap 'rm -f "${api_secrets_file}" "${worker_secrets_file}" "${mcp_secrets_file}"; rmdir "${secrets_dir}"' EXIT
 
-          API_SECRETS_FILE="${api_secrets_file}" WORKER_SECRETS_FILE="${worker_secrets_file}" bun -e '
+          API_SECRETS_FILE="${api_secrets_file}" WORKER_SECRETS_FILE="${worker_secrets_file}" MCP_SECRETS_FILE="${mcp_secrets_file}" bun -e '
             const sharedSecrets = [["LINE_CHANNEL_ACCESS_TOKEN", process.env.LINE_CHANNEL_ACCESS_TOKEN], ["LIFF_ID", process.env.LIFF_ID], ["ADMIN_LINE_USER_IDS", process.env.ADMIN_LINE_USER_IDS]];
             const optionalSecrets = Object.fromEntries(
               sharedSecrets
@@ -183,6 +190,7 @@ jobs:
               LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
               ...(process.env.GOOGLE_IDENTITY_PLATFORM_API_KEY ? { GOOGLE_IDENTITY_PLATFORM_API_KEY: process.env.GOOGLE_IDENTITY_PLATFORM_API_KEY } : {}),
               ...(process.env.GOOGLE_OAUTH_CLIENT_SECRET ? { GOOGLE_OAUTH_CLIENT_SECRET: process.env.GOOGLE_OAUTH_CLIENT_SECRET } : {}),
+              ...(process.env.MCP_TOKEN_HMAC_SECRET ? { MCP_TOKEN_HMAC_SECRET: process.env.MCP_TOKEN_HMAC_SECRET } : {}),
               ...optionalSecrets,
               ...apiConfiguration,
             }));
@@ -190,13 +198,18 @@ jobs:
               ...optionalSecrets,
               ...workerOnlySecrets,
             }));
+            await Bun.write(process.env.MCP_SECRETS_FILE, JSON.stringify({
+              GOOGLE_VERTEX_AI_API_KEY: process.env.GOOGLE_VERTEX_AI_API_KEY,
+              BRAIN_VECTOR_HMAC_SECRET: process.env.BRAIN_VECTOR_HMAC_SECRET,
+              ...(process.env.MCP_TOKEN_HMAC_SECRET ? { MCP_TOKEN_HMAC_SECRET: process.env.MCP_TOKEN_HMAC_SECRET } : {}),
+            }));
           '
 
           bun --cwd apps/worker wrangler deploy --env production --secrets-file "${worker_secrets_file}"
-          api_sso_vars=(--var "SSO_ROLLOUT_MODE:${sso_mode}" --var "SSO_ROLLOUT_PERCENT:${sso_percent}")
+          api_sso_vars=(--var "SSO_ROLLOUT_MODE:${sso_mode}" --var "SSO_ROLLOUT_PERCENT:${sso_percent}" --var "MCP_FEATURE_ENABLED:${MCP_FEATURE_ENABLED}")
           if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ]; then api_sso_vars+=(--var "GOOGLE_OAUTH_CLIENT_ID:${GOOGLE_OAUTH_CLIENT_ID}"); fi
           bun --cwd apps/api wrangler deploy --env production --secrets-file "${api_secrets_file}" "${api_sso_vars[@]}"
-          bun --filter @me-builder/mcp deploy:production
+          bun --cwd apps/mcp wrangler deploy --env production --secrets-file "${mcp_secrets_file}" --var "MCP_FEATURE_ENABLED:${MCP_FEATURE_ENABLED}"
           bun --filter @me-builder/web deploy:production
 
       - name: Verify Service Site Metadata and Search Boundaries (Production)

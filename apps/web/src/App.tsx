@@ -11,6 +11,7 @@ import {
 } from "./feature/auth/infrastructure/sso-auth-adapter";
 import { createCustomerPortalSession } from "./feature/billing/infrastructure/billing-api";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
+import { McpAuthorizationScreen } from "./feature/mcp";
 import {
   type ResetDevelopmentAccountDataResult,
   resetDevelopmentAccountData,
@@ -45,6 +46,7 @@ import {
   loadDiagnosisApplication,
   loadFamilySeatApplication,
   loadMainApplication,
+  loadMcpManagementScreen,
   loadPersonalDataApplication,
   loadProfileApplication,
   loadProfileSettingsScreen,
@@ -64,6 +66,7 @@ const PersonalDataApplication = lazy(loadPersonalDataApplication);
 const FamilySeatApplication = lazy(loadFamilySeatApplication);
 const BillingPlanApplication = lazy(loadBillingPlanApplication);
 const DevelopmentBrainItemsApplication = lazy(loadDevelopmentBrainItemsApplication);
+const McpManagementScreen = lazy(loadMcpManagementScreen);
 
 type ProfileView =
   | "closed"
@@ -72,7 +75,8 @@ type ProfileView =
   | "personal-data"
   | "brain-items"
   | "family"
-  | "billing";
+  | "billing"
+  | "mcp";
 type MainRoute = "compatibility" | "diagnosis" | "me";
 
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
@@ -81,6 +85,7 @@ const PROFILE_HISTORY_STATE_KEY = "me-builder-profile-view";
 const PROFILE_RETURN_PATHNAME_STATE_KEY = "me-builder-profile-return-pathname";
 
 function resolveProfileView(pathname: string): ProfileView {
+  if (pathname.startsWith("/profile/mcp")) return "mcp";
   if (pathname.startsWith("/profile/billing")) return "billing";
   if (pathname.startsWith("/profile/family")) return "family";
   if (pathname.startsWith("/profile/avatar")) return "avatar";
@@ -102,7 +107,8 @@ function historyProfileView(state: unknown): Exclude<ProfileView, "closed"> | nu
     value === "personal-data" ||
     value === "brain-items" ||
     value === "family" ||
-    value === "billing"
+    value === "billing" ||
+    value === "mcp"
     ? value
     : null;
 }
@@ -452,6 +458,11 @@ function AppContents() {
     setNavigation((current) => ({ ...current, profileView: "billing" }));
   };
 
+  const openMcp = () => {
+    window.history.pushState({ [PROFILE_HISTORY_STATE_KEY]: "mcp" }, "", "/profile/mcp");
+    setNavigation((current) => ({ ...current, profileView: "mcp" }));
+  };
+
   const closeAvatar = () => {
     if (historyProfileView(window.history.state) === "avatar") {
       setNavigation((current) => ({ ...current, profileView: "profile" }));
@@ -497,6 +508,16 @@ function AppContents() {
 
   const closeBillingPlans = () => {
     if (historyProfileView(window.history.state) === "billing") {
+      setNavigation((current) => ({ ...current, profileView: "profile" }));
+      window.history.back();
+      return;
+    }
+    window.history.replaceState({}, "", "/profile");
+    setNavigation((current) => ({ ...current, profileView: "profile" }));
+  };
+
+  const closeMcp = () => {
+    if (historyProfileView(window.history.state) === "mcp") {
       setNavigation((current) => ({ ...current, profileView: "profile" }));
       window.history.back();
       return;
@@ -614,11 +635,13 @@ function AppContents() {
               }
               isInactive={profileView !== "profile"}
               inactiveFocusTarget={
-                profileView === "billing"
-                  ? "billing"
-                  : profileView === "brain-items"
-                    ? "brain-items"
-                    : "avatar"
+                profileView === "mcp"
+                  ? "mcp"
+                  : profileView === "billing"
+                    ? "billing"
+                    : profileView === "brain-items"
+                      ? "brain-items"
+                      : "avatar"
               }
               isProfileLoading={profileReadState.status === "loading"}
               profileError={profileReadState.status === "error" ? profileReadState.message : null}
@@ -628,6 +651,7 @@ function AppContents() {
               fontSize={fontSize.fontSize}
               onBack={closeProfile}
               onOpenAdmin={openAdmin}
+              onOpenMcp={openMcp}
               onOpenAvatar={openAvatar}
               onOpenBillingPortal={openBillingPortal}
               {...(DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")
@@ -725,6 +749,17 @@ function AppContents() {
           </Suspense>
         </RouteErrorBoundary>
       )}
+      {profileView === "mcp" &&
+        authSession.state.status === "authenticated" &&
+        authSession.state.role === "admin" && (
+          <RouteErrorBoundary>
+            <Suspense
+              fallback={<LoadingState message="MCP連携を読み込んでいます..." variant="overlay" />}
+            >
+              <McpManagementScreen onBack={closeMcp} />
+            </Suspense>
+          </RouteErrorBoundary>
+        )}
     </>
   );
 }
@@ -734,6 +769,10 @@ export function App() {
     <AuthSessionProvider>
       {resolveRequestedPathname() === "/account-recovery" ? (
         <AccountRecoveryScreen />
+      ) : resolveRequestedPathname() === "/mcp/authorize" ? (
+        <ServiceTermsGate>
+          <McpAuthorizationScreen />
+        </ServiceTermsGate>
       ) : (
         <ServiceTermsGate>
           <AppContents />
