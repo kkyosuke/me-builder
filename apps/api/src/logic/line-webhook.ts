@@ -33,6 +33,8 @@ export type ReceiveLineWebhookParams = {
   waitUntil?: ((promise: Promise<unknown>) => void) | undefined;
   /** 現在扱えない非テキストmessageへ定型文を返信する */
   replyUnsupportedMessage?: ((replyToken: string, text: string) => Promise<unknown>) | undefined;
+  /** 法務・規約release gateを通過した環境だけLINE画像をQueueへ残す。 */
+  photoDiaryStorageEnabled?: boolean;
 };
 
 export const UNSUPPORTED_MESSAGE_REPLY_TEXT =
@@ -89,7 +91,10 @@ function routeLineTextEvents(payload: unknown): NonNullable<WebhookQueueMessage[
   };
 }
 
-function excludeUnsupportedMessageEvents(payload: unknown): {
+function excludeUnsupportedMessageEvents(
+  payload: unknown,
+  photoDiaryStorageEnabled: boolean,
+): {
   payload: unknown;
   replyTokens: string[];
   excludedCount: number;
@@ -108,11 +113,25 @@ function excludeUnsupportedMessageEvents(payload: unknown): {
     if (!webhookEvent || typeof webhookEvent !== "object") return true;
     const event = webhookEvent as Record<string, unknown>;
     const message = event.message;
+    const messageRecord =
+      message && typeof message === "object" ? (message as Record<string, unknown>) : undefined;
+    const sourceRecord =
+      event.source && typeof event.source === "object"
+        ? (event.source as Record<string, unknown>)
+        : undefined;
+    const isEnabledLineImage =
+      photoDiaryStorageEnabled &&
+      messageRecord?.type === "image" &&
+      messageRecord.contentProvider !== null &&
+      typeof messageRecord.contentProvider === "object" &&
+      (messageRecord.contentProvider as Record<string, unknown>).type === "line" &&
+      sourceRecord?.type === "user" &&
+      typeof sourceRecord.userId === "string";
     if (
       event.type !== "message" ||
-      !message ||
-      typeof message !== "object" ||
-      (message as Record<string, unknown>).type === "text"
+      !messageRecord ||
+      messageRecord.type === "text" ||
+      isEnabledLineImage
     ) {
       return true;
     }
@@ -139,6 +158,7 @@ export async function receiveLineWebhook({
   startChatLoading,
   waitUntil,
   replyUnsupportedMessage,
+  photoDiaryStorageEnabled = false,
 }: ReceiveLineWebhookParams): Promise<LineWebhookOutcome> {
   // 未設定の場合は環境を問わず検証をスキップせず拒否する
   if (!channelSecret) {
@@ -168,7 +188,7 @@ export async function receiveLineWebhook({
     );
   }
 
-  const filtered = excludeUnsupportedMessageEvents(payload);
+  const filtered = excludeUnsupportedMessageEvents(payload, photoDiaryStorageEnabled);
   if (filtered.excludedCount > 0) {
     const unsupportedReplies = Promise.all(
       filtered.replyTokens.map(async (replyToken) => {
@@ -201,7 +221,9 @@ export async function receiveLineWebhook({
     routing: routeLineTextEvents(filtered.payload),
   };
 
-  const messages = line.webhook.extractMessages(filtered.payload);
+  const messageCount = line.webhook
+    .parseEvents(filtered.payload)
+    .filter(({ type }) => type === "message").length;
 
   if (filtered.excludedCount > 0 && !filtered.hasRemainingEvents) {
     logger.info(
@@ -241,7 +263,7 @@ export async function receiveLineWebhook({
         outcome: "failed",
         disposition: "http-error",
         source: event.source,
-        messageCount: messages.length,
+        messageCount,
         ...toSafeOperationalErrorFields(error, errorDescriptor),
       },
       "[LINE webhook] failed at queue.configure -> http-error (WEBHOOK_QUEUE_BINDING_MISSING, category:configuration, via:cloudflare-queue)",
@@ -279,7 +301,7 @@ export async function receiveLineWebhook({
         outcome: "degraded",
         disposition: "not-queued",
         source: event.source,
-        messageCount: messages.length,
+        messageCount,
       },
       "[LINE webhook] degraded at queue.send -> not-queued (WEBHOOK_QUEUE binding is not configured)",
     );
@@ -298,7 +320,7 @@ export async function receiveLineWebhook({
         outcome: "failed",
         disposition: "http-error",
         source: event.source,
-        messageCount: messages.length,
+        messageCount,
         ...toSafeOperationalErrorFields(error, {
           code: "WEBHOOK_QUEUE_SEND_FAILED",
           category: "dependency",
@@ -320,7 +342,7 @@ export async function receiveLineWebhook({
       outcome: "succeeded",
       disposition: "queued",
       source: event.source,
-      messageCount: messages.length,
+      messageCount,
     },
     "[LINE webhook] succeeded at queue.send -> queued (handed off to the Worker with the same traceId)",
   );

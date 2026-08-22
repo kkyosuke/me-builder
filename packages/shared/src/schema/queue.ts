@@ -19,6 +19,13 @@ export interface WebhookQueueMessage {
   };
 }
 
+/** 本文やR2 keyをQueueへ複製せず、AccountDataの削除対象だけを参照する。 */
+export interface PhotoDiaryDeletionQueueMessage {
+  type: "photo-diary-deletion";
+  accountId: string;
+  mediaId: string;
+}
+
 /** AI生成Queueには本文を含めず、認証済みAccountのData ObjectとTurnだけを参照させる。 */
 export interface ChatTurnQueueMessage {
   type: "chat-turn";

@@ -5,6 +5,7 @@ import {
   D1,
   DIAGNOSIS_CATALOG_ID,
   DO,
+  PHOTO_DIARY_DELETION_DISPATCH_RECOVERY_MS,
   PROFILE_SUMMARY_DISPATCH_RECOVERY_MS,
   type ReleaseCompatibilityReservationResult,
   type ReserveCompatibilityReferenceResult,
@@ -505,6 +506,18 @@ export class AccountDataRepository {
       .orderBy(asc(DO.account.schema.aiUsageRecords.expiresAt))
       .limit(1)
       .get();
+    const undispatchedPhotoDeletion = this.database
+      .select({ updatedAt: DO.account.schema.photoDiaryMedia.updatedAt })
+      .from(DO.account.schema.photoDiaryMedia)
+      .where(
+        and(
+          eq(DO.account.schema.photoDiaryMedia.storageStatus, "deleting"),
+          isNull(DO.account.schema.photoDiaryMedia.deletionEnqueuedAt),
+        ),
+      )
+      .orderBy(asc(DO.account.schema.photoDiaryMedia.updatedAt))
+      .limit(1)
+      .get();
     const candidates = [
       session
         ? Math.min(
@@ -519,6 +532,9 @@ export class AccountDataRepository {
         ? profileSummaryGeneration.requestedAt.getTime() + PROFILE_SUMMARY_DISPATCH_RECOVERY_MS
         : null,
       expiringAiUsageReservation?.expiresAt.getTime() ?? null,
+      undispatchedPhotoDeletion
+        ? undispatchedPhotoDeletion.updatedAt.getTime() + PHOTO_DIARY_DELETION_DISPATCH_RECOVERY_MS
+        : null,
     ].filter((value): value is number => value !== null);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }

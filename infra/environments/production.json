@@ -8,9 +8,14 @@
   "avatarBucket": {
     "name": "me-builder-avatar-production"
   },
+  "photoDiaryBucket": {
+    "name": "me-builder-photo-diary-production"
+  },
   "queues": {
     "webhook": { "name": "me-builder-webhook-queue-production" },
     "webhookDeadLetter": { "name": "me-builder-webhook-dlq-production" },
+    "photoDiaryDeletion": { "name": "me-builder-photo-diary-deletion-queue-production" },
+    "photoDiaryDeletionDeadLetter": { "name": "me-builder-photo-diary-deletion-dlq-production" },
     "billing": { "name": "me-builder-billing-queue-production" },
     "billingDeadLetter": { "name": "me-builder-billing-dlq-production" },
     "chatTurn": { "name": "me-builder-chat-turn-queue-production" },

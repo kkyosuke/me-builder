@@ -21,25 +21,25 @@
 
 ## 2. 現在の安全境界
 
-現在の本人入力はLINEのテキスト日記とWebの`single_choice`診断です。LINEのimage、video、audio、file、location、stickerは署名検証後にテキストeventから分離し、本人へ未対応案内を返します。media contentを取得せず、Queue、Source Record、Brain、Vector、AI providerへ渡しません。
+LINE写真日記の保存段階は実装済みですが、`PHOTO_DIARY_STORAGE_ENABLED`の既定値を全環境で`false`としています。無効時は従来どおりimage、video、audio、file、location、stickerを署名検証後にテキストeventから分離し、本人へ未対応案内を返します。
+
+法務・規約gateを通過した環境で保存flagを有効にした場合だけ、1対1トークのLINE provider画像を取得し、Cloudflare Imagesで検証とthumbnail生成を行い、写真専用Private R2とAccountData metadataへ保存します。保存処理にはGemini、Brain、Vector、意味検索、推薦へのbindingや呼び出しを持たせていません。動画、音声、file、location、stickerはflagに関係なく未対応です。
 
 アバター画像はプロフィール表示専用であり、日記、診断、Brainのmedia入力として再利用しません。
 
-## 3. 保存段階
+## 3. 保存段階の公開残タスク
 
-依存順に次を実装します。
+保存段階のrepository実装は完了しています。Private R2、AccountDataの直列化された容量予約、LINE取得再試行、file検証、Cloudflare Images thumbnail、本人Web UI、認証付き画像response、即時利用停止と30分間隔・47回再試行の専用削除Queue／DLQ、Account削除・dev resetへの削除波及、feature flagまで接続済みです。容量は原本とthumbnailの実bytes合計で判定します。
 
-1. 写真日記専用Private R2、AccountDataのmedia metadata、使用量と予約を追加する
-2. LINE画像eventを専用取得Queueへ投入し、設計済みのkeyで冪等化する
-3. LINE取得の再試行、終端失敗、本人への成功・失敗案内を実装する
-4. 許可形式、size、pixel数、decode、animation、実形式を永続化前に検証する
-5. 原本を変えず、表示用metadataを除いたthumbnailを生成する
-6. 本人の日記履歴で、認証付きの閲覧、汎用代替テキスト、削除を提供する
-7. 削除直後の利用停止と物理削除を設計の期限内にjobで収束させる
-8. Plan downgradeと同時uploadを含む容量判定を実装する
-9. 写真保存だけのfeature flagを追加し、AI、Brain、Vectorへの経路が閉じていることをnegative testで固定する
+repositoryに残すのは、環境へ変更を適用した後にしか実施できない次のrelease作業だけです。
 
-保存段階では写真のbinary exportを追加しません。本人データ特徴APIに写真bytes、画像固有metadata、画像由来のAI派生物を混ぜないことを検証します。
+1. 法務確認と重要改定を完了し、保存flagを有効にできる規約versionを確定する
+2. Previewへ専用R2とAccountData migrationを適用し、保存flagをPreviewだけで有効にする
+3. LINE実端末で、1枚の送信、再配送、容量超過、閲覧、削除、Account削除を確認する
+4. R2／LINEの一時障害とDLQを演習し、本文、LINE user ID、message ID、R2 keyがログへ出ないことを確認する
+5. Preview証跡と法務承認をrelease checklistへ記録してからProduction flagを有効にする
+
+保存段階では写真のbinary exportを追加しません。本人データ特徴APIにも写真bytes、画像固有metadata、画像由来のAI派生物を含めません。
 
 ### 3.1 【検討必須】Production公開前の法務・規約gate
 
@@ -63,18 +63,9 @@
 
 ## 5. 検証
 
-- LINE実端末から1枚を送り、原本、thumbnail、日記履歴、削除まで確認する
-- 同じWebhook、同じmessage、同じQueue jobを再配送しても1件だけ保存される
-- LINE content取得の一時失敗、終端失敗、再試行期限経過を再現する
-- size、実形式、decode、pixel数、animationの各拒否caseをfixtureで固定する
-- 同時uploadでPlan上限を超えず、保存失敗時に予約が戻る
-- downgrade後も既存写真を閲覧・削除でき、新規uploadだけが止まる
-- 別Accountと未同意Accountが原本、thumbnail、存在を取得できない
-- 原本以外からEXIFとGPSが除去される
-- 削除後のR2、AI派生、Brain、Vectorに対するnegative testが通る
-- 保存段階ではGemini呼び出しが0件である
-- AI利用段階では`blocked`の再利用が0件である
-- 写真本文と識別子を含まないmetricsだけで成功、失敗、bytes、遅延を確認できる
+repository CIでは、MIMEとmagic bytesの不一致、decode失敗、10MB、4,000万pixel、APNG、容量合計、再配送の一意性、即時tombstone、R2削除失敗時の再試行、CSRF付き削除、1対1 LINE provider限定を自動検証します。保存用schemaと処理からBrain Item、Vector、text payloadを生成しないnegative testも維持します。
+
+実環境でだけ確認できる項目は§3のrelease作業へ集約します。AI利用段階では、`blocked`の再利用が0件であること、Geminiの実safety応答、AI用派生物の全終了経路での破棄を別のdatasetとPreview検証で追加します。
 
 ## 6. 将来media
 

@@ -5,6 +5,7 @@ import type {
   DailyPromptQueueMessage,
   DiaryBrainCheckpointQueueMessage,
   MessageBatch,
+  PhotoDiaryDeletionQueueMessage,
   ProfileSummaryGenerationQueueMessage,
   WebhookQueueMessage,
   WeeklyReflectionGenerationQueueMessage,
@@ -25,6 +26,7 @@ export async function queueHandler(
     | BrainVectorSyncQueueMessage
     | ProfileSummaryGenerationQueueMessage
     | WeeklyReflectionGenerationQueueMessage
+    | PhotoDiaryDeletionQueueMessage
   >,
   env: Env,
 ): Promise<void> {

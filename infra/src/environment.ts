@@ -13,10 +13,13 @@ export function resourceNames(environment: Environment) {
   return {
     database: `me-builder-db-${environment}`,
     avatarBucket: `me-builder-avatar-${environment}`,
+    photoDiaryBucket: `me-builder-photo-diary-${environment}`,
     sessionStore: `me-builder-session-${environment}`,
     queues: {
       webhook: `me-builder-webhook-queue-${environment}`,
       webhookDeadLetter: `me-builder-webhook-dlq-${environment}`,
+      photoDiaryDeletion: `me-builder-photo-diary-deletion-queue-${environment}`,
+      photoDiaryDeletionDeadLetter: `me-builder-photo-diary-deletion-dlq-${environment}`,
       billing: `me-builder-billing-queue-${environment}`,
       billingDeadLetter: `me-builder-billing-dlq-${environment}`,
       chatTurn: `me-builder-chat-turn-queue-${environment}`,

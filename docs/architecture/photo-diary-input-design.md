@@ -161,6 +161,8 @@ AI分析回数は写真保存容量と別のEntitlementとして扱います。�
 
 削除操作では、対象を同期的に閲覧、AI、Brain、Vector、検索から外し、次を24時間以内に物理削除します。
 
+物理削除は通常Webhook処理から分離した専用Queueで実行し、30分間隔で47回まで再試行して24時間より前に成功または専用DLQへ収束させます。Queueへの初回送信前にAccountDataへ未配送状態を保存し、APIからの送信に失敗した場合はDurable Object Alarmが30秒後に同じmedia IDを再配送します。R2障害が期限まで継続した場合はDLQ alertを期限違反として扱い、復旧後に同じAccountData参照を再配送します。削除jobへ画像bytesやR2 keyを複製しません。
+
 - 写真原本
 - thumbnail
 - 永続化されてしまった未完了の一時AI派生物

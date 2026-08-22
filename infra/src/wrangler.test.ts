@@ -9,10 +9,19 @@ function manifest(environment: "preview" | "production", databaseId: string) {
     baseDomain: environment === "preview" ? "preview.example.com" : "example.com",
     database: { id: databaseId, name: `me-builder-db-${suffix}` },
     avatarBucket: { name: `me-builder-avatar-${suffix}` },
+    photoDiaryBucket: { name: `me-builder-photo-diary-${suffix}` },
     sessionStore: { id: `${suffix}-session-id`, name: `me-builder-session-${suffix}` },
     queues: {
       webhook: { id: "1", name: `me-builder-webhook-queue-${suffix}` },
       webhookDeadLetter: { id: "2", name: `me-builder-webhook-dlq-${suffix}` },
+      photoDiaryDeletion: {
+        id: "15",
+        name: `me-builder-photo-diary-deletion-queue-${suffix}`,
+      },
+      photoDiaryDeletionDeadLetter: {
+        id: "16",
+        name: `me-builder-photo-diary-deletion-dlq-${suffix}`,
+      },
       billing: { id: "13", name: `me-builder-billing-queue-${suffix}` },
       billingDeadLetter: { id: "14", name: `me-builder-billing-dlq-${suffix}` },
       chatTurn: { id: "3", name: `me-builder-chat-turn-queue-${suffix}` },
@@ -37,6 +46,13 @@ describe("renderWranglerConfigs", () => {
     );
     expect(configs.worker).toContain('database_id = "preview-id"');
     expect(configs.api).toContain('queue = "me-builder-webhook-queue-preview"');
+    expect(configs.api).toContain('binding = "PHOTO_DIARY_DELETION_QUEUE"');
+    expect(configs.worker).toContain('queue = "me-builder-photo-diary-deletion-queue-preview"');
+    expect(configs.worker).toContain('binding = "PHOTO_DIARY_DELETION_QUEUE"');
+    expect(configs.worker).toContain(
+      'dead_letter_queue = "me-builder-photo-diary-deletion-dlq-preview"',
+    );
+    expect(configs.worker).toContain("max_retries = 47\nretry_delay = 1800");
     expect(configs.api).toContain('binding = "BILLING_QUEUE"');
     expect(configs.worker).toContain('queue = "me-builder-billing-dlq-production"');
     expect(configs.api).toContain('binding = "PROFILE_SUMMARY_QUEUE"');
@@ -55,6 +71,8 @@ describe("renderWranglerConfigs", () => {
     expect(configs.api).toContain('index_name = "me-builder-brain-preview"');
     expect(configs.api).not.toContain('index_name = "me-builder-brain-production"');
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-preview"');
+    expect(configs.api).toContain('bucket_name = "me-builder-photo-diary-preview"');
+    expect(configs.worker).toContain('binding = "IMAGES"');
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-production"');
     expect(configs.api).toContain('bucket_name = "me-builder-avatar-local"');
     expect(configs.api).toContain('id = "me-builder-session-local-id"');

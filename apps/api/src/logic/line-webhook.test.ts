@@ -24,6 +24,7 @@ function receive(
     startChatLoading?: (chatId: string) => Promise<unknown>;
     waitUntil?: (promise: Promise<unknown>) => void;
     replyUnsupportedMessage?: (replyToken: string, text: string) => Promise<unknown>;
+    photoDiaryStorageEnabled?: boolean;
     sendError?: Error;
   } = {},
 ) {
@@ -47,6 +48,9 @@ function receive(
       startChatLoading: options.startChatLoading,
       waitUntil: options.waitUntil ?? ((promise) => void promise),
       replyUnsupportedMessage: options.replyUnsupportedMessage,
+      ...(options.photoDiaryStorageEnabled === undefined
+        ? {}
+        : { photoDiaryStorageEnabled: options.photoDiaryStorageEnabled }),
     }),
   };
 }
@@ -118,6 +122,38 @@ describe("receiveLineWebhook chat loading", () => {
 });
 
 describe("receiveLineWebhook unsupported messages", () => {
+  it("公開gateが有効な1対1のLINE画像だけをQueueへ残す", async () => {
+    const lineImage = {
+      ...textEvent(""),
+      message: { type: "image", id: "image-id", contentProvider: { type: "line" } },
+    };
+    const { send, result } = receive([lineImage], { photoDiaryStorageEnabled: true });
+
+    await expect(result).resolves.toMatchObject({ type: "accepted", queued: true });
+    const queued = send.mock.calls[0]?.[0] as WebhookQueueMessage;
+    expect((queued.payload as { events: unknown[] }).events).toEqual([lineImage]);
+  });
+
+  it("公開gateが有効でも外部provider画像とgroup画像は保存Queueへ残さない", async () => {
+    const replyUnsupportedMessage = vi.fn().mockResolvedValue({});
+    const externalImage = {
+      ...textEvent(""),
+      message: { type: "image", id: "external", contentProvider: { type: "external" } },
+    };
+    const groupImage = {
+      ...textEvent("", { type: "group", groupId: "G1", userId: "U1" }),
+      message: { type: "image", id: "group", contentProvider: { type: "line" } },
+    };
+    const { send, result } = receive([externalImage, groupImage], {
+      photoDiaryStorageEnabled: true,
+      replyUnsupportedMessage,
+    });
+
+    await expect(result).resolves.toMatchObject({ type: "accepted", queued: false });
+    expect(send).not.toHaveBeenCalled();
+    expect(replyUnsupportedMessage).toHaveBeenCalledTimes(2);
+  });
+
   it.each(["image", "video", "audio", "file", "location", "sticker"])(
     "%sメッセージへ案内を返信し、Queueへ投入しない",
     async (messageType) => {

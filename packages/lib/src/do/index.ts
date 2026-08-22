@@ -58,6 +58,13 @@ export type {
   DiaryBrainCategory,
   DiaryBrainCheckpointCandidate,
 } from "./account/action/diary";
+export type {
+  PhotoDiaryMediaRecord,
+  PhotoDiaryMimeType,
+  ReservePhotoDiaryInput,
+  ReservePhotoDiaryResult,
+} from "./account/action/photo-diary";
+export { PHOTO_DIARY_DELETION_DISPATCH_RECOVERY_MS } from "./account/action/photo-diary";
 export {
   buildDiaryTemporalSearchText,
   DIARY_BRAIN_TIME_ZONE,

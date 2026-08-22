@@ -80,6 +80,10 @@ export const loadMcpManagementScreen = memoizeModuleLoader(() =>
   import("./feature/mcp").then((feature) => ({ default: feature.McpManagementScreen })),
 );
 
+export const loadPhotoDiaryScreen = memoizeModuleLoader(() =>
+  import("./feature/photo-diary").then((feature) => ({ default: feature.PhotoDiaryScreen })),
+);
+
 export function loadMainApplication(route: MainApplicationRoute): Promise<LazyApplicationModule> {
   if (route === "me") return loadProfileApplication();
   if (route === "compatibility") return loadCompatibilityApplication();

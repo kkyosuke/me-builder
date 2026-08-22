@@ -18,6 +18,7 @@ function dependencies(order: string[]) {
           { relationshipId: "active", status: "active" },
         ] as never,
     ),
+    listPhotoObjectKeys: vi.fn(async () => ["photo/original", "photo/thumbnail"] as never),
     cancelCompatibility: vi.fn(async () => {
       order.push("cancel-compatibility");
       return { outcome: "cancelled" } as never;
@@ -74,6 +75,9 @@ describe("deleteOwnAccount", () => {
           deleteAvatarObject: async () => {
             order.push("delete-avatar");
           },
+          deletePhotoObjects: async () => {
+            order.push("delete-photos");
+          },
           now: new Date("2026-08-21T00:01:00.000Z"),
         },
         deps,
@@ -87,6 +91,7 @@ describe("deleteOwnAccount", () => {
       "leave-family",
       "end-family",
       "reset-coordinator",
+      "delete-photos",
       "delete-content",
       "delete-avatar",
       "delete-identity",
@@ -105,6 +110,7 @@ describe("deleteOwnAccount", () => {
           compatibilityData: {} as never,
           conversationCoordinator: {} as never,
           deleteAvatarObject: async () => undefined,
+          deletePhotoObjects: async () => undefined,
         },
         deps,
       ),

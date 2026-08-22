@@ -7,6 +7,7 @@ import type {
 } from "@me-builder/lib";
 import type {
   BillingQueueMessage,
+  PhotoDiaryDeletionQueueMessage,
   Queue,
   ReflectionGenerationQueueMessage,
   SafeOperationalErrorFields,
@@ -20,12 +21,14 @@ type Env = Omit<
   | "DB"
   | "SESSION_STORE"
   | "WEBHOOK_QUEUE"
+  | "PHOTO_DIARY_DELETION_QUEUE"
   | "PROFILE_SUMMARY_QUEUE"
   | "BILLING_QUEUE"
   | "ACCOUNT_DATA"
   | "COMPATIBILITY_DATA"
   | "CONVERSATION_COORDINATOR"
   | "BRAIN_VECTOR_INDEX"
+  | "PHOTO_DIARY_BUCKET"
   | "WEB_ERROR_RATE_LIMITER"
   | "WEB_ORIGIN"
 > & {
@@ -51,11 +54,13 @@ type Env = Omit<
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;
+  PHOTO_DIARY_DELETION_QUEUE?: Queue<PhotoDiaryDeletionQueueMessage>;
   PROFILE_SUMMARY_QUEUE?: Queue<ReflectionGenerationQueueMessage>;
   BILLING_QUEUE?: Queue<BillingQueueMessage>;
   DB?: D1Database;
   SESSION_STORE?: KVNamespace;
   AVATAR_BUCKET?: R2Bucket;
+  PHOTO_DIARY_BUCKET?: R2Bucket;
   ACCOUNT_DATA?: AccountDataNamespace;
   COMPATIBILITY_DATA?: CompatibilityDataNamespace;
   CONVERSATION_COORDINATOR?: ConversationCoordinatorNamespace;
@@ -63,6 +68,7 @@ type Env = Omit<
   MCP_TOKEN_HMAC_SECRET?: string;
   MCP_RESOURCE_URL?: string;
   MCP_FEATURE_ENABLED?: string;
+  PHOTO_DIARY_STORAGE_ENABLED?: string;
   /** Wrangler local以外では常に設定する。単体テストでは未設定へ縮退できる。 */
   WEB_ERROR_RATE_LIMITER?: {
     limit(options: { key: string }): Promise<{ success: boolean }>;

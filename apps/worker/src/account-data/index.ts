@@ -19,6 +19,7 @@ import { compatibilityActions } from "./compatibility";
 import { developmentActions } from "./development";
 import { diagnosisActions } from "./diagnosis";
 import { diaryActions } from "./diary";
+import { photoDiaryActions } from "./photo-diary";
 import { profileSummaryActions } from "./profile-summary";
 import { AccountDataRepository, type DiagnosisCatalogSnapshot } from "./repository";
 
@@ -28,6 +29,7 @@ const actions = {
   ...diagnosisActions,
   ...developmentActions,
   ...diaryActions,
+  ...photoDiaryActions,
   ...profileSummaryActions,
 } as const;
 
@@ -102,6 +104,31 @@ async function dispatchUndispatchedWeeklyReflections(
     );
   }
   return generationIds.length;
+}
+
+/** APIからQueueへ渡せなかった写真削除要求を、AccountDataの状態から再配送する。 */
+async function dispatchUndispatchedPhotoDiaryDeletions(
+  db: DO.account.Database,
+  accountId: string,
+  queue: Env["PHOTO_DIARY_DELETION_QUEUE"],
+): Promise<number> {
+  const mediaIds = await DO.account.action.photoDiary.listUndispatchedPhotoDiaryDeletionIds(
+    db,
+    accountId,
+  );
+  if (mediaIds.length > 0 && !queue) {
+    throw new Error("PHOTO_DIARY_DELETION_QUEUE binding is required for photo deletion");
+  }
+  for (const mediaId of mediaIds) {
+    await queue?.send({ type: "photo-diary-deletion", accountId, mediaId });
+    const marked = await DO.account.action.photoDiary.markPhotoDiaryDeletionEnqueued(
+      db,
+      accountId,
+      mediaId,
+    );
+    if (!marked) throw new Error("Photo diary deletion dispatch state could not be recorded");
+  }
+  return mediaIds.length;
 }
 
 /** 1 AccountのSource / Brain / Diagnosis / Diary / Profile Summaryをprivate SQLiteに保存する。 */
@@ -194,6 +221,11 @@ export class AccountData extends DurableObject<Env> {
           this.repository.client,
           this.accountId,
           this.env.PROFILE_SUMMARY_QUEUE,
+        );
+        await dispatchUndispatchedPhotoDiaryDeletions(
+          this.repository.client,
+          this.accountId,
+          this.env.PHOTO_DIARY_DELETION_QUEUE,
         );
         await expireAiUsageReservations(this.repository.client, this.accountId);
         const checkpointClaim = await DO.account.action.diary.claimDueDiaryBrainCheckpointIds(

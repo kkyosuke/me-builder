@@ -16,7 +16,13 @@ crons = ["0 9,11,12 * * *"]
 [[queues.consumers]]
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"
-max_retries = 3
+max_retries = 6
+
+[[queues.consumers]]
+queue = "me-builder-photo-diary-deletion-queue-local"
+dead_letter_queue = "me-builder-photo-diary-deletion-dlq-local"
+max_retries = 47
+retry_delay = 1800
 
 [[queues.consumers]]
 queue = "me-builder-billing-queue-local"
@@ -51,6 +57,10 @@ max_retries = 5
 [[queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
+
+[[queues.producers]]
+queue = "me-builder-photo-diary-deletion-queue-local"
+binding = "PHOTO_DIARY_DELETION_QUEUE"
 
 [[queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-local"
@@ -106,6 +116,13 @@ database_id = "me-builder-db-local-id"
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-local"
 
+[[r2_buckets]]
+binding = "PHOTO_DIARY_BUCKET"
+bucket_name = "me-builder-photo-diary-local"
+
+[images]
+binding = "IMAGES"
+
 [[vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-local"
@@ -113,6 +130,7 @@ index_name = "me-builder-brain-local"
 [vars]
 ENVIRONMENT = "local"
 AVATAR_CLEANUP_MODE = "dry-run"
+PHOTO_DIARY_STORAGE_ENABLED = "false"
 
 [env.local]
 name = "me-builder-worker-local"
@@ -123,7 +141,13 @@ crons = ["0 9,11,12 * * *"]
 [[env.local.queues.consumers]]
 queue = "me-builder-webhook-queue-local"
 dead_letter_queue = "me-builder-webhook-dlq-local"
-max_retries = 3
+max_retries = 6
+
+[[env.local.queues.consumers]]
+queue = "me-builder-photo-diary-deletion-queue-local"
+dead_letter_queue = "me-builder-photo-diary-deletion-dlq-local"
+max_retries = 47
+retry_delay = 1800
 
 [[env.local.queues.consumers]]
 queue = "me-builder-billing-queue-local"
@@ -158,6 +182,10 @@ max_retries = 5
 [[env.local.queues.producers]]
 queue = "me-builder-chat-turn-queue-local"
 binding = "CHAT_TURN_QUEUE"
+
+[[env.local.queues.producers]]
+queue = "me-builder-photo-diary-deletion-queue-local"
+binding = "PHOTO_DIARY_DELETION_QUEUE"
 
 [[env.local.queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-local"
@@ -196,6 +224,13 @@ database_id = "me-builder-db-local-id"
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-local"
 
+[[env.local.r2_buckets]]
+binding = "PHOTO_DIARY_BUCKET"
+bucket_name = "me-builder-photo-diary-local"
+
+[env.local.images]
+binding = "IMAGES"
+
 [[env.local.vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-local"
@@ -203,6 +238,7 @@ index_name = "me-builder-brain-local"
 [env.local.vars]
 ENVIRONMENT = "local"
 AVATAR_CLEANUP_MODE = "dry-run"
+PHOTO_DIARY_STORAGE_ENABLED = "false"
 
 [env.preview]
 name = "me-builder-worker-preview"
@@ -213,7 +249,13 @@ crons = ["0 9,11,12 * * *"]
 [[env.preview.queues.consumers]]
 queue = "me-builder-webhook-queue-preview"
 dead_letter_queue = "me-builder-webhook-dlq-preview"
-max_retries = 3
+max_retries = 6
+
+[[env.preview.queues.consumers]]
+queue = "me-builder-photo-diary-deletion-queue-preview"
+dead_letter_queue = "me-builder-photo-diary-deletion-dlq-preview"
+max_retries = 47
+retry_delay = 1800
 
 [[env.preview.queues.consumers]]
 queue = "me-builder-billing-queue-preview"
@@ -248,6 +290,10 @@ max_retries = 5
 [[env.preview.queues.producers]]
 queue = "me-builder-chat-turn-queue-preview"
 binding = "CHAT_TURN_QUEUE"
+
+[[env.preview.queues.producers]]
+queue = "me-builder-photo-diary-deletion-queue-preview"
+binding = "PHOTO_DIARY_DELETION_QUEUE"
 
 [[env.preview.queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-preview"
@@ -286,6 +332,13 @@ database_id = "b61c9de2-4fa3-4644-8f01-f42af513e57a"
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-preview"
 
+[[env.preview.r2_buckets]]
+binding = "PHOTO_DIARY_BUCKET"
+bucket_name = "me-builder-photo-diary-preview"
+
+[env.preview.images]
+binding = "IMAGES"
+
 [[env.preview.vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-preview"
@@ -293,6 +346,7 @@ index_name = "me-builder-brain-preview"
 [env.preview.vars]
 ENVIRONMENT = "preview"
 AVATAR_CLEANUP_MODE = "dry-run"
+PHOTO_DIARY_STORAGE_ENABLED = "false"
 
 [env.production]
 name = "me-builder-worker-production"
@@ -303,7 +357,13 @@ crons = ["0 9,11,12 * * *"]
 [[env.production.queues.consumers]]
 queue = "me-builder-webhook-queue-production"
 dead_letter_queue = "me-builder-webhook-dlq-production"
-max_retries = 3
+max_retries = 6
+
+[[env.production.queues.consumers]]
+queue = "me-builder-photo-diary-deletion-queue-production"
+dead_letter_queue = "me-builder-photo-diary-deletion-dlq-production"
+max_retries = 47
+retry_delay = 1800
 
 [[env.production.queues.consumers]]
 queue = "me-builder-billing-queue-production"
@@ -338,6 +398,10 @@ max_retries = 5
 [[env.production.queues.producers]]
 queue = "me-builder-chat-turn-queue-production"
 binding = "CHAT_TURN_QUEUE"
+
+[[env.production.queues.producers]]
+queue = "me-builder-photo-diary-deletion-queue-production"
+binding = "PHOTO_DIARY_DELETION_QUEUE"
 
 [[env.production.queues.producers]]
 queue = "me-builder-brain-checkpoint-queue-production"
@@ -376,6 +440,13 @@ database_id = "6d11180b-3286-4b69-bd63-c7b60d768be1"
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-production"
 
+[[env.production.r2_buckets]]
+binding = "PHOTO_DIARY_BUCKET"
+bucket_name = "me-builder-photo-diary-production"
+
+[env.production.images]
+binding = "IMAGES"
+
 [[env.production.vectorize]]
 binding = "BRAIN_VECTOR_INDEX"
 index_name = "me-builder-brain-production"
@@ -383,3 +454,4 @@ index_name = "me-builder-brain-production"
 [env.production.vars]
 ENVIRONMENT = "production"
 AVATAR_CLEANUP_MODE = "dry-run"
+PHOTO_DIARY_STORAGE_ENABLED = "false"
