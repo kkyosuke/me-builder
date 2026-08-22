@@ -117,16 +117,6 @@ jobs:
       - name: Run CI Verification
         run: bun run ci
 
-      # 型チェックの incremental 情報を main のキャッシュとして残す。PR の CI はこれを復元して使う。
-      - name: Save TypeScript build info
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            apps/*/tsconfig.tsbuildinfo
-            packages/*/tsconfig.tsbuildinfo
-            infra/tsconfig.tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ github.sha }}
-
       - name: Verify Vertex AI Connectivity (Production)
         run: bun run --cwd apps/worker check:gemini "Reply with OK."
 

@@ -1,0 +1,56 @@
+name: Warm CI caches
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'tsconfig.json'
+      - '.github/actions/setup-bun-workspace/**'
+      - '.github/workflows/warm-ci-caches.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warm-ci-caches
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    name: Warm dependency and TypeScript caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: setup
+        uses: ./.github/actions/setup-bun-workspace
+
+      # 成功したmainの型情報だけを次のPRへ渡す。型エラーがあればcacheを保存しない。
+      - name: Type Check
+        run: bun run typecheck
+
+      # pull_requestのcacheはPR固有のmerge refに隔離されるため、default branchで一度だけ保存する。
+      - name: Save Bun dependencies
+        if: steps.setup.outputs.bun-cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+
+      - name: Save TypeScript build info
+        if: steps.setup.outputs.typescript-cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            apps/*/tsconfig.tsbuildinfo
+            packages/*/tsconfig.tsbuildinfo
+            infra/tsconfig.tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ github.sha }}

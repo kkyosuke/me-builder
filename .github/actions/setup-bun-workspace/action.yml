@@ -1,6 +1,14 @@
 name: 'Setup Bun Workspace'
 description: 'Setup Bun, restore dependency and TypeScript caches, and run bun install'
 
+outputs:
+  bun-cache-hit:
+    description: 'Whether the exact Bun dependency cache was restored'
+    value: ${{ steps.bun-cache.outputs.cache-hit }}
+  typescript-cache-hit:
+    description: 'Whether the exact TypeScript build info cache was restored'
+    value: ${{ steps.typescript-cache.outputs.cache-hit }}
+
 runs:
   using: 'composite'
   steps:
@@ -9,15 +17,13 @@ runs:
       with:
         bun-version: latest
 
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version-file: '.nvmrc'
-
     # `**/bun.lock` はツリー全体 (node_modules を含む) を走査するため、
     # ルートの lockfile だけをキーにする。lockfile が同じなら常に同じキーになる。
-    - name: Cache Bun dependencies
-      uses: actions/cache@v4
+    # PR固有のmerge refへ同じ大容量cacheを複製しないよう、ここでは復元だけを行う。
+    # mainのpush時にwarm-ci-caches.ymlがdefault branch scopeへ保存する。
+    - name: Restore Bun dependencies
+      id: bun-cache
+      uses: actions/cache/restore@v4
       with:
         path: ~/.bun/install/cache
         key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
@@ -25,9 +31,9 @@ runs:
           ${{ runner.os }}-bun-
 
     # tsc の incremental 情報。前回の型チェック結果を再利用し、変更が無いパッケージの
-    # 再チェックを省く。取得だけを行い、保存は main の CD だけが担う
-    # (PR ごとに保存すると repository cache の 10GB 上限を圧迫し、依存キャッシュが追い出される)。
+    # 再チェックを省く。取得だけを行い、保存は main のcache warmingが担う。
     - name: Restore TypeScript build info
+      id: typescript-cache
       uses: actions/cache/restore@v4
       with:
         # `**/*.tsbuildinfo` は node_modules まで走査するため、生成先を直接指定する。
