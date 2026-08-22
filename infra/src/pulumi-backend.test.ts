@@ -74,6 +74,7 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain("cloudBillingApi.id.apply(() => projectId)");
     expect(gcpPlatformProgram).toContain("{ dependsOn: cloudBillingApi }");
     expect(gcpPlatformProgram).toContain("verifyExistingGcpProjectBilling");
+    expect(gcpPlatformProgram).toContain("monitoringNotificationChannels: []");
     expect(gcpPlatformProgram).not.toContain("new gcp.organizations.Project");
     expect(gcpPlatformProgram).not.toContain("import: projectId");
     expect(gcpPlatformProgram).not.toContain("autoCreateNetwork");
