@@ -59,6 +59,7 @@ export async function getMcpAuthorization(c: Context<AppEnv>) {
 }
 
 export async function getMcpAuthorizationRequest(c: Context<AppEnv>) {
+  c.header("Cache-Control", "no-store");
   const current = runtime(c);
   if (!current?.enabled) return oauthError(c, "temporarily_unavailable", 503);
   const request = await D1.shared.action.mcp.findAuthorizationRequest(
@@ -67,7 +68,6 @@ export async function getMcpAuthorizationRequest(c: Context<AppEnv>) {
     c.req.param("requestId") ?? "",
   );
   if (!request) return c.json({ error: "Not Found" } as const, 404);
-  c.header("Cache-Control", "no-store");
   return c.json(
     v.parse(McpAuthorizationRequestResponseSchema, {
       id: request.id,
@@ -81,6 +81,8 @@ export async function getMcpAuthorizationRequest(c: Context<AppEnv>) {
 }
 
 export async function postMcpAuthorizationDecision(c: Context<AppEnv>) {
+  // 許可時のresponseには短命なauthorization codeを含むため、成功・失敗を問わず保存させない。
+  c.header("Cache-Control", "no-store");
   const current = runtime(c);
   if (!current?.enabled) return oauthError(c, "temporarily_unavailable", 503);
   const body = v.safeParse(McpAuthorizationDecisionSchema, await c.req.json().catch(() => null));
@@ -192,13 +194,13 @@ export async function postMcpToken(c: Context<AppEnv>) {
 }
 
 export async function getMcpConnections(c: Context<AppEnv>) {
+  c.header("Cache-Control", "no-store");
   const current = runtime(c);
   if (!current) return c.json({ error: "Service Unavailable" } as const, 503);
   const connections = await D1.shared.action.mcp.listConnections(
     current.db,
     authenticatedActor(c).accountId,
   );
-  c.header("Cache-Control", "no-store");
   return c.json(
     v.parse(McpConnectionsResponseSchema, {
       connections: connections.map((item) => ({
@@ -212,6 +214,7 @@ export async function getMcpConnections(c: Context<AppEnv>) {
 }
 
 export async function deleteMcpConnection(c: Context<AppEnv>) {
+  c.header("Cache-Control", "no-store");
   const current = runtime(c);
   if (!current) return c.json({ error: "Service Unavailable" } as const, 503);
   const revoked = await D1.shared.action.mcp.revokeConnection(
@@ -223,6 +226,7 @@ export async function deleteMcpConnection(c: Context<AppEnv>) {
 }
 
 export async function getMcpAudit(c: Context<AppEnv>) {
+  c.header("Cache-Control", "no-store");
   const current = runtime(c);
   if (!current) return c.json({ error: "Service Unavailable" } as const, 503);
   await D1.shared.action.mcp.pruneAuditRecords(current.db);
@@ -230,7 +234,6 @@ export async function getMcpAudit(c: Context<AppEnv>) {
     current.db,
     authenticatedActor(c).accountId,
   );
-  c.header("Cache-Control", "no-store");
   return c.json(
     v.parse(McpAuditResponseSchema, {
       records: records.map((record) => ({

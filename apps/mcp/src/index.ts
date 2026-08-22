@@ -230,20 +230,26 @@ app.post("/mcp", async (c) => {
     await hmacSha256Hex(tokenSecret, "access-token", match[1]),
     currentUrls.resource.href,
   );
-  const termsAccepted = verified
-    ? await D1.shared.action.agreement.hasAcceptedCurrentTerms(db, verified.account.id)
-    : false;
-  if (!verified || !termsAccepted || verified.token.scope !== "brain:search") {
-    if (verified) {
-      await D1.shared.action.mcp.recordAudit(db, {
-        accountId: verified.account.id,
-        connectionId: verified.connection.id,
-        clientId: verified.connection.clientId,
-        clientName: verified.connection.clientName,
-        outcome: "refused",
-        reasonCode: termsAccepted ? "SCOPE_REFUSED" : "TERMS_NOT_ACCEPTED",
-      });
-    }
+  if (!verified) {
+    c.header(
+      "WWW-Authenticate",
+      `Bearer resource_metadata="${getOAuthProtectedResourceMetadataUrl(currentUrls.resource)}", error="invalid_token"`,
+    );
+    return c.json({ error: "Unauthorized" } as const, 401);
+  }
+  const termsAccepted = await D1.shared.action.agreement.hasAcceptedCurrentTerms(
+    db,
+    verified.account.id,
+  );
+  if (!termsAccepted || verified.token.scope !== "brain:search") {
+    await D1.shared.action.mcp.recordAudit(db, {
+      accountId: verified.account.id,
+      connectionId: verified.connection.id,
+      clientId: verified.connection.clientId,
+      clientName: verified.connection.clientName,
+      outcome: "refused",
+      reasonCode: termsAccepted ? "SCOPE_REFUSED" : "TERMS_NOT_ACCEPTED",
+    });
     return c.json({ error: "Forbidden" } as const, 403);
   }
   await D1.shared.action.mcp.touchConnection(db, verified.connection.id);

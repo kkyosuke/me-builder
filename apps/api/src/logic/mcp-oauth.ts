@@ -15,6 +15,8 @@ function publicHttpsUrl(value: string): URL | undefined {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password || url.hash) return undefined;
     const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+    const ipv6 =
+      hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : undefined;
     if (
       hostname === "localhost" ||
       hostname.endsWith(".localhost") ||
@@ -29,9 +31,13 @@ function publicHttpsUrl(value: string): URL | undefined {
       hostname === "::" ||
       hostname === "::1" ||
       hostname === "[::1]" ||
-      hostname.startsWith("fe80:") ||
-      hostname.startsWith("fc") ||
-      hostname.startsWith("fd")
+      (ipv6 !== undefined &&
+        (ipv6 === "::" ||
+          ipv6 === "::1" ||
+          ipv6.startsWith("::ffff:") ||
+          /^fe[89ab][0-9a-f]:/.test(ipv6) ||
+          ipv6.startsWith("fc") ||
+          ipv6.startsWith("fd")))
     ) {
       return undefined;
     }

@@ -9,6 +9,9 @@ describe("MCP CIMD", () => {
     "https://10.0.0.1/client.json",
     "https://169.254.169.254/latest/meta-data",
     "https://[::1]/client.json",
+    "https://[fd00::1]/client.json",
+    "https://[fe80::1]/client.json",
+    "https://[::ffff:127.0.0.1]/client.json",
   ])("公開HTTPS以外のmetadata URLをfetch前に拒否する: %s", async (clientId) => {
     const fetcher = vi.fn<typeof fetch>();
     expect(await fetchAndVerifyClientMetadata(clientId, fetcher)).toBeUndefined();

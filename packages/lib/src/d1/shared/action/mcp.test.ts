@@ -149,6 +149,37 @@ describe("MCP OAuth storage", () => {
     ).resolves.toEqual({ type: "reuse" });
   });
 
+  it("soft-delete済みrefresh tokenをrotation対象に戻さない", async () => {
+    const db = createTestDb();
+    const accountId = await adminAccount(db);
+    const at = new Date("2026-08-21T00:00:00Z");
+    await authorize(db, accountId, at);
+    await exchangeAuthorizationCode(
+      db,
+      {
+        codeHash: "code-hash",
+        clientId: "https://client.example/metadata.json",
+        redirectUri: "https://client.example/callback",
+        resource: "https://mcp.example/mcp",
+        codeChallenge: "challenge",
+        tokens: { accessTokenHash: "access", refreshTokenHash: "deleted-refresh" },
+      },
+      at,
+    );
+    await db
+      .update(schema.mcpTokens)
+      .set({ isDeleted: true, deletedAt: at })
+      .where(eq(schema.mcpTokens.tokenHash, "deleted-refresh"));
+
+    await expect(
+      rotateRefreshToken(db, {
+        refreshTokenHash: "deleted-refresh",
+        clientId: "https://client.example/metadata.json",
+        tokens: { accessTokenHash: "next-access", refreshTokenHash: "next-refresh" },
+      }),
+    ).resolves.toEqual({ type: "invalid" });
+  });
+
   it("解除で有効期限内access tokenも即時無効化し、監査は本文なしで保持する", async () => {
     const db = createTestDb();
     const accountId = await adminAccount(db);

@@ -272,7 +272,11 @@ export async function rotateRefreshToken(
 ) {
   const found = await db.query.mcpTokens.findFirst({
     where: (table, { and, eq }) =>
-      and(eq(table.tokenHash, input.refreshTokenHash), eq(table.kind, "refresh")),
+      and(
+        eq(table.tokenHash, input.refreshTokenHash),
+        eq(table.kind, "refresh"),
+        eq(table.isDeleted, false),
+      ),
   });
   if (!found) return { type: "invalid" as const };
   const connection = await db.query.mcpConnections.findFirst({
