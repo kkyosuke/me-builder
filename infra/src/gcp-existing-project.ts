@@ -1,14 +1,12 @@
 export type ExistingGcpProject = {
   projectId?: string | undefined;
   number?: string | undefined;
-  billingAccount?: string | undefined;
   orgId?: string | undefined;
   folderId?: string | undefined;
 };
 
 export type ExpectedGcpProject = {
   projectId: string;
-  billingAccount: string;
   organizationId?: string | undefined;
   folderId?: string | undefined;
 };
@@ -16,6 +14,10 @@ export type ExpectedGcpProject = {
 export type VerifiedGcpProject = {
   projectId: string;
   projectNumber: string;
+};
+
+export type VerifiedGcpProjectBilling = {
+  billingAccount: string;
 };
 
 function normalizeBillingAccount(value: string): string {
@@ -46,14 +48,6 @@ export function verifyExistingGcpProject(
     throw new Error(`Existing GCP project ${expected.projectId} has no project number`);
   }
 
-  const actualBillingAccount = normalizeBillingAccount(actual.billingAccount?.trim() ?? "");
-  const expectedBillingAccount = normalizeBillingAccount(expected.billingAccount.trim());
-  if (actualBillingAccount !== expectedBillingAccount) {
-    throw new Error(
-      `Existing GCP project ${expected.projectId} uses billing account ${actualBillingAccount || "none"}, expected ${expectedBillingAccount}`,
-    );
-  }
-
   const expectedOrganizationId = normalizeOptionalId(expected.organizationId);
   const expectedFolderId = normalizeOptionalId(expected.folderId);
   const actualOrganizationId = normalizeOptionalId(actual.orgId);
@@ -65,4 +59,23 @@ export function verifyExistingGcpProject(
   }
 
   return { projectId: expected.projectId, projectNumber };
+}
+
+/**
+ * Cloud Billing API有効化後に、既存projectの請求先を更新せず検証する。
+ */
+export function verifyExistingGcpProjectBilling(
+  projectId: string,
+  expectedBillingAccount: string,
+  actualBillingAccount: string | undefined,
+): VerifiedGcpProjectBilling {
+  const actual = normalizeBillingAccount(actualBillingAccount?.trim() ?? "");
+  const expected = normalizeBillingAccount(expectedBillingAccount.trim());
+  if (actual !== expected) {
+    throw new Error(
+      `Existing GCP project ${projectId} uses billing account ${actual || "none"}, expected ${expected}`,
+    );
+  }
+
+  return { billingAccount: expected };
 }

@@ -1,7 +1,10 @@
 import * as gcp from "@pulumi/gcp";
 import * as pulumi from "@pulumi/pulumi";
 import { authorizationKeyPolicyRule } from "../src/gcp-authorization-key-policy.ts";
-import { verifyExistingGcpProject } from "../src/gcp-existing-project.ts";
+import {
+  verifyExistingGcpProject,
+  verifyExistingGcpProjectBilling,
+} from "../src/gcp-existing-project.ts";
 import { pulumiGcsBackends, requirePulumiGcsBackend } from "../src/pulumi-backend.ts";
 
 requirePulumiGcsBackend(process.env, pulumiGcsBackends.gcpPlatform);
@@ -115,22 +118,45 @@ const verifiedProject = pulumi
   .all({
     projectId: existingProject.projectId,
     number: existingProject.number,
-    billingAccount: existingProject.billingAccount,
     orgId: existingProject.orgId,
     folderId: existingProject.folderId,
   })
   .apply((actual) =>
     verifyExistingGcpProject(
-      { projectId, billingAccount, organizationId, folderId },
+      { projectId, organizationId, folderId },
       {
         projectId: actual.projectId,
         number: actual.number,
-        billingAccount: actual.billingAccount,
         orgId: actual.orgId,
         folderId: actual.folderId,
       },
     ),
   );
+
+const cloudBillingApi = new gcp.projects.Service(
+  "cloudbilling-googleapis-com",
+  {
+    project: verifiedProject.projectId,
+    service: "cloudbilling.googleapis.com",
+    disableDependentServices: false,
+    disableOnDestroy: false,
+  },
+  { protect },
+);
+
+// The upstream project data source returns an empty billing account while the Cloud Billing API is
+// disabled. Make the project ID depend on the service resource ID so a first preview leaves the
+// read unknown and the update performs it only after enabling the API. This validates the existing
+// association without managing it.
+const billingReadableProjectId = cloudBillingApi.id.apply(() => projectId);
+const existingProjectWithBilling = gcp.organizations.getProjectOutput(
+  { projectId: billingReadableProjectId },
+  { dependsOn: cloudBillingApi },
+);
+const verifiedProjectBilling = existingProjectWithBilling.billingAccount.apply(
+  (actualBillingAccount) =>
+    verifyExistingGcpProjectBilling(projectId, billingAccount, actualBillingAccount),
+);
 
 const enabledServices = [
   "aiplatform.googleapis.com",
@@ -141,19 +167,22 @@ const enabledServices = [
   "orgpolicy.googleapis.com",
   "serviceusage.googleapis.com",
 ] as const;
-const services = enabledServices.map(
-  (service) =>
-    new gcp.projects.Service(
-      service.replaceAll(".", "-"),
-      {
-        project: verifiedProject.projectId,
-        service,
-        disableDependentServices: false,
-        disableOnDestroy: false,
-      },
-      { protect },
-    ),
-);
+const services = [
+  cloudBillingApi,
+  ...enabledServices.map(
+    (service) =>
+      new gcp.projects.Service(
+        service.replaceAll(".", "-"),
+        {
+          project: verifiedProject.projectId,
+          service,
+          disableDependentServices: false,
+          disableOnDestroy: false,
+        },
+        { protect },
+      ),
+  ),
+];
 
 const identityPlatform = new gcp.identityplatform.Config(
   "identityPlatform",
@@ -196,7 +225,7 @@ const googleProvider =
 const projectBudget = new gcp.billing.Budget(
   "projectMonthlyBudget",
   {
-    billingAccount,
+    billingAccount: verifiedProjectBilling.billingAccount,
     displayName: `me-builder ${environment} monthly budget`,
     amount: {
       specifiedAmount: {
@@ -352,7 +381,7 @@ export const platform = {
   environment,
   projectId: verifiedProject.projectId,
   projectNumber: verifiedProject.projectNumber,
-  billingAccount,
+  billingAccount: verifiedProjectBilling.billingAccount,
   budgetCurrencyCode,
   monthlyBudgetAmount,
   vertexSpendCapAmount,
