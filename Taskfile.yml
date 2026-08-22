@@ -108,6 +108,11 @@ tasks:
     cmds:
       - bun scripts/verify-service-site-deployment.ts
 
+  infra:verify:production:
+    desc: 'Read-only verification of critical Production Cloudflare resources and configuration'
+    cmds:
+      - bun scripts/verify-cloudflare-infrastructure.ts production
+
   infra:generate:
     desc: 'Generate Wrangler TOML files from committed Pulumi stack outputs'
     cmds:
