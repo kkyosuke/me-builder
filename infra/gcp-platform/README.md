@@ -5,7 +5,7 @@ This Pulumi project creates the Google Cloud resources used by me-builder authen
 ## Managed resources
 
 - validation of an existing environment-specific GCP project and its preconfigured Cloud Billing connection, without managing the project itself
-- Service Usage, API Keys, IAM, Organization Policy, Billing Budgets, Identity Toolkit, and Vertex AI APIs
+- Cloud Billing, Service Usage, API Keys, IAM, Organization Policy, Billing Budgets, Identity Toolkit, and Vertex AI APIs
 - Identity Platform project configuration with anonymous, email/password, and phone sign-in disabled
 - Google as the enabled Identity Platform provider
 - rotatable API key slots restricted to Identity Platform `SignInWithIdp`
@@ -27,7 +27,7 @@ The manual `Deploy / GCP Platform` GitHub Actions workflow authenticates with Gi
 
 The existing state project, `gs://kagami-infra/` bucket, required bucket controls, and local ADC are defined by the parent [infrastructure state backend guide](../README.md#one-time-state-backend-bootstrap). This project uses the dedicated `kagami/gcp-platform/` managed folder and does not share a passphrase or IAM access with the Cloudflare project. The repository wrapper and Pulumi program require a non-empty `PULUMI_CONFIG_PASSPHRASE` before evaluating resources and reject any runtime backend override that differs from `Pulumi.yaml`. This prevents the OAuth Client Secret from entering local state or state encrypted with an empty passphrase.
 
-Application projects are manual prerequisites. Create the Development and Production projects, connect their intended Cloud Billing accounts, and configure their Organization or Folder parent before the first Stack operation. Pulumi reads and validates the existing project but never creates, imports, updates, moves, unlinks, or deletes it. Project name, labels, network configuration, and Cloud Billing connection therefore remain outside this Stack. Use different project IDs for the two Stacks.
+Application projects are manual prerequisites. Create the Development and Production projects, connect their intended Cloud Billing accounts, and configure their Organization or Folder parent before the first Stack operation. Pulumi reads and validates the existing project but never creates, imports, updates, moves, unlinks, or deletes it. Project name, labels, network configuration, and Cloud Billing connection therefore remain outside this Stack. The Stack enables the Cloud Billing API inside the existing project before reading and validating that manual billing connection; a first preview keeps the deferred billing read unknown until apply. Use different project IDs for the two Stacks.
 
 Google does not support changing the policy required for service-account-bound authorization keys on a project without an organization. A standalone project can deploy Identity Platform, its restricted API key, the budget, Vertex AI API, and the Vertex runtime service account, but `vertexRuntimeCredentialsEnabled` must remain `false`. This is a fail-closed limitation: do not replace it with an unbound Vertex API key without a separate security review.
 

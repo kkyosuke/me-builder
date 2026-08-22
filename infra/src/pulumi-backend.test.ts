@@ -70,6 +70,10 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain('from "../src/gcp-existing-project.ts"');
     expect(gcpPlatformProgram).toContain('from "../src/pulumi-backend.ts"');
     expect(gcpPlatformProgram).toContain("gcp.organizations.getProjectOutput({ projectId })");
+    expect(gcpPlatformProgram).toContain('service: "cloudbilling.googleapis.com"');
+    expect(gcpPlatformProgram).toContain("cloudBillingApi.id.apply(() => projectId)");
+    expect(gcpPlatformProgram).toContain("{ dependsOn: cloudBillingApi }");
+    expect(gcpPlatformProgram).toContain("verifyExistingGcpProjectBilling");
     expect(gcpPlatformProgram).not.toContain("new gcp.organizations.Project");
     expect(gcpPlatformProgram).not.toContain("import: projectId");
     expect(gcpPlatformProgram).not.toContain("autoCreateNetwork");
