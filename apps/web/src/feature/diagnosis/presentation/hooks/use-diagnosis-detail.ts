@@ -178,6 +178,11 @@ export function useDiagnosisDetail({ onProgress }: UseDiagnosisDetailOptions) {
     return definition ? answerSaver.waitForPendingSaves(definition.id) : true;
   }, [answerSaver.waitForPendingSaves]);
 
+  const hasUnsavedAnswers = useCallback((): boolean => {
+    const definition = selectedDefinition.current;
+    return definition ? answerSaver.hasUnsavedSaves(definition.id) : false;
+  }, [answerSaver.hasUnsavedSaves]);
+
   const openCompletedResult = useCallback(async (): Promise<void> => {
     const definition = selectedDefinition.current;
     if (!definition) {
@@ -228,6 +233,7 @@ export function useDiagnosisDetail({ onProgress }: UseDiagnosisDetailOptions) {
     close,
     saveAnswer,
     deferQuestion,
+    hasUnsavedAnswers,
     waitForPendingAnswers,
     openCompletedResult,
   };

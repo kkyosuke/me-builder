@@ -82,6 +82,12 @@ type ProfileView =
   | "photos";
 type MainRoute = "compatibility" | "diagnosis" | "me";
 
+interface MainNavigationGuard {
+  hasUnsavedAnswers: () => boolean;
+  restore: () => void;
+  waitForPendingAnswers: () => Promise<boolean>;
+}
+
 const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
 
 const PROFILE_HISTORY_STATE_KEY = "me-builder-profile-view";
@@ -180,6 +186,8 @@ function AppContents() {
   });
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const applicationContentRef = useRef<HTMLDivElement>(null);
+  const mainNavigationGuard = useRef<MainNavigationGuard | null>(null);
+  const navigationAttempt = useRef(0);
   const shouldRestoreProfileButtonFocus = useRef(false);
   const { pathname, mainPathname, profileView } = navigation;
   const isAdminPath = pathname.startsWith("/admin");
@@ -262,28 +270,49 @@ function AppContents() {
   useEffect(() => {
     const handlePopState = () => {
       const nextView = resolveProfileView(window.location.pathname);
-      setNavigation((current) => {
-        if (nextView !== "closed") {
-          const returnPathname = historyProfileReturnPathname(window.history.state) ?? "/me";
+      const returnPathname = historyProfileReturnPathname(window.history.state) ?? "/me";
+      const requestedPathname = resolveRequestedPathname();
+      const applyNavigation = () => {
+        setNavigation((current) => {
+          if (nextView !== "closed") {
+            return {
+              pathname: returnPathname,
+              mainPathname: returnPathname,
+              profileView: nextView,
+            };
+          }
           return {
-            pathname: returnPathname,
-            mainPathname: returnPathname,
-            profileView: nextView,
+            pathname: requestedPathname,
+            mainPathname: requestedPathname.startsWith("/admin")
+              ? current.mainPathname
+              : requestedPathname,
+            profileView: "closed",
           };
+        });
+      };
+
+      const attempt = ++navigationAttempt.current;
+      const guard = mainNavigationGuard.current;
+      if (!guard?.hasUnsavedAnswers()) {
+        applyNavigation();
+        return;
+      }
+      void guard.waitForPendingAnswers().then((saved) => {
+        if (attempt !== navigationAttempt.current) return;
+        if (!saved) {
+          guard.restore();
+          return;
         }
-        const requestedPathname = resolveRequestedPathname();
-        return {
-          pathname: requestedPathname,
-          mainPathname: requestedPathname.startsWith("/admin")
-            ? current.mainPathname
-            : requestedPathname,
-          profileView: "closed",
-        };
+        applyNavigation();
       });
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const changeMainNavigationGuard = useCallback((guard: MainNavigationGuard | null) => {
+    mainNavigationGuard.current = guard;
   }, []);
 
   useEffect(() => {
@@ -628,7 +657,10 @@ function AppContents() {
               ) : isMePath ? (
                 <ProfileApplication key={`${sessionRevision}:${accountDataResetKey}`} />
               ) : (
-                <DiagnosisApplication key={`${sessionRevision}:${accountDataResetKey}`} />
+                <DiagnosisApplication
+                  key={`${sessionRevision}:${accountDataResetKey}`}
+                  onNavigationGuardChange={changeMainNavigationGuard}
+                />
               )}
             </Suspense>
           </RouteErrorBoundary>

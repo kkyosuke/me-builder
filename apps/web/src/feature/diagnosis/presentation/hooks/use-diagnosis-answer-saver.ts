@@ -54,6 +54,11 @@ export function useDiagnosisAnswerSaver({
     return (saves.current.get(diagnosisId)?.size ?? 0) === 0;
   }, []);
 
+  const hasUnsavedSaves = useCallback(
+    (diagnosisId: string): boolean => (saves.current.get(diagnosisId)?.size ?? 0) > 0,
+    [],
+  );
+
   const save = useCallback(
     async (definition: DiagnosisDefinition, answer: DiagnosisAnswer) => {
       const saveRequest = saveDiagnosisAnswer(
@@ -95,5 +100,5 @@ export function useDiagnosisAnswerSaver({
     [onProgress, updateUnsavedCount],
   );
 
-  return { save, waitForPendingSaves };
+  return { hasUnsavedSaves, save, waitForPendingSaves };
 }
