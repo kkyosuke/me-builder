@@ -30,6 +30,14 @@ describe("RootApplication", () => {
     expect(screen.queryByText("本人向けアプリ")).toBeNull();
   });
 
+  it("公開規約URLは認証を開始せずサービス紹介サイトで表示する", async () => {
+    window.history.replaceState({}, "", "/terms");
+    render(<RootApplication />);
+
+    expect(await screen.findByText("サービス紹介トップ")).toBeTruthy();
+    expect(screen.queryByText("本人向けアプリ")).toBeNull();
+  });
+
   it("アプリpathnameでは本人向けアプリを表示し、検索対象外にする", async () => {
     window.history.replaceState({}, "", "/diagnosis");
     render(<RootApplication />);
@@ -45,6 +53,14 @@ describe("RootApplication", () => {
     render(<RootApplication />);
 
     expect(await screen.findByText("本人向けアプリ")).toBeTruthy();
+  });
+
+  it("LIFF deep linkの規約導線は公開規約ページではなく本人向けアプリへ渡す", async () => {
+    window.history.replaceState({}, "", "/app?liff.state=%2Fterms");
+    render(<RootApplication />);
+
+    expect(await screen.findByText("本人向けアプリ")).toBeTruthy();
+    expect(screen.queryByText("サービス紹介トップ")).toBeNull();
   });
 
   it("LIFFの共通endpointでは本人向けアプリを表示する", async () => {

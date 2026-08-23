@@ -2,7 +2,10 @@ import { Suspense, lazy } from "react";
 import { DocumentMetadata } from "./components/document-metadata";
 import { LoadingState } from "./components/loading-state";
 import { resolveServiceSiteRoute } from "./feature/service-site/model/service-site-route";
-import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
+import {
+  hasLiffDeepLinkLocation,
+  resolveRequestedPathname,
+} from "./infrastructure/requested-pathname";
 
 const ServiceSiteApplication = lazy(() =>
   import("./feature/service-site").then((feature) => ({
@@ -14,7 +17,9 @@ const WebApplication = lazy(() =>
 );
 
 export function RootApplication() {
-  const route = resolveServiceSiteRoute(resolveRequestedPathname());
+  const route = hasLiffDeepLinkLocation()
+    ? null
+    : resolveServiceSiteRoute(resolveRequestedPathname());
 
   return (
     <>
