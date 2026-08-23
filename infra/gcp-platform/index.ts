@@ -22,6 +22,11 @@ if (pulumi.getStack() !== environment) {
   throw new Error(`Stack ${pulumi.getStack()} must match environment ${environment}`);
 }
 const managesSharedProjectResources = environment === "development";
+const identityPlatformTenantDisplayName =
+  environment === "development" ? "me-builder-dev" : "me-builder-prd";
+if (!/^[A-Za-z][A-Za-z0-9-]{3,19}$/u.test(identityPlatformTenantDisplayName)) {
+  throw new Error("Identity Platform Tenant display name must satisfy the GCP 4-20 character rule");
+}
 
 const projectId = config.require("projectId");
 const billingAccount = config.require("billingAccount");
@@ -177,7 +182,7 @@ const identityPlatformTenant = new gcp.identityplatform.Tenant(
   "identityPlatformTenant",
   {
     project: verifiedProject.projectId,
-    displayName: `me-builder ${environment}`,
+    displayName: identityPlatformTenantDisplayName,
     allowPasswordSignup: false,
     enableEmailLinkSignin: false,
     disableAuth: false,

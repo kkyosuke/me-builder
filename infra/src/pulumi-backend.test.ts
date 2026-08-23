@@ -84,6 +84,10 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain("{ dependsOn: cloudBillingApi }");
     expect(gcpPlatformProgram).toContain("verifyExistingGcpProjectBilling");
     expect(gcpPlatformProgram).toContain("new gcp.identityplatform.Tenant(");
+    expect(gcpPlatformProgram).toContain('"me-builder-dev"');
+    expect(gcpPlatformProgram).toContain('"me-builder-prd"');
+    expect(gcpPlatformProgram).toContain("/^[A-Za-z][A-Za-z0-9-]{3,19}$/u");
+    expect(gcpPlatformProgram).not.toContain("`me-builder ${environment}`");
     expect(gcpPlatformProgram).toContain(
       "new gcp.identityplatform.TenantDefaultSupportedIdpConfig(",
     );
