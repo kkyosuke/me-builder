@@ -163,11 +163,20 @@ export function useDiagnosisDetail({ onProgress }: UseDiagnosisDetailOptions) {
       if (!definition) {
         throw new Error("診断を読み込み直してください。");
       }
+      const saved = await answerSaver.waitForPendingSaves(definition.id);
+      if (!saved) {
+        throw new Error("保存できていない回答があります。保存を再試行してください。");
+      }
       await deferDiagnosisQuestion(config.apiUrl, definition.id, diagnosisQuestionId);
       close();
     },
-    [close],
+    [answerSaver.waitForPendingSaves, close],
   );
+
+  const waitForPendingAnswers = useCallback(async (): Promise<boolean> => {
+    const definition = selectedDefinition.current;
+    return definition ? answerSaver.waitForPendingSaves(definition.id) : true;
+  }, [answerSaver.waitForPendingSaves]);
 
   const openCompletedResult = useCallback(async (): Promise<void> => {
     const definition = selectedDefinition.current;
@@ -213,5 +222,13 @@ export function useDiagnosisDetail({ onProgress }: UseDiagnosisDetailOptions) {
     }
   }, [onProgress]);
 
-  return { state, open, close, saveAnswer, deferQuestion, openCompletedResult };
+  return {
+    state,
+    open,
+    close,
+    saveAnswer,
+    deferQuestion,
+    waitForPendingAnswers,
+    openCompletedResult,
+  };
 }

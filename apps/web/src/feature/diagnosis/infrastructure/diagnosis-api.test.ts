@@ -98,7 +98,9 @@ describe("saveDiagnosisAnswer", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await saveDiagnosisAnswer(API_URL, "relationship-priority", "dq-1", "yes");
+    const result = await saveDiagnosisAnswer(API_URL, "relationship-priority", "dq-1", "yes", {
+      keepalive: true,
+    });
 
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_URL}/api/diagnoses/relationship-priority/answers/dq-1`,
@@ -106,6 +108,7 @@ describe("saveDiagnosisAnswer", () => {
         method: "PUT",
         body: JSON.stringify({ choiceId: "yes" }),
         credentials: "include",
+        keepalive: true,
       }),
     );
     expect(result).toMatchObject({

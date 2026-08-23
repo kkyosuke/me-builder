@@ -145,7 +145,7 @@ vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
       </button>
       <button
         type="button"
-        onClick={() =>
+        onClick={() => {
           void onSaveAnswer({
             kind: "answer",
             diagnosisQuestionId: "dq-1",
@@ -154,8 +154,8 @@ vi.mock("./feature/diagnosis/presentation/components/swipe-diagnosis", () => ({
             choiceId: "yes",
             direction: "right",
             acceptedAt: "2026-08-05T00:00:00.000Z",
-          })
-        }
+          }).catch(() => undefined);
+        }}
       >
         テスト回答
       </button>
@@ -1598,6 +1598,7 @@ describe("App", () => {
         "diagnosis-1",
         "dq-1",
         "yes",
+        { keepalive: true },
       ),
     );
   });
@@ -1697,7 +1698,7 @@ describe("App", () => {
     expect(mocks.restoreDiagnosisProgress).toHaveBeenCalledOnce();
   });
 
-  it("直前のバックグラウンド保存を待ってから現在回答を再取得する", async () => {
+  it("アプリ内の戻るはバックグラウンド保存を待ってから一覧へ遷移する", async () => {
     let resolveSave: ((value: unknown) => void) | undefined;
     mocks.saveDiagnosisAnswer.mockImplementation(
       () =>
@@ -1714,17 +1715,94 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "テスト回答" }));
     fireEvent.click(screen.getByRole("button", { name: "テスト一覧へ戻る" }));
-    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
-
-    await Promise.resolve();
+    expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
     expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledTimes(1);
 
-    resolveSave?.({
-      outcome: "created",
-      answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
-      progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
+    await act(async () => {
+      resolveSave?.({
+        outcome: "created",
+        answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
+        progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
+      });
     });
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
     await waitFor(() => expect(mocks.fetchDiagnosisProgress).toHaveBeenCalledTimes(2));
+  });
+
+  it("ブラウザ履歴の戻るもバックグラウンド保存を待ってから一覧へ遷移する", async () => {
+    let resolveSave: ((value: unknown) => void) | undefined;
+    mocks.saveDiagnosisAnswer.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "診断をはじめる" }));
+    fireEvent.click(await screen.findByRole("button", { name: "テスト回答" }));
+
+    act(() => window.history.back());
+    await waitFor(() => expect(diagnosisDetailIdFromHistoryState(window.history.state)).toBeNull());
+    expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
+
+    await act(async () => {
+      resolveSave?.({
+        outcome: "created",
+        answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
+        progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
+      });
+    });
+    expect(await screen.findByRole("heading", { name: "わたしの診断" })).toBeTruthy();
+  });
+
+  it("保存中の再読込・tab終了・外部遷移を標準離脱警告で確認する", async () => {
+    let resolveSave: ((value: unknown) => void) | undefined;
+    mocks.saveDiagnosisAnswer.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "診断をはじめる" }));
+    fireEvent.click(await screen.findByRole("button", { name: "テスト回答" }));
+
+    await waitFor(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      expect(window.dispatchEvent(event)).toBe(false);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    await act(async () => {
+      resolveSave?.({
+        outcome: "created",
+        answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
+        progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
+      });
+    });
+    await waitFor(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      expect(window.dispatchEvent(event)).toBe(true);
+      expect(event.defaultPrevented).toBe(false);
+    });
+  });
+
+  it("回答保存に失敗した場合は戻らず、同じ回答の再試行経路を残す", async () => {
+    mocks.saveDiagnosisAnswer.mockRejectedValue(new Error("通信に失敗しました"));
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "診断をはじめる" }));
+    fireEvent.click(await screen.findByRole("button", { name: "テスト回答" }));
+    await waitFor(() => expect(mocks.saveDiagnosisAnswer).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: "テスト一覧へ戻る" }));
+
+    expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /テスト診断/ })).toBeNull();
   });
 
   it("受付終了した回答途中診断は再開せず保存済み回答だけを表示する", async () => {

@@ -36,6 +36,7 @@ export default function DiagnosisApplication() {
   const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
   const openedDirectDiagnosisId = useRef<string | null>(null);
   const openedHistoryDiagnosisId = useRef<string | null>(null);
+  const navigationPending = useRef(false);
   const isHistoryDetailOpen = useRef(
     diagnosisDetailIdFromHistoryState(window.history.state) !== null,
   );
@@ -70,31 +71,34 @@ export default function DiagnosisApplication() {
     [detail.open],
   );
 
-  const closeDetail = useCallback(() => {
-    if (directDiagnosisId) {
-      detail.close();
-      window.history.replaceState({}, "", directBackHref);
-      window.dispatchEvent(new PopStateEvent("popstate"));
-      return;
-    }
-    if (!directDiagnosisId && listScrollY.current !== null) {
-      shouldRestoreListScroll.current = true;
-    }
-    if (
-      !directDiagnosisId &&
-      isHistoryDetailOpen.current &&
-      diagnosisDetailIdFromHistoryState(window.history.state)
-    ) {
+  const closeDetail = useCallback(async () => {
+    if (navigationPending.current) return;
+    navigationPending.current = true;
+    try {
+      if (!(await detail.waitForPendingAnswers())) return;
+      if (directDiagnosisId) {
+        detail.close();
+        window.history.replaceState({}, "", directBackHref);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        return;
+      }
+      if (listScrollY.current !== null) {
+        shouldRestoreListScroll.current = true;
+      }
+      if (isHistoryDetailOpen.current && diagnosisDetailIdFromHistoryState(window.history.state)) {
+        isHistoryDetailOpen.current = false;
+        openedHistoryDiagnosisId.current = null;
+        detail.close();
+        window.history.back();
+        return;
+      }
       isHistoryDetailOpen.current = false;
       openedHistoryDiagnosisId.current = null;
       detail.close();
-      window.history.back();
-      return;
+    } finally {
+      navigationPending.current = false;
     }
-    isHistoryDetailOpen.current = false;
-    openedHistoryDiagnosisId.current = null;
-    detail.close();
-  }, [detail.close, directBackHref, directDiagnosisId]);
+  }, [detail.close, detail.waitForPendingAnswers, directBackHref, directDiagnosisId]);
 
   const deferQuestion = useCallback(
     async (questionId: string) => {
@@ -146,12 +150,29 @@ export default function DiagnosisApplication() {
     if (directDiagnosisId) return;
     const historyDiagnosisId = diagnosisDetailIdFromHistoryState(window.history.state);
     if (!historyDiagnosisId) {
-      if (!isHistoryDetailOpen.current) return;
-      isHistoryDetailOpen.current = false;
-      openedHistoryDiagnosisId.current = null;
-      listScrollY.current ??= 0;
-      shouldRestoreListScroll.current = true;
-      detail.close();
+      const openDiagnosisId = openedHistoryDiagnosisId.current;
+      if (!isHistoryDetailOpen.current || !openDiagnosisId || navigationPending.current) return;
+      navigationPending.current = true;
+      void detail
+        .waitForPendingAnswers()
+        .then((saved) => {
+          if (!saved) {
+            window.history.pushState(
+              createDiagnosisDetailHistoryState(window.history.state, openDiagnosisId),
+              "",
+              `${window.location.pathname}${window.location.search}${window.location.hash}`,
+            );
+            return;
+          }
+          isHistoryDetailOpen.current = false;
+          openedHistoryDiagnosisId.current = null;
+          listScrollY.current ??= 0;
+          shouldRestoreListScroll.current = true;
+          detail.close();
+        })
+        .finally(() => {
+          navigationPending.current = false;
+        });
       return;
     }
     if (
@@ -166,7 +187,7 @@ export default function DiagnosisApplication() {
     isHistoryDetailOpen.current = true;
     openedHistoryDiagnosisId.current = historyDiagnosisId;
     void detail.open(diagnosis);
-  }, [detail.close, detail.open, diagnoses.state, directDiagnosisId]);
+  }, [detail.close, detail.open, detail.waitForPendingAnswers, diagnoses.state, directDiagnosisId]);
 
   useEffect(() => {
     syncDetailWithHistory();
