@@ -79,7 +79,7 @@ Configure one approval-protected GitHub Environment named `infra`. It owns the s
 | Secret | `GOOGLE_OAUTH_CLIENT_SECRET_DEVELOPMENT` | Development Web OAuth Client Secret |
 | Secret | `GOOGLE_OAUTH_CLIENT_SECRET_PRODUCTION` | Production Web OAuth Client Secret |
 
-The `infra` WIF principal needs object administration only on the `kagami/gcp-platform/` managed folder for state. On the existing application project, grant Browser, Service Usage Admin, API Keys Admin, Identity Platform Admin, and Secret Manager Admin. Grant Billing Account Costs Manager on the configured Billing Account so the Development Stack can manage the shared budget. Project Creator, Project Mover, Project Billing Manager, Billing Account User, Service Account Admin, Role Admin, Project IAM Admin, Organization Policy Administrator, and Service Account API Key Binding Admin are not required.
+The `infra` WIF principal needs object administration only on the `kagami/gcp-platform/` managed folder for state. On the existing application project, grant Browser, Service Usage Admin, API Keys Admin, Identity Platform Admin, and Secret Manager Admin. Grant Billing Account Costs Manager on the configured Billing Account so the Development Stack can manage the shared budget. Project Creator, Project Mover, Project Billing Manager, Billing Account User, and Service Account API Key Binding Admin are not required. Service Account Admin, Role Admin, Project IAM Admin, and Organization Policy Administrator are not steady-state permissions; the one-time cleanup exception is described below.
 
 Use the mapped `infra` Environment principal for both the application-project roles and the Billing Account role. Billing Account Costs Manager must be granted on the **Billing Account resource**, not on the application project. The latter does not authorize `billingAccounts.get` or budget operations against the Billing Account.
 
@@ -106,7 +106,9 @@ Run [`deploy-gcp-platform.yml`](../../.github/workflows/deploy-gcp-platform.yml)
 
 The workflow creates the Pulumi Stack when it does not exist and reconstructs its environment-specific configuration before every operation. It selects the target-specific OAuth values from the shared `infra` Environment. OAuth client ID and secret are required from the first operation so a successful first Apply always includes the Tenant's Google provider.
 
-The guarded `up` wrapper also performs the one-time state transition from the removed Vertex authorization-key implementation. It unprotects only the obsolete service account, custom role, IAM bindings, organization policy, and related API-service resources found in the selected Stack; Pulumi then removes them in the same update. The transition is a no-op when those resources are absent.
+The guarded `up` wrapper also performs the one-time state transition from the removed Vertex authorization-key implementation. It exports the encrypted Stack state, clears both Pulumi protection and the provider deletion guard only for the obsolete service account, custom role, IAM bindings, organization policy, and related API-service resources, then imports that state through standard input. In the same update, Pulumi deletes the obsolete owned resources and removes the two API-service records from state without disabling the APIs. The transition does not print decrypted secrets and is a no-op when those resources are absent.
+
+If the wrapper reports obsolete resources, temporarily grant the `infra` principal `roles/iam.serviceAccountAdmin`, `roles/iam.roleAdmin`, `roles/resourcemanager.projectIamAdmin`, and `roles/orgpolicy.policyAdmin` on the application project. Run `apply` for every Stack that reports the cleanup, confirm the obsolete resources were deleted, and then revoke all four roles. Do not retain these migration-only permissions for normal operation.
 
 ### Local deployment
 

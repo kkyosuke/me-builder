@@ -1,5 +1,5 @@
 import { gcpPlatformCommand } from "../src/gcp-platform-command";
-import { obsoleteGcpPlatformResourceUrns } from "../src/gcp-platform-state-migration";
+import { prepareGcpPlatformStateMigration } from "../src/gcp-platform-state-migration";
 import { run } from "../src/process";
 import { pulumiGcsBackends, requirePulumiGcsBackend } from "../src/pulumi-backend";
 
@@ -13,22 +13,18 @@ await run(["pulumi", "login", backendUrl]);
 await run(["pulumi", "-C", "gcp-platform", "whoami", "--verbose"]);
 
 if (operation === "up") {
-  const stackOutput = await run(
-    ["pulumi", "-C", "gcp-platform", "stack", "--show-urns", "--stack", stack],
+  const stackExport = await run(
+    ["pulumi", "-C", "gcp-platform", "stack", "export", "--stack", stack],
     { stdout: "pipe" },
   );
-  for (const urn of obsoleteGcpPlatformResourceUrns(stackOutput)) {
-    await run([
-      "pulumi",
-      "-C",
-      "gcp-platform",
-      "state",
-      "unprotect",
-      urn,
-      "--stack",
-      stack,
-      "--yes",
-    ]);
+  const migration = prepareGcpPlatformStateMigration(stackExport);
+  if (migration.migratedResourceCount > 0) {
+    console.log(
+      `Preparing one-time cleanup for ${migration.migratedResourceCount} obsolete GCP platform resources`,
+    );
+    await run(["pulumi", "-C", "gcp-platform", "stack", "import", "--stack", stack], {
+      stdin: migration.deployment,
+    });
   }
 }
 

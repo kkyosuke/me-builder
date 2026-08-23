@@ -1,14 +1,23 @@
-export async function run(command: string[], options: { stdout?: "inherit" | "pipe" } = {}) {
-  const process = Bun.spawn(command, {
+export async function run(
+  command: string[],
+  options: { stdin?: string; stdout?: "inherit" | "pipe" } = {},
+) {
+  const childProcess = Bun.spawn(command, {
     cwd: new URL("..", import.meta.url).pathname,
     env: processEnv(),
-    stdin: "inherit",
+    stdin: options.stdin == null ? "inherit" : "pipe",
     stdout: options.stdout ?? "inherit",
     stderr: "inherit",
   });
+  if (options.stdin != null) {
+    const stdin = childProcess.stdin;
+    if (!stdin) throw new Error(`Failed to open stdin for command: ${command.join(" ")}`);
+    stdin.write(options.stdin);
+    stdin.end();
+  }
   const output =
-    options.stdout === "pipe" ? new Response(process.stdout).text() : Promise.resolve("");
-  const [exitCode, stdout] = await Promise.all([process.exited, output]);
+    options.stdout === "pipe" ? new Response(childProcess.stdout).text() : Promise.resolve("");
+  const [exitCode, stdout] = await Promise.all([childProcess.exited, output]);
   if (exitCode !== 0) {
     throw new Error(`Command failed (${exitCode}): ${command.join(" ")}`);
   }
