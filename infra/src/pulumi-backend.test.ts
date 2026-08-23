@@ -75,6 +75,8 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain("{ dependsOn: cloudBillingApi }");
     expect(gcpPlatformProgram).toContain("verifyExistingGcpProjectBilling");
     expect(gcpPlatformProgram).toContain("monitoringNotificationChannels: []");
+    expect(gcpPlatformProgram).toContain('config.require("googleOAuthClientId")');
+    expect(gcpPlatformProgram).toContain('config.requireSecret("googleOAuthClientSecret")');
     expect(gcpPlatformProgram).not.toContain("new gcp.organizations.Project");
     expect(gcpPlatformProgram).not.toContain("import: projectId");
     expect(gcpPlatformProgram).not.toContain("autoCreateNetwork");
@@ -94,6 +96,11 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).toContain("remove_config_if_present folderId");
     expect(gcpPlatformWorkflow).toContain("Existing standalone project");
     expect(gcpPlatformWorkflow).toContain("remove_config_if_present projectName");
+    expect(gcpPlatformWorkflow).toContain(
+      "GOOGLE_OAUTH_CLIENT_ID\n            GOOGLE_OAUTH_CLIENT_SECRET",
+    );
+    expect(gcpPlatformWorkflow).not.toContain("remove_config_if_present googleOAuthClientId");
+    expect(gcpPlatformWorkflow).not.toContain("remove_config_if_present googleOAuthClientSecret");
     expect(gcpPlatformWorkflow).not.toContain("GCP_PLATFORM_PROJECT_NAME");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage buckets");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");

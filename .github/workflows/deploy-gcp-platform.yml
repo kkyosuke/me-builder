@@ -74,6 +74,8 @@ jobs:
             GCP_BILLING_ACCOUNT
             GCP_WORKLOAD_IDENTITY_PROVIDER
             PULUMI_CONFIG_PASSPHRASE
+            GOOGLE_OAUTH_CLIENT_ID
+            GOOGLE_OAUTH_CLIENT_SECRET
           )
           for value_name in "${required_values[@]}"; do
             value="${!value_name}"
@@ -87,12 +89,6 @@ jobs:
             echo "::error::GCP_ORGANIZATION_IDとGCP_FOLDER_IDは両方同時に設定できません。"
             exit 1
           fi
-          if { [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ] && [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; } ||
-            { [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ] && [ -n "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; }; then
-            echo "::error::GOOGLE_OAUTH_CLIENT_IDとGOOGLE_OAUTH_CLIENT_SECRETは両方設定するか、両方未設定にしてください。"
-            exit 1
-          fi
-
       - uses: ./.github/actions/setup-bun-workspace
 
       - uses: arduino/setup-task@v2
@@ -141,13 +137,8 @@ jobs:
             remove_config_if_present folderId
           fi
 
-          if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ]; then
-            pulumi -C infra/gcp-platform config set googleOAuthClientId "${GOOGLE_OAUTH_CLIENT_ID}" --stack "${TARGET}"
-            pulumi -C infra/gcp-platform config set --secret googleOAuthClientSecret "${GOOGLE_OAUTH_CLIENT_SECRET}" --stack "${TARGET}"
-          else
-            remove_config_if_present googleOAuthClientId
-            remove_config_if_present googleOAuthClientSecret
-          fi
+          pulumi -C infra/gcp-platform config set googleOAuthClientId "${GOOGLE_OAUTH_CLIENT_ID}" --stack "${TARGET}"
+          pulumi -C infra/gcp-platform config set --secret googleOAuthClientSecret "${GOOGLE_OAUTH_CLIENT_SECRET}" --stack "${TARGET}"
 
       - name: Run Pulumi
         run: |

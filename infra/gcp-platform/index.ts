@@ -103,14 +103,8 @@ if (
 ) {
   throw new Error(`${environment} OAuth redirect URIs must match the application callback URLs`);
 }
-const googleOAuthClientId = config.get("googleOAuthClientId");
-const googleOAuthClientSecret = config.getSecret("googleOAuthClientSecret");
-if (
-  (googleOAuthClientId && !googleOAuthClientSecret) ||
-  (!googleOAuthClientId && googleOAuthClientSecret)
-) {
-  throw new Error("Set both googleOAuthClientId and googleOAuthClientSecret");
-}
+const googleOAuthClientId = config.require("googleOAuthClientId");
+const googleOAuthClientSecret = config.requireSecret("googleOAuthClientSecret");
 const protect = true;
 
 const existingProject = gcp.organizations.getProjectOutput({ projectId });
@@ -202,25 +196,22 @@ const identityPlatform = new gcp.identityplatform.Config(
   },
 );
 
-const googleProvider =
-  googleOAuthClientId && googleOAuthClientSecret
-    ? new gcp.identityplatform.DefaultSupportedIdpConfig(
-        "googleProvider",
-        {
-          project: verifiedProject.projectId,
-          idpId: "google.com",
-          enabled: true,
-          clientId: googleOAuthClientId,
-          clientSecret: googleOAuthClientSecret,
-          deletionPolicy: "PREVENT",
-        },
-        {
-          dependsOn: identityPlatform,
-          protect,
-          additionalSecretOutputs: ["clientSecret"],
-        },
-      )
-    : undefined;
+const googleProvider = new gcp.identityplatform.DefaultSupportedIdpConfig(
+  "googleProvider",
+  {
+    project: verifiedProject.projectId,
+    idpId: "google.com",
+    enabled: true,
+    clientId: googleOAuthClientId,
+    clientSecret: googleOAuthClientSecret,
+    deletionPolicy: "PREVENT",
+  },
+  {
+    dependsOn: identityPlatform,
+    protect,
+    additionalSecretOutputs: ["clientSecret"],
+  },
+);
 
 const projectBudget = new gcp.billing.Budget(
   "projectMonthlyBudget",
@@ -391,7 +382,7 @@ export const platform = {
   vertexSpendCapConfirmed,
   vertexRuntimeCredentialsEnabled,
   activeCredentialSlot,
-  identityProvider: googleProvider?.idpId,
+  identityProvider: googleProvider.idpId,
   googleOAuthClientId,
   oauthRedirectUris,
   identityPlatformApiKeys: pulumi.secret({
