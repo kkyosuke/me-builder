@@ -63,8 +63,8 @@ jobs:
             echo "::error::確認文字列は ${expected_confirmation} である必要があります。"
             exit 1
           fi
-          if [ "${REF_TYPE}" != "branch" ] || { [ "${REF_NAME}" != "main" ] && [ "${REF_NAME}" != "docs/gcp-manual-prerequisites" ]; }; then
-            echo "::error::GCP platform操作は許可されたブランチからだけ実行できます。"
+          if [ "${REF_TYPE}" != "branch" ] || [ "${REF_NAME}" != "main" ]; then
+            echo "::error::GCP platform操作はmainブランチからだけ実行できます。"
             exit 1
           fi
 
@@ -101,6 +101,20 @@ jobs:
         with:
           project_id: ${{ env.GCP_STATE_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Verify GCP Deployment Access
+        run: |
+          if ! gcloud projects describe "${GCP_PLATFORM_PROJECT_ID}" \
+            --format='value(projectId)' >/dev/null; then
+            echo "::error::既存projectを読み取れません。infra WIF principalへapplication project上のroles/browserを付与してください。"
+            exit 1
+          fi
+
+          if ! gcloud billing accounts describe "${GCP_BILLING_ACCOUNT}" \
+            --format='value(name)' >/dev/null; then
+            echo "::error::請求先アカウントを読み取れません。roles/billing.costsManagerはprojectではなくBilling Account ${GCP_BILLING_ACCOUNT}上でinfra WIF principalへ付与してください。"
+            exit 1
+          fi
 
       - name: Install Pulumi CLI
         run: |

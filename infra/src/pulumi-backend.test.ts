@@ -94,6 +94,13 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:preview:${TARGET}"');
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:up:${TARGET}"');
     expect(gcpPlatformWorkflow).toContain("environment: infra");
+    expect(gcpPlatformWorkflow).toContain('gcloud projects describe "${GCP_PLATFORM_PROJECT_ID}"');
+    expect(gcpPlatformWorkflow).toContain(
+      'gcloud billing accounts describe "${GCP_BILLING_ACCOUNT}"',
+    );
+    expect(gcpPlatformWorkflow).toContain(
+      "roles/billing.costsManagerはprojectではなくBilling Account",
+    );
     expect(gcpPlatformWorkflow).toContain("vars.GOOGLE_OAUTH_CLIENT_ID_DEVELOPMENT");
     expect(gcpPlatformWorkflow).toContain("vars.GOOGLE_OAUTH_CLIENT_ID_PRODUCTION");
     expect(gcpPlatformWorkflow).toContain("secrets.GOOGLE_OAUTH_CLIENT_SECRET_DEVELOPMENT");

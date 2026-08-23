@@ -110,6 +110,18 @@ Configure one approval-protected GitHub Environment named `infra`. It owns the s
 
 The `infra` WIF principal needs object administration only on the `kagami/gcp-platform/` managed folder for state. On the existing application project, grant Browser, Service Usage Admin, API Keys Admin, Identity Platform Admin, Service Account Admin, Role Admin, and Project IAM Admin. Grant Billing Account Costs Manager on the configured Billing Account so the Development Stack can manage the shared budget. Project Creator, Project Mover, Project Billing Manager, and Billing Account User are not required because the Stacks do not mutate the project or its billing association. Organization Policy Administrator and Service Account API Key Binding Admin are required only for the authorization-key path available to Organization or Folder projects.
 
+Use the mapped `infra` Environment principal for both the application-project roles and the Billing Account role. Billing Account Costs Manager must be granted on the **Billing Account resource**, not on the application project. The latter does not authorize `billingAccounts.get` or budget operations against the Billing Account.
+
+```bash
+GCP_INFRA_PRINCIPAL="principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloadIdentityPools/github-actions/attribute.environment/infra"
+
+gcloud billing accounts add-iam-policy-binding 0169CD-74F0D2-7C9777 \
+  --member="${GCP_INFRA_PRINCIPAL}" \
+  --role=roles/billing.costsManager
+```
+
+The workflow checks project and Billing Account readability immediately after Direct WIF authentication and before installing Pulumi. A failure at this point means the IAM binding scope or member is incorrect; recreating the Pulumi Stack does not repair it.
+
 | Scope | Role ID | Purpose |
 | --- | --- | --- |
 | application project | `roles/browser` | read the existing project, number, billing association, and parent |
@@ -119,7 +131,7 @@ The `infra` WIF principal needs object administration only on the `kagami/gcp-pl
 | application project | `roles/iam.serviceAccountAdmin` | manage the dedicated Vertex runtime service account |
 | application project | `roles/iam.roleAdmin` | manage the inference-only custom role |
 | application project | `roles/resourcemanager.projectIamAdmin` | bind the custom role and Service Usage Consumer to the runtime service account |
-| Billing Account | `roles/billing.costsManager` | manage the Pulumi-declared project budget |
+| Billing Account (not application project) | `roles/billing.costsManager` | read the Billing Account and manage the Pulumi-declared project budget |
 | Organization or Folder project only | `roles/orgpolicy.policyAdmin` | manage the service-account-bound authorization-key policy |
 | Organization or Folder project only | `roles/iam.serviceAccountApiKeyBindingAdmin` | bind a Vertex authorization key to the runtime service account |
 
