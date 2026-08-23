@@ -63,8 +63,8 @@ jobs:
             echo "::error::確認文字列は ${expected_confirmation} である必要があります。"
             exit 1
           fi
-          if [ "${REF_TYPE}" != "branch" ] || { [ "${REF_NAME}" != "main" ] && [ "${REF_NAME}" != "docs/gcp-manual-prerequisites" ]; }; then
-            echo "::error::GCP platform操作は許可されたブランチからだけ実行できます。"
+          if [ "${REF_TYPE}" != "branch" ] || [ "${REF_NAME}" != "main" ]; then
+            echo "::error::GCP platform操作はmainブランチからだけ実行できます。"
             exit 1
           fi
 
