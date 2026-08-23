@@ -124,42 +124,8 @@ jobs:
           pulumi -C infra/gcp-platform config set environment "${TARGET}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set projectId "${GCP_PLATFORM_PROJECT_ID}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set billingAccount "${GCP_BILLING_ACCOUNT}" --stack "${TARGET}"
-
-          remove_config_if_present() {
-            if pulumi -C infra/gcp-platform config get "$1" --stack "${TARGET}" >/dev/null 2>&1; then
-              pulumi -C infra/gcp-platform config rm "$1" --stack "${TARGET}"
-            fi
-          }
-
-          # 旧Stack configを残してもprojectは更新しないが、管理対象外になった値は除去する。
-          remove_config_if_present projectName
-          remove_config_if_present organizationId
-          remove_config_if_present folderId
-          remove_config_if_present vertexSpendCapConfirmed
-          remove_config_if_present vertexRuntimeCredentialsEnabled
-
           pulumi -C infra/gcp-platform config set googleOAuthClientId "${GOOGLE_OAUTH_CLIENT_ID}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set --secret googleOAuthClientSecret "${GOOGLE_OAUTH_CLIENT_SECRET}" --stack "${TARGET}"
-
-      # 旧実装が作成した未使用resourceだけを対象に、削除保護を一度解除する。
-      - name: Migrate Obsolete Vertex Identity Resources
-        if: inputs.operation == 'apply'
-        run: |
-          urn_prefix="urn:pulumi:${TARGET}::me-builder-gcp-platform::"
-          stack_resources="$(pulumi -C infra/gcp-platform stack --show-urns --stack "${TARGET}")"
-          obsolete_urns=(
-            "${urn_prefix}gcp:serviceaccount/account:Account::vertexRuntime"
-            "${urn_prefix}gcp:projects/iAMCustomRole:IAMCustomRole::vertexInferenceRole"
-            "${urn_prefix}gcp:projects/service:Service::iam-googleapis-com"
-            "${urn_prefix}gcp:projects/service:Service::orgpolicy-googleapis-com"
-          )
-          for obsolete_urn in "${obsolete_urns[@]}"; do
-            if grep --fixed-strings --quiet "${obsolete_urn}" <<< "${stack_resources}"; then
-              pulumi -C infra/gcp-platform state unprotect "${obsolete_urn}" \
-                --stack "${TARGET}" \
-                --yes
-            fi
-          done
 
       - name: Run Pulumi
         run: |

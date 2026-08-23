@@ -1,19 +1,10 @@
 # GCP platform infrastructure
 
-This Pulumi project creates the Google Cloud resources used by me-builder authentication and Vertex AI inside one existing shared application project. It is intentionally separate from the Cloudflare Pulumi project. The `development` and `production` Stacks isolate environment resources while the Development Stack owns project-wide resources once.
+This is the operational runbook for the GCP platform Pulumi project. Resource ownership, environment isolation, secret flow, and cost-control policy are defined only in [Infrastructure Architecture §6.2](../../docs/architecture/infrastructure-architecture.md#62-gcp共通リソースの宣言境界).
 
-## Managed resources
+## Scope
 
-- validation of the same existing GCP project and its preconfigured Cloud Billing connection, without managing the project itself
-- project-wide API activation owned only by the Development Stack
-- a separate Identity Platform Tenant for each Stack, with email/password and email-link sign-in disabled
-- Google as the enabled provider inside each Tenant
-- rotatable API key slots restricted to Identity Platform `SignInWithIdp`
-- Vertex AI API
-- environment-specific Secret Manager containers and least-privilege CD access for the generated Identity Platform key and manually registered Vertex AI key
-- one gross-cost monthly shared-project budget, owned by the Development Stack, with alerts at 50%, 80%, and 100%
-
-Google Auth Platform registration, two Web OAuth clients, Identity Platform activation, and multi-tenancy are one-time manual prerequisites. The detailed boundary and environment-specific values are defined under [State backend and first deployment](#state-backend-and-first-deployment).
+The project assumes one existing application project and its Cloud Billing connection. This runbook covers the one-time manual prerequisites, required IAM, Pulumi execution, runtime secret registration, and credential rotation; it does not provide an alternate project-creation path.
 
 ## GCP deploy authentication
 
@@ -44,22 +35,7 @@ flowchart LR
 5. Register the project in Google Auth Platform and create the Development and Production Web OAuth clients using the environment-specific settings below.
 6. Complete the [Direct WIF and state backend setup](../README.md#one-time-state-backend-bootstrap), then configure the approval-protected `infra` GitHub Environment as described under [GitHub Actions deployment](#github-actions-deployment).
 
-If a new project must be bootstrapped outside Pulumi, the equivalent `gcloud` commands for project creation, billing connection, and step 3 are:
-
-```bash
-GCP_APPLICATION_PROJECT_ID="replace-with-application-project-id"
-GCP_APPLICATION_PROJECT_NAME="replace-with-application-project-name"
-GCP_BILLING_ACCOUNT_ID="replace-with-billing-account-id"
-
-gcloud projects create "${GCP_APPLICATION_PROJECT_ID}" \
-  --name="${GCP_APPLICATION_PROJECT_NAME}"
-gcloud billing projects link "${GCP_APPLICATION_PROJECT_ID}" \
-  --billing-account="${GCP_BILLING_ACCOUNT_ID}"
-gcloud services enable serviceusage.googleapis.com \
-  --project="${GCP_APPLICATION_PROJECT_ID}"
-```
-
-Skip project creation when the intended project already exists. Running the Service Usage command again is safe; it converges on the enabled state. Identity Platform activation and multi-tenancy remain Console-owned prerequisites; Pulumi starts at Tenant creation.
+Identity Platform activation and multi-tenancy remain Console-owned prerequisites; Pulumi starts at Tenant creation.
 
 #### Google Auth Platform and Web OAuth client
 
@@ -130,6 +106,8 @@ Run [`deploy-gcp-platform.yml`](../../.github/workflows/deploy-gcp-platform.yml)
 
 The workflow creates the Pulumi Stack when it does not exist and reconstructs its environment-specific configuration before every operation. It selects the target-specific OAuth values from the shared `infra` Environment. OAuth client ID and secret are required from the first operation so a successful first Apply always includes the Tenant's Google provider.
 
+The guarded `up` wrapper also performs the one-time state transition from the removed Vertex authorization-key implementation. It unprotects only the obsolete service account, custom role, IAM bindings, organization policy, and related API-service resources found in the selected Stack; Pulumi then removes them in the same update. The transition is a no-op when those resources are absent.
+
 ### Local deployment
 
 ```bash
@@ -155,31 +133,17 @@ ALLOW_GCP_PLATFORM_UP=production task infra:gcp-platform:up:production
 
 These commands require the shared project, its Cloud Billing connection, Identity Platform activation, and multi-tenancy to exist before they run. Apply Development before Production. Pulumi verifies that the configured project and billing account match GCP and fails without changing them when they differ.
 
-The checked-in shared-project monthly budget and Vertex AI service spend cap are both JPY 10,000, owned by the Development Stack. `budgetCurrencyCode` must match the Billing Account currency exactly; Pulumi reports both values before attempting budget creation when they differ. Change it together with `monthlyBudgetAmount` and `vertexSpendCapAmount` in the reviewed Development Stack YAML when these are no longer the intended limits. Production has no separate project budget because Identity Platform Tenant does not partition Cloud Billing or Vertex AI usage.
+The reviewed Development Stack YAML configures the Pulumi-managed shared-project monthly budget. `budgetCurrencyCode` must match the Billing Account currency exactly; Pulumi reports both values before attempting budget creation when they differ. The intended budget and Vertex AI spend-cap amounts, their ownership, and the reason Production has no separate project budget are defined in [Infrastructure Architecture §6.2](../../docs/architecture/infrastructure-architecture.md#62-gcp共通リソースの宣言境界).
 
 The first update intentionally leaves the Vertex runtime Secret container empty. Complete this additional manual Google Cloud control once in the shared project:
 
-1. Open Cloud Billing Budgets & alerts, create a service spend cap for Vertex AI on this project, and set it to exactly the Development Stack's `vertexSpendCapAmount` in `budgetCurrencyCode`. A normal Pulumi-managed budget only sends alerts; it does not stop usage. Google's spend cap is currently Preview and is not exposed by the public Cloud Billing Budget API or the Pulumi GCP provider.
+1. Open Cloud Billing Budgets & alerts and create the Vertex AI service spend cap specified by [Infrastructure Architecture §6.2](../../docs/architecture/infrastructure-architecture.md#62-gcp共通リソースの宣言境界) on this project. A normal Pulumi-managed budget only sends alerts; it does not stop usage.
 
-The spend cap remains a Console-owned control. Pulumi records the intended amount in reviewed configuration and manages the project budget alerts, but it does not attest to the spend cap or issue Vertex credentials.
+The spend cap remains a Console-owned control. Pulumi manages the project budget alerts, but it does not attest to the spend cap or issue Vertex credentials.
 
 ### Runtime secret distribution to Cloudflare CD
 
 Cloudflare CD does not read or decrypt the GCS Pulumi state. Each Stack owns two environment-specific Secret Manager containers, and grants `roles/secretmanager.secretAccessor` only to the matching GitHub Environment principal. CD authenticates with Direct WIF, reads only the active runtime values, masks them, and passes them to `wrangler deploy --secrets-file` with the application version.
-
-```mermaid
-flowchart LR
-    Pulumi["GCP Pulumi apply"] --> Identity["Identity Platform API key"]
-    Manual["Manual Vertex key registration"] --> Vertex["Vertex AI API key"]
-    Identity --> DevSecret["development Secret Manager"]
-    Vertex --> DevSecret
-    Identity --> PrdSecret["production Secret Manager"]
-    Vertex --> PrdSecret
-    DevCD["CD / Preview via dev WIF"] --> DevSecret
-    PrdCD["CD / Production via prd WIF"] --> PrdSecret
-    DevCD --> CloudflareDev["Cloudflare Preview secrets-file"]
-    PrdCD --> CloudflarePrd["Cloudflare Production secrets-file"]
-```
 
 | Stack | Secret Manager ID | CD destination |
 | --- | --- | --- |
@@ -211,10 +175,10 @@ The Vertex AI key remains externally owned: Pulumi manages its Secret container 
 
 Keys use `primary` and `secondary` slots, but only the active slot exists during normal operation. To rotate without downtime:
 
-1. Change the inactive slot under `credentialGenerations` from `null` to a new generation (for example, `v2`) and apply the Stack.
-2. Retrieve that inactive slot locally from the secret `identityPlatformApiKeys` output. Do not expose it in CI logs.
+1. Change the inactive slot under `identityPlatformCredentialGenerations` from `null` to a new generation (for example, `v2`) and apply the Stack.
+2. Retrieve the newly created inactive key from Google Cloud API Keys locally. Pulumi does not export credential values; do not expose the key in CI logs.
 3. Test the inactive Development key locally without replacing the Secret Manager `latest` version.
-4. Change `activeCredentialSlot` to the new slot and apply. Pulumi writes the selected key as a new Secret Manager version; no GitHub Secret update is required.
+4. Change `identityPlatformActiveCredentialSlot` to the new slot and apply. Pulumi writes the selected key as a new Secret Manager version; no GitHub Secret update is required.
 5. Run the matching CD workflow and verify Identity Platform. Roll back by restoring the former active slot and applying again if needed.
 6. After a short rollback window, set the old slot's generation to `null` and apply to delete that key. Rotate Production separately after the Development gate; the Tenant IDs do not change during key rotation.
 

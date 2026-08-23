@@ -219,9 +219,19 @@ APIとMCPがブラウザへ返すCORSヘッダは、環境manifestのベース�
 
 各Stackは専用Identity Platform Tenant、そのTenant内のGoogle provider、Identity Toolkit APIだけへ制限したAPI keyを所有します。API Serverは環境固定のTenant IDを`accounts:signInWithIdp`へ指定し、応答Tenant IDも照合するため、同じprojectでもDevelopmentとProductionのuserは混在しません。Vertex AI keyはPulumiの管理対象にせず、既存projectで手動発行して環境別Secret Managerへ登録します。PulumiはVertex service account、custom role、project IAM binding、organization policy、Vertex API keyを作成しません。認証Tenant、Secret Manager、予算などStackが作成する永続的な基盤はDevelopmentを含めて削除保護します。
 
-API keyは`primary`と`secondary`のrotation slotを持ち、平常時はactive slotだけを作成します。Stack configに非active slotのgenerationを追加して移行期間だけ2 keyを併存させ、配布先の切り替え後に旧slotを`null`へ戻して削除します。key自体へ削除保護を付けず、Identity Platform、IAM、予算などStackが所有する永続的な基盤だけを削除保護します。これにより、固定名の長期credentialを壊さずに置換できない状態と、不要な予備credentialの常設をともに避けます。
+Identity Platform API keyは`primary`と`secondary`のrotation slotを持ち、平常時はactive slotだけを作成します。Stack configに非active slotのgenerationを追加して移行期間だけ2 keyを併存させ、配布先の切り替え後に旧slotを`null`へ戻して削除します。key自体へ削除保護を付けず、Identity Platform Tenant、Google provider、Secret Manager、予算などStackが所有する永続的な基盤だけを削除保護します。これにより、固定名の長期credentialを壊さずに置換できない状態と、不要な予備credentialの常設をともに避けます。
 
-Cloud Billing予算とVertex AIの費用はTenantでは分離できないため、`development` Stackが共有project全体の月額予算を1つだけ管理し、gross costの50%、80%、100%で警告します。設定通貨がBilling Accountの通貨と異なる場合は作成前に明示的に失敗します。通常の予算通知は利用を停止しないため、Vertex AIの実費上限にはGoogle Cloud Billingのservice別Spend capを共有projectへ1つ設定します。Spend capは現行の公開Cloud Billing Budget APIとPulumi GCP providerから設定できないため、最初の基盤適用後にCloud Consoleで手動設定します。上限到達時に両環境のAI機能が停止することを可用性上の正常な縮退として扱います。
+Cloud Billing予算とVertex AIの費用はTenantでは分離できないため、`development` Stackが共有project全体の月額予算JPY 10,000を1つだけ管理し、gross costの50%、80%、100%で警告します。設定通貨がBilling Accountの通貨と異なる場合は作成前に明示的に失敗します。通常の予算通知は利用を停止しないため、Vertex AIの実費上限にはGoogle Cloud Billingのservice別Spend cap JPY 10,000を共有projectへ1つ設定します。Spend capはPulumiの管理対象にせず、最初の基盤適用後にCloud Consoleで手動設定します。上限到達時に両環境のAI機能が停止することを可用性上の正常な縮退として扱います。
+
+```mermaid
+flowchart LR
+    Pulumi["環境別Pulumi Stack"] --> IdentityKey["Identity Platform API key"]
+    Operator["運用者"] --> VertexKey["Vertex AI API key"]
+    IdentityKey --> EnvSecret["環境別Secret Manager"]
+    VertexKey --> EnvSecret
+    EnvSecret --> CD["対応するdev / prd CD"]
+    CD --> Cloudflare["Cloudflare runtime Secret"]
+```
 
 Google Auth Platformは共有projectのOAuth同意画面と一般ユーザー向けWeb OAuth clientを所有します。Development clientにはLocalとPreviewの完全一致callback、Production clientにはProduction callbackだけを登録します。Web OAuth clientの作成はPulumi管理対象外とし、そのClient IDとSecretを環境別Pulumi configへ入力して対応TenantのGoogle providerへ接続します。IAP用またはworkload用OAuth clientで代用しません。
 

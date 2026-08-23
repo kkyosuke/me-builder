@@ -3,17 +3,9 @@ export type ExistingGcpProject = {
   number?: string | undefined;
 };
 
-export type ExpectedGcpProject = {
-  projectId: string;
-};
-
 export type VerifiedGcpProject = {
   projectId: string;
   projectNumber: string;
-};
-
-export type VerifiedGcpProjectBilling = {
-  billingAccount: string;
 };
 
 function normalizeBillingAccount(value: string): string {
@@ -29,22 +21,25 @@ function normalizeOptionalId(value: string | undefined): string | undefined {
  * 既存projectを更新せず、Stack設定が実際のprojectと一致することだけを検証する。
  */
 export function verifyExistingGcpProject(
-  expected: ExpectedGcpProject,
+  expectedProjectId: string,
   actual: ExistingGcpProject,
 ): VerifiedGcpProject {
   const actualProjectId = normalizeOptionalId(actual.projectId);
-  if (actualProjectId && actualProjectId !== expected.projectId) {
+  if (!actualProjectId) {
+    throw new Error(`Existing GCP project ${expectedProjectId} has no project ID`);
+  }
+  if (actualProjectId !== expectedProjectId) {
     throw new Error(
-      `Existing GCP project ID ${actualProjectId} does not match configured projectId ${expected.projectId}`,
+      `Existing GCP project ID ${actualProjectId} does not match configured projectId ${expectedProjectId}`,
     );
   }
 
   const projectNumber = actual.number?.trim() ?? "";
   if (!projectNumber) {
-    throw new Error(`Existing GCP project ${expected.projectId} has no project number`);
+    throw new Error(`Existing GCP project ${expectedProjectId} has no project number`);
   }
 
-  return { projectId: expected.projectId, projectNumber };
+  return { projectId: expectedProjectId, projectNumber };
 }
 
 /**
@@ -54,7 +49,7 @@ export function verifyExistingGcpProjectBilling(
   projectId: string,
   expectedBillingAccount: string,
   actualBillingAccount: string | undefined,
-): VerifiedGcpProjectBilling {
+): string {
   const actual = normalizeBillingAccount(actualBillingAccount?.trim() ?? "");
   const expected = normalizeBillingAccount(expectedBillingAccount.trim());
   if (actual !== expected) {
@@ -63,5 +58,5 @@ export function verifyExistingGcpProjectBilling(
     );
   }
 
-  return { billingAccount: expected };
+  return expected;
 }
