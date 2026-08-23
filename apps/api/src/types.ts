@@ -51,6 +51,7 @@ type Env = Omit<
   SSO_ROLLOUT_MODE?: string;
   SSO_ROLLOUT_PERCENT?: string;
   GOOGLE_IDENTITY_PLATFORM_API_KEY?: string;
+  GOOGLE_IDENTITY_PLATFORM_TENANT_ID?: string;
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
   WEBHOOK_QUEUE?: Queue<WebhookQueueMessage>;

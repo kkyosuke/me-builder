@@ -127,6 +127,7 @@ describe("getConfig & ConfigSchema", () => {
       SSO_ROLLOUT_MODE: "",
       SSO_ROLLOUT_PERCENT: "",
       GOOGLE_IDENTITY_PLATFORM_API_KEY: "",
+      GOOGLE_IDENTITY_PLATFORM_TENANT_ID: "",
       GOOGLE_OAUTH_CLIENT_ID: "",
       GOOGLE_OAUTH_CLIENT_SECRET: "",
     });
@@ -134,6 +135,7 @@ describe("getConfig & ConfigSchema", () => {
     expect(conf.ssoRolloutMode).toBe("disabled");
     expect(conf.ssoRolloutPercent).toBe(0);
     expect(conf.googleIdentityPlatformApiKey).toBeUndefined();
+    expect(conf.googleIdentityPlatformTenantId).toBeUndefined();
     expect(conf.googleOAuthClientId).toBeUndefined();
     expect(conf.googleOAuthClientSecret).toBeUndefined();
   });
@@ -142,6 +144,7 @@ describe("getConfig & ConfigSchema", () => {
     const conf = getConfig({
       SSO_ROLLOUT_MODE: "linking",
       GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+      GOOGLE_IDENTITY_PLATFORM_TENANT_ID: "development-tenant",
       GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
       GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
       SSO_ROLLOUT_PERCENT: "5",
@@ -153,6 +156,7 @@ describe("getConfig & ConfigSchema", () => {
       expect.objectContaining({
         ssoRolloutMode: "linking",
         googleIdentityPlatformApiKey: "identity-platform-api-key",
+        googleIdentityPlatformTenantId: "development-tenant",
         googleOAuthClientId: "google-client-id",
         googleOAuthClientSecret: "google-client-secret",
         ssoRolloutPercent: 5,
@@ -166,6 +170,7 @@ describe("getConfig & ConfigSchema", () => {
       getConfig({
         SSO_ROLLOUT_MODE: "linked-login",
         GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+        GOOGLE_IDENTITY_PLATFORM_TENANT_ID: "development-tenant",
       }),
     ).toThrow("GOOGLE_OAUTH_CLIENT_ID");
   });
@@ -180,6 +185,7 @@ describe("getConfig & ConfigSchema", () => {
       getConfig({
         SSO_ROLLOUT_MODE: "linked-login",
         GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+        GOOGLE_IDENTITY_PLATFORM_TENANT_ID: "development-tenant",
         GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
         GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
         BASE_URL: "https://api.example.com",
@@ -196,6 +202,7 @@ describe("getConfig & ConfigSchema", () => {
         getConfig({
           SSO_ROLLOUT_MODE: "linking",
           GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+          GOOGLE_IDENTITY_PLATFORM_TENANT_ID: "development-tenant",
           GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
           GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
           BASE_URL: `http://${hostname}:3000`,

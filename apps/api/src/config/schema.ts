@@ -65,6 +65,8 @@ export const ConfigSchema = v.object({
   ),
   /** Identity Platform REST APIの環境別Web API key。 */
   googleIdentityPlatformApiKey: v.optional(v.pipe(v.string(), v.nonEmpty())),
+  /** development/productionのuserを分離するIdentity Platform tenant ID。 */
+  googleIdentityPlatformTenantId: v.optional(v.pipe(v.string(), v.nonEmpty())),
   /** Identity PlatformのGoogle providerへ登録した環境別OAuth client。 */
   googleOAuthClientId: v.optional(v.pipe(v.string(), v.nonEmpty())),
   googleOAuthClientSecret: v.optional(v.pipe(v.string(), v.nonEmpty())),

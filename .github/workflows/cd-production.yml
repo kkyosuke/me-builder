@@ -37,6 +37,7 @@ jobs:
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
       LINE_LOGIN_CHANNEL_SECRET: ${{ secrets.LINE_LOGIN_CHANNEL_SECRET }}
       GOOGLE_IDENTITY_PLATFORM_API_KEY: ${{ secrets.GOOGLE_IDENTITY_PLATFORM_API_KEY }}
+      GOOGLE_IDENTITY_PLATFORM_TENANT_ID: ${{ vars.GOOGLE_IDENTITY_PLATFORM_TENANT_ID }}
       GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
@@ -92,8 +93,8 @@ jobs:
             echo "::error::SSO_ROLLOUT_PERCENT は0から100の整数で指定してください。"
             configuration_invalid=1
           fi
-          if [ "${sso_mode}" != "disabled" ] && { [ -z "${GOOGLE_IDENTITY_PLATFORM_API_KEY}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; }; then
-            echo "::error::SSOを有効にするにはGOOGLE_IDENTITY_PLATFORM_API_KEY、GOOGLE_OAUTH_CLIENT_ID、GOOGLE_OAUTH_CLIENT_SECRETが必要です。"
+          if [ "${sso_mode}" != "disabled" ] && { [ -z "${GOOGLE_IDENTITY_PLATFORM_API_KEY}" ] || [ -z "${GOOGLE_IDENTITY_PLATFORM_TENANT_ID}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; }; then
+            echo "::error::SSOを有効にするにはGOOGLE_IDENTITY_PLATFORM_API_KEY、GOOGLE_IDENTITY_PLATFORM_TENANT_ID、GOOGLE_OAUTH_CLIENT_ID、GOOGLE_OAUTH_CLIENT_SECRETが必要です。"
             configuration_invalid=1
           fi
           if [ "${MCP_FEATURE_ENABLED}" = "true" ] && [ -z "${MCP_TOKEN_HMAC_SECRET}" ]; then
@@ -207,6 +208,7 @@ jobs:
 
           bun --cwd apps/worker wrangler deploy --env production --secrets-file "${worker_secrets_file}"
           api_sso_vars=(--var "SSO_ROLLOUT_MODE:${sso_mode}" --var "SSO_ROLLOUT_PERCENT:${sso_percent}" --var "MCP_FEATURE_ENABLED:${MCP_FEATURE_ENABLED}")
+          if [ -n "${GOOGLE_IDENTITY_PLATFORM_TENANT_ID}" ]; then api_sso_vars+=(--var "GOOGLE_IDENTITY_PLATFORM_TENANT_ID:${GOOGLE_IDENTITY_PLATFORM_TENANT_ID}"); fi
           if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ]; then api_sso_vars+=(--var "GOOGLE_OAUTH_CLIENT_ID:${GOOGLE_OAUTH_CLIENT_ID}"); fi
           bun --cwd apps/api wrangler deploy --env production --secrets-file "${api_secrets_file}" "${api_sso_vars[@]}"
           bun --cwd apps/mcp wrangler deploy --env production --secrets-file "${mcp_secrets_file}" --var "MCP_FEATURE_ENABLED:${MCP_FEATURE_ENABLED}"

@@ -118,6 +118,7 @@ const env = {
   BASE_URL: "https://api.stg.example.com",
   SSO_ROLLOUT_MODE: "linking",
   GOOGLE_IDENTITY_PLATFORM_API_KEY: "identity-platform-api-key",
+  GOOGLE_IDENTITY_PLATFORM_TENANT_ID: "development-tenant",
   GOOGLE_OAUTH_CLIENT_ID: "google-client-id",
   GOOGLE_OAUTH_CLIENT_SECRET: "google-client-secret",
   SESSION_STORE: {},

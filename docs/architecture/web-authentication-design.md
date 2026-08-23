@@ -360,7 +360,7 @@ OpenAPIのsecurity schemeは`liffIdToken`からprovider非依存のアプリケ�
 
 ### 9.1 製品、client、subject
 
-外部ブラウザのSSOにはGoogle Cloud Identity Platformを採用し、最初のIdPとしてGoogleを有効にします。Identity PlatformはGoogleの本人確認結果を環境別のUIDへ正規化しますが、me-builderのAccount、role、Plan、利用規約同意は所有しません。GCPプロジェクトはVertex AI等と同じCloud Billingアカウントへ接続しつつ、Productionの認証データを開発環境から分離します。
+外部ブラウザのSSOにはGoogle Cloud Identity Platformを採用し、最初のIdPとしてGoogleを有効にします。Identity PlatformはGoogleの本人確認結果を環境別TenantのUIDへ正規化しますが、me-builderのAccount、role、Plan、利用規約同意は所有しません。DevelopmentとProductionは同じ既存GCP projectを使い、Identity Platform Tenantを分けてuserとprovider設定を隔離します。Vertex AI、Cloud Billing予算、service spend capはproject単位で共有され、Tenantによる費用分離は行いません。
 
 | 項目 | 決定 |
 | --- | --- |
@@ -368,11 +368,11 @@ OpenAPIのsecurity schemeは`liffIdToken`からprovider非依存のアプリケ�
 | response | `response_type=code`。API ServerがcodeをGoogle ID tokenへ交換し、ブラウザへprovider tokenを保存しない |
 | scope | `openid profile`。Account照合に使わない`email`と、不要な`offline_access`は要求しない |
 | audience | Google ID tokenの`aud`として環境別のOAuth Client IDを要求する。me-builder API用access token audienceは設けない |
-| subject | Identity Platformの`accounts:signInWithIdp`が返す環境別`localId` |
+| subject | `tenantId`を指定したIdentity Platformの`accounts:signInWithIdp`が返す環境別`localId` |
 | provider key | 全環境で`gcp_identity_platform`。共有D1自体を環境分離するためGCP project IDをprovider keyへ埋め込まない |
 | 登録policy | `link-only`。SSO Identityだけを根拠に新規Accountを作らない |
 
-API Serverは検証済みGoogle ID tokenをIdentity Platformの`accounts:signInWithIdp`へ渡し、返された`localId`だけをIdentityのsubjectとして保存します。認証済みAccountから開始したlink transactionではIdentity Platform userの初回作成を許可し、その`localId`を開始時Accountへ接続します。公開login transactionでは`autoCreate=false`を指定し、上流が作成した`isNewUser=true`の応答も防御的に拒否します。この区別により、プロフィールからの初回連携を成立させつつ、未知のGoogle Identityだけを根拠にme-builder Accountを作成しません。Google ID tokenの`sub`とemailはAccount照合やIdentity保存に使いません。Identity Platform上でuserを削除・再作成して`localId`が変わった場合は別Identityとして扱い、email一致で既存Accountへ自動統合しません。
+API Serverは検証済みGoogle ID tokenと環境固定の`tenantId`をIdentity Platformの`accounts:signInWithIdp`へ渡し、応答の`tenantId`が要求値と一致した場合だけ`localId`をIdentityのsubjectとして保存します。認証済みAccountから開始したlink transactionではIdentity Platform userの初回作成を許可し、その`localId`を開始時Accountへ接続します。公開login transactionでは`autoCreate=false`を指定し、上流が作成した`isNewUser=true`の応答も防御的に拒否します。この区別により、プロフィールからの初回連携を成立させつつ、未知のGoogle Identityだけを根拠にme-builder Accountを作成しません。Google ID tokenの`sub`とemailはAccount照合やIdentity保存に使いません。Identity Platform上でuserを削除・再作成して`localId`が変わった場合は別Identityとして扱い、email一致で既存Accountへ自動統合しません。
 
 Firebase Web SDKは導入しません。このアプリではprovider認証を一度だけme-builderのHttpOnly application sessionへ交換するため、API Serverが公式OAuth endpointとIdentity Platform REST APIを直接利用します。これにより、Firebaseのブラウザsessionを併設せず、Cloudflare Pagesのcustom domainでredirect helperやstorage制限へ依存しません。将来、クライアント側のFirebase token継続利用、メール認証、MFA等が必要になった時点でSDK採用を再評価します。
 
@@ -384,21 +384,21 @@ SSO開始時に256 bit以上の暗号学的乱数から`state`、`nonce`、PKCE 
 
 transaction payloadはOAuth stateのSHA-256 hashをkeyとして短命KVへ保存し、10分のTTLで物理削除します。callbackでは共有D1へstate hashだけのconsume claimを単一の`INSERT ... ON CONFLICT DO NOTHING RETURNING`で作成し、claimを取得した1件だけがKV payloadを削除して処理します。これにより、同じstateのcallbackが同時実行されてもprovider交換とsession発行へ進むのは1件だけです。consume claimは個人識別子やnonce、PKCE verifierを持たず、期限後に削除します。
 
-callbackではGoogleの固定authorization endpoint、token endpoint、JWKS URIを利用します。Google ID tokenはRS256署名、`iss`が`https://accounts.google.com`または`accounts.google.com`、`aud`のOAuth Client ID一致、`exp`と`iat`、transactionの`nonce`完全一致を検証します。複数audienceの場合は`azp`もOAuth Client IDと一致させます。検証後にIdentity Platformへ交換し、`providerId=google.com`と環境別`localId`を確認できた場合だけIdentity解決へ進みます。
+callbackではGoogleの固定authorization endpoint、token endpoint、JWKS URIを利用します。Google ID tokenはRS256署名、`iss`が`https://accounts.google.com`または`accounts.google.com`、`aud`のOAuth Client ID一致、`exp`と`iat`、transactionの`nonce`完全一致を検証します。複数audienceの場合は`azp`もOAuth Client IDと一致させます。検証後にIdentity Platformへ環境固定の`tenantId`付きで交換し、`providerId=google.com`、応答`tenantId`の一致、環境別`localId`を確認できた場合だけIdentity解決へ進みます。
 
 ### 9.3 環境とURL
 
-DevelopmentとProductionは別GCP project、別Identity Platform user store、別OAuth clientにします。LocalとPreviewはDevelopment projectとDevelopment clientを共有しますが、callback URIを完全一致で個別登録します。Local／PreviewからProductionのuser、callback、Secretへ接続しません。OAuth clientの承認済みリダイレクトURIにはwildcardを使わず、次の値を完全一致で登録します。
+DevelopmentとProductionは同じGCP project内の別Identity Platform Tenant、別OAuth clientにします。LocalとPreviewはDevelopment TenantとDevelopment clientを共有しますが、callback URIを完全一致で個別登録します。Local／PreviewからProduction Tenantのuser、callback、Secretへ接続しません。OAuth clientの承認済みリダイレクトURIにはwildcardを使わず、次の値を完全一致で登録します。
 
-| 環境 | GCP project / OAuth client | 承認済みリダイレクトURI |
+| 環境 | Identity Platform Tenant / OAuth client | 承認済みリダイレクトURI |
 | --- | --- | --- |
-| Local | 開発用project / Development client | `http://localhost:3000/api/auth/sso/callback` |
-| Preview | 開発用project / Development client | `https://api.stg.kagami.kyosuke.dev/api/auth/sso/callback` |
-| Production | Production project / Production client | `https://api.kagami.kyosuke.dev/api/auth/sso/callback` |
+| Local | Development Tenant / Development client | `http://localhost:3000/api/auth/sso/callback` |
+| Preview | Development Tenant / Development client | `https://api.stg.kagami.kyosuke.dev/api/auth/sso/callback` |
+| Production | Production Tenant / Production client | `https://api.kagami.kyosuke.dev/api/auth/sso/callback` |
 
-Identity PlatformとVertex AIのAPI有効化、実行Identity、API keyは`infra/gcp-platform`の独立したPulumi `development`／`production` Stackで管理します。GCP projectとCloud Billing接続は既存の前提リソースとして参照・検証だけを行い、詳しい所有境界は[インフラ・システム構成](./infrastructure-architecture.md#62-gcp共通リソースの宣言境界)を正とします。Google Auth Platformの一般ユーザー向けWeb OAuth clientは、規約確認と同意画面設定を含むため各projectのCloud Consoleで初回だけ手動作成し、Client IDとSecretをPulumi configへ入力します。PulumiのIAP用OAuth client resourceは用途が異なるため代用しません。Development clientにはLocalとPreviewの2つの完全一致callbackを登録し、Production clientと認証データを共有しません。
+Identity Platform Tenant、Tenant内のGoogle provider、実行Identity、API keyは`infra/gcp-platform`の独立したPulumi `development`／`production` Stackで管理します。既存GCP project、Cloud Billing接続、Identity Platformの有効化、multi-tenancy、project共通のauthorized domainは前提リソースとして参照し、詳しい所有境界は[インフラ・システム構成](./infrastructure-architecture.md#62-gcp共通リソースの宣言境界)を正とします。Google Auth Platformの一般ユーザー向けWeb OAuth clientは、規約確認と同意画面設定を含むため共有projectのCloud Consoleで環境ごとに初回だけ手動作成し、Client IDとSecretをPulumi configへ入力します。PulumiのIAP用OAuth client resourceは用途が異なるため代用しません。Development clientにはLocalとPreviewの2つの完全一致callbackを登録し、Production clientと認証データを共有しません。
 
-Identity PlatformのWeb API keyは`GOOGLE_IDENTITY_PLATFORM_API_KEY`、OAuth Client IDは`GOOGLE_OAUTH_CLIENT_ID`、OAuth Client Secretは`GOOGLE_OAUTH_CLIENT_SECRET`へ設定します。Localはgit管理外の`.env`、PreviewはGitHub Environment `dev`、Productionは`prd`へ環境別に設定し、Cloudflare API Workerへデプロイします。API keyはproject識別子であり単独では認可情報になりませんが、この構成ではserver-side専用値としてsecret配布し、Identity Toolkit APIだけへAPI制限を付けます。Secret値、authorization code、token、subjectはworkflowの引数、ログ、artifactへ出しません。
+Identity PlatformのWeb API keyは`GOOGLE_IDENTITY_PLATFORM_API_KEY`、Tenant IDは`GOOGLE_IDENTITY_PLATFORM_TENANT_ID`、OAuth Client IDは`GOOGLE_OAUTH_CLIENT_ID`、OAuth Client Secretは`GOOGLE_OAUTH_CLIENT_SECRET`へ設定します。Localはgit管理外の`.env`、PreviewはGitHub Environment `dev`、Productionは`prd`へ環境別に設定し、Cloudflare API Workerへデプロイします。Tenant IDとOAuth Client IDは秘密値ではありませんが、誤接続を防ぐため環境別variableとして配布します。API keyはproject識別子であり単独では認可情報になりませんが、この構成ではserver-side専用値としてsecret配布し、Identity Toolkit APIだけへAPI制限を付けます。Secret値、authorization code、token、subjectはworkflowの引数、ログ、artifactへ出しません。
 
 OAuth Client IDは秘密値ではありませんが、環境を誤接続しないようGitHub Environmentのvariableとして配布します。起動時にcallbackのoriginが`BASE_URL`と一致し、ProductionではHTTPS、Localではloopback HTTPだけを許可します。
 
@@ -419,8 +419,8 @@ logoutの既定はme-builderのlocal logoutだけです。GoogleやIdentity Plat
 - Googleは一般ユーザー向けOAuth clientの規約確認、同意画面設定、client作成をCloud Consoleで手動実施するよう定めています（[OAuth 2.0 best practices](https://developers.google.com/identity/protocols/oauth2/resources/best-practices#handle_client_credentials_securely)）。
 - GoogleのWeb server向けOAuth 2.0はauthorization endpointとtoken endpointを使うcode flowを定義しています（[Using OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)）。
 - Google OpenID ConnectではID tokenの署名、`iss`、`aud`、`exp`を検証し、`sub`を一意識別子として扱います（[OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect)）。me-builderはこのGoogle `sub`を保存せず、Identity Platformの環境別`localId`へ交換します。
-- Identity Platformは`accounts:signInWithIdp`でIdP credentialを検証し、project内のuserを表す`localId`を返します（[accounts.signInWithIdp](https://cloud.google.com/identity-platform/docs/reference/rest/v1/accounts/signInWithIdp)）。
-- 開発環境とProductionでFirebase／GCP projectを分離し、環境ごとにOAuth clientと認証データを隔離します（[General best practices for setting up Firebase projects](https://firebase.google.com/docs/projects/dev-workflows/general-best-practices)）。
+- Identity Platformは`accounts:signInWithIdp`でIdP credentialと`tenantId`を検証し、Tenant内のuserを表す`localId`と`tenantId`を返します（[accounts.signInWithIdp](https://cloud.google.com/identity-platform/docs/reference/rest/v1/accounts/signInWithIdp)）。
+- Identity Platformのmulti-tenancyは、同じproject内でTenantごとにuserとprovider設定を分離します（[Identity Platform multi-tenancy](https://cloud.google.com/identity-platform/docs/multi-tenancy)）。
 
 ## 10. 後続で決めること
 

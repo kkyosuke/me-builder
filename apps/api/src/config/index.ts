@@ -97,6 +97,8 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
     ssoRolloutPercent: Number(getEnv("SSO_ROLLOUT_PERCENT", env) ?? 0),
     googleIdentityPlatformApiKey:
       getEnv("GOOGLE_IDENTITY_PLATFORM_API_KEY", env)?.trim() || undefined,
+    googleIdentityPlatformTenantId:
+      getEnv("GOOGLE_IDENTITY_PLATFORM_TENANT_ID", env)?.trim() || undefined,
     googleOAuthClientId: getEnv("GOOGLE_OAUTH_CLIENT_ID", env)?.trim() || undefined,
     googleOAuthClientSecret: getEnv("GOOGLE_OAUTH_CLIENT_SECRET", env)?.trim() || undefined,
     ssoCallbackUrl:
@@ -117,13 +119,14 @@ export function getConfig(env?: Record<string, unknown>): ApiConfig {
   if (
     parsed.ssoRolloutMode !== "disabled" &&
     (!parsed.googleIdentityPlatformApiKey ||
+      !parsed.googleIdentityPlatformTenantId ||
       !parsed.googleOAuthClientId ||
       !parsed.googleOAuthClientSecret ||
       !parsed.ssoCallbackUrl ||
       !parsed.webOrigin)
   ) {
     throw new Error(
-      "GOOGLE_IDENTITY_PLATFORM_API_KEY, GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, BASE_URL, and WEB_ORIGIN are required when SSO is enabled",
+      "GOOGLE_IDENTITY_PLATFORM_API_KEY, GOOGLE_IDENTITY_PLATFORM_TENANT_ID, GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, BASE_URL, and WEB_ORIGIN are required when SSO is enabled",
     );
   }
   return parsed;

@@ -26,16 +26,16 @@ permissions:
   contents: read
   id-token: write
 
-# Stack単位で直列化し、開始済みのGCP更新は中断しない。
+# 同じGCP projectのIAMを更新するためStackをまたいで直列化し、開始済みの更新は中断しない。
 concurrency:
-  group: gcp-platform-${{ inputs.target }}
+  group: gcp-platform
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: ${{ inputs.operation }} GCP platform (${{ inputs.target }})
     runs-on: ubuntu-latest
-    environment: ${{ inputs.target == 'development' && 'infra-dev' || 'infra-prd' }}
+    environment: infra
     env:
       TARGET: ${{ inputs.target }}
       OPERATION: ${{ inputs.operation }}
@@ -49,8 +49,8 @@ jobs:
       GCP_FOLDER_ID: ${{ vars.GCP_FOLDER_ID }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
-      GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ inputs.target == 'development' && vars.GOOGLE_OAUTH_CLIENT_ID_DEVELOPMENT || vars.GOOGLE_OAUTH_CLIENT_ID_PRODUCTION }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ inputs.target == 'development' && secrets.GOOGLE_OAUTH_CLIENT_SECRET_DEVELOPMENT || secrets.GOOGLE_OAUTH_CLIENT_SECRET_PRODUCTION }}
 
     steps:
       - uses: actions/checkout@v4
@@ -153,6 +153,7 @@ jobs:
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          identity_platform_tenant_id="$(pulumi -C infra/gcp-platform stack output identityPlatformTenantId --stack "${TARGET}" 2>/dev/null || true)"
           if [ -n "${GCP_ORGANIZATION_ID}" ]; then
             project_parent="Existing project in Organization"
           elif [ -n "${GCP_FOLDER_ID}" ]; then
@@ -166,6 +167,9 @@ jobs:
             echo "- Project ID: \`${GCP_PLATFORM_PROJECT_ID}\`"
             echo "- Project parent: \`${project_parent}\`"
             echo "- Environment: \`${TARGET}\`"
+            if [ -n "${identity_platform_tenant_id}" ]; then
+              echo "- Identity Platform tenant ID: \`${identity_platform_tenant_id}\`"
+            fi
             echo "- Operation: \`${OPERATION}\`"
             echo "- Workflow run: [open run](${RUN_URL})"
           } >> "${GITHUB_STEP_SUMMARY}"

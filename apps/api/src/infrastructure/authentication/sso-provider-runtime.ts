@@ -18,6 +18,7 @@ export function createConfiguredSsoProvider(
 ): ExternalSsoProvider | undefined {
   if (
     !configuration.googleIdentityPlatformApiKey ||
+    !configuration.googleIdentityPlatformTenantId ||
     !configuration.googleOAuthClientId ||
     !configuration.googleOAuthClientSecret ||
     !configuration.ssoCallbackUrl
@@ -26,6 +27,7 @@ export function createConfiguredSsoProvider(
   }
   return createGoogleCloudIdentityPlatformSsoClient({
     identityPlatformApiKey: configuration.googleIdentityPlatformApiKey,
+    identityPlatformTenantId: configuration.googleIdentityPlatformTenantId,
     googleClientId: configuration.googleOAuthClientId,
     googleClientSecret: configuration.googleOAuthClientSecret,
     callbackUrl: configuration.ssoCallbackUrl,

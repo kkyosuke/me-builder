@@ -5,6 +5,7 @@ import { createGoogleCloudIdentityPlatformSsoClient } from "./sso-client";
 
 const configuration = {
   identityPlatformApiKey: "identity-platform-api-key",
+  identityPlatformTenantId: "development-tenant",
   googleClientId: "google-client-id",
   googleClientSecret: "google-client-secret",
   callbackUrl: "https://api.example.com/api/auth/sso/callback",
@@ -93,12 +94,17 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
           requestUri: configuration.callbackUrl,
           returnSecureToken: true,
           returnIdpCredential: false,
+          tenantId: configuration.identityPlatformTenantId,
           autoCreate: false,
         });
         expect(new URLSearchParams(body.postBody)).toEqual(
           new URLSearchParams({ id_token: signed.token, providerId: "google.com" }),
         );
-        return Response.json({ localId: "identity-platform-uid", providerId: "google.com" });
+        return Response.json({
+          localId: "identity-platform-uid",
+          providerId: "google.com",
+          tenantId: configuration.identityPlatformTenantId,
+        });
       }
       throw new Error(`unexpected URL: ${url.href}`);
     });
@@ -181,6 +187,7 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
 
   it.each([
     { identityPlatformApiKey: "" },
+    { identityPlatformTenantId: "" },
     { googleClientId: "" },
     { googleClientSecret: "" },
     { callbackUrl: "javascript:alert(1)" },
@@ -232,6 +239,37 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
     ).rejects.toEqual(new SsoProviderError("provider_rejected"));
   });
 
+  it("Identity Platformの応答Tenantが要求した環境と異なる場合は拒否する", async () => {
+    const signed = await googleToken({});
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "https://oauth2.googleapis.com/token") {
+        return Response.json({ id_token: signed.token });
+      }
+      if (url === "https://www.googleapis.com/oauth2/v3/certs") {
+        return Response.json(signed.jwks);
+      }
+      return Response.json({
+        localId: "production-user",
+        providerId: "google.com",
+        tenantId: "production-tenant",
+      });
+    });
+    const client = createGoogleCloudIdentityPlatformSsoClient(configuration, {
+      fetch: fetcher,
+      now: () => new Date("2026-08-16T00:01:00.000Z"),
+    });
+
+    await expect(
+      client.exchangeAuthorizationCode({
+        code: "code",
+        codeVerifier: "verifier",
+        expectedNonce: "expected-nonce",
+        identityProvisioning: "existing-only",
+      }),
+    ).rejects.toEqual(new SsoProviderError("provider_rejected"));
+  });
+
   it("認証済みAccountへのlinkではIdentity Platform userの初回作成を許可する", async () => {
     const signed = await googleToken({});
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -246,6 +284,7 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
       return Response.json({
         localId: "new-identity-platform-user",
         providerId: "google.com",
+        tenantId: configuration.identityPlatformTenantId,
         isNewUser: true,
       });
     });
@@ -277,6 +316,7 @@ describe("createGoogleCloudIdentityPlatformSsoClient", () => {
       return Response.json({
         localId: "unexpected-new-user",
         providerId: "google.com",
+        tenantId: configuration.identityPlatformTenantId,
         isNewUser: true,
       });
     });

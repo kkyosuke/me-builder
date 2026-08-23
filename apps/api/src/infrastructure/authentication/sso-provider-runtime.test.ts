@@ -8,6 +8,7 @@ import {
 
 const baseConfig = {
   googleIdentityPlatformApiKey: "identity-platform-api-key",
+  googleIdentityPlatformTenantId: "development-tenant",
   googleOAuthClientId: "google-client-id",
   googleOAuthClientSecret: "google-client-secret",
   ssoCallbackUrl: "https://api.example.com/api/auth/sso/callback",

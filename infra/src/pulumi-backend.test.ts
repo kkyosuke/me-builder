@@ -70,10 +70,17 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain('from "../src/gcp-existing-project.ts"');
     expect(gcpPlatformProgram).toContain('from "../src/pulumi-backend.ts"');
     expect(gcpPlatformProgram).toContain("gcp.organizations.getProjectOutput({ projectId })");
-    expect(gcpPlatformProgram).toContain('service: "cloudbilling.googleapis.com"');
+    expect(gcpPlatformProgram).toContain('"cloudbilling.googleapis.com"');
     expect(gcpPlatformProgram).toContain("cloudBillingApi.id.apply(() => projectId)");
     expect(gcpPlatformProgram).toContain("{ dependsOn: cloudBillingApi }");
     expect(gcpPlatformProgram).toContain("verifyExistingGcpProjectBilling");
+    expect(gcpPlatformProgram).toContain("new gcp.identityplatform.Tenant(");
+    expect(gcpPlatformProgram).toContain(
+      "new gcp.identityplatform.TenantDefaultSupportedIdpConfig(",
+    );
+    expect(gcpPlatformProgram).toContain("identityPlatformTenantId");
+    expect(gcpPlatformProgram).not.toContain("new gcp.identityplatform.Config(");
+    expect(gcpPlatformProgram).toContain('environment === "development"');
     expect(gcpPlatformProgram).toContain("monitoringNotificationChannels: []");
     expect(gcpPlatformProgram).toContain('config.require("googleOAuthClientId")');
     expect(gcpPlatformProgram).toContain('config.requireSecret("googleOAuthClientSecret")');
@@ -86,9 +93,11 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).toContain(`pulumi login ${pulumiGcsBackends.gcpPlatform}`);
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:preview:${TARGET}"');
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:up:${TARGET}"');
-    expect(gcpPlatformWorkflow).toContain(
-      "environment: ${{ inputs.target == 'development' && 'infra-dev' || 'infra-prd' }}",
-    );
+    expect(gcpPlatformWorkflow).toContain("environment: infra");
+    expect(gcpPlatformWorkflow).toContain("vars.GOOGLE_OAUTH_CLIENT_ID_DEVELOPMENT");
+    expect(gcpPlatformWorkflow).toContain("vars.GOOGLE_OAUTH_CLIENT_ID_PRODUCTION");
+    expect(gcpPlatformWorkflow).toContain("secrets.GOOGLE_OAUTH_CLIENT_SECRET_DEVELOPMENT");
+    expect(gcpPlatformWorkflow).toContain("secrets.GOOGLE_OAUTH_CLIENT_SECRET_PRODUCTION");
     expect(gcpPlatformWorkflow).toContain(
       'if [ -n "${GCP_ORGANIZATION_ID}" ] && [ -n "${GCP_FOLDER_ID}" ]; then',
     );
@@ -104,10 +113,10 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).not.toContain("GCP_PLATFORM_PROJECT_NAME");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage buckets");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");
-    expect(resetWorkflow).toContain("environment: infra-dev");
+    expect(resetWorkflow).toContain("environment: infra");
     expect(resetWorkflow).toContain('expected_confirmation="reset-preview:${RESET_REF}"');
     expect(resetWorkflow).toContain('[ "${REF_TYPE}" != "branch" ]');
-    expect(stripeWorkflow).toContain("inputs.environment == 'dev' && 'infra-dev' || 'stripe-prd'");
+    expect(stripeWorkflow).toContain("inputs.environment == 'dev' && 'infra' || 'stripe-prd'");
     for (const workflow of [gcpPlatformWorkflow, resetWorkflow]) {
       expect(workflow).toContain("uses: google-github-actions/auth@v2");
       expect(workflow).toContain(
