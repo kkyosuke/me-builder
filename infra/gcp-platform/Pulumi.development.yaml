@@ -1,8 +1,8 @@
 config:
   me-builder-gcp-platform:environment: development
-  me-builder-gcp-platform:budgetCurrencyCode: USD
-  me-builder-gcp-platform:monthlyBudgetAmount: 10
-  me-builder-gcp-platform:vertexSpendCapAmount: 10
+  me-builder-gcp-platform:budgetCurrencyCode: JPY
+  me-builder-gcp-platform:monthlyBudgetAmount: 10000
+  me-builder-gcp-platform:vertexSpendCapAmount: 10000
   me-builder-gcp-platform:vertexSpendCapConfirmed: false
   me-builder-gcp-platform:vertexRuntimeCredentialsEnabled: false
   me-builder-gcp-platform:activeCredentialSlot: primary
