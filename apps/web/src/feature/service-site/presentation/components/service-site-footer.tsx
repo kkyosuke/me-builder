@@ -16,7 +16,7 @@ export function ServiceSiteFooter() {
             LINEの日記とWebの診断から、自分の考え方や大切にしていることを少しずつ振り返るサービスです。
           </p>
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            運営者: {serviceOperator.displayName}
+            {serviceOperator.displayName}
           </p>
         </div>
         <nav aria-label="フッターナビゲーション" className="grid content-start gap-3 text-sm">

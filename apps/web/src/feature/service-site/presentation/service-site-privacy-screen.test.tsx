@@ -24,6 +24,7 @@ describe("ServiceSitePrivacyScreen", () => {
     expect(screen.getByText(/自由記述のerror messageとstackは含めません/u)).toBeTruthy();
     expect(screen.getAllByText(/生年月日は取得しません/u).length).toBeGreaterThan(0);
     expect(screen.getByText(/屋号「つきうさぎ」の河村 京介/u)).toBeTruthy();
+    expect(screen.queryByText(/有料機能|購入前|年齢確認書類の提出/u)).toBeNull();
   });
 
   it("公開前レビュー中の正本を検索対象外にする", () => {
