@@ -242,7 +242,10 @@ const projectBudget = new gcp.billing.Budget(
       thresholdPercent,
       spendBasis: "CURRENT_SPEND",
     })),
-    allUpdatesRule: { enableProjectLevelRecipients: true },
+    allUpdatesRule: {
+      monitoringNotificationChannels: [],
+      enableProjectLevelRecipients: true,
+    },
     deletionPolicy: "PREVENT",
   },
   { dependsOn: services, protect },
