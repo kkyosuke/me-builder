@@ -35,6 +35,8 @@ flowchart LR
 
 ## 3. 現在の残タスク
 
+Issue [#357](https://github.com/kkyosuke/me-builder/issues/357)と[#374](https://github.com/kkyosuke/me-builder/issues/374)がclose済みであることは、法務・運用レビューや有料Planの一般提供が完了したことを意味しません。公開サイトは、各項目の完了条件を満たすまでFree限定かつ法務ページを検索対象外として扱います。コード上の公開段階、料金表示、robotsの境界はIssue [#457](https://github.com/kkyosuke/me-builder/issues/457)で固定し、次の実環境確認は引き続きこの文書で管理します。
+
 ### 3.1 プライバシーポリシーを実環境で確認する
 
 - Previewで正本の表示と実際のデータ処理が一致することを確認する
@@ -77,10 +79,10 @@ flowchart LR
 
 ### 3.6 SNS共有表示をデプロイ環境で確認する
 
-CDはデプロイ直後に、`/`、`/terms`、`/privacy`、`/commercial-transactions`、`/contact`の非JavaScript初期HTMLと、本人向けWebアプリ・管理者画面の`X-Robots-Tag: noindex, nofollow`を自動検査します。次の実サービス確認は引き続き必要です。
+CDはデプロイ直後に、`/`、`/terms`、`/privacy`、`/commercial-transactions`、`/contact`の非JavaScript初期HTMLとページごとのrobots境界、および本人向けWebアプリ・管理者画面の`X-Robots-Tag: noindex, nofollow`を自動検査します。次の実サービス確認は引き続き必要です。
 
 - SNS共有時にタイトル、説明、共有画像が個人データを含まず表示されることを確認する
-- 正式なプライバシーポリシーと窓口の公開後だけ、対応ページを検索対象へ変更する
+- 正式な法務本文と窓口のレビュー完了後だけ、対応ページを検索対象へ変更する
 
 完了条件は、主要SNSの実previewで共有表示を確認し、公開ページと検索対象外ページが意図した範囲に分かれていることです。
 

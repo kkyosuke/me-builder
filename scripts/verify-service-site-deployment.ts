@@ -44,7 +44,7 @@ export async function verifyServiceSiteDeployment(
       return {
         checks: [
           "public-document-metadata",
-          "public-route-indexable-header",
+          "public-route-robots-boundary",
           "private-route-noindex-header",
         ],
       };
@@ -62,7 +62,7 @@ async function verifyPublicDocuments(fetcher: typeof fetch, origin: string): Pro
     const url = new URL(metadata.pathname, origin);
     const response = await fetcher(url, { redirect: "error" });
     expectHtmlResponse(response, url);
-    expectPublicRouteHeader(response, url);
+    expectPublicRouteHeader(response, metadata.robots, url);
     const document = await response.text();
     const canonicalUrl = url.toString();
     const shareImageUrl = new URL("/images/service/banner.jpg", origin).toString();
@@ -91,9 +91,16 @@ async function verifyPublicDocuments(fetcher: typeof fetch, origin: string): Pro
   }
 }
 
-function expectPublicRouteHeader(response: Response, url: URL): void {
+function expectPublicRouteHeader(
+  response: Response,
+  expectedRobots: "index,follow" | "noindex,nofollow",
+  url: URL,
+): void {
   const robots = (response.headers.get("x-robots-tag") ?? "").toLowerCase();
-  if (robots.includes("noindex") || robots.includes("nofollow")) {
+  if (
+    expectedRobots === "index,follow" &&
+    (robots.includes("noindex") || robots.includes("nofollow"))
+  ) {
     throw new Error(`Public route has a conflicting X-Robots-Tag boundary (${url.pathname})`);
   }
 }

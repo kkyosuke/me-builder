@@ -16,7 +16,7 @@ describe("commercialTransactionsDisclosure", () => {
     expect(text).toContain("LINEには表示しません");
   });
 
-  it("公開料金catalogの全Plan・月額・年額を支払総額として表示する", () => {
+  it("将来の有料一般提供に備えた正本へcatalogの全Plan・月額・年額を保持する", () => {
     const priceEntry = commercialTransactionsDisclosure.entries.find(
       ({ label }) => label === "販売価格",
     );

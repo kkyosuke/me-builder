@@ -31,11 +31,11 @@ describe("ServiceSiteContactScreen", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
-  it("有効な窓口を検索対象にする", () => {
+  it("実送信レビュー前の窓口を検索対象外にする", () => {
     render(<ServiceSiteContactScreen />);
 
     expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
-      "index,follow",
+      "noindex,nofollow",
     );
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
       "https://kagami.example.com/contact",

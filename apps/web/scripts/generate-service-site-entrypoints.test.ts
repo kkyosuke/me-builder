@@ -13,6 +13,7 @@ describe("renderServiceSiteDocument", () => {
     ["/terms", "terms.html"],
     ["/privacy", "privacy.html"],
     ["/contact", "contact.html"],
+    ["/commercial-transactions", "commercial-transactions.html"],
   ])("%sを末尾slashへのredirectが不要なentrypointへ変換する", (pathname, expected) => {
     expect(serviceSiteEntrypointFilename(pathname)).toBe(expected);
   });
@@ -41,25 +42,39 @@ describe("renderServiceSiteDocument", () => {
     expect(result).toContain('rel="canonical" href="https://kagami.example.com/terms"');
   });
 
-  it("公開中のプライバシー画面を初期HTMLから検索対象にする", () => {
+  it("レビュー中のプライバシー画面を初期HTMLから検索対象外にする", () => {
     const result = renderServiceSiteDocument(
       source,
       serviceSitePageMetadata.privacy,
       "https://kagami.example.com",
     );
 
-    expect(result).toContain('name="robots" content="index,follow"');
+    expect(result).toContain('name="robots" content="noindex,nofollow"');
     expect(result).toContain('rel="canonical" href="https://kagami.example.com/privacy"');
   });
 
-  it("公開中のお問い合わせ画面を初期HTMLから検索対象にする", () => {
+  it("実送信レビュー前のお問い合わせ画面を初期HTMLから検索対象外にする", () => {
     const result = renderServiceSiteDocument(
       source,
       serviceSitePageMetadata.contact,
       "https://kagami.example.com",
     );
 
-    expect(result).toContain('name="robots" content="index,follow"');
+    expect(result).toContain('name="robots" content="noindex,nofollow"');
     expect(result).toContain('rel="canonical" href="https://kagami.example.com/contact"');
+  });
+
+  it("Free限定中の特商法画面を非JS初期HTMLでも検索対象外にする", () => {
+    const result = renderServiceSiteDocument(
+      source,
+      serviceSitePageMetadata["commercial-transactions"],
+      "https://kagami.example.com",
+    );
+
+    expect(result).toContain('name="robots" content="noindex,nofollow"');
+    expect(result).not.toMatch(/Lite|Full|ファミリーパック|月額|年額|トライアル/u);
+    expect(result).toContain(
+      'rel="canonical" href="https://kagami.example.com/commercial-transactions"',
+    );
   });
 });

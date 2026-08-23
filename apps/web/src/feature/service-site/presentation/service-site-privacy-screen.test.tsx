@@ -23,13 +23,14 @@ describe("ServiceSitePrivacyScreen", () => {
     expect(screen.getByText(/bundleファイル名と行・列/u)).toBeTruthy();
     expect(screen.getByText(/自由記述のerror messageとstackは含めません/u)).toBeTruthy();
     expect(screen.getAllByText(/生年月日は取得しません/u).length).toBeGreaterThan(0);
+    expect(screen.getByText(/屋号「つきうさぎ」の河村 京介/u)).toBeTruthy();
   });
 
-  it("正式公開した正本を検索対象にする", () => {
+  it("公開前レビュー中の正本を検索対象外にする", () => {
     render(<ServiceSitePrivacyScreen />);
 
     expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
-      "index,follow",
+      "noindex,nofollow",
     );
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
       "https://kagami.example.com/privacy",
