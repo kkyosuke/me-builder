@@ -5,6 +5,7 @@ export * as diagnosisBrainProjection from "./diagnosis-brain-projection";
 export * as development from "./development";
 export * as diary from "./diary";
 export * as goalFollowUp from "./goal-follow-up";
+export * as photoDiary from "./photo-diary";
 export * as selfCareContext from "./self-care-context";
 export * as profileSummary from "./profile-summary";
 export * as progression from "./progression";

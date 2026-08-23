@@ -43,6 +43,24 @@ function lineEvent(text: string, replyToken: string | null = "reply-token-terms-
   };
 }
 
+function lineImageEvent() {
+  return {
+    events: [
+      {
+        type: "message",
+        webhookEventId: "webhook-event-photo-disabled-1",
+        timestamp: Date.now(),
+        message: {
+          type: "image",
+          id: "message-photo-disabled-1",
+          contentProvider: { type: "line" },
+        },
+        source: { type: "user", userId: PROVIDER_ACCOUNT_ID },
+      },
+    ],
+  };
+}
+
 const workerConfig = getWorkerConfig({
   ENVIRONMENT: "test",
   LINE_CHANNEL_ACCESS_TOKEN: "line-token",
@@ -110,6 +128,57 @@ describe("LINE terms acceptance gate", () => {
     });
     expect(execute).toHaveBeenCalledOnce();
     expect(execute.mock.calls[0]?.[1]).toBe("conversation.storeLineTextSource");
+  });
+
+  it("写真保存flagが無効ならcontentを取得・保存せず、冪等な未対応案内だけを送る", async () => {
+    const db = createTestDb();
+    const resolved = await D1.shared.action.account.resolveAccountByLineMessagingApi(
+      db,
+      PROVIDER_ACCOUNT_ID,
+    );
+    await D1.shared.action.agreement.acceptCurrentTerms(db, resolved.account.id);
+    const pushMessage = vi.fn().mockResolvedValue({});
+    vi.spyOn(line.client, "create").mockReturnValue({
+      pushMessage,
+    } as unknown as ReturnType<typeof line.client.create>);
+    const execute = vi.fn();
+    const accountDataNamespace = {
+      getByName: vi.fn(() => ({ execute })),
+    } as unknown as AccountDataNamespace;
+    const fetchContent = vi.spyOn(globalThis, "fetch");
+
+    const result = await processLineWebhook(
+      lineImageEvent(),
+      db,
+      getWorkerConfig({
+        ENVIRONMENT: "test",
+        LINE_CHANNEL_ACCESS_TOKEN: "line-token",
+        CHAT_DELIVERY_SECRET: "photo-disabled-secret",
+      }),
+      undefined,
+      accountDataNamespace,
+    );
+
+    expect(result).toEqual({
+      outcome: "discarded",
+      stage: "photo.feature-gate",
+      resultCode: "PHOTO_DIARY_STORAGE_DISABLED",
+    });
+    expect(fetchContent).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    expect(pushMessage).toHaveBeenCalledOnce();
+    expect(pushMessage.mock.calls[0]?.[0]).toMatchObject({
+      to: PROVIDER_ACCOUNT_ID,
+      messages: [
+        {
+          type: "text",
+          text: expect.stringContaining("いまは写真を保存していない"),
+        },
+      ],
+    });
+    expect(pushMessage.mock.calls[0]?.[1]).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
   });
 
   it("未同意の診断要求も診断処理へ進めず、規約リンクをreplyする", async () => {

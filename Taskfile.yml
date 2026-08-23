@@ -183,12 +183,12 @@ tasks:
     cmds:
       - bun scripts/setup-brain-vectorize.ts production
   avatar-bucket:setup:preview:
-    desc: 'Create the private Preview avatar R2 bucket if missing'
+    desc: 'Create the private Preview avatar and photo diary R2 buckets if missing'
     cmds:
       - bun scripts/setup-avatar-bucket.ts preview
 
   avatar-bucket:setup:production:
-    desc: 'Create the private Production avatar R2 bucket if missing'
+    desc: 'Create the private Production avatar and photo diary R2 buckets if missing'
     cmds:
       - bun scripts/setup-avatar-bucket.ts production
 

@@ -8,6 +8,9 @@
   "avatarBucket": {
     "name": "me-builder-avatar-preview"
   },
+  "photoDiaryBucket": {
+    "name": "me-builder-photo-diary-preview"
+  },
   "queues": {
     "webhook": {
       "id": "0c3e1a5cbe5045bcb4f1f1b636a3808b",
@@ -17,6 +20,8 @@
       "id": "4453ebb9f7db458ab2a4d409c962faab",
       "name": "me-builder-webhook-dlq-preview"
     },
+    "photoDiaryDeletion": { "name": "me-builder-photo-diary-deletion-queue-preview" },
+    "photoDiaryDeletionDeadLetter": { "name": "me-builder-photo-diary-deletion-dlq-preview" },
     "billing": { "name": "me-builder-billing-queue-preview" },
     "billingDeadLetter": { "name": "me-builder-billing-dlq-preview" },
     "chatTurn": {

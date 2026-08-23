@@ -5,6 +5,8 @@ import { verifyCloudflareInfrastructure } from "./verify-cloudflare-infrastructu
 const queueNames = {
   webhook: "me-builder-webhook-queue-production",
   webhookDeadLetter: "me-builder-webhook-dlq-production",
+  photoDiaryDeletion: "me-builder-photo-diary-deletion-queue-production",
+  photoDiaryDeletionDeadLetter: "me-builder-photo-diary-deletion-dlq-production",
   billing: "me-builder-billing-queue-production",
   billingDeadLetter: "me-builder-billing-dlq-production",
   chatTurn: "me-builder-chat-turn-queue-production",
@@ -24,6 +26,7 @@ const manifest = parseManifest({
   baseDomain: "example.com",
   database: { id: "database-id", name: "me-builder-db-production" },
   avatarBucket: { name: "me-builder-avatar-production" },
+  photoDiaryBucket: { name: "me-builder-photo-diary-production" },
   queues: Object.fromEntries(Object.entries(queueNames).map(([key, name]) => [key, { name }])),
 });
 
@@ -41,7 +44,12 @@ function remoteState(overrides: { databaseId?: string; queueNames?: string[] } =
         name: "me-builder-db-production",
       },
     ],
-    buckets: { buckets: [{ name: "me-builder-avatar-production" }] },
+    buckets: {
+      buckets: [
+        { name: "me-builder-avatar-production" },
+        { name: "me-builder-photo-diary-production" },
+      ],
+    },
     namespaces: [{ id: "session-id", title: "me-builder-session-production" }],
     queues: (overrides.queueNames ?? Object.values(queueNames)).map((queue_name, index) => ({
       queue_id: `queue-${index}`,
@@ -80,7 +88,7 @@ describe("verifyCloudflareInfrastructure", () => {
     ).resolves.toEqual({
       checks: [
         "d1-manifest-id",
-        "private-r2-bucket",
+        "private-r2-buckets",
         "session-kv",
         "queue-set",
         "vectorize-schema",

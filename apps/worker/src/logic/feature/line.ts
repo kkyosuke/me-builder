@@ -7,8 +7,9 @@ import {
   toOperationalError,
 } from "@me-builder/shared";
 import * as v from "valibot";
-import type { WorkerConfig } from "../../config";
+import type { CloudflareBindings, WorkerConfig } from "../../config";
 import { replyLineText } from "../../infrastructure/line-delivery";
+import { notifyPhotoDiaryUnavailable, processPhotoDiaryImage } from "../photo-diary";
 
 export const classifyLineText = line.text.classify;
 
@@ -65,6 +66,8 @@ export async function processLineWebhook(
   accountDataNamespace?: AccountDataNamespace,
   routing?: WebhookQueueMessage["routing"],
   traceId?: string,
+  cloudflareBindings?: CloudflareBindings,
+  isFinalAttempt = false,
 ): Promise<LineWebhookProcessingResult> {
   const events = line.webhook.parseEvents(payload);
   let result: LineWebhookProcessingResult = { outcome: "succeeded", stage: "line.parse" };
@@ -90,12 +93,17 @@ export async function processLineWebhook(
     if (
       event.type !== "message" ||
       !event.message ||
-      event.message.type !== "text" ||
       event.source?.type !== "user" ||
       !providerAccountId
     ) {
       continue;
     }
+
+    const textMessage = event.message.type === "text" ? event.message : null;
+    const isTextMessage = textMessage !== null;
+    const isLineImageMessage =
+      event.message.type === "image" && event.message.contentProvider?.type === "line";
+    if (!isTextMessage && !isLineImageMessage) continue;
 
     const eventId = getLineEventId(event);
     if (!eventId) {
@@ -107,8 +115,8 @@ export async function processLineWebhook(
       continue;
     }
 
-    const intent = classifyLineText(event.message.text);
-    if (routedIntents && routedIntents.get(eventId) !== intent) {
+    const intent = textMessage ? classifyLineText(textMessage.text) : undefined;
+    if (isTextMessage && routedIntents && routedIntents.get(eventId) !== intent) {
       result = mergeResult(result, {
         outcome: "discarded",
         stage: "routing.validate",
@@ -178,6 +186,57 @@ export async function processLineWebhook(
       });
       continue;
     }
+    if (isLineImageMessage) {
+      if (!workerConfig.photoDiaryStorageEnabled) {
+        await notifyPhotoDiaryUnavailable(
+          workerConfig,
+          resolved.account.id,
+          providerAccountId,
+          event.message.id,
+        );
+        result = mergeResult(result, {
+          outcome: "discarded",
+          stage: "photo.feature-gate",
+          resultCode: "PHOTO_DIARY_STORAGE_DISABLED",
+        });
+        continue;
+      }
+      if (!cloudflareBindings) {
+        throw new OperationalError({
+          code: "PHOTO_DIARY_BINDINGS_MISSING",
+          category: "configuration",
+          stage: "photo.configure",
+          retryable: true,
+        });
+      }
+      const photoResult = await processPhotoDiaryImage(
+        {
+          webhookEventId: event.webhookEventId,
+          timestamp: event.timestamp,
+          ...(event.replyToken ? { replyToken: event.replyToken } : {}),
+          source: { type: "user", userId: providerAccountId },
+          message: {
+            id: event.message.id,
+            type: "image",
+            contentProvider: { type: "line" },
+          },
+        },
+        resolved.account.id,
+        cloudflareBindings,
+        workerConfig,
+        isFinalAttempt,
+      );
+      result = mergeResult(result, {
+        outcome:
+          photoResult === "stored" || photoResult === "duplicate" ? "succeeded" : "discarded",
+        stage: "photo.store",
+        ...(photoResult === "stored"
+          ? {}
+          : { resultCode: `PHOTO_${photoResult.toUpperCase().replaceAll("-", "_")}` }),
+      });
+      continue;
+    }
+    if (!textMessage || intent === undefined) continue;
     if (intent === "diagnosis-request") {
       if (!workerConfig.lineChannelAccessToken || !event.replyToken) {
         result = mergeResult(result, {
@@ -214,7 +273,7 @@ export async function processLineWebhook(
     }
 
     const receivedAt = new Date(event.timestamp);
-    const dailyPromptControl = line.text.classifyDailyPromptControl(event.message.text);
+    const dailyPromptControl = line.text.classifyDailyPromptControl(textMessage.text);
     if (!accountDataNamespace) {
       throw new OperationalError({
         code: "ACCOUNT_DATA_BINDING_MISSING",
@@ -245,7 +304,7 @@ export async function processLineWebhook(
         "conversation.storeLineTextSource",
         {
           eventId,
-          body: event.message.text,
+          body: textMessage.text,
           receivedAt,
           ...(dailyPromptControl ? { dailyPromptControl } : {}),
           ...(resetEpoch === undefined ? {} : { resetEpoch }),

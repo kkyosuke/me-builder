@@ -15,6 +15,10 @@ queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
 
 [[queues.producers]]
+queue = "me-builder-photo-diary-deletion-queue-local"
+binding = "PHOTO_DIARY_DELETION_QUEUE"
+
+[[queues.producers]]
 queue = "me-builder-billing-queue-local"
 binding = "BILLING_QUEUE"
 
@@ -47,6 +51,10 @@ index_name = "me-builder-brain-local"
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-local"
 
+[[r2_buckets]]
+binding = "PHOTO_DIARY_BUCKET"
+bucket_name = "me-builder-photo-diary-local"
+
 [[durable_objects.bindings]]
 name = "ACCOUNT_DATA"
 class_name = "AccountData"
@@ -67,6 +75,7 @@ ENVIRONMENT = "local"
 WEB_ORIGIN = "http://localhost:5173"
 SSO_ROLLOUT_MODE = "disabled"
 SSO_ROLLOUT_PERCENT = "0"
+PHOTO_DIARY_STORAGE_ENABLED = "false"
 
 [env.local]
 name = "me-builder-api-local"
@@ -74,6 +83,10 @@ name = "me-builder-api-local"
 [[env.local.queues.producers]]
 queue = "me-builder-webhook-queue-local"
 binding = "WEBHOOK_QUEUE"
+
+[[env.local.queues.producers]]
+queue = "me-builder-photo-diary-deletion-queue-local"
+binding = "PHOTO_DIARY_DELETION_QUEUE"
 
 [[env.local.queues.producers]]
 queue = "me-builder-billing-queue-local"
@@ -108,6 +121,10 @@ index_name = "me-builder-brain-local"
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-local"
 
+[[env.local.r2_buckets]]
+binding = "PHOTO_DIARY_BUCKET"
+bucket_name = "me-builder-photo-diary-local"
+
 [[env.local.durable_objects.bindings]]
 name = "ACCOUNT_DATA"
 class_name = "AccountData"
@@ -128,6 +145,7 @@ ENVIRONMENT = "local"
 WEB_ORIGIN = "http://localhost:5173"
 SSO_ROLLOUT_MODE = "disabled"
 SSO_ROLLOUT_PERCENT = "0"
+PHOTO_DIARY_STORAGE_ENABLED = "false"
 
 [env.preview]
 name = "me-builder-api-preview"
@@ -138,6 +156,10 @@ routes = [
 [[env.preview.queues.producers]]
 queue = "me-builder-webhook-queue-preview"
 binding = "WEBHOOK_QUEUE"
+
+[[env.preview.queues.producers]]
+queue = "me-builder-photo-diary-deletion-queue-preview"
+binding = "PHOTO_DIARY_DELETION_QUEUE"
 
 [[env.preview.queues.producers]]
 queue = "me-builder-billing-queue-preview"
@@ -168,6 +190,10 @@ index_name = "me-builder-brain-preview"
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-preview"
 
+[[env.preview.r2_buckets]]
+binding = "PHOTO_DIARY_BUCKET"
+bucket_name = "me-builder-photo-diary-preview"
+
 [[env.preview.durable_objects.bindings]]
 name = "ACCOUNT_DATA"
 class_name = "AccountData"
@@ -191,6 +217,7 @@ SSO_ROLLOUT_MODE = "disabled"
 SSO_ROLLOUT_PERCENT = "0"
 MCP_RESOURCE_URL = "https://mcp.stg.kagami.kyosuke.dev/mcp"
 MCP_FEATURE_ENABLED = "false"
+PHOTO_DIARY_STORAGE_ENABLED = "false"
 
 [env.production]
 name = "me-builder-api-production"
@@ -201,6 +228,10 @@ routes = [
 [[env.production.queues.producers]]
 queue = "me-builder-webhook-queue-production"
 binding = "WEBHOOK_QUEUE"
+
+[[env.production.queues.producers]]
+queue = "me-builder-photo-diary-deletion-queue-production"
+binding = "PHOTO_DIARY_DELETION_QUEUE"
 
 [[env.production.queues.producers]]
 queue = "me-builder-billing-queue-production"
@@ -227,6 +258,10 @@ database_id = "6d11180b-3286-4b69-bd63-c7b60d768be1"
 binding = "AVATAR_BUCKET"
 bucket_name = "me-builder-avatar-production"
 
+[[env.production.r2_buckets]]
+binding = "PHOTO_DIARY_BUCKET"
+bucket_name = "me-builder-photo-diary-production"
+
 [[env.production.durable_objects.bindings]]
 name = "ACCOUNT_DATA"
 class_name = "AccountData"
@@ -250,3 +285,4 @@ SSO_ROLLOUT_MODE = "disabled"
 SSO_ROLLOUT_PERCENT = "0"
 MCP_RESOURCE_URL = "https://mcp.kagami.kyosuke.dev/mcp"
 MCP_FEATURE_ENABLED = "false"
+PHOTO_DIARY_STORAGE_ENABLED = "false"

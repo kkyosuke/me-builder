@@ -66,6 +66,11 @@ import { deferDiagnosisQuestionRoute } from "./contract/diagnosis/deferred-quest
 import { diagnosisDetailRoute } from "./contract/diagnosis/detail";
 import { diagnosisListRoute } from "./contract/diagnosis/list";
 import {
+  photoDiaryDeleteRoute,
+  photoDiaryImageRoute,
+  photoDiaryListRoute,
+} from "./contract/diary/photos";
+import {
   acceptFamilyInvitationRoute,
   cancelFamilyInvitationRoute,
   declineFamilyInvitationRoute,
@@ -223,6 +228,7 @@ import {
   getPersonalDataRecords,
   patchPersonalDataRecord,
 } from "./controller/personal-data";
+import { deletePhotoDiary, getPhotoDiaries, getPhotoDiaryImage } from "./controller/photo-diary";
 import {
   deleteProfileSummaryVersionContents,
   getGoalFollowUpContents,
@@ -671,6 +677,27 @@ app.delete(
   requireCurrentTerms,
   deleteProfileAvatarRoute,
   deleteProfileAvatarContents,
+);
+app.get(
+  "/api/diary/photos",
+  requireAuthentication,
+  requireCurrentTerms,
+  photoDiaryListRoute,
+  getPhotoDiaries,
+);
+app.get(
+  "/api/diary/photos/:mediaId/:variant",
+  requireAuthentication,
+  requireCurrentTerms,
+  photoDiaryImageRoute,
+  getPhotoDiaryImage,
+);
+app.delete(
+  "/api/diary/photos/:mediaId",
+  requireAuthentication,
+  requireCurrentTerms,
+  photoDiaryDeleteRoute,
+  deletePhotoDiary,
 );
 
 app.get(

@@ -9,7 +9,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "./config";
 import worker from "./index";
-import { handleQueueBatch } from "./logic/webhook";
+import { WEBHOOK_QUEUE_MAX_ATTEMPTS, handleQueueBatch } from "./logic/webhook";
 
 const mockPushMessage = vi.fn().mockResolvedValue({});
 const mockReplyMessage = vi.fn().mockResolvedValue({});
@@ -265,7 +265,7 @@ describe("Worker", () => {
 
   it("最終attemptの失敗はDLQへ向かうことを記録する", async () => {
     const { batch, message } = createBatch("今日は散歩した");
-    Object.defineProperty(message, "attempts", { value: 4 });
+    Object.defineProperty(message, "attempts", { value: WEBHOOK_QUEUE_MAX_ATTEMPTS });
     mockAccountDataExecute.mockRejectedValueOnce(new Error("temporary failure"));
 
     await handleQueueBatch(
@@ -283,10 +283,12 @@ describe("Worker", () => {
     expect(mockErrorLog).toHaveBeenCalledWith(
       expect.objectContaining({
         traceId: "trace-1",
-        attempt: 4,
+        attempt: WEBHOOK_QUEUE_MAX_ATTEMPTS,
         disposition: "dead-letter",
       }),
-      expect.stringContaining("[LINE webhook] failed at source.store -> dead-letter (attempt 4/4"),
+      expect.stringContaining(
+        `[LINE webhook] failed at source.store -> dead-letter (attempt ${WEBHOOK_QUEUE_MAX_ATTEMPTS}/${WEBHOOK_QUEUE_MAX_ATTEMPTS}`,
+      ),
     );
   });
 

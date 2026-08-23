@@ -15,15 +15,19 @@ const queueNames = [
   `me-builder-daily-prompt-queue-${environment}`,
   `me-builder-daily-prompt-dlq-${environment}`,
   `me-builder-webhook-dlq-${environment}`,
+  `me-builder-photo-diary-deletion-queue-${environment}`,
+  `me-builder-photo-diary-deletion-dlq-${environment}`,
   `me-builder-billing-queue-${environment}`,
   `me-builder-billing-dlq-${environment}`,
 ];
 
 for (const queueName of queueNames) {
-  const processResult = Bun.spawn(
-    ["bun", "--cwd", "apps/worker", "wrangler", "queues", "create", queueName],
-    { stdout: "pipe", stderr: "pipe", env: process.env },
-  );
+  const processResult = Bun.spawn(["bun", "wrangler", "queues", "create", queueName], {
+    cwd: new URL("../apps/worker", import.meta.url).pathname,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: process.env,
+  });
   const [exitCode, stdout, stderr] = await Promise.all([
     processResult.exited,
     new Response(processResult.stdout).text(),

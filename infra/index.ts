@@ -34,6 +34,17 @@ const avatarBucket = new cloudflare.R2Bucket(
   { protect },
 );
 
+const photoDiaryBucket = new cloudflare.R2Bucket(
+  "photoDiaryBucket",
+  {
+    accountId,
+    name: names.photoDiaryBucket,
+    location: "apac",
+    storageClass: "Standard",
+  },
+  { protect },
+);
+
 const sessionStore = new cloudflare.WorkersKvNamespace(
   "sessionStore",
   {
@@ -59,6 +70,9 @@ export const infrastructure = {
   },
   avatarBucket: {
     name: avatarBucket.name,
+  },
+  photoDiaryBucket: {
+    name: photoDiaryBucket.name,
   },
   sessionStore: {
     id: sessionStore.id,

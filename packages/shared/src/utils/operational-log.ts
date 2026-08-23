@@ -18,6 +18,7 @@ export const FLOW_LABEL = {
   "profile-summary-generation": "Profile summary generation",
   "weekly-reflection-generation": "Weekly reflection generation",
   "daily-prompt": "Daily prompt",
+  "photo-diary-deletion": "Photo diary deletion",
   billing: "Billing projection",
   "queue-dispatch": "Queue dispatch",
 } as const;

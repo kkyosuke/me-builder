@@ -33,6 +33,7 @@ export async function deleteAccount(c: Context<AppEnv>): Promise<Response> {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
   const config = getConfig(c.env);
+  const photoDiaryBucket = c.env.PHOTO_DIARY_BUCKET;
   const db = D1.shared.client.create(c.env.DB);
   const billingCustomer = await D1.shared.action.billing.findBillingCustomerByAccount(
     db,
@@ -58,6 +59,11 @@ export async function deleteAccount(c: Context<AppEnv>): Promise<Response> {
     deleteAvatarObject: async (objectKey) => {
       if (!c.env.AVATAR_BUCKET) throw new Error("Avatar bucket is required for Account deletion");
       await c.env.AVATAR_BUCKET.delete(objectKey);
+    },
+    deletePhotoObjects: async (objectKeys) => {
+      if (objectKeys.length === 0) return;
+      if (!photoDiaryBucket) throw new Error("Photo diary bucket is required for Account deletion");
+      await photoDiaryBucket.delete([...objectKeys]);
     },
   });
   deleteCookie(c, APPLICATION_SESSION_COOKIE, {

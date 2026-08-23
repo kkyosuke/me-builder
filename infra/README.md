@@ -2,7 +2,7 @@
 
 `infra/` contains two independent Pulumi projects:
 
-- the root project manages the Cloudflare D1 database, private avatar R2 bucket, KV namespace, and Queue resources
+- the root project manages the Cloudflare D1 database, separate private avatar and photo-diary R2 buckets, KV namespace, and Queue resources
 - [`gcp-platform/`](./gcp-platform/) manages Identity Platform and Vertex AI resources inside separate existing development and production GCP projects
 
 Wrangler still deploys Worker bundles, secrets, bindings, and Durable Object migrations. The ownership boundary and deletion order are defined in [the infrastructure architecture](../docs/architecture/infrastructure-architecture.md#61-cloudflareリソースの宣言とデプロイ境界).
@@ -98,8 +98,8 @@ task infra:preview:up
 
 `infra:preview:up` updates Pulumi resources, writes the current non-secret resource IDs to `infra/environments/preview.json`, and regenerates the four checked-in `wrangler.toml` files. Run the existing D1 migration and deployment tasks after creation.
 
-Normal Preview CD creates the named private avatar bucket and application-session KV namespace if they are missing before discovering the live infrastructure. Production CD performs the same idempotent bootstrap because Production foundation resources are not recreated by the Preview-only Pulumi lifecycle.
+Normal Preview CD creates the named private avatar and photo-diary buckets and application-session KV namespace if they are missing before discovering the live infrastructure. Production CD performs the same idempotent bootstrap because Production foundation resources are not recreated by the Preview-only Pulumi lifecycle.
 
-`infra:preview:clean` is only for the one-time adoption of an existing unmanaged Preview environment. It also removes orphaned `me-builder-*-preview` queues that are no longer declared by the Pulumi program. Preview destruction empties the private avatar bucket before Pulumi removes it. Both destructive commands require `ALLOW_PREVIEW_DESTROY=preview`; there is no Production destroy command.
+`infra:preview:clean` is only for the one-time adoption of an existing unmanaged Preview environment. It also removes orphaned `me-builder-*-preview` queues that are no longer declared by the Pulumi program. Preview destruction empties both private media buckets before Pulumi removes them. Both destructive commands require `ALLOW_PREVIEW_DESTROY=preview`; there is no Production destroy command.
 
 The `Reset / Preview Migrations` manual workflow performs the clean recreation and application redeployment only from reviewed `main`, after `infra-dev` approval. Because recreation changes Cloudflare resource IDs, the workflow opens a dedicated PR containing the updated manifest and generated TOML files, verifies it, and merges it when verification succeeds. Normal Preview CD runs `infra:preview:sync` before migrations so deployment remains valid while generated changes are awaiting merge.

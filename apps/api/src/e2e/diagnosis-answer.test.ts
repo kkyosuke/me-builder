@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import { D1, DO } from "@me-builder/lib";
 import { Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -73,6 +73,9 @@ const env = () => ({
   CONVERSATION_COORDINATOR: {
     getByName: () => ({ resetAccountData: async () => 1 }),
   },
+  PHOTO_DIARY_BUCKET: {
+    delete: async () => undefined,
+  } as unknown as R2Bucket,
   ...sessionFixture.bindings,
   ENVIRONMENT: "test",
   LIFF_ID: "1234567890-testliff",

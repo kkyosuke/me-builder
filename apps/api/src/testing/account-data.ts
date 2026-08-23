@@ -272,6 +272,8 @@ const actions = {
     sourceRecordId: string,
     at?: Date,
   ) => DO.account.action.source.deletePersonalDataRecord(db, accountId, sourceRecordId, at),
+  "photoDiary.listObjectKeys": (db: DO.account.Database, accountId: string) =>
+    DO.account.action.photoDiary.listPhotoDiaryObjectKeys(db, accountId),
   "diagnosisProjection.processLatest": (
     db: DO.account.Database,
     accountId: string,
