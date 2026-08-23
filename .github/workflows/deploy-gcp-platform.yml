@@ -63,6 +63,11 @@ jobs:
             echo "::error::確認文字列は ${expected_confirmation} である必要があります。"
             exit 1
           fi
+          if [ "${REF_TYPE}" != "branch" ] || [ "${REF_NAME}" != "main" ]; then
+            echo "::error::GCP platform操作はmainブランチからだけ実行できます。"
+            exit 1
+          fi
+
           required_values=(
             GCP_STATE_PROJECT_ID
             GCP_PLATFORM_PROJECT_ID
