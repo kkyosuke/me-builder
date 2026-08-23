@@ -26,16 +26,16 @@ permissions:
   contents: read
   id-token: write
 
-# Stack単位で直列化し、開始済みのGCP更新は中断しない。
+# 同じGCP projectのIAMを更新するためStackをまたいで直列化し、開始済みの更新は中断しない。
 concurrency:
-  group: gcp-platform-${{ inputs.target }}
+  group: gcp-platform
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: ${{ inputs.operation }} GCP platform (${{ inputs.target }})
     runs-on: ubuntu-latest
-    environment: ${{ inputs.target == 'development' && 'infra-dev' || 'infra-prd' }}
+    environment: infra
     env:
       TARGET: ${{ inputs.target }}
       OPERATION: ${{ inputs.operation }}
@@ -49,8 +49,8 @@ jobs:
       GCP_FOLDER_ID: ${{ vars.GCP_FOLDER_ID }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
-      GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ inputs.target == 'development' && vars.GOOGLE_OAUTH_CLIENT_ID_DEVELOPMENT || vars.GOOGLE_OAUTH_CLIENT_ID_PRODUCTION }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ inputs.target == 'development' && secrets.GOOGLE_OAUTH_CLIENT_SECRET_DEVELOPMENT || secrets.GOOGLE_OAUTH_CLIENT_SECRET_PRODUCTION }}
 
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +74,8 @@ jobs:
             GCP_BILLING_ACCOUNT
             GCP_WORKLOAD_IDENTITY_PROVIDER
             PULUMI_CONFIG_PASSPHRASE
+            GOOGLE_OAUTH_CLIENT_ID
+            GOOGLE_OAUTH_CLIENT_SECRET
           )
           for value_name in "${required_values[@]}"; do
             value="${!value_name}"
@@ -87,12 +89,6 @@ jobs:
             echo "::error::GCP_ORGANIZATION_IDとGCP_FOLDER_IDは両方同時に設定できません。"
             exit 1
           fi
-          if { [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ] && [ -z "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; } ||
-            { [ -z "${GOOGLE_OAUTH_CLIENT_ID}" ] && [ -n "${GOOGLE_OAUTH_CLIENT_SECRET}" ]; }; then
-            echo "::error::GOOGLE_OAUTH_CLIENT_IDとGOOGLE_OAUTH_CLIENT_SECRETは両方設定するか、両方未設定にしてください。"
-            exit 1
-          fi
-
       - uses: ./.github/actions/setup-bun-workspace
 
       - uses: arduino/setup-task@v2
@@ -105,6 +101,20 @@ jobs:
         with:
           project_id: ${{ env.GCP_STATE_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Verify GCP Deployment Access
+        run: |
+          if ! gcloud projects describe "${GCP_PLATFORM_PROJECT_ID}" \
+            --format='value(projectId)' >/dev/null; then
+            echo "::error::既存projectを読み取れません。infra WIF principalへapplication project上のroles/browserを付与してください。"
+            exit 1
+          fi
+
+          if ! gcloud billing accounts describe "${GCP_BILLING_ACCOUNT}" \
+            --format='value(name)' >/dev/null; then
+            echo "::error::請求先アカウントを読み取れません。roles/billing.costsManagerはprojectではなくBilling Account ${GCP_BILLING_ACCOUNT}上でinfra WIF principalへ付与してください。"
+            exit 1
+          fi
 
       - name: Install Pulumi CLI
         run: |
@@ -141,13 +151,8 @@ jobs:
             remove_config_if_present folderId
           fi
 
-          if [ -n "${GOOGLE_OAUTH_CLIENT_ID}" ]; then
-            pulumi -C infra/gcp-platform config set googleOAuthClientId "${GOOGLE_OAUTH_CLIENT_ID}" --stack "${TARGET}"
-            pulumi -C infra/gcp-platform config set --secret googleOAuthClientSecret "${GOOGLE_OAUTH_CLIENT_SECRET}" --stack "${TARGET}"
-          else
-            remove_config_if_present googleOAuthClientId
-            remove_config_if_present googleOAuthClientSecret
-          fi
+          pulumi -C infra/gcp-platform config set googleOAuthClientId "${GOOGLE_OAUTH_CLIENT_ID}" --stack "${TARGET}"
+          pulumi -C infra/gcp-platform config set --secret googleOAuthClientSecret "${GOOGLE_OAUTH_CLIENT_SECRET}" --stack "${TARGET}"
 
       - name: Run Pulumi
         run: |
@@ -162,6 +167,7 @@ jobs:
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          identity_platform_tenant_id="$(pulumi -C infra/gcp-platform stack output identityPlatformTenantId --stack "${TARGET}" 2>/dev/null || true)"
           if [ -n "${GCP_ORGANIZATION_ID}" ]; then
             project_parent="Existing project in Organization"
           elif [ -n "${GCP_FOLDER_ID}" ]; then
@@ -175,6 +181,9 @@ jobs:
             echo "- Project ID: \`${GCP_PLATFORM_PROJECT_ID}\`"
             echo "- Project parent: \`${project_parent}\`"
             echo "- Environment: \`${TARGET}\`"
+            if [ -n "${identity_platform_tenant_id}" ]; then
+              echo "- Identity Platform tenant ID: \`${identity_platform_tenant_id}\`"
+            fi
             echo "- Operation: \`${OPERATION}\`"
             echo "- Workflow run: [open run](${RUN_URL})"
           } >> "${GITHUB_STEP_SUMMARY}"

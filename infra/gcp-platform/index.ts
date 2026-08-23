@@ -21,6 +21,7 @@ const environment = environmentValue as Environment;
 if (pulumi.getStack() !== environment) {
   throw new Error(`Stack ${pulumi.getStack()} must match environment ${environment}`);
 }
+const managesSharedProjectResources = environment === "development";
 
 const projectId = config.require("projectId");
 const billingAccount = config.require("billingAccount");
@@ -30,21 +31,26 @@ if (organizationId && folderId) {
   throw new Error("Set only one of organizationId or folderId");
 }
 
-const budgetCurrencyCode = config.require("budgetCurrencyCode");
-if (!/^[A-Z]{3}$/u.test(budgetCurrencyCode)) {
-  throw new Error("budgetCurrencyCode must be a three-letter ISO 4217 code");
-}
-const monthlyBudgetAmount = config.requireNumber("monthlyBudgetAmount");
-const vertexSpendCapAmount = config.requireNumber("vertexSpendCapAmount");
-if (!Number.isInteger(monthlyBudgetAmount) || monthlyBudgetAmount <= 0) {
-  throw new Error("monthlyBudgetAmount must be a positive whole-currency amount");
-}
-if (!Number.isInteger(vertexSpendCapAmount) || vertexSpendCapAmount <= 0) {
-  throw new Error("vertexSpendCapAmount must be a positive whole-currency amount");
-}
-if (vertexSpendCapAmount > monthlyBudgetAmount) {
-  throw new Error("vertexSpendCapAmount must not exceed the project monthlyBudgetAmount");
-}
+const sharedBudgetConfiguration = managesSharedProjectResources
+  ? (() => {
+      const currencyCode = config.require("budgetCurrencyCode");
+      const monthlyAmount = config.requireNumber("monthlyBudgetAmount");
+      const vertexCapAmount = config.requireNumber("vertexSpendCapAmount");
+      if (!/^[A-Z]{3}$/u.test(currencyCode)) {
+        throw new Error("budgetCurrencyCode must be a three-letter ISO 4217 code");
+      }
+      if (!Number.isInteger(monthlyAmount) || monthlyAmount <= 0) {
+        throw new Error("monthlyBudgetAmount must be a positive whole-currency amount");
+      }
+      if (!Number.isInteger(vertexCapAmount) || vertexCapAmount <= 0) {
+        throw new Error("vertexSpendCapAmount must be a positive whole-currency amount");
+      }
+      if (vertexCapAmount > monthlyAmount) {
+        throw new Error("vertexSpendCapAmount must not exceed the project monthlyBudgetAmount");
+      }
+      return { currencyCode, monthlyAmount, vertexCapAmount };
+    })()
+  : undefined;
 
 const credentialSlots = ["primary", "secondary"] as const;
 type CredentialSlot = (typeof credentialSlots)[number];
@@ -78,18 +84,7 @@ if (vertexRuntimeCredentialsEnabled && !organizationId && !folderId) {
   throw new Error("Vertex authorization keys require a project under an organization or folder");
 }
 
-const authorizedDomains = config.requireObject<string[]>("authorizedDomains");
 const oauthRedirectUris = config.requireObject<string[]>("oauthRedirectUris");
-const expectedAuthorizedDomains =
-  environment === "development"
-    ? ["localhost", "api.stg.kagami.kyosuke.dev"]
-    : ["api.kagami.kyosuke.dev"];
-if (
-  authorizedDomains.length !== expectedAuthorizedDomains.length ||
-  expectedAuthorizedDomains.some((domain) => !authorizedDomains.includes(domain))
-) {
-  throw new Error(`${environment} authorized domains must match the application callback hosts`);
-}
 const expectedRedirectUris =
   environment === "development"
     ? [
@@ -103,14 +98,8 @@ if (
 ) {
   throw new Error(`${environment} OAuth redirect URIs must match the application callback URLs`);
 }
-const googleOAuthClientId = config.get("googleOAuthClientId");
-const googleOAuthClientSecret = config.getSecret("googleOAuthClientSecret");
-if (
-  (googleOAuthClientId && !googleOAuthClientSecret) ||
-  (!googleOAuthClientId && googleOAuthClientSecret)
-) {
-  throw new Error("Set both googleOAuthClientId and googleOAuthClientSecret");
-}
+const googleOAuthClientId = config.require("googleOAuthClientId");
+const googleOAuthClientSecret = config.requireSecret("googleOAuthClientSecret");
 const protect = true;
 
 const existingProject = gcp.organizations.getProjectOutput({ projectId });
@@ -133,15 +122,26 @@ const verifiedProject = pulumi
     ),
   );
 
-const cloudBillingApi = new gcp.projects.Service(
+function projectService(name: string, service: string): gcp.projects.Service {
+  if (!managesSharedProjectResources) {
+    return gcp.projects.Service.get(name, `${projectId}/${service}`);
+  }
+
+  return new gcp.projects.Service(
+    name,
+    {
+      project: verifiedProject.projectId,
+      service,
+      disableDependentServices: false,
+      disableOnDestroy: false,
+    },
+    { protect },
+  );
+}
+
+const cloudBillingApi = projectService(
   "cloudbilling-googleapis-com",
-  {
-    project: verifiedProject.projectId,
-    service: "cloudbilling.googleapis.com",
-    disableDependentServices: false,
-    disableOnDestroy: false,
-  },
-  { protect },
+  "cloudbilling.googleapis.com",
 );
 
 // The upstream project data source returns an empty billing account while the Cloud Billing API is
@@ -165,36 +165,24 @@ const enabledServices = [
   "identitytoolkit.googleapis.com",
   "iam.googleapis.com",
   "orgpolicy.googleapis.com",
+  "secretmanager.googleapis.com",
   "serviceusage.googleapis.com",
 ] as const;
 const services = [
   cloudBillingApi,
-  ...enabledServices.map(
-    (service) =>
-      new gcp.projects.Service(
-        service.replaceAll(".", "-"),
-        {
-          project: verifiedProject.projectId,
-          service,
-          disableDependentServices: false,
-          disableOnDestroy: false,
-        },
-        { protect },
-      ),
-  ),
+  ...enabledServices.map((service) => projectService(service.replaceAll(".", "-"), service)),
 ];
 
-const identityPlatform = new gcp.identityplatform.Config(
-  "identityPlatform",
+const identityPlatformTenant = new gcp.identityplatform.Tenant(
+  "identityPlatformTenant",
   {
     project: verifiedProject.projectId,
-    authorizedDomains,
-    autodeleteAnonymousUsers: true,
-    signIn: {
-      allowDuplicateEmails: false,
-      anonymous: { enabled: false },
-      email: { enabled: false, passwordRequired: true },
-    },
+    displayName: `me-builder ${environment}`,
+    allowPasswordSignup: false,
+    enableEmailLinkSignin: false,
+    disableAuth: false,
+    client: { permissions: { disabledUserDeletion: true, disabledUserSignup: false } },
+    deletionPolicy: "PREVENT",
   },
   {
     dependsOn: services,
@@ -202,54 +190,74 @@ const identityPlatform = new gcp.identityplatform.Config(
   },
 );
 
-const googleProvider =
-  googleOAuthClientId && googleOAuthClientSecret
-    ? new gcp.identityplatform.DefaultSupportedIdpConfig(
-        "googleProvider",
-        {
-          project: verifiedProject.projectId,
-          idpId: "google.com",
-          enabled: true,
-          clientId: googleOAuthClientId,
-          clientSecret: googleOAuthClientSecret,
-          deletionPolicy: "PREVENT",
-        },
-        {
-          dependsOn: identityPlatform,
-          protect,
-          additionalSecretOutputs: ["clientSecret"],
-        },
-      )
-    : undefined;
-
-const projectBudget = new gcp.billing.Budget(
-  "projectMonthlyBudget",
+const googleProvider = new gcp.identityplatform.TenantDefaultSupportedIdpConfig(
+  "googleProvider",
   {
-    billingAccount: verifiedProjectBilling.billingAccount,
-    displayName: `me-builder ${environment} monthly budget`,
-    amount: {
-      specifiedAmount: {
-        currencyCode: budgetCurrencyCode,
-        units: String(monthlyBudgetAmount),
-      },
-    },
-    budgetFilter: {
-      calendarPeriod: "MONTH",
-      creditTypesTreatment: "EXCLUDE_ALL_CREDITS",
-      projects: [pulumi.interpolate`projects/${verifiedProject.projectNumber}`],
-    },
-    thresholdRules: [0.5, 0.8, 1].map((thresholdPercent) => ({
-      thresholdPercent,
-      spendBasis: "CURRENT_SPEND",
-    })),
-    allUpdatesRule: {
-      monitoringNotificationChannels: [],
-      enableProjectLevelRecipients: true,
-    },
+    project: verifiedProject.projectId,
+    tenant: identityPlatformTenant.name,
+    idpId: "google.com",
+    enabled: true,
+    clientId: googleOAuthClientId,
+    clientSecret: googleOAuthClientSecret,
     deletionPolicy: "PREVENT",
   },
-  { dependsOn: services, protect },
+  {
+    dependsOn: identityPlatformTenant,
+    protect,
+    additionalSecretOutputs: ["clientSecret"],
+  },
 );
+
+const billingAccountDetails = managesSharedProjectResources
+  ? gcp.organizations.getBillingAccountOutput(
+      { billingAccount, lookupProjects: false },
+      { dependsOn: cloudBillingApi },
+    )
+  : undefined;
+const verifiedBudgetCurrencyCode = billingAccountDetails?.currencyCode.apply(
+  (actualCurrencyCode) => {
+    if (actualCurrencyCode !== sharedBudgetConfiguration?.currencyCode) {
+      throw new Error(
+        `budgetCurrencyCode ${sharedBudgetConfiguration?.currencyCode} does not match billing account currency ${actualCurrencyCode}`,
+      );
+    }
+    return actualCurrencyCode;
+  },
+);
+
+// A billing budget applies to the shared project, not to an Identity Platform tenant. Keep one
+// owner so the development and production stacks cannot create competing project-wide budgets.
+const projectBudget =
+  sharedBudgetConfiguration && verifiedBudgetCurrencyCode
+    ? new gcp.billing.Budget(
+        "projectMonthlyBudget",
+        {
+          billingAccount: verifiedProjectBilling.billingAccount,
+          displayName: "me-builder shared project monthly budget",
+          amount: {
+            specifiedAmount: {
+              currencyCode: verifiedBudgetCurrencyCode,
+              units: String(sharedBudgetConfiguration.monthlyAmount),
+            },
+          },
+          budgetFilter: {
+            calendarPeriod: "MONTH",
+            creditTypesTreatment: "EXCLUDE_ALL_CREDITS",
+            projects: [pulumi.interpolate`projects/${verifiedProject.projectNumber}`],
+          },
+          thresholdRules: [0.5, 0.8, 1].map((thresholdPercent) => ({
+            thresholdPercent,
+            spendBasis: "CURRENT_SPEND",
+          })),
+          allUpdatesRule: {
+            monitoringNotificationChannels: [],
+            enableProjectLevelRecipients: true,
+          },
+          deletionPolicy: "PREVENT",
+        },
+        { dependsOn: services, protect },
+      )
+    : undefined;
 
 const vertexServiceAccount = new gcp.serviceaccount.Account(
   "vertexRuntime",
@@ -265,8 +273,11 @@ const vertexInferenceRole = new gcp.projects.IAMCustomRole(
   "vertexInferenceRole",
   {
     project: verifiedProject.projectId,
-    roleId: "meBuilderVertexInference",
-    title: "me-builder Vertex inference",
+    roleId:
+      environment === "development"
+        ? "meBuilderVertexInference"
+        : "meBuilderVertexInferenceProduction",
+    title: `me-builder Vertex inference ${environment}`,
     description: "Invoke Gemini generation and embedding without Vertex resource administration",
     permissions: ["aiplatform.endpoints.predict"],
     deletionPolicy: "PREVENT",
@@ -291,21 +302,24 @@ const vertexServiceUsageBinding = new gcp.projects.IAMMember(
     role: "roles/serviceusage.serviceUsageConsumer",
     member: pulumi.interpolate`serviceAccount:${vertexServiceAccount.email}`,
   },
-  { dependsOn: vertexServiceAccount, protect },
+  { dependsOn: [vertexServiceAccount, vertexInferenceBinding], protect },
 );
 
+const authorizationKeyPolicyName = pulumi.interpolate`projects/${verifiedProject.projectNumber}/policies/iam.managed.disableServiceAccountApiKeyCreation`;
 const authorizationKeyPolicy =
   organizationId || folderId
-    ? new gcp.orgpolicy.Policy(
-        "allowRestrictedServiceAccountApiKeys",
-        {
-          parent: pulumi.interpolate`projects/${verifiedProject.projectNumber}`,
-          name: pulumi.interpolate`projects/${verifiedProject.projectNumber}/policies/iam.managed.disableServiceAccountApiKeyCreation`,
-          spec: { rules: [authorizationKeyPolicyRule(vertexRuntimeCredentialsEnabled)] },
-          deletionPolicy: "PREVENT",
-        },
-        { dependsOn: services, protect },
-      )
+    ? managesSharedProjectResources
+      ? new gcp.orgpolicy.Policy(
+          "allowRestrictedServiceAccountApiKeys",
+          {
+            parent: pulumi.interpolate`projects/${verifiedProject.projectNumber}`,
+            name: authorizationKeyPolicyName,
+            spec: { rules: [authorizationKeyPolicyRule(vertexRuntimeCredentialsEnabled)] },
+            deletionPolicy: "PREVENT",
+          },
+          { dependsOn: services, protect },
+        )
+      : gcp.orgpolicy.Policy.get("allowRestrictedServiceAccountApiKeys", authorizationKeyPolicyName)
     : undefined;
 
 const identityPlatformApiKeys = Object.fromEntries(
@@ -380,18 +394,109 @@ if (vertexRuntimeCredentialsEnabled && !activeVertexAiApiKey) {
   throw new Error("Active Vertex AI API key is missing");
 }
 
+const runtimeSecretIds = {
+  identityPlatformApiKey: `me-builder-${environment}-identity-platform-api-key`,
+  vertexAiApiKey: `me-builder-${environment}-vertex-ai-api-key`,
+} as const;
+
+function runtimeSecret(name: string, secretId: string): gcp.secretmanager.Secret {
+  return new gcp.secretmanager.Secret(
+    name,
+    {
+      project: verifiedProject.projectId,
+      secretId,
+      replication: { auto: {} },
+      deletionPolicy: "PREVENT",
+      deletionProtection: true,
+      labels: {
+        environment,
+        managed_by: "pulumi",
+      },
+    },
+    { dependsOn: services, protect },
+  );
+}
+
+const identityPlatformApiKeySecret = runtimeSecret(
+  "identityPlatformApiKeyRuntimeSecret",
+  runtimeSecretIds.identityPlatformApiKey,
+);
+const vertexAiApiKeySecret = runtimeSecret(
+  "vertexAiApiKeyRuntimeSecret",
+  runtimeSecretIds.vertexAiApiKey,
+);
+
+const githubEnvironment = environment === "development" ? "dev" : "prd";
+const githubActionsEnvironmentPrincipal = pulumi.interpolate`principalSet://iam.googleapis.com/projects/${verifiedProject.projectNumber}/locations/global/workloadIdentityPools/github-actions/attribute.environment/${githubEnvironment}`;
+
+function grantRuntimeSecretAccess(
+  name: string,
+  secret: gcp.secretmanager.Secret,
+): gcp.secretmanager.SecretIamMember {
+  return new gcp.secretmanager.SecretIamMember(
+    name,
+    {
+      project: verifiedProject.projectId,
+      secretId: secret.secretId,
+      role: "roles/secretmanager.secretAccessor",
+      member: githubActionsEnvironmentPrincipal,
+    },
+    { dependsOn: secret, protect },
+  );
+}
+
+const identityPlatformApiKeySecretAccess = grantRuntimeSecretAccess(
+  "identityPlatformApiKeyRuntimeSecretAccess",
+  identityPlatformApiKeySecret,
+);
+const vertexAiApiKeySecretAccess = grantRuntimeSecretAccess(
+  "vertexAiApiKeyRuntimeSecretAccess",
+  vertexAiApiKeySecret,
+);
+
+const identityPlatformApiKeySecretVersion = new gcp.secretmanager.SecretVersion(
+  "identityPlatformApiKeyRuntimeSecretVersion",
+  {
+    secret: identityPlatformApiKeySecret.id,
+    secretData: activeIdentityPlatformApiKey.keyString,
+    deletionPolicy: "DISABLE",
+  },
+  {
+    dependsOn: identityPlatformApiKeySecretAccess,
+    additionalSecretOutputs: ["secretData"],
+  },
+);
+
+const vertexAiApiKeySecretVersion = activeVertexAiApiKey
+  ? new gcp.secretmanager.SecretVersion(
+      "vertexAiApiKeyRuntimeSecretVersion",
+      {
+        secret: vertexAiApiKeySecret.id,
+        secretData: activeVertexAiApiKey.keyString,
+        deletionPolicy: "DISABLE",
+      },
+      {
+        dependsOn: vertexAiApiKeySecretAccess,
+        additionalSecretOutputs: ["secretData"],
+      },
+    )
+  : undefined;
+
+export const identityPlatformTenantId = identityPlatformTenant.name;
+
 export const platform = {
   environment,
   projectId: verifiedProject.projectId,
   projectNumber: verifiedProject.projectNumber,
   billingAccount: verifiedProjectBilling.billingAccount,
-  budgetCurrencyCode,
-  monthlyBudgetAmount,
-  vertexSpendCapAmount,
+  budgetCurrencyCode: sharedBudgetConfiguration?.currencyCode,
+  monthlyBudgetAmount: sharedBudgetConfiguration?.monthlyAmount,
+  vertexSpendCapAmount: sharedBudgetConfiguration?.vertexCapAmount,
   vertexSpendCapConfirmed,
   vertexRuntimeCredentialsEnabled,
   activeCredentialSlot,
-  identityProvider: googleProvider?.idpId,
+  identityProvider: googleProvider.idpId,
+  identityPlatformTenantId,
   googleOAuthClientId,
   oauthRedirectUris,
   identityPlatformApiKeys: pulumi.secret({
@@ -411,5 +516,10 @@ export const platform = {
       })
     : undefined,
   vertexAiApiKey: activeVertexAiApiKey ? pulumi.secret(activeVertexAiApiKey.keyString) : undefined,
-  projectBudget: projectBudget.name,
+  runtimeSecretIds,
+  runtimeSecretVersions: {
+    identityPlatformApiKey: identityPlatformApiKeySecretVersion.version,
+    vertexAiApiKey: vertexAiApiKeySecretVersion?.version,
+  },
+  projectBudget: projectBudget?.name,
 };

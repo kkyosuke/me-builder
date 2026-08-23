@@ -22,11 +22,13 @@ const GoogleTokenResponseSchema = v.object({
 const IdentityPlatformResponseSchema = v.object({
   localId: v.pipe(v.string(), v.nonEmpty()),
   providerId: v.literal("google.com"),
+  tenantId: v.pipe(v.string(), v.nonEmpty()),
   isNewUser: v.optional(v.boolean(), false),
 });
 
 export type GoogleCloudIdentityPlatformSsoConfiguration = {
   identityPlatformApiKey: string;
+  identityPlatformTenantId: string;
   googleClientId: string;
   googleClientSecret: string;
   callbackUrl: string;
@@ -61,6 +63,7 @@ export function createGoogleCloudIdentityPlatformSsoClient(
 ): ExternalSsoProvider {
   if (
     !configuration.identityPlatformApiKey.trim() ||
+    !configuration.identityPlatformTenantId.trim() ||
     !configuration.googleClientId.trim() ||
     !configuration.googleClientSecret.trim()
   ) {
@@ -134,6 +137,7 @@ export function createGoogleCloudIdentityPlatformSsoClient(
           }).toString(),
           returnSecureToken: true,
           returnIdpCredential: false,
+          tenantId: configuration.identityPlatformTenantId,
           // linkは認証済みAccountへ接続するためIdentity Platform userの初回作成を許可する。
           // 公開loginでは既存userだけを許可し、未知userをIdentity Platformへ増やさない。
           ...(identityProvisioning === "existing-only" ? { autoCreate: false } : {}),
@@ -146,6 +150,9 @@ export function createGoogleCloudIdentityPlatformSsoClient(
     if (!response.ok) throw new SsoProviderError("provider_rejected");
     try {
       const exchanged = v.parse(IdentityPlatformResponseSchema, await response.json());
+      if (exchanged.tenantId !== configuration.identityPlatformTenantId) {
+        throw new SsoProviderError("provider_rejected");
+      }
       // existing-onlyでautoCreateが上流に無視されても、公開loginの未知userは拒否する。
       if (identityProvisioning === "existing-only" && exchanged.isNewUser) {
         throw new SsoProviderError("provider_rejected");
