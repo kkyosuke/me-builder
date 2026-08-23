@@ -1,7 +1,5 @@
 config:
   me-builder-gcp-platform:environment: production
-  me-builder-gcp-platform:vertexSpendCapConfirmed: false
-  me-builder-gcp-platform:vertexRuntimeCredentialsEnabled: false
   me-builder-gcp-platform:activeCredentialSlot: primary
   me-builder-gcp-platform:credentialGenerations:
     primary: v1

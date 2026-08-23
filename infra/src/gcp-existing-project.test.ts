@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { verifyExistingGcpProject, verifyExistingGcpProjectBilling } from "./gcp-existing-project";
 
-const standaloneProject = {
+const existingProject = {
   projectId: "existing-project",
   number: "123456789",
-  orgId: "",
-  folderId: "",
 };
 
 describe("verifyExistingGcpProject", () => {
@@ -15,21 +13,27 @@ describe("verifyExistingGcpProject", () => {
         {
           projectId: "existing-project",
         },
-        standaloneProject,
+        existingProject,
       ),
     ).toEqual({ projectId: "existing-project", projectNumber: "123456789" });
   });
 
-  it("projectの親が設定と異なる場合は更新せず拒否する", () => {
+  it("取得したproject IDが設定と異なる場合は拒否する", () => {
     expect(() =>
       verifyExistingGcpProject(
-        {
-          projectId: "existing-project",
-          organizationId: "1234",
-        },
-        standaloneProject,
+        { projectId: "configured-project" },
+        { projectId: "different-project", number: "123456789" },
       ),
-    ).toThrow("parent does not match");
+    ).toThrow("does not match configured projectId");
+  });
+
+  it("既存projectのnumberを取得できない場合は拒否する", () => {
+    expect(() =>
+      verifyExistingGcpProject(
+        { projectId: "existing-project" },
+        { ...existingProject, number: "" },
+      ),
+    ).toThrow("has no project number");
   });
 
   it("Cloud Billing API有効化後に請求先を検証する", () => {

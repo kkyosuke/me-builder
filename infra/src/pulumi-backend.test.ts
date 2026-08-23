@@ -75,7 +75,6 @@ describe("requirePulumiGcsBackend", () => {
 
     expect(cloudflareProject).toContain(`url: ${pulumiGcsBackends.cloudflare}`);
     expect(gcpPlatformProject).toContain(`url: ${pulumiGcsBackends.gcpPlatform}`);
-    expect(gcpPlatformProgram).toContain('from "../src/gcp-authorization-key-policy.ts"');
     expect(gcpPlatformProgram).toContain('from "../src/gcp-existing-project.ts"');
     expect(gcpPlatformProgram).toContain('from "../src/pulumi-backend.ts"');
     expect(gcpPlatformProgram).toContain("gcp.organizations.getProjectOutput({ projectId })");
@@ -84,6 +83,11 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain("{ dependsOn: cloudBillingApi }");
     expect(gcpPlatformProgram).toContain("verifyExistingGcpProjectBilling");
     expect(gcpPlatformProgram).toContain("new gcp.identityplatform.Tenant(");
+    expect(gcpPlatformProgram).not.toContain("new gcp.serviceaccount.Account(");
+    expect(gcpPlatformProgram).not.toContain("new gcp.projects.IAMCustomRole(");
+    expect(gcpPlatformProgram).not.toContain("new gcp.projects.IAMMember(");
+    expect(gcpPlatformProgram).not.toContain("new gcp.orgpolicy.Policy(");
+    expect(gcpPlatformProgram).not.toContain("serviceAccountEmail:");
     expect(gcpPlatformProgram).toContain('"me-builder-dev"');
     expect(gcpPlatformProgram).toContain('"me-builder-prd"');
     expect(gcpPlatformProgram).toContain("/^[A-Za-z][A-Za-z0-9-]{3,19}$/u");
@@ -128,12 +132,16 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).toContain("vars.GOOGLE_OAUTH_CLIENT_ID_PRODUCTION");
     expect(gcpPlatformWorkflow).toContain("secrets.GOOGLE_OAUTH_CLIENT_SECRET_DEVELOPMENT");
     expect(gcpPlatformWorkflow).toContain("secrets.GOOGLE_OAUTH_CLIENT_SECRET_PRODUCTION");
-    expect(gcpPlatformWorkflow).toContain(
-      'if [ -n "${GCP_ORGANIZATION_ID}" ] && [ -n "${GCP_FOLDER_ID}" ]; then',
-    );
     expect(gcpPlatformWorkflow).toContain("remove_config_if_present organizationId");
     expect(gcpPlatformWorkflow).toContain("remove_config_if_present folderId");
-    expect(gcpPlatformWorkflow).toContain("Existing standalone project");
+    expect(gcpPlatformWorkflow).toContain("remove_config_if_present vertexSpendCapConfirmed");
+    expect(gcpPlatformWorkflow).toContain(
+      "remove_config_if_present vertexRuntimeCredentialsEnabled",
+    );
+    expect(gcpPlatformWorkflow).toContain("Migrate Obsolete Vertex Identity Resources");
+    expect(gcpPlatformWorkflow).toContain("state unprotect");
+    expect(gcpPlatformWorkflow).not.toContain("vars.GCP_ORGANIZATION_ID");
+    expect(gcpPlatformWorkflow).not.toContain("vars.GCP_FOLDER_ID");
     expect(gcpPlatformWorkflow).toContain("remove_config_if_present projectName");
     expect(gcpPlatformWorkflow).toContain(
       "GOOGLE_OAUTH_CLIENT_ID\n            GOOGLE_OAUTH_CLIENT_SECRET",

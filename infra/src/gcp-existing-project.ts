@@ -1,14 +1,10 @@
 export type ExistingGcpProject = {
   projectId?: string | undefined;
   number?: string | undefined;
-  orgId?: string | undefined;
-  folderId?: string | undefined;
 };
 
 export type ExpectedGcpProject = {
   projectId: string;
-  organizationId?: string | undefined;
-  folderId?: string | undefined;
 };
 
 export type VerifiedGcpProject = {
@@ -46,16 +42,6 @@ export function verifyExistingGcpProject(
   const projectNumber = actual.number?.trim() ?? "";
   if (!projectNumber) {
     throw new Error(`Existing GCP project ${expected.projectId} has no project number`);
-  }
-
-  const expectedOrganizationId = normalizeOptionalId(expected.organizationId);
-  const expectedFolderId = normalizeOptionalId(expected.folderId);
-  const actualOrganizationId = normalizeOptionalId(actual.orgId);
-  const actualFolderId = normalizeOptionalId(actual.folderId);
-  if (expectedOrganizationId !== actualOrganizationId || expectedFolderId !== actualFolderId) {
-    throw new Error(
-      `Existing GCP project ${expected.projectId} parent does not match the configured organizationId/folderId`,
-    );
   }
 
   return { projectId: expected.projectId, projectNumber };
