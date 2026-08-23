@@ -1819,6 +1819,39 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
   });
 
+  it("保存中に戻ってから進んだ場合は、保存後も最新の詳細履歴を表示する", async () => {
+    let resolveSave: ((value: unknown) => void) | undefined;
+    mocks.saveDiagnosisAnswer.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /テスト診断/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "診断をはじめる" }));
+    fireEvent.click(screen.getByRole("button", { name: "テスト回答" }));
+
+    act(() => window.history.back());
+    await waitFor(() => expect(diagnosisDetailIdFromHistoryState(window.history.state)).toBeNull());
+    act(() => window.history.forward());
+    await waitFor(() =>
+      expect(diagnosisDetailIdFromHistoryState(window.history.state)).toBe("diagnosis-1"),
+    );
+    expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
+
+    await act(async () => {
+      resolveSave?.({
+        outcome: "created",
+        answer: { acceptedAt: "2026-08-05T00:00:01.000Z" },
+        progress: { responseStatus: "in-progress", answeredCount: 1, questionCount: 10 },
+      });
+    });
+    expect(screen.getByText("回答UI: テスト診断")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "わたしの診断" })).toBeNull();
+  });
+
   it("直接URLからの戻る中に保存が失敗した場合は診断URLを復元する", async () => {
     let rejectSave: ((reason?: unknown) => void) | undefined;
     mocks.saveDiagnosisAnswer.mockImplementation(
