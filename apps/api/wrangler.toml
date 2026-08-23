@@ -185,9 +185,12 @@ script_name = "me-builder-worker-preview"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
+BASE_DOMAIN = "stg.kagami.kyosuke.dev"
 WEB_ORIGIN = "https://stg.kagami.kyosuke.dev"
 SSO_ROLLOUT_MODE = "disabled"
 SSO_ROLLOUT_PERCENT = "0"
+MCP_RESOURCE_URL = "https://mcp.stg.kagami.kyosuke.dev/mcp"
+MCP_FEATURE_ENABLED = "false"
 
 [env.production]
 name = "me-builder-api-production"
@@ -241,6 +244,9 @@ script_name = "me-builder-worker-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+BASE_DOMAIN = "kagami.kyosuke.dev"
 WEB_ORIGIN = "https://kagami.kyosuke.dev"
 SSO_ROLLOUT_MODE = "disabled"
 SSO_ROLLOUT_PERCENT = "0"
+MCP_RESOURCE_URL = "https://mcp.kagami.kyosuke.dev/mcp"
+MCP_FEATURE_ENABLED = "false"

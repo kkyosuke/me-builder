@@ -76,6 +76,10 @@ export const loadBillingPlanApplication = memoizeModuleLoader(() =>
   })),
 );
 
+export const loadMcpManagementScreen = memoizeModuleLoader(() =>
+  import("./feature/mcp").then((feature) => ({ default: feature.McpManagementScreen })),
+);
+
 export function loadMainApplication(route: MainApplicationRoute): Promise<LazyApplicationModule> {
   if (route === "me") return loadProfileApplication();
   if (route === "compatibility") return loadCompatibilityApplication();

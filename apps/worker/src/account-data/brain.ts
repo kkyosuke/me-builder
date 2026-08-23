@@ -27,6 +27,12 @@ export const brainActions = {
       notBefore,
       requiredAccessLabel,
     ),
+  "brain.loadMcpSearchResults": (
+    db: DO.account.Database,
+    accountId: string,
+    vectorIds: readonly string[],
+    at?: Date,
+  ) => DO.account.action.brain.loadMcpBrainSearchResults(db, accountId, vectorIds, at),
   "brain.loadRelationshipDiagnosisContexts": (
     db: DO.account.Database,
     accountId: string,

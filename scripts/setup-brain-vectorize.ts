@@ -59,29 +59,42 @@ await runWrangler(
   /already exists|already indexed|duplicate/i,
   `metadata index ${indexName}.owner_scope`,
 );
+await runWrangler(
+  [
+    "vectorize",
+    "create-metadata-index",
+    indexName,
+    "--propertyName=mcp_owner_scope",
+    "--type=string",
+  ],
+  /already exists|already indexed|duplicate/i,
+  `metadata index ${indexName}.mcp_owner_scope`,
+);
 
 // create-metadata-index はmutationをキューへ積むだけで、list へ現れるまでの時間に保証がない。
 // デプロイをその反映待ちで止めないため、ここでは1回だけ確認し、未反映は警告に留める。
 // 型違いで既に存在する場合だけは、後続のfilter検索が壊れるためデプロイを止める。
 const metadataIndexes = await readWranglerJson(["vectorize", "list-metadata-index", indexName]);
-const ownerScope = (Array.isArray(metadataIndexes) ? metadataIndexes : []).find(
-  (entry): entry is { propertyName: string; indexType?: string } =>
-    typeof entry === "object" &&
-    entry !== null &&
-    "propertyName" in entry &&
-    entry.propertyName === "owner_scope",
-);
 // Cloudflare APIは`String`のように先頭を大文字にして返す。SDKの型宣言 (`'string' | 'number' |
 // 'boolean'`) と一致しないため、大文字小文字を無視して比べる。
-const ownerScopeType = ownerScope?.indexType?.toLowerCase();
-if (!ownerScope) {
-  console.warn(
-    `::warning::metadata index ${indexName}.owner_scope is still propagating; vector insert must wait until it becomes visible`,
+for (const propertyName of ["owner_scope", "mcp_owner_scope"] as const) {
+  const metadataIndex = (Array.isArray(metadataIndexes) ? metadataIndexes : []).find(
+    (entry): entry is { propertyName: string; indexType?: string } =>
+      typeof entry === "object" &&
+      entry !== null &&
+      "propertyName" in entry &&
+      entry.propertyName === propertyName,
   );
-} else if (ownerScopeType !== "string") {
-  throw new Error(
-    `metadata index ${indexName}.owner_scope must be a string index but is ${ownerScope.indexType}; delete and recreate it before deployment`,
-  );
-} else {
-  console.info(`Verified metadata index ${indexName}.owner_scope`);
+  const indexType = metadataIndex?.indexType?.toLowerCase();
+  if (!metadataIndex) {
+    console.warn(
+      `::warning::metadata index ${indexName}.${propertyName} is still propagating; vector insert must wait until it becomes visible`,
+    );
+  } else if (indexType !== "string") {
+    throw new Error(
+      `metadata index ${indexName}.${propertyName} must be a string index but is ${metadataIndex.indexType}; delete and recreate it before deployment`,
+    );
+  } else {
+    console.info(`Verified metadata index ${indexName}.${propertyName}`);
+  }
 }

@@ -64,6 +64,10 @@ export type AccountDataActions = {
     [vectorIds: readonly string[], at?: Date, notBefore?: Date, requiredAccessLabel?: string],
     typeof brain.loadBrainChatContextMemories
   >;
+  "brain.loadMcpSearchResults": RpcAction<
+    [vectorIds: readonly string[], at?: Date],
+    typeof brain.loadMcpBrainSearchResults
+  >;
   "brain.loadRelationshipDiagnosisContexts": RpcAction<
     [at?: Date],
     typeof brain.loadRelationshipDiagnosisContexts

@@ -64,6 +64,8 @@ describe("renderWranglerConfigs", () => {
     expect(configs.api).toContain('WEB_ORIGIN = "https://preview.example.com"');
     expect(configs.api).toContain('WEB_ORIGIN = "https://example.com"');
     expect(configs.api).toContain('WEB_ORIGIN = "http://localhost:5173"');
+    expect(configs.api).toContain('BASE_DOMAIN = "preview.example.com"');
+    expect(configs.mcp).toContain('BASE_DOMAIN = "preview.example.com"');
     expect(configs.api.match(/SSO_ROLLOUT_MODE = "disabled"/gu)).toHaveLength(4);
     expect(configs.api.match(/SSO_ROLLOUT_PERCENT = "0"/gu)).toHaveLength(4);
     expect(configs.api).toContain('{ pattern = "api.preview.example.com", custom_domain = true }');

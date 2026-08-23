@@ -89,6 +89,15 @@ import {
   getServiceTermsRoute,
 } from "./contract/legal/terms";
 import { lineWebhookRoute } from "./contract/line/webhook";
+import {
+  decideMcpAuthorizationRequestRoute,
+  getMcpAuthorizationRequestRoute,
+  listMcpAuditRoute,
+  listMcpConnectionsRoute,
+  mcpAuthorizeRoute,
+  mcpTokenRoute,
+  revokeMcpConnectionRoute,
+} from "./contract/mcp";
 import { webClientErrorReportRoute } from "./contract/observability/web-client-error";
 import { openApiOptions } from "./contract/openapi";
 import { personalDataFeaturesRoute } from "./contract/personal-data/features";
@@ -197,6 +206,16 @@ import {
   putServiceTermsAcceptance,
 } from "./controller/legal";
 import { postLineWebhook } from "./controller/line";
+import {
+  deleteMcpConnection,
+  getMcpAudit,
+  getMcpAuthorization,
+  getMcpAuthorizationRequest,
+  getMcpConnections,
+  getOAuthAuthorizationServerMetadata,
+  postMcpAuthorizationDecision,
+  postMcpToken,
+} from "./controller/mcp";
 import { postWebClientError } from "./controller/observability";
 import {
   deletePersonalDataRecordContents,
@@ -336,6 +355,8 @@ app.get("/api/health", healthRoute, (c) => {
   );
 });
 
+app.get("/.well-known/oauth-authorization-server", getOAuthAuthorizationServerMetadata);
+
 app.get("/api/ready", readinessRoute, async (c) => {
   const timestamp = new Date().toISOString();
   c.header("Cache-Control", "no-store");
@@ -461,6 +482,56 @@ app.put(
   acceptServiceTermsRoute,
   acceptServiceTermsRequestValidator,
   putServiceTermsAcceptance,
+);
+
+app.get(
+  "/api/mcp/oauth/authorize",
+  mcpAuthorizeRoute,
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  getMcpAuthorization,
+);
+app.post("/api/mcp/oauth/token", mcpTokenRoute, postMcpToken);
+app.get(
+  "/api/mcp/authorization-requests/:requestId",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  getMcpAuthorizationRequestRoute,
+  getMcpAuthorizationRequest,
+);
+app.post(
+  "/api/mcp/authorization-requests/:requestId/decision",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  decideMcpAuthorizationRequestRoute,
+  postMcpAuthorizationDecision,
+);
+app.get(
+  "/api/mcp/connections",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  listMcpConnectionsRoute,
+  getMcpConnections,
+);
+app.delete(
+  "/api/mcp/connections/:connectionId",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  revokeMcpConnectionRoute,
+  deleteMcpConnection,
+);
+app.get(
+  "/api/mcp/audit-records",
+  requireAuthentication,
+  requireCurrentTerms,
+  requireAdmin,
+  listMcpAuditRoute,
+  getMcpAudit,
 );
 
 app.get(
