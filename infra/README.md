@@ -32,7 +32,7 @@ gcloud storage managed-folders create gs://kagami-infra/kagami/cloudflare/
 gcloud storage managed-folders create gs://kagami-infra/kagami/gcp-platform/
 ```
 
-GitHub Actions uses Direct Workload Identity Federation and does not impersonate a service account. Repository-only trust is not sufficient because a different workflow in the same repository could request an ID token. Map the immutable repository ID, workflow reference, and Environment, then restrict the Provider to the reviewed workflows on `main`:
+GitHub Actions uses Direct Workload Identity Federation and does not impersonate a service account. Repository-only trust is not sufficient because a different workflow in the same repository could request an ID token. Map the immutable repository ID, workflow reference, and Environment, then restrict the Provider to the exact deployment workflows. GCP apply, Production CD, and Preview reset require `main`; Preview CD accepts the selected branch because `dev` Environment approval is its deployment gate:
 
 ```bash
 gcloud iam workload-identity-pools providers update-oidc github-actions-provider \
@@ -40,7 +40,7 @@ gcloud iam workload-identity-pools providers update-oidc github-actions-provider
   --location=global \
   --workload-identity-pool=github-actions \
   --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.workflow_ref=assertion.workflow_ref,attribute.environment=assertion.environment" \
-  --attribute-condition="assertion.repository_id=='1309307514' && assertion.ref=='refs/heads/main' && ((assertion.workflow_ref.endsWith('/.github/workflows/deploy-gcp-platform.yml@refs/heads/main') && assertion.environment=='infra') || (assertion.workflow_ref.endsWith('/.github/workflows/reset-preview-migrations.yml@refs/heads/main') && assertion.environment=='dev'))"
+  --attribute-condition="assertion.repository_id=='1309307514' && ((assertion.ref=='refs/heads/main' && assertion.workflow_ref.endsWith('/.github/workflows/deploy-gcp-platform.yml@refs/heads/main') && assertion.environment=='infra') || (assertion.workflow_ref.startsWith('kkyosuke/me-builder/.github/workflows/cd-preview.yml@refs/') && assertion.environment=='dev') || (assertion.ref=='refs/heads/main' && assertion.workflow_ref.endsWith('/.github/workflows/cd-production.yml@refs/heads/main') && assertion.environment=='prd') || (assertion.ref=='refs/heads/main' && assertion.workflow_ref.endsWith('/.github/workflows/reset-preview-migrations.yml@refs/heads/main') && assertion.environment=='dev'))"
 ```
 
 Grant state access by mapped Environment so the GCP platform and Cloudflare workflows cannot cross-read each other's Pulumi state:
@@ -53,6 +53,8 @@ principalSet://iam.googleapis.com/projects/719104396651/locations/global/workloa
 `principal://.../attribute.environment/...` is invalid: `principal://` is only for one mapped `subject`, while a mapped attribute requires `principalSet://`. Grant `roles/storage.objectAdmin` to `infra` only on `kagami/gcp-platform/`, and grant it to `dev` only on `kagami/cloudflare/`. Remove the former bucket-level `attribute.repository/kkyosuke/me-builder` binding after these bindings are verified. No GitHub Actions principal needs `storage.buckets.create`, `storage.buckets.update`, or `storage.buckets.setIamPolicy`. Do not create or store a service-account JSON key.
 
 Managed folders `kagami/cloudflare/` and `kagami/gcp-platform/` provide IAM boundaries for each state prefix.
+
+The `dev` and `prd` principals do not receive access to `kagami/gcp-platform/`. GCP Pulumi grants each principal Secret Manager accessor only on its own runtime Secret resources, so Cloudflare CD never receives the state passphrase or cross-environment state access. Configure the same provider resource name as `GCP_WORKLOAD_IDENTITY_PROVIDER` and the application project as `GCP_PLATFORM_PROJECT_ID` in both Environments before removing the former Google API Key GitHub Secrets.
 
 When migrating from the former `infra-dev` / `infra-prd` approval split, create `infra`, configure its Required reviewers and `main` deployment branch restriction, copy the shared GCP values, and add the environment-suffixed OAuth values documented in the [GCP platform guide](./gcp-platform/README.md#github-actions-deployment). Update the WIF Provider condition and grant the `attribute.environment/infra` principal before changing or removing the old bindings. Verify both Stack previews through `infra`, then remove the obsolete `infra-dev` / `infra-prd` principal bindings and Environments. Secret values cannot be copied by GitHub after creation, so enter them again from the password manager.
 
@@ -81,6 +83,7 @@ The `Reset / Preview Migrations` workflow first requires approval through `infra
 | --- | --- | --- |
 | Secret | `PULUMI_CONFIG_PASSPHRASE` | the non-empty passphrase for the Cloudflare Stack |
 | Variable | `GCP_STATE_PROJECT_ID` | the project that owns `gs://kagami-infra/` |
+| Variable | `GCP_PLATFORM_PROJECT_ID` | the application project that owns the Development runtime Secrets |
 | Secret | `GCP_WORKLOAD_IDENTITY_PROVIDER` | the full Workload Identity Provider resource name restricted to this repository and Environment |
 
 Grant the direct Workload Identity principal object access on the `kagami/cloudflare/` managed folder, not at bucket level, and do not grant it access to `kagami/gcp-platform/`. The workflows do not accept a service-account or JSON-key fallback.

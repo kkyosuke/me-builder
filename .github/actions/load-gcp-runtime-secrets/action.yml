@@ -1,0 +1,86 @@
+name: Load GCP Runtime Secrets
+description: Load environment-scoped application API keys from GCP Secret Manager through Direct WIF
+
+inputs:
+  project-id:
+    description: Existing GCP application project ID
+    required: true
+  workload-identity-provider:
+    description: Full Workload Identity Provider resource name
+    required: true
+  environment:
+    description: GCP platform environment (development or production)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate GCP Runtime Secret Configuration
+      shell: bash
+      env:
+        GCP_RUNTIME_PROJECT_ID: ${{ inputs.project-id }}
+        GCP_RUNTIME_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload-identity-provider }}
+        GCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        if [ -z "${GCP_RUNTIME_PROJECT_ID//[[:space:]]/}" ]; then
+          echo "::error::GCP_PLATFORM_PROJECT_ID is required."
+          exit 1
+        fi
+        if [ -z "${GCP_RUNTIME_WORKLOAD_IDENTITY_PROVIDER//[[:space:]]/}" ]; then
+          echo "::error::GCP_WORKLOAD_IDENTITY_PROVIDER is required."
+          exit 1
+        fi
+        case "${GCP_RUNTIME_ENVIRONMENT}" in
+          development|production) ;;
+          *)
+            echo "::error::environment must be development or production."
+            exit 1
+            ;;
+        esac
+
+    - name: Authenticate to GCP Runtime Secret Manager
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ inputs.project-id }}
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+
+    - name: Set Up Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v3
+
+    - name: Load Environment Runtime Secrets
+      shell: bash
+      env:
+        GCP_RUNTIME_PROJECT_ID: ${{ inputs.project-id }}
+        GCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment }}
+      run: |
+        load_secret() {
+          local environment_variable="$1"
+          local secret_id="$2"
+          local secret_value
+
+          if ! secret_value="$(gcloud secrets versions access latest \
+            --project="${GCP_RUNTIME_PROJECT_ID}" \
+            --secret="${secret_id}")"; then
+            echo "::error::Secret Managerから${secret_id}のlatest versionを取得できませんでした。"
+            exit 1
+          fi
+          if [ -z "${secret_value}" ]; then
+            echo "::error::Secret Managerの${secret_id}が空です。"
+            exit 1
+          fi
+          if [[ "${secret_value}" == *$'\n'* || "${secret_value}" == *$'\r'* ]]; then
+            echo "::error::Secret Managerの${secret_id}に改行が含まれています。"
+            exit 1
+          fi
+
+          echo "::add-mask::${secret_value}"
+          printf '%s=%s\n' "${environment_variable}" "${secret_value}" >> "${GITHUB_ENV}"
+        }
+
+        secret_prefix="me-builder-${GCP_RUNTIME_ENVIRONMENT}"
+        load_secret \
+          GOOGLE_IDENTITY_PLATFORM_API_KEY \
+          "${secret_prefix}-identity-platform-api-key"
+        load_secret \
+          GOOGLE_VERTEX_AI_API_KEY \
+          "${secret_prefix}-vertex-ai-api-key"

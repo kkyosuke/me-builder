@@ -46,6 +46,9 @@ describe("requirePulumiGcsBackend", () => {
       gcpPlatformProgram,
       gcpPlatformScript,
       gcpPlatformWorkflow,
+      loadGcpRuntimeSecretsAction,
+      previewWorkflow,
+      productionWorkflow,
       resetWorkflow,
       stripeWorkflow,
     ] = await Promise.all([
@@ -54,6 +57,12 @@ describe("requirePulumiGcsBackend", () => {
       readFile(new URL("../gcp-platform/index.ts", import.meta.url), "utf8"),
       readFile(new URL("../scripts/gcp-platform.ts", import.meta.url), "utf8"),
       readFile(new URL("../../.github/workflows/deploy-gcp-platform.yml", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../.github/actions/load-gcp-runtime-secrets/action.yml", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../../.github/workflows/cd-preview.yml", import.meta.url), "utf8"),
+      readFile(new URL("../../.github/workflows/cd-production.yml", import.meta.url), "utf8"),
       readFile(
         new URL("../../.github/workflows/reset-preview-migrations.yml", import.meta.url),
         "utf8",
@@ -84,6 +93,16 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain("monitoringNotificationChannels: []");
     expect(gcpPlatformProgram).toContain('config.require("googleOAuthClientId")');
     expect(gcpPlatformProgram).toContain('config.requireSecret("googleOAuthClientSecret")');
+    expect(gcpPlatformProgram).toContain('"secretmanager.googleapis.com"');
+    expect(gcpPlatformProgram).toContain("new gcp.secretmanager.Secret(");
+    expect(gcpPlatformProgram).toContain("new gcp.secretmanager.SecretVersion(");
+    expect(gcpPlatformProgram).toContain("new gcp.secretmanager.SecretIamMember(");
+    expect(gcpPlatformProgram).toContain('role: "roles/secretmanager.secretAccessor"');
+    expect(gcpPlatformProgram).toContain(
+      "workloadIdentityPools/github-actions/attribute.environment/${githubEnvironment}",
+    );
+    expect(gcpPlatformProgram).toContain("deletionProtection: true");
+    expect(gcpPlatformProgram).toContain('deletionPolicy: "DISABLE"');
     expect(gcpPlatformProgram).not.toContain("new gcp.organizations.Project");
     expect(gcpPlatformProgram).not.toContain("import: projectId");
     expect(gcpPlatformProgram).not.toContain("autoCreateNetwork");
@@ -120,6 +139,24 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).not.toContain("GCP_PLATFORM_PROJECT_NAME");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage buckets");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");
+    expect(loadGcpRuntimeSecretsAction).toContain("uses: google-github-actions/auth@v2");
+    expect(loadGcpRuntimeSecretsAction).toContain("uses: google-github-actions/setup-gcloud@v3");
+    expect(loadGcpRuntimeSecretsAction).toContain("gcloud secrets versions access latest");
+    expect(loadGcpRuntimeSecretsAction).toContain("me-builder-${GCP_RUNTIME_ENVIRONMENT}");
+    expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_IDENTITY_PLATFORM_API_KEY");
+    expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_VERTEX_AI_API_KEY");
+    expect(loadGcpRuntimeSecretsAction).toContain('>> "${GITHUB_ENV}"');
+    expect(loadGcpRuntimeSecretsAction).not.toContain("pulumi");
+    for (const workflow of [previewWorkflow, productionWorkflow, resetWorkflow]) {
+      expect(workflow).toContain("id-token: write");
+      expect(workflow).toContain("uses: ./.github/actions/load-gcp-runtime-secrets");
+      expect(workflow).toContain("vars.GCP_PLATFORM_PROJECT_ID");
+      expect(workflow).not.toContain("secrets.GOOGLE_IDENTITY_PLATFORM_API_KEY");
+      expect(workflow).not.toContain("secrets.GOOGLE_VERTEX_AI_API_KEY");
+    }
+    expect(previewWorkflow).toContain("environment: development");
+    expect(productionWorkflow).toContain("environment: production");
+    expect(resetWorkflow).toContain("environment: development");
     expect(resetWorkflow).toContain("environment: infra");
     expect(resetWorkflow).toContain('expected_confirmation="reset-preview:${RESET_REF}"');
     expect(resetWorkflow).toContain('[ "${REF_TYPE}" != "branch" ]');

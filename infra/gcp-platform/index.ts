@@ -165,6 +165,7 @@ const enabledServices = [
   "identitytoolkit.googleapis.com",
   "iam.googleapis.com",
   "orgpolicy.googleapis.com",
+  "secretmanager.googleapis.com",
   "serviceusage.googleapis.com",
 ] as const;
 const services = [
@@ -393,6 +394,94 @@ if (vertexRuntimeCredentialsEnabled && !activeVertexAiApiKey) {
   throw new Error("Active Vertex AI API key is missing");
 }
 
+const runtimeSecretIds = {
+  identityPlatformApiKey: `me-builder-${environment}-identity-platform-api-key`,
+  vertexAiApiKey: `me-builder-${environment}-vertex-ai-api-key`,
+} as const;
+
+function runtimeSecret(name: string, secretId: string): gcp.secretmanager.Secret {
+  return new gcp.secretmanager.Secret(
+    name,
+    {
+      project: verifiedProject.projectId,
+      secretId,
+      replication: { auto: {} },
+      deletionPolicy: "PREVENT",
+      deletionProtection: true,
+      labels: {
+        environment,
+        managed_by: "pulumi",
+      },
+    },
+    { dependsOn: services, protect },
+  );
+}
+
+const identityPlatformApiKeySecret = runtimeSecret(
+  "identityPlatformApiKeyRuntimeSecret",
+  runtimeSecretIds.identityPlatformApiKey,
+);
+const vertexAiApiKeySecret = runtimeSecret(
+  "vertexAiApiKeyRuntimeSecret",
+  runtimeSecretIds.vertexAiApiKey,
+);
+
+const githubEnvironment = environment === "development" ? "dev" : "prd";
+const githubActionsEnvironmentPrincipal = pulumi.interpolate`principalSet://iam.googleapis.com/projects/${verifiedProject.projectNumber}/locations/global/workloadIdentityPools/github-actions/attribute.environment/${githubEnvironment}`;
+
+function grantRuntimeSecretAccess(
+  name: string,
+  secret: gcp.secretmanager.Secret,
+): gcp.secretmanager.SecretIamMember {
+  return new gcp.secretmanager.SecretIamMember(
+    name,
+    {
+      project: verifiedProject.projectId,
+      secretId: secret.secretId,
+      role: "roles/secretmanager.secretAccessor",
+      member: githubActionsEnvironmentPrincipal,
+    },
+    { dependsOn: secret, protect },
+  );
+}
+
+const identityPlatformApiKeySecretAccess = grantRuntimeSecretAccess(
+  "identityPlatformApiKeyRuntimeSecretAccess",
+  identityPlatformApiKeySecret,
+);
+const vertexAiApiKeySecretAccess = grantRuntimeSecretAccess(
+  "vertexAiApiKeyRuntimeSecretAccess",
+  vertexAiApiKeySecret,
+);
+
+const identityPlatformApiKeySecretVersion = new gcp.secretmanager.SecretVersion(
+  "identityPlatformApiKeyRuntimeSecretVersion",
+  {
+    secret: identityPlatformApiKeySecret.id,
+    secretData: activeIdentityPlatformApiKey.keyString,
+    deletionPolicy: "DISABLE",
+  },
+  {
+    dependsOn: identityPlatformApiKeySecretAccess,
+    additionalSecretOutputs: ["secretData"],
+  },
+);
+
+const vertexAiApiKeySecretVersion = activeVertexAiApiKey
+  ? new gcp.secretmanager.SecretVersion(
+      "vertexAiApiKeyRuntimeSecretVersion",
+      {
+        secret: vertexAiApiKeySecret.id,
+        secretData: activeVertexAiApiKey.keyString,
+        deletionPolicy: "DISABLE",
+      },
+      {
+        dependsOn: vertexAiApiKeySecretAccess,
+        additionalSecretOutputs: ["secretData"],
+      },
+    )
+  : undefined;
+
 export const identityPlatformTenantId = identityPlatformTenant.name;
 
 export const platform = {
@@ -427,5 +516,10 @@ export const platform = {
       })
     : undefined,
   vertexAiApiKey: activeVertexAiApiKey ? pulumi.secret(activeVertexAiApiKey.keyString) : undefined,
+  runtimeSecretIds,
+  runtimeSecretVersions: {
+    identityPlatformApiKey: identityPlatformApiKeySecretVersion.version,
+    vertexAiApiKey: vertexAiApiKeySecretVersion?.version,
+  },
   projectBudget: projectBudget?.name,
 };

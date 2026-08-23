@@ -68,13 +68,11 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
       LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
       LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-      GOOGLE_VERTEX_AI_API_KEY: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
       CHAT_DELIVERY_SECRET: ${{ secrets.CHAT_DELIVERY_SECRET }}
       BRAIN_VECTOR_HMAC_SECRET: ${{ secrets.BRAIN_VECTOR_HMAC_SECRET }}
       ADMIN_LINE_USER_IDS: ${{ secrets.ADMIN_LINE_USER_IDS }}
       LIFF_ID: ${{ vars.LIFF_ID }}
       LINE_LOGIN_CHANNEL_ID: ${{ vars.LINE_LOGIN_CHANNEL_ID }}
-      GOOGLE_IDENTITY_PLATFORM_API_KEY: ${{ secrets.GOOGLE_IDENTITY_PLATFORM_API_KEY }}
       GOOGLE_IDENTITY_PLATFORM_TENANT_ID: ${{ vars.GOOGLE_IDENTITY_PLATFORM_TENANT_ID }}
       GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
@@ -82,11 +80,18 @@ jobs:
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
       PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
       GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
+      GCP_PLATFORM_PROJECT_ID: ${{ vars.GCP_PLATFORM_PROJECT_ID }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
       # 選択branchと確認文字列を一致させ、resource IDは後段で専用PRへ反映する。
       - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/load-gcp-runtime-secrets
+        with:
+          project-id: ${{ env.GCP_PLATFORM_PROJECT_ID }}
+          workload-identity-provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          environment: development
 
       - uses: ./.github/actions/setup-bun-workspace
 
@@ -115,7 +120,7 @@ jobs:
             exit 1
           fi
           if [ -z "${GOOGLE_VERTEX_AI_API_KEY}" ]; then
-            echo "::error::GOOGLE_VERTEX_AI_API_KEY が GitHub Environment dev に設定されていません。"
+            echo "::error::GOOGLE_VERTEX_AI_API_KEY を Secret Manager から取得できていません。"
             exit 1
           fi
           if [ -z "${CHAT_DELIVERY_SECRET}" ]; then
@@ -132,6 +137,7 @@ jobs:
           fi
           required_gcp_variables=(
             GCP_STATE_PROJECT_ID
+            GCP_PLATFORM_PROJECT_ID
             GCP_WORKLOAD_IDENTITY_PROVIDER
           )
           for variable_name in "${required_gcp_variables[@]}"; do

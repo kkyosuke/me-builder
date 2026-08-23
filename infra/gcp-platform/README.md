@@ -12,6 +12,7 @@ This Pulumi project creates the Google Cloud resources used by me-builder authen
 - Vertex AI API
 - a dedicated Vertex AI service account with a custom inference-only role and Service Usage Consumer
 - rotatable service-account-bound authorization key slots restricted to `GenerateContent` and `EmbedContent`
+- environment-specific Secret Manager containers and least-privilege CD access for runtime API keys
 - one gross-cost monthly shared-project budget, owned by the Development Stack, with alerts at 50%, 80%, and 100%
 - a fail-closed gate that keeps Vertex runtime credentials absent until its service spend cap is confirmed
 
@@ -85,6 +86,7 @@ Service Usage API and Identity Platform activation are manual prerequisites. Ide
 | Development Stack | Identity and Access Management API | `iam.googleapis.com` |
 | Development Stack | Organization Policy API | `orgpolicy.googleapis.com` |
 | Development Stack | Vertex AI API | `aiplatform.googleapis.com` |
+| Development Stack | Secret Manager API | `secretmanager.googleapis.com` |
 
 Pulumi reads and validates the existing project but never creates, imports, updates, moves, unlinks, or deletes it. Project name, labels, network configuration, Cloud Billing connection, Identity Platform root configuration, and authorized domains therefore remain outside these Stacks. The Development Stack enables the Cloud Billing API before reading and validating the manual billing connection; a first preview keeps the deferred billing read unknown until Apply. Configure the same project ID and Billing Account in both Stacks.
 
@@ -108,7 +110,7 @@ Configure one approval-protected GitHub Environment named `infra`. It owns the s
 | Secret | `GOOGLE_OAUTH_CLIENT_SECRET_DEVELOPMENT` | Development Web OAuth Client Secret |
 | Secret | `GOOGLE_OAUTH_CLIENT_SECRET_PRODUCTION` | Production Web OAuth Client Secret |
 
-The `infra` WIF principal needs object administration only on the `kagami/gcp-platform/` managed folder for state. On the existing application project, grant Browser, Service Usage Admin, API Keys Admin, Identity Platform Admin, Service Account Admin, Role Admin, and Project IAM Admin. Grant Billing Account Costs Manager on the configured Billing Account so the Development Stack can manage the shared budget. Project Creator, Project Mover, Project Billing Manager, and Billing Account User are not required because the Stacks do not mutate the project or its billing association. Organization Policy Administrator and Service Account API Key Binding Admin are required only for the authorization-key path available to Organization or Folder projects.
+The `infra` WIF principal needs object administration only on the `kagami/gcp-platform/` managed folder for state. On the existing application project, grant Browser, Service Usage Admin, API Keys Admin, Identity Platform Admin, Service Account Admin, Role Admin, Project IAM Admin, and Secret Manager Admin. Grant Billing Account Costs Manager on the configured Billing Account so the Development Stack can manage the shared budget. Project Creator, Project Mover, Project Billing Manager, and Billing Account User are not required because the Stacks do not mutate the project or its billing association. Organization Policy Administrator and Service Account API Key Binding Admin are required only for the authorization-key path available to Organization or Folder projects.
 
 Use the mapped `infra` Environment principal for both the application-project roles and the Billing Account role. Billing Account Costs Manager must be granted on the **Billing Account resource**, not on the application project. The latter does not authorize `billingAccounts.get` or budget operations against the Billing Account.
 
@@ -131,6 +133,7 @@ The workflow checks project and Billing Account readability immediately after Di
 | application project | `roles/iam.serviceAccountAdmin` | manage the dedicated Vertex runtime service account |
 | application project | `roles/iam.roleAdmin` | manage the inference-only custom role |
 | application project | `roles/resourcemanager.projectIamAdmin` | bind the custom role and Service Usage Consumer to the runtime service account |
+| application project | `roles/secretmanager.admin` | create runtime Secret containers, versions, and per-secret CD access |
 | Billing Account (not application project) | `roles/billing.costsManager` | read the Billing Account and manage the Pulumi-declared project budget |
 | Organization or Folder project only | `roles/orgpolicy.policyAdmin` | manage the service-account-bound authorization-key policy |
 | Organization or Folder project only | `roles/iam.serviceAccountApiKeyBindingAdmin` | bind a Vertex authorization key to the runtime service account |
@@ -184,9 +187,49 @@ ALLOW_GCP_PLATFORM_UP=production task infra:gcp-platform:up:production
 
 For an Organization or Folder project only, set `vertexRuntimeCredentialsEnabled` to `true` after the spend cap is confirmed and apply again. The deploy principal also needs permission to manage project organization policies and service-account API key bindings. Pulumi explicitly enforces Google's block on service-account-bound API keys while runtime credentials are disabled. When enabled, the constraint remains enforced and its `allowedServices` parameter permits only `aiplatform.googleapis.com`; it does not open authorization-key creation for other services and leaves the parent policy unchanged.
 
-The `identityPlatformTenantId` Stack output is non-secret. Copy it to `GOOGLE_IDENTITY_PLATFORM_TENANT_ID` in Cloudflare GitHub Environment `dev` for Development and `prd` for Production. The `platform` output contains the active keys as Pulumi secrets. Copy `identityPlatformApiKey` to `GOOGLE_IDENTITY_PLATFORM_API_KEY`, copy `vertexAiApiKey` to `GOOGLE_VERTEX_AI_API_KEY`, copy the selected client ID to `GOOGLE_OAUTH_CLIENT_ID`, and distribute the matching original client secret as `GOOGLE_OAUTH_CLIENT_SECRET` in `dev` or `prd`. Never print secret outputs in CI logs. `vertexAiApiKey` remains absent in a Stack until its spend-cap confirmation and runtime-credential flags are both true.
+### Runtime secret distribution to Cloudflare CD
 
-The Vertex AI key is bound to the Stack's dedicated service account, not an unbound standard API key. The Worker continues to keep the value only in its server-side secret binding. API method restrictions limit the key to generation and embedding, while the custom IAM role grants only `aiplatform.endpoints.predict`. Cloudflare Workers do not have stable outbound IP addresses, so this Stack cannot add the only supported application restriction for authorization keys, an IP allowlist.
+Cloudflare CD does not read or decrypt the GCS Pulumi state. Each Stack owns two environment-specific Secret Manager containers, and grants `roles/secretmanager.secretAccessor` only to the matching GitHub Environment principal. CD authenticates with Direct WIF, reads only the active runtime values, masks them, and passes them to `wrangler deploy --secrets-file` with the application version.
+
+```mermaid
+flowchart LR
+    Pulumi["GCP Pulumi apply"] --> Identity["Identity Platform API key"]
+    Pulumi --> Vertex["Vertex authorization key"]
+    Identity --> DevSecret["development Secret Manager"]
+    Vertex --> DevSecret
+    Identity --> PrdSecret["production Secret Manager"]
+    Vertex --> PrdSecret
+    DevCD["CD / Preview via dev WIF"] --> DevSecret
+    PrdCD["CD / Production via prd WIF"] --> PrdSecret
+    DevCD --> CloudflareDev["Cloudflare Preview secrets-file"]
+    PrdCD --> CloudflarePrd["Cloudflare Production secrets-file"]
+```
+
+| Stack | Secret Manager ID | CD destination |
+| --- | --- | --- |
+| Development | `me-builder-development-identity-platform-api-key` | API `GOOGLE_IDENTITY_PLATFORM_API_KEY` |
+| Development | `me-builder-development-vertex-ai-api-key` | Worker / MCP `GOOGLE_VERTEX_AI_API_KEY` |
+| Production | `me-builder-production-identity-platform-api-key` | API `GOOGLE_IDENTITY_PLATFORM_API_KEY` |
+| Production | `me-builder-production-vertex-ai-api-key` | Worker / MCP `GOOGLE_VERTEX_AI_API_KEY` |
+
+Configure `GCP_PLATFORM_PROJECT_ID` as a variable and `GCP_WORKLOAD_IDENTITY_PROVIDER` as a secret in both GitHub Environments `dev` and `prd`. Remove the former `GOOGLE_IDENTITY_PLATFORM_API_KEY` and `GOOGLE_VERTEX_AI_API_KEY` GitHub Secrets only after each CD workflow has read its matching Secret Manager values successfully. Keep `GOOGLE_IDENTITY_PLATFORM_TENANT_ID` and `GOOGLE_OAUTH_CLIENT_ID` as environment variables and keep the manually issued `GOOGLE_OAUTH_CLIENT_SECRET` as an environment secret.
+
+The Identity Platform API key version is written automatically by Pulumi. `vertexAiApiKey` remains absent until its spend-cap confirmation and runtime-credential flags are both true. Because an authorization key for Vertex AI cannot be newly created in a standalone project, add the existing working key once after the Stack has created its empty Vertex Secret container:
+
+```bash
+read -rs GOOGLE_VERTEX_AI_API_KEY
+printf '%s' "${GOOGLE_VERTEX_AI_API_KEY}" | \
+  gcloud secrets versions add me-builder-development-vertex-ai-api-key \
+    --project=gen-lang-client-0647422425 \
+    --data-file=-
+unset GOOGLE_VERTEX_AI_API_KEY
+```
+
+Repeat with `me-builder-production-vertex-ai-api-key` only when preparing Production. Do not pass the value as a command argument or print it. If the project is later placed under an Organization or Folder and Pulumi starts issuing Vertex authorization keys, its managed version becomes `latest` without changing the CD contract.
+
+The non-secret `identityPlatformTenantId` Stack output must still be copied to `GOOGLE_IDENTITY_PLATFORM_TENANT_ID` in `dev` for Development and `prd` for Production. Never print secret Pulumi outputs in CI logs.
+
+In the Organization or Folder path, the Vertex AI key is bound to the Stack's dedicated service account. API method restrictions limit it to generation and embedding, while the custom IAM role grants only `aiplatform.endpoints.predict`. Cloudflare Workers do not have stable outbound IP addresses, so this Stack cannot add the only supported application restriction for authorization keys, an IP allowlist. A manually bootstrapped standalone-project key remains externally owned: Pulumi manages its Secret container and CD access but does not claim or alter that key's binding or API restrictions. Verify it with the existing Vertex connectivity check after every replacement.
 
 ## Credential rotation
 
@@ -194,9 +237,12 @@ Keys use `primary` and `secondary` slots, but only the active slot exists during
 
 1. Change the inactive slot under `credentialGenerations` from `null` to a new generation (for example, `v2`) and apply the Stack.
 2. Retrieve that inactive slot locally from the secret `identityPlatformApiKeys` or `vertexAiApiKeys` output. Do not expose it in CI logs.
-3. Test the new Development key, distribute it to the matching `dev` or `prd` GitHub Environment, and verify text generation and embedding.
-4. Change `activeCredentialSlot` to the new slot and apply.
-5. After a short rollback window, set the old slot's generation to `null` and apply to delete that key. Rotate Production separately after the Development gate; the Tenant IDs do not change during key rotation.
+3. Test the inactive Development key locally without replacing the Secret Manager `latest` version.
+4. Change `activeCredentialSlot` to the new slot and apply. Pulumi writes the selected key as a new Secret Manager version; no GitHub Secret update is required.
+5. Run the matching CD workflow and verify Identity Platform plus Vertex generation and embedding. Roll back by restoring the former active slot and applying again if needed.
+6. After a short rollback window, set the old slot's generation to `null` and apply to delete that key. Rotate Production separately after the Development gate; the Tenant IDs do not change during key rotation.
+
+For a manually bootstrapped standalone-project Vertex key, create the replacement outside Pulumi, add it as a new version of the same environment Secret, verify CD, then disable the former Secret Version and revoke the former key. Do not change the Secret ID.
 
 ## Updates
 
