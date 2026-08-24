@@ -2,12 +2,41 @@ import { describe, expect, it, vi } from "vitest";
 import { createSsoRolloutAuthorizer } from "../infrastructure/authentication/sso-rollout";
 import type { ExternalSsoProvider } from "../logic/authentication/sso-provider";
 import {
+  type CompleteSsoAuthenticationInput,
+  type SsoApplicationSessionIssuer,
   SsoAuthenticationError,
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
-  completeSsoLogin,
+  type SsoExistingIdentityResolver,
+  type SsoRolloutAuthorizer,
+  completeSsoCallback,
   startSsoAuthentication,
 } from "../logic/authentication/sso-transaction";
+
+async function completeSsoLogin<SessionResult>(
+  input: CompleteSsoAuthenticationInput & {
+    identityResolver: SsoExistingIdentityResolver;
+    rolloutAuthorizer: SsoRolloutAuthorizer;
+    sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
+  },
+) {
+  const completed = await completeSsoCallback({
+    ...input,
+    identityLinker: {
+      async link() {
+        throw new Error("login E2E reached the link branch");
+      },
+    },
+  });
+  if (completed.purpose !== "login") {
+    throw new Error("login E2E reached an unexpected callback branch");
+  }
+  return {
+    session: completed.session,
+    returnTo: completed.returnTo,
+    ...(completed.traceId ? { traceId: completed.traceId } : {}),
+  };
+}
 
 function memoryStore(): SsoAuthenticationTransactionStore & {
   transactions: Map<string, SsoAuthenticationTransaction>;

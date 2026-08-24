@@ -70,20 +70,6 @@ if (identityPlatformCredentialGenerations[identityPlatformActiveCredentialSlot] 
   throw new Error("The identityPlatformActiveCredentialSlot must have a credential generation");
 }
 
-const oauthRedirectUris = config.requireObject<string[]>("oauthRedirectUris");
-const expectedRedirectUris =
-  environment === "development"
-    ? [
-        "http://localhost:3000/api/auth/sso/callback",
-        "https://api.stg.kagami.kyosuke.dev/api/auth/sso/callback",
-      ]
-    : ["https://api.kagami.kyosuke.dev/api/auth/sso/callback"];
-if (
-  oauthRedirectUris.length !== expectedRedirectUris.length ||
-  expectedRedirectUris.some((uri) => !oauthRedirectUris.includes(uri))
-) {
-  throw new Error(`${environment} OAuth redirect URIs must match the application callback URLs`);
-}
 const googleOAuthClientId = config.require("googleOAuthClientId");
 const googleOAuthClientSecret = config.requireSecret("googleOAuthClientSecret");
 const protect = true;

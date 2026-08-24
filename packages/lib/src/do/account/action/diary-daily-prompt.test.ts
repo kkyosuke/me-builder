@@ -6,9 +6,8 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
 import type { AccountDataDatabase } from "../database";
 import { accountSchema as schema } from "../database";
+import { chooseDailyPromptLocalHour, chooseDailyPromptStrategy } from "../diary-policy";
 import {
-  chooseDailyPromptLocalHour,
-  chooseDailyPromptStrategy,
   listDailyPromptStrategyStats,
   listDailyPromptTimeStats,
   markDailyPromptDelivered,

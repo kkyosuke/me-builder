@@ -77,7 +77,7 @@ type StartSsoAuthenticationInput = {
   randomBytes?: (size: number) => Uint8Array;
 };
 
-type CompleteSsoAuthenticationInput = {
+export type CompleteSsoAuthenticationInput = {
   state: string;
   code: string;
   store: SsoAuthenticationTransactionStore;
@@ -229,68 +229,6 @@ async function consumeAndVerifySsoTransaction(
   return { identity, transaction };
 }
 
-/** login callback transactionだけを一度消費し、検証済みIdentityと復帰pathを返す。 */
-export async function completeSsoAuthentication(
-  input: CompleteSsoAuthenticationInput,
-): Promise<{ identity: SsoVerifiedIdentity; returnTo: string; traceId?: string }> {
-  const { identity, transaction } = await consumeAndVerifySsoTransaction(input, "login");
-  if (transaction.purpose !== "login") {
-    throw new SsoAuthenticationError("transaction_purpose_mismatch", callbackContext(transaction));
-  }
-  return {
-    identity,
-    returnTo: transaction.returnTo,
-    ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
-  };
-}
-
-/** link済みIdentityだけをAccountへ解決し、共通application sessionを発行する。 */
-export async function completeSsoLogin<SessionResult>(
-  input: CompleteSsoAuthenticationInput & {
-    identityResolver: SsoExistingIdentityResolver;
-    rolloutAuthorizer: SsoRolloutAuthorizer;
-    sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
-  },
-): Promise<{ session: SessionResult; returnTo: string; traceId?: string }> {
-  const { identity, returnTo, traceId } = await completeSsoAuthentication(input);
-  const callback = { ...(traceId ? { traceId } : {}), returnTo };
-  let account:
-    | { accountId: string; authenticatedIdentityId: string; role: "user" | "admin" }
-    | undefined;
-  try {
-    account = await input.identityResolver.findAccount({
-      providerKey: identity.providerKey,
-      subject: identity.subject,
-    });
-  } catch (error) {
-    throw new SsoCallbackCompletionError(callback, error);
-  }
-  if (!account) throw new SsoAuthenticationError("identity_unlinked", callback);
-  try {
-    if (
-      !(await input.rolloutAuthorizer.allows({ accountId: account.accountId, role: account.role }))
-    ) {
-      throw new SsoAuthenticationError("rollout_excluded", callback);
-    }
-  } catch (error) {
-    if (error instanceof SsoAuthenticationError) throw error;
-    throw new SsoCallbackCompletionError(callback, error);
-  }
-
-  let session: SessionResult;
-  try {
-    session = await input.sessionIssuer.issue({
-      accountId: account.accountId,
-      authenticatedIdentityId: account.authenticatedIdentityId,
-      authenticationMethod: identity.authenticationMethod,
-      authenticatedAt: identity.authenticatedAt,
-    });
-  } catch (error) {
-    throw new SsoCallbackCompletionError(callback, error);
-  }
-  return { session, returnTo, ...(traceId ? { traceId } : {}) };
-}
-
 /** login/link callbackを一度だけ消費し、用途に応じた副作用へ分岐する。 */
 export async function completeSsoCallback<SessionResult>(
   input: CompleteSsoAuthenticationInput & {
@@ -371,43 +309,6 @@ export async function completeSsoCallback<SessionResult>(
   }
   return {
     purpose: "link",
-    accountId: transaction.initiatingAccountId,
-    authenticatedIdentityId,
-    authenticationMethod: identity.authenticationMethod,
-    authenticatedAt: identity.authenticatedAt,
-    providerKey: identity.providerKey,
-    returnTo: transaction.returnTo,
-    ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
-  };
-}
-
-/** 開始時のAccountへだけ検証済みIdentity Platform Identityを追加する。 */
-export async function completeSsoIdentityLinking(
-  input: CompleteSsoAuthenticationInput & { identityLinker: SsoIdentityLinker },
-): Promise<{
-  accountId: string;
-  authenticatedIdentityId: string;
-  authenticationMethod: "sso";
-  authenticatedAt: Date;
-  providerKey: string;
-  returnTo: string;
-  traceId?: string;
-}> {
-  const { identity, transaction } = await consumeAndVerifySsoTransaction(input, "link");
-  if (transaction.purpose !== "link") {
-    throw new SsoAuthenticationError("transaction_purpose_mismatch", callbackContext(transaction));
-  }
-  let authenticatedIdentityId: string;
-  try {
-    authenticatedIdentityId = await input.identityLinker.link({
-      accountId: transaction.initiatingAccountId,
-      providerKey: identity.providerKey,
-      subject: identity.subject,
-    });
-  } catch (error) {
-    throw new SsoCallbackCompletionError(callbackContext(transaction), error);
-  }
-  return {
     accountId: transaction.initiatingAccountId,
     authenticatedIdentityId,
     authenticationMethod: identity.authenticationMethod,

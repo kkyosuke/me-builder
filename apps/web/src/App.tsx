@@ -33,8 +33,18 @@ import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
 import type { ProfileEntitlement } from "./feature/profile-settings/model/entitlement";
 import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
 import { useColorTheme, useFontSize } from "./feature/theme";
+import { focusMainRouteHeading } from "./infrastructure/focus-main-route-heading";
 import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
 import type { AsyncState } from "./model/async-state";
+import {
+  type MainRoute,
+  PROFILE_HISTORY_STATE_KEY,
+  PROFILE_RETURN_PATHNAME_STATE_KEY,
+  historyProfileReturnPathname,
+  historyProfileView,
+  isDevelopmentEnvironment,
+  resolveProfileView,
+} from "./model/profile-navigation";
 import { restoreWindowScroll } from "./model/scroll-restoration";
 import {
   getIdleMainApplicationRoutes,
@@ -70,66 +80,11 @@ const DevelopmentBrainItemsApplication = lazy(loadDevelopmentBrainItemsApplicati
 const McpManagementScreen = lazy(loadMcpManagementScreen);
 const PhotoDiaryScreen = lazy(loadPhotoDiaryScreen);
 
-type ProfileView =
-  | "closed"
-  | "profile"
-  | "avatar"
-  | "personal-data"
-  | "brain-items"
-  | "family"
-  | "billing"
-  | "mcp"
-  | "photos";
-type MainRoute = "compatibility" | "diagnosis" | "me";
-
 interface MainNavigationGuard {
   hasUnsavedAnswers: () => boolean;
   restore: () => void;
   waitForPendingAnswers: () => Promise<boolean>;
 }
-
-const DEVELOPMENT_ENVIRONMENTS = new Set(["development", "local", "preview", "test"]);
-
-const PROFILE_HISTORY_STATE_KEY = "me-builder-profile-view";
-const PROFILE_RETURN_PATHNAME_STATE_KEY = "me-builder-profile-return-pathname";
-
-function resolveProfileView(pathname: string): ProfileView {
-  if (pathname.startsWith("/profile/photos")) return "photos";
-  if (pathname.startsWith("/profile/mcp")) return "mcp";
-  if (pathname.startsWith("/profile/billing")) return "billing";
-  if (pathname.startsWith("/profile/family")) return "family";
-  if (pathname.startsWith("/profile/avatar")) return "avatar";
-  if (pathname.startsWith("/profile/personal-data")) {
-    return DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") ? "personal-data" : "profile";
-  }
-  if (pathname.startsWith("/profile/brain-items")) {
-    return DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") ? "brain-items" : "profile";
-  }
-  if (pathname === "/profile" || pathname.startsWith("/profile/")) return "profile";
-  return "closed";
-}
-
-function historyProfileView(state: unknown): Exclude<ProfileView, "closed"> | null {
-  if (!state || typeof state !== "object") return null;
-  const value = (state as Record<string, unknown>)[PROFILE_HISTORY_STATE_KEY];
-  return value === "profile" ||
-    value === "avatar" ||
-    value === "personal-data" ||
-    value === "brain-items" ||
-    value === "family" ||
-    value === "billing" ||
-    value === "mcp" ||
-    value === "photos"
-    ? value
-    : null;
-}
-
-function historyProfileReturnPathname(state: unknown): string | null {
-  if (!state || typeof state !== "object") return null;
-  const value = (state as Record<string, unknown>)[PROFILE_RETURN_PATHNAME_STATE_KEY];
-  return typeof value === "string" && value.startsWith("/") ? value : null;
-}
-
 function errorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
@@ -142,41 +97,13 @@ function uploadedAvatar(profile: AccountProfile): AvatarSelection | null {
     : null;
 }
 
-function focusMainRouteHeading(container: HTMLElement, route: MainRoute): () => void {
-  let mutationObserver: MutationObserver | null = null;
-  let timeoutId: number | null = null;
-  let stopped = false;
-
-  const stop = () => {
-    if (stopped) return;
-    stopped = true;
-    mutationObserver?.disconnect();
-    if (timeoutId !== null) window.clearTimeout(timeoutId);
-  };
-  const focus = (): boolean => {
-    const heading = container.querySelector<HTMLElement>(`[data-main-route-heading="${route}"]`);
-    if (!heading) return false;
-    heading.focus({ preventScroll: true });
-    return true;
-  };
-
-  if (focus()) return stop;
-  mutationObserver = new MutationObserver(() => {
-    if (focus()) stop();
-  });
-  mutationObserver.observe(container, { childList: true, subtree: true });
-  timeoutId = window.setTimeout(stop, 5_000);
-
-  return stop;
-}
-
 function AppContents() {
   const colorTheme = useColorTheme();
   const fontSize = useFontSize();
   const authSession = useAuthSession();
   const [navigation, setNavigation] = useState(() => {
     const requestedPathname = resolveRequestedPathname();
-    const profileView = resolveProfileView(requestedPathname);
+    const profileView = resolveProfileView(requestedPathname, config.environment);
     const pathname = profileView === "closed" ? requestedPathname : "/me";
     return {
       pathname,
@@ -196,7 +123,7 @@ function AppContents() {
   const isMePath = mainPathname === "/me" || mainPathname?.startsWith("/me/");
   const isProfileOpen = profileView !== "closed";
   const canUseDevelopmentTools =
-    DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") &&
+    isDevelopmentEnvironment(config.environment) &&
     authSession.state.status === "authenticated" &&
     authSession.state.role === "admin";
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
@@ -269,7 +196,7 @@ function AppContents() {
 
   useEffect(() => {
     const handlePopState = () => {
-      const nextView = resolveProfileView(window.location.pathname);
+      const nextView = resolveProfileView(window.location.pathname, config.environment);
       const returnPathname = historyProfileReturnPathname(window.history.state) ?? "/me";
       const requestedPathname = resolveRequestedPathname();
       const applyNavigation = () => {
@@ -709,7 +636,7 @@ function AppContents() {
               onOpenAvatar={openAvatar}
               onOpenPhotoDiary={openPhotoDiary}
               onOpenBillingPortal={openBillingPortal}
-              {...(DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "")
+              {...(isDevelopmentEnvironment(config.environment)
                 ? {
                     onOpenBillingPlans: openBillingPlans,
                     onOpenPersonalData: openPersonalData,
@@ -773,21 +700,18 @@ function AppContents() {
           </Suspense>
         </RouteErrorBoundary>
       )}
-      {profileView === "personal-data" &&
-        DEVELOPMENT_ENVIRONMENTS.has(config.environment ?? "") && (
-          <RouteErrorBoundary>
-            <Suspense
-              fallback={
-                <LoadingState message="入力データを読み込んでいます..." variant="overlay" />
-              }
-            >
-              <PersonalDataApplication
-                onBack={closePersonalData}
-                onChanged={() => setAccountDataResetKey((current) => current + 1)}
-              />
-            </Suspense>
-          </RouteErrorBoundary>
-        )}
+      {profileView === "personal-data" && isDevelopmentEnvironment(config.environment) && (
+        <RouteErrorBoundary>
+          <Suspense
+            fallback={<LoadingState message="入力データを読み込んでいます..." variant="overlay" />}
+          >
+            <PersonalDataApplication
+              onBack={closePersonalData}
+              onChanged={() => setAccountDataResetKey((current) => current + 1)}
+            />
+          </Suspense>
+        </RouteErrorBoundary>
+      )}
       {profileView === "family" && (
         <RouteErrorBoundary>
           <Suspense

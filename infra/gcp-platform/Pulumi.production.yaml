@@ -4,5 +4,3 @@ config:
   me-builder-gcp-platform:identityPlatformCredentialGenerations:
     primary: v1
     secondary: null
-  me-builder-gcp-platform:oauthRedirectUris:
-    - https://api.kagami.kyosuke.dev/api/auth/sso/callback

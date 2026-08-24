@@ -28,6 +28,7 @@
       "**/node_modules/**",
       "**/.bun/**",
       "**/.pulumi-state/**",
+      "**/coverage/**",
       "**/worker-configuration.d.ts",
       ".usagi/**"
     ]
