@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import { commercialTransactionsDisclosure } from "@me-builder/shared";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceSiteCommercialTransactionsScreen } from "./service-site-commercial-transactions-screen";
@@ -12,24 +11,23 @@ vi.mock("../../../config", () => ({
 afterEach(cleanup);
 
 describe("ServiceSiteCommercialTransactionsScreen", () => {
-  it("購入条件と事業者情報の個別開示導線を認証なしで表示する", () => {
+  it("Free限定中は旧直リンクでも有料Planの条件を表示しない", () => {
     render(<ServiceSiteCommercialTransactionsScreen />);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: commercialTransactionsDisclosure.title }),
+      screen.getByRole("heading", { level: 1, name: "現在は無料で利用できます" }),
     ).toBeTruthy();
-    expect(screen.getByText(/適格請求書は発行しません/)).toBeTruthy();
-    expect(screen.getByText(/LINEには表示しません/)).toBeTruthy();
-    expect(
-      screen
-        .getByRole("link", { name: commercialTransactionsDisclosure.contact })
-        .getAttribute("href"),
-    ).toContain("subject=");
+    expect(screen.getByText(/有料Planの一般提供は行っていません/u)).toBeTruthy();
+    expect(screen.queryByText(/Lite|Full|ファミリーパック/u)).toBeNull();
+    expect(screen.queryByText(/月額|年額|トライアル|自動更新|返金/u)).toBeNull();
   });
 
-  it("固有のcanonical URLを設定する", () => {
+  it("固有URLを検索対象外にする", () => {
     render(<ServiceSiteCommercialTransactionsScreen />);
 
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
+      "noindex,nofollow",
+    );
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
       "https://kagami.example.com/commercial-transactions",
     );

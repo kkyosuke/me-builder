@@ -1,13 +1,4 @@
-import {
-  ArrowLeft,
-  Bug,
-  CreditCard,
-  HelpCircle,
-  Mail,
-  MailQuestion,
-  Scale,
-  ShieldAlert,
-} from "lucide-react";
+import { ArrowLeft, Bug, HelpCircle, Mail, MailQuestion, Scale, ShieldAlert } from "lucide-react";
 import { DocumentMetadata } from "../../../components/document-metadata";
 import { config } from "../../../config";
 import { serviceSitePageMetadata } from "../model/service-site-page-metadata";
@@ -22,12 +13,6 @@ const contactCategories = [
     icon: Bug,
     title: "不具合",
     description: "画面が開かない、操作を完了できないなどの技術的な問題について",
-  },
-  {
-    icon: CreditCard,
-    title: "契約・請求",
-    description:
-      "契約管理（Customer Portal）を利用できない場合の有料契約の期間末解約や、請求について",
   },
   {
     icon: Mail,
@@ -122,8 +107,7 @@ export function ServiceSiteContactScreen() {
               復旧コードがない場合
             </h2>
             <p className="mt-2 text-sm leading-7">
-              問い合わせを復旧コードの代わりにして、同じAccountへ再接続したり、保存済みデータへ再アクセスしたりすることはできません。契約管理（Customer
-              Portal）を利用できない場合は、現在の契約期間の終了時に解約する手続きをAccount復旧と分けて受け付けます。
+              問い合わせを復旧コードの代わりにして、同じAccountへ再接続したり、保存済みデータへ再アクセスしたりすることはできません。
             </p>
           </section>
 

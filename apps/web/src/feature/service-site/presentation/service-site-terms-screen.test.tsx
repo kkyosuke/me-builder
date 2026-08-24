@@ -30,6 +30,9 @@ describe("ServiceSiteTermsScreen", () => {
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
       "https://kagami.example.com/terms",
     );
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
+      "noindex,nofollow",
+    );
   });
 
   it("利用開始はLINE公式アカウントの友だち追加へ案内する", () => {

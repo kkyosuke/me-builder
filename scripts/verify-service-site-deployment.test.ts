@@ -76,7 +76,7 @@ describe("verifyServiceSiteDeployment", () => {
     ).resolves.toEqual({
       checks: [
         "public-document-metadata",
-        "public-route-indexable-header",
+        "public-route-robots-boundary",
         "private-route-noindex-header",
       ],
     });
@@ -109,10 +109,10 @@ describe("verifyServiceSiteDeployment", () => {
     await expect(
       verifyServiceSiteDeployment({
         baseDomain: "https://kagami.example.com",
-        fetcher: deployedFetch({ publicNoindexAt: "/privacy" }),
+        fetcher: deployedFetch({ publicNoindexAt: "/" }),
         attempts: 1,
       }),
-    ).rejects.toThrow("Public route has a conflicting X-Robots-Tag boundary (/privacy)");
+    ).rejects.toThrow("Public route has a conflicting X-Robots-Tag boundary (/)");
   });
 
   it("custom domainへのdeployment反映が遅れた場合は検証をretryする", async () => {
@@ -134,7 +134,7 @@ describe("verifyServiceSiteDeployment", () => {
     ).resolves.toEqual({
       checks: [
         "public-document-metadata",
-        "public-route-indexable-header",
+        "public-route-robots-boundary",
         "private-route-noindex-header",
       ],
     });

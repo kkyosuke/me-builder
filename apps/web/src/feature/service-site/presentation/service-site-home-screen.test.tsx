@@ -40,18 +40,15 @@ describe("ServiceSiteHomeScreen", () => {
     expect(screen.getByRole("heading", { name: "現在は無料で利用できます。" })).toBeTruthy();
     expect(screen.getAllByText(/どなたでも無料で利用できます/u).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Lite|Full|ファミリーパック/u)).toBeNull();
-    expect(screen.queryByText(/￥|トライアル/u)).toBeNull();
+    expect(screen.queryByText(/有料契約|Customer Portal|期間末解約|￥|トライアル/u)).toBeNull();
   });
 
   it("LINE Account復旧の実装済み範囲と事前コードがない場合の境界を説明する", () => {
     render(<ServiceSiteHomeScreen />);
 
-    expect(screen.getByText(/事前に発行・保存した一回限りの復旧コード/u)).toBeTruthy();
+    expect(screen.getByText(/本人向け画面に表示された一回限りの復旧コード/u)).toBeTruthy();
     expect(
       screen.getByText(/問い合わせを復旧コードの代わりにして、同じAccountへ再接続/u),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/契約管理（Customer Portal）を利用できない有料契約の期間末解約/u),
     ).toBeTruthy();
     expect(screen.queryByText(/現在の仕組みでは、Accountを復旧できないことがあります/u)).toBeNull();
   });

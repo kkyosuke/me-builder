@@ -20,22 +20,21 @@ describe("ServiceSiteContactScreen", () => {
       screen.getByRole("link", { name: "support@kagami.kyosuke.dev" }).getAttribute("href"),
     ).toBe("mailto:support@kagami.kyosuke.dev");
     expect(screen.getByText(/サービス運用者だけが確認/u)).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "契約・請求" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "データとプライバシー" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "復旧コードがない場合" })).toBeTruthy();
     expect(
       screen.getByText(/問い合わせを復旧コードの代わりにして、同じAccountへ再接続/u),
     ).toBeTruthy();
-    expect(screen.getByText(/現在の契約期間の終了時に解約する手続き/u)).toBeTruthy();
+    expect(screen.queryByText(/有料契約|Customer Portal|期間末解約/u)).toBeNull();
     expect(screen.getByText(/復旧コード、認証token/u)).toBeTruthy();
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
-  it("有効な窓口を検索対象にする", () => {
+  it("実送信レビュー前の窓口を検索対象外にする", () => {
     render(<ServiceSiteContactScreen />);
 
     expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
-      "index,follow",
+      "noindex,nofollow",
     );
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
       "https://kagami.example.com/contact",

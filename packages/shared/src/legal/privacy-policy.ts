@@ -14,13 +14,20 @@ export type PrivacyPolicyDocument = Readonly<{
   sections: readonly PrivacyPolicySection[];
 }>;
 
+/** 公開する屋号と個人事業者の正式名称の正本。 */
+export const serviceOperator = {
+  tradeName: "つきうさぎ",
+  legalName: "河村 京介",
+  displayName: "つきうさぎ（運営者：河村 京介）",
+} as const;
+
 /** 公開ページに表示する最新のプライバシーポリシー正本。 */
 export const currentPrivacyPolicy: PrivacyPolicyDocument = {
-  version: "2026-08-21",
-  publishedAt: "2026-08-21T00:00:00+09:00",
-  effectiveAt: "2026-08-21T00:00:00+09:00",
+  version: "2026-08-24",
+  publishedAt: "2026-08-24T00:00:00+09:00",
+  effectiveAt: "2026-08-24T00:00:00+09:00",
   title: "かがみ プライバシーポリシー",
-  operator: "サービス運用者",
+  operator: serviceOperator.displayName,
   contact: "support@kagami.kyosuke.dev",
   sections: [
     {
@@ -84,7 +91,7 @@ export const currentPrivacyPolicy: PrivacyPolicyDocument = {
     {
       heading: "8. 年齢",
       paragraphs: [
-        "無料で提供する現在のサービスは年齢を問わず利用でき、年齢による機能差を設けません。生年月日は取得しません。将来有料機能を提供する場合、18歳以上または保護者の同意を得たことを申告するcheckboxを購入前に設けます。確認書類の提出は求めません。",
+        "無料で提供する現在のサービスは年齢を問わず利用でき、年齢による機能差を設けません。生年月日や年齢確認書類は取得しません。",
       ],
     },
     {
@@ -96,7 +103,7 @@ export const currentPrivacyPolicy: PrivacyPolicyDocument = {
     {
       heading: "10. 運営者とお問い合わせ",
       paragraphs: [
-        "運営者はサービス運用者です。本ポリシーに関するお問い合わせは support@kagami.kyosuke.dev へお送りください。対応はベストエフォートで、営業時間や回答期限は設けません。",
+        `運営者は、屋号「${serviceOperator.tradeName}」の${serviceOperator.legalName}です。本ポリシーに関するお問い合わせは support@kagami.kyosuke.dev へお送りください。対応はベストエフォートで、営業時間や回答期限は設けません。`,
       ],
     },
   ],
