@@ -21,13 +21,15 @@
 
 ## 2. 現在の残タスク
 
-### 2.1 セルフケアとAI相談への導線を接続する
+### 2.1 セルフケア表示とLINE相談導線の後発仕様への追随を確認する
 
-- 本人が確認したセルフケア情報を短く表示する
-- 「詳しく見る」と「AIに聞く」から、それぞれ対応する画面へ移動できるようにする
-- 診断結果だけからストレスの原因や対処法を補わない
+[#367](https://github.com/kkyosuke/me-builder/issues/367)と[#411](https://github.com/kkyosuke/me-builder/pull/411)では、当時の仕様に基づくセルフケア表示と相談文のLINE送信、clipboard fallbackまでを完了済みとしています。その後、[#426](https://github.com/kkyosuke/me-builder/pull/426)でWebとLINEの提供境界が更新されたため、追随する実装とテストを[#462](https://github.com/kkyosuke/me-builder/issues/462)で扱います。
 
-完了条件は、[ストレスの手がかりとAIセルフケア相談体験設計](../product/self-care-ai-consultation-experience.md)で定義された情報と安全上の切り替えを再利用し、「わたしのまとめ」側へ別の判定規則を作らないことです。
+- [#462](https://github.com/kkyosuke/me-builder/issues/462)の完了後に、「わたしのセルフケア」の表示内容と未登録時の操作が[わたしのまとめ仕様 §2.7](../product/profile-summary-experience.md#27-わたしのセルフケアとai相談)と[ストレスの手がかりとAIセルフケア相談体験設計 §5](../product/self-care-ai-consultation-experience.md#5-わたしのまとめ画面への追加)に一致することを確認する
+- 「詳しく見る」から「わたしのセルフケア」へ移動し、「わたしのまとめ」へ戻れることを、[全体画面遷移設計 §4.4](../product/screen-navigation.md#44-わたし配下)に照らして確認する
+- 「AIに聞く」が相談文や利用者データを引き継がずにLINE公式トークを開くことを確認する
+
+完了条件は、各SSoTで定義された表示と遷移をWebとテストで確認でき、「わたしのまとめ」側へ別の表示分類、判定規則、相談開始規則を作っていないことです。
 
 ### 2.2 Previewで実際のAI生成を通しで確認する
 
