@@ -20,4 +20,43 @@ describe("createLineCredentialVerifier", () => {
       identity: { authenticatedAt: issuedAt },
     });
   });
+
+  it("channel ID未設定とLINE検証拒否を固定理由へ変換する", async () => {
+    const verify = vi.spyOn(line.idToken, "verify").mockResolvedValue({
+      ok: false,
+      reason: "signature_invalid",
+    });
+
+    await expect(
+      createLineCredentialVerifier(undefined).verify({ idToken: "token" }),
+    ).resolves.toEqual({ type: "rejected", reason: "authentication_not_configured" });
+    expect(verify).not.toHaveBeenCalled();
+
+    await expect(
+      createLineCredentialVerifier("channel-id").verify({ idToken: "token" }),
+    ).resolves.toEqual({ type: "rejected", reason: "credential_invalid" });
+  });
+
+  it("任意の表示情報だけを検証済みIdentityへ含める", async () => {
+    vi.spyOn(line.idToken, "verify").mockResolvedValue({
+      ok: true,
+      claims: {
+        sub: "secret-subject",
+        issuedAt: new Date("2026-08-16T00:00:00.000Z"),
+        name: "表示名",
+        picture: "https://example.com/avatar.png",
+      },
+    });
+
+    await expect(
+      createLineCredentialVerifier("channel-id").verify({ idToken: "token" }),
+    ).resolves.toMatchObject({
+      identity: {
+        displayProfile: {
+          displayName: "表示名",
+          pictureUrl: "https://example.com/avatar.png",
+        },
+      },
+    });
+  });
 });

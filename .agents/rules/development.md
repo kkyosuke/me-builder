@@ -60,7 +60,7 @@
     - `ci.yml` はルートの `bun run test:unit` を実行します。1 プロセスの `vitest run` で `apps/web` を含む全パッケージのテストを流します。パッケージごとに `vitest` を起動し直すより速く済みます。
     - **E2E は `ci.yml` では実行しません。** 実行時間が長いためjobは`ci-e2e.yml`へ分離しますが、回帰をマージ前に検出するためすべてのPR更新で実行します。`main`へのマージ後は`cd-production.yml`の`bun run ci`でもE2Eを再検証してからデプロイします。
     - `ci.yml`のUnit Testは認証logic・adapter・controllerをV8 coverage対象とし、`vitest.config.mts`のthresholdを下回った場合に失敗します。対象範囲を広げる場合はthresholdを維持し、対象外へ移して数値を回避してはいけません。
-    - テストの区分は npm script で表します。`test` が全体、`test:unit` が E2E を除いた分、`test:e2e` が E2E と Worker runtime E2E です。`test:unit` と `test:e2e` は重複も漏れもなく `test` を二分します。**E2E は `e2e/` ディレクトリ配下に置くか `*.e2e.test.*` という名前にしてください**（`test:e2e` はパスに `e2e` を含むかで選別します）。
+    - テストの区分は npm script で表します。`test` が全体、`test:unit` が E2E を除いた分、`test:e2e` が E2E と Worker runtime E2E です。`test:unit` と `test:e2e` は重複も漏れもなく `test` を二分します。**E2E は `e2e/` ディレクトリ配下に置くか `*.e2e.test.*` という名前にしてください**（`test:e2e` はパスに `e2e` を含むかで選別します）。Miniflare／D1／Durable Objectを高負荷で使う3つのE2E fileは並列実行で互いのtimeoutを誘発するため、`test:e2e`はそれらを1 workerで先に実行し、残りを2 workerで実行します。高負荷fileを追加する場合は前半へ明示し、後半のexcludeにも同じpathを加えて重複を防ぎます。
     - `ci.yml` は `dorny/paths-filter` で変更領域を判定し、コードが変わっていない PR ではコードの検証を、ドキュメントが変わっていない PR では Markdown lint を飛ばします。トリガー側に `paths:` を書かないため、ワークフロー自体は常に結果を報告します。**どちらのフィルタにも一致しない変更は全検証へ倒します**（列挙から漏れたファイルだけの PR が「1 つも検証せず success」になるのを防ぐため）。
     - 同じ PR へ続けて push したときは `concurrency` で古い実行を打ち切ります (`cancel-in-progress: true`)。共有環境を触る CD ワークフローだけは打ち切りません。
     - 外部サービスの応答を待つ検証は `scheduled-checks.yml` (毎週月曜 + 手動実行) に隔離します。対象は Markdown の**外部 URL** のリンク切れ確認と、本番 LINE Webhook への疎通確認 (`register-webhook.ts --force`) です。失敗の原因が外部側の変化であってPRの変更ではないものは、ここへ寄せます。

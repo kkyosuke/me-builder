@@ -13,38 +13,32 @@ import { createCustomerPortalSession } from "./feature/billing/infrastructure/bi
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
 import { McpAuthorizationScreen } from "./feature/mcp";
 import {
-  type ResetDevelopmentAccountDataResult,
-  resetDevelopmentAccountData,
-} from "./feature/profile-settings/infrastructure/development-account-data-api";
-import { fetchProfileEntitlement } from "./feature/profile-settings/infrastructure/entitlement-api";
-import {
   type AccountProfile,
-  deleteAccountAvatar,
-  fetchAccountProfile,
-  saveAccountAvatar,
-} from "./feature/profile-settings/infrastructure/profile-api";
-import {
-  type SsoIdentityStatus,
-  fetchSsoIdentityStatus,
-  startSsoIdentityLink,
-  unlinkSsoIdentity,
-} from "./feature/profile-settings/infrastructure/sso-identity-api";
-import type { AvatarSelection } from "./feature/profile-settings/model/avatar";
-import type { ProfileEntitlement } from "./feature/profile-settings/model/entitlement";
-import { ProfileMenuButton } from "./feature/profile-settings/presentation/components/profile-menu-button";
-import { useColorTheme, useFontSize } from "./feature/theme";
-import { focusMainRouteHeading } from "./infrastructure/focus-main-route-heading";
-import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
-import type { AsyncState } from "./model/async-state";
-import {
+  type AvatarSelection,
   type MainRoute,
   PROFILE_HISTORY_STATE_KEY,
   PROFILE_RETURN_PATHNAME_STATE_KEY,
+  type ProfileEntitlement,
+  ProfileMenuButton,
+  type ResetDevelopmentAccountDataResult,
+  type SsoIdentityStatus,
+  deleteAccountAvatar,
+  fetchAccountProfile,
+  fetchProfileEntitlement,
+  fetchSsoIdentityStatus,
+  focusMainRouteHeading,
   historyProfileReturnPathname,
   historyProfileView,
   isDevelopmentEnvironment,
+  resetDevelopmentAccountData,
   resolveProfileView,
-} from "./model/profile-navigation";
+  saveAccountAvatar,
+  startSsoIdentityLink,
+  unlinkSsoIdentity,
+} from "./feature/profile-settings";
+import { useColorTheme, useFontSize } from "./feature/theme";
+import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
+import type { AsyncState } from "./model/async-state";
 import { restoreWindowScroll } from "./model/scroll-restoration";
 import {
   getIdleMainApplicationRoutes,

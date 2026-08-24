@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ExternalSsoProvider, SsoVerifiedIdentity } from "./sso-provider";
 import {
-  type CompleteSsoAuthenticationInput,
   type SsoApplicationSessionIssuer,
   SsoAuthenticationError,
   type SsoAuthenticationTransaction,
@@ -17,7 +16,12 @@ import {
   startSsoIdentityLinking,
 } from "./sso-transaction";
 
-function completeSsoAuthentication(input: CompleteSsoAuthenticationInput) {
+type SsoTransactionCompletionInput = Pick<
+  Parameters<typeof completeSsoCallback>[0],
+  "state" | "code" | "store" | "client" | "now"
+>;
+
+function completeVerifiedLoginFixture(input: SsoTransactionCompletionInput) {
   let identity: SsoVerifiedIdentity | undefined;
   return completeSsoCallback({
     ...input,
@@ -62,8 +66,8 @@ function completeSsoAuthentication(input: CompleteSsoAuthenticationInput) {
   });
 }
 
-async function completeSsoLogin<SessionResult>(
-  input: CompleteSsoAuthenticationInput & {
+async function completeLoginFixture<SessionResult>(
+  input: SsoTransactionCompletionInput & {
     identityResolver: SsoExistingIdentityResolver;
     rolloutAuthorizer: SsoRolloutAuthorizer;
     sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
@@ -87,8 +91,8 @@ async function completeSsoLogin<SessionResult>(
   };
 }
 
-async function completeSsoIdentityLinking(
-  input: CompleteSsoAuthenticationInput & { identityLinker: SsoIdentityLinker },
+async function completeLinkFixture(
+  input: SsoTransactionCompletionInput & { identityLinker: SsoIdentityLinker },
 ) {
   const completed = await completeSsoCallback({
     ...input,
@@ -225,7 +229,7 @@ describe("SSO authentication transaction", () => {
     });
 
     await expect(
-      completeSsoAuthentication({
+      completeVerifiedLoginFixture({
         state: "state",
         code: "authorization-code",
         store,
@@ -247,7 +251,7 @@ describe("SSO authentication transaction", () => {
       identityProvisioning: "existing-only",
     });
     await expect(
-      completeSsoAuthentication({ state: "state", code: "code", store, client }),
+      completeVerifiedLoginFixture({ state: "state", code: "code", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
   });
 
@@ -266,7 +270,13 @@ describe("SSO authentication transaction", () => {
     });
 
     await expect(
-      completeSsoAuthentication({ state: "state", code: "code", store, client, now: () => 1_000 }),
+      completeVerifiedLoginFixture({
+        state: "state",
+        code: "code",
+        store,
+        client,
+        now: () => 1_000,
+      }),
     ).rejects.toEqual(
       new SsoCallbackCompletionError(
         { traceId: "trace-token-exchange", returnTo: "/diagnosis/result?from=share" },
@@ -287,10 +297,10 @@ describe("SSO authentication transaction", () => {
     });
 
     await expect(
-      completeSsoAuthentication({ state: "tampered", code: "code", store, client }),
+      completeVerifiedLoginFixture({ state: "tampered", code: "code", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
     await expect(
-      completeSsoAuthentication({
+      completeVerifiedLoginFixture({
         state: "expired",
         code: "code",
         store,
@@ -309,10 +319,10 @@ describe("SSO authentication transaction", () => {
     const client = createClient();
 
     await expect(
-      completeSsoAuthentication({ state: "", code: "code", store, client }),
+      completeVerifiedLoginFixture({ state: "", code: "code", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("invalid_callback"));
     await expect(
-      completeSsoAuthentication({ state: "state", code: "", store, client }),
+      completeVerifiedLoginFixture({ state: "state", code: "", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("invalid_callback"));
   });
 
@@ -339,7 +349,7 @@ describe("SSO authentication transaction", () => {
     };
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: "state",
         code: "code",
         store,
@@ -382,7 +392,7 @@ describe("SSO authentication transaction", () => {
     const sessionIssuer = { issue: vi.fn() };
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: "state",
         code: "code",
         store,
@@ -494,7 +504,7 @@ describe("SSO authentication transaction", () => {
     const sessionIssuer = { issue: vi.fn() };
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: "state",
         code: "code",
         store,
@@ -553,7 +563,7 @@ describe("SSO authentication transaction", () => {
     const identityLinker = { link: vi.fn(async () => "identity-platform-identity") };
 
     await expect(
-      completeSsoIdentityLinking({
+      completeLinkFixture({
         state: "link-state",
         code: "code",
         store,
@@ -581,7 +591,7 @@ describe("SSO authentication transaction", () => {
       identityProvisioning: "allow",
     });
     await expect(
-      completeSsoIdentityLinking({
+      completeLinkFixture({
         state: "link-state",
         code: "code",
         store,

@@ -36,10 +36,26 @@ export default defineConfig({
       ],
       exclude: ["**/*.test.ts", "**/*.e2e.test.ts", "**/testing/**"],
       thresholds: {
-        statements: 80,
-        branches: 70,
-        functions: 90,
-        lines: 80,
+        // 集計値で未検証fileを隠さない。各layerの全fileへ個別にfloorを適用する。
+        perFile: true,
+        "apps/api/src/controller/*.ts": {
+          statements: 80,
+          branches: 70,
+          functions: 80,
+          lines: 80,
+        },
+        "apps/api/src/logic/authentication/*.ts": {
+          statements: 75,
+          branches: 70,
+          functions: 90,
+          lines: 80,
+        },
+        "apps/api/src/infrastructure/authentication/*.ts": {
+          statements: 70,
+          branches: 60,
+          functions: 80,
+          lines: 80,
+        },
       },
     },
   },

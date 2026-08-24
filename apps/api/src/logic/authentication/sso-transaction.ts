@@ -77,7 +77,7 @@ type StartSsoAuthenticationInput = {
   randomBytes?: (size: number) => Uint8Array;
 };
 
-export type CompleteSsoAuthenticationInput = {
+type SsoTransactionCompletionInput = {
   state: string;
   code: string;
   store: SsoAuthenticationTransactionStore;
@@ -200,7 +200,7 @@ export async function startSsoIdentityLinking(
 }
 
 async function consumeAndVerifySsoTransaction(
-  input: CompleteSsoAuthenticationInput,
+  input: SsoTransactionCompletionInput,
   expectedPurpose?: SsoAuthenticationTransaction["purpose"],
 ): Promise<{ identity: SsoVerifiedIdentity; transaction: SsoAuthenticationTransaction }> {
   if (!input.state || !input.code) throw new SsoAuthenticationError("invalid_callback");
@@ -231,7 +231,7 @@ async function consumeAndVerifySsoTransaction(
 
 /** login/link callbackを一度だけ消費し、用途に応じた副作用へ分岐する。 */
 export async function completeSsoCallback<SessionResult>(
-  input: CompleteSsoAuthenticationInput & {
+  input: SsoTransactionCompletionInput & {
     identityResolver: SsoExistingIdentityResolver;
     identityLinker: SsoIdentityLinker;
     rolloutAuthorizer: SsoRolloutAuthorizer;
