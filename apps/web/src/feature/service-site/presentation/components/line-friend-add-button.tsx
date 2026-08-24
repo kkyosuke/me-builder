@@ -1,10 +1,11 @@
-const LINE_FRIEND_URL = "https://lin.ee/YezPSYA";
+import { LINE_OFFICIAL_ACCOUNT_URL } from "../../../../model/line-official-account";
+
 const LINE_FRIEND_BUTTON_IMAGE_URL = "https://scdn.line-apps.com/n/line_add_friends/btn/ja.png";
 
 export function LineFriendAddButton({ className = "" }: { className?: string }) {
   return (
     <a
-      href={LINE_FRIEND_URL}
+      href={LINE_OFFICIAL_ACCOUNT_URL}
       className={`inline-flex min-h-11 items-center justify-center rounded-lg px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06c755] ${className}`}
     >
       <img

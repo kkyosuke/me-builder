@@ -48,36 +48,6 @@ export function openLiffWindow(url: string): boolean {
   }
 }
 
-/** 現在のLINEトークへ、本人が選んだ相談開始メッセージを送る。 */
-export async function sendLiffTextMessage(text: string): Promise<boolean> {
-  try {
-    if (!liff.isInClient() || !liff.isApiAvailable("sendMessages")) return false;
-    await liff.sendMessages([{ type: "text", text }]);
-    return true;
-  } catch {
-    logger.warn(
-      { event: "liff.message.send.failed", outcome: "failed", reason: "sdk-error" },
-      "LIFF から相談開始メッセージを送れませんでした",
-    );
-    return false;
-  }
-}
-
-/** 相談開始メッセージを送信した後、LINEのトークへ戻る。 */
-export function closeLiffWindow(): boolean {
-  try {
-    if (!liff.isInClient()) return false;
-    liff.closeWindow();
-    return true;
-  } catch {
-    logger.warn(
-      { event: "liff.window.close.failed", outcome: "failed", reason: "sdk-error" },
-      "LIFF を閉じてLINEのトークへ戻れませんでした",
-    );
-    return false;
-  }
-}
-
 /**
  * LIFFの共有先選択を開始する。利用できない場合は同期的にnullを返し、呼び出し側が
  * ユーザー操作の権限を失う前にWeb Share APIへ切り替えられるようにする。

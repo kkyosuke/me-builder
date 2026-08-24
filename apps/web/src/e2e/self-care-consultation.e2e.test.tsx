@@ -4,16 +4,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ProfileApplication from "../feature/profile/presentation/profile-application";
+import { LINE_OFFICIAL_ACCOUNT_URL } from "../model/line-official-account";
 
-const liff = vi.hoisted(() => ({
-  sendText: vi.fn(),
-  closeWindow: vi.fn(),
-}));
-
-vi.mock("../feature/liff", () => ({
-  sendLiffTextMessage: liff.sendText,
-  closeLiffWindow: liff.closeWindow,
-}));
 vi.mock("../feature/compatibility", () => ({ CompatibilityShareContentSection: () => null }));
 vi.mock("../feature/profile/presentation/profile-summary-screen", () => ({
   ProfileSummaryScreen: ({ children }: { children: ReactNode }) => <main>{children}</main>,
@@ -38,6 +30,7 @@ vi.mock("../feature/profile/presentation/use-profile-summary", () => ({
     reload: vi.fn(),
     generate: vi.fn(),
     setSelfView: vi.fn(),
+    deleteVersion: vi.fn(),
   }),
 }));
 vi.mock("../feature/profile/presentation/use-profile-progression", () => ({
@@ -84,36 +77,37 @@ vi.mock("../feature/profile/presentation/use-self-care-contexts", () => ({
 
 describe("self-care consultation user journey", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    liff.closeWindow.mockReturnValue(true);
+    window.history.replaceState({}, "", "/me");
   });
 
-  afterEach(() => {
-    cleanup();
-    vi.unstubAllGlobals();
+  afterEach(() => cleanup());
+
+  it("詳しく見るから詳細へ進み、わたしのまとめへ戻る", () => {
+    const view = render(<ProfileApplication />);
+
+    fireEvent.click(screen.getByRole("link", { name: "詳しく見る" }));
+    view.rerender(<ProfileApplication />);
+    expect(screen.getByRole("heading", { level: 1, name: "わたしのセルフケア" })).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "わたしのまとめへ戻る" }));
+    view.rerender(<ProfileApplication />);
+    expect(window.location.pathname).toBe("/me");
+    expect(screen.getByRole("link", { name: "詳しく見る" })).toBeDefined();
   });
 
-  it("相談目的を現在のLINEトークへ送信してLIFFを閉じる", async () => {
-    liff.sendText.mockResolvedValue(true);
-    render(<ProfileApplication />);
+  it("まとめと個別情報のAIに聞くは本文を持たない同じLINE公式トークを開く", () => {
+    const view = render(<ProfileApplication />);
+    expect(screen.getByRole("link", { name: "AIに聞く" })).toHaveProperty(
+      "href",
+      LINE_OFFICIAL_ACCOUNT_URL,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "自分に合いそうな休み方を一緒に考えたい" }));
-
-    expect(await screen.findByText("LINEのトークへ相談文を送信しました。")).toBeDefined();
-    expect(liff.sendText).toHaveBeenCalledWith("自分に合いそうな休み方を一緒に考えたい");
-    expect(liff.closeWindow).toHaveBeenCalledOnce();
-  });
-
-  it("LINE外では送信せず相談文をclipboardへ渡す", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    liff.sendText.mockResolvedValue(false);
-    vi.stubGlobal("navigator", { clipboard: { writeText } });
-    render(<ProfileApplication />);
-
-    fireEvent.click(screen.getByRole("button", { name: "今しんどい。何からすればいい？" }));
-
-    expect(await screen.findByText(/相談文をコピーしました/u)).toBeDefined();
-    expect(writeText).toHaveBeenCalledWith("今しんどい。何からすればいい？");
-    expect(liff.closeWindow).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("link", { name: "詳しく見る" }));
+    view.rerender(<ProfileApplication />);
+    for (const link of screen.getAllByRole("link", { name: "AIに聞く" })) {
+      expect(link).toHaveProperty("href", LINE_OFFICIAL_ACCOUNT_URL);
+      expect((link as HTMLAnchorElement).search).toBe("");
+      expect((link as HTMLAnchorElement).hash).toBe("");
+    }
   });
 });

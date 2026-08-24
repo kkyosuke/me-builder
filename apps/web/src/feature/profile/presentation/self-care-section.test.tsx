@@ -1,135 +1,125 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { LINE_OFFICIAL_ACCOUNT_URL } from "../../../model/line-official-account";
 import type { SelfCareContextResult } from "../model/self-care-context";
+import { SelfCareDetailsScreen } from "./self-care-details-screen";
 import { SelfCareSection } from "./self-care-section";
 
 const result: SelfCareContextResult = {
   items: [
     {
-      id: "self-care-1",
-      brainItemId: "brain-1",
+      id: "worked-latest",
+      brainItemId: "brain-worked-latest",
       statement: "予定を一つ減らすと少し楽になった",
       kind: "worked",
       status: "active",
       confirmedAt: "2026-08-18T00:00:00.000Z",
       updatedAt: "2026-08-18T00:00:00.000Z",
     },
+    {
+      id: "recent-state",
+      brainItemId: "brain-recent-state",
+      statement: "今週は肩に力が入っている",
+      kind: "recent-state",
+      status: "active",
+      confirmedAt: "2026-08-17T00:00:00.000Z",
+      updatedAt: "2026-08-17T00:00:00.000Z",
+    },
+    {
+      id: "did-not-work",
+      brainItemId: "brain-did-not-work",
+      statement: "長い散歩は余計に疲れた",
+      kind: "did-not-work",
+      status: "active",
+      confirmedAt: "2026-08-16T00:00:00.000Z",
+      updatedAt: "2026-08-16T00:00:00.000Z",
+    },
   ],
   canManage: true,
 };
 
 describe("SelfCareSection", () => {
-  it("確認済み情報を表示し、本人が撤回できる", () => {
-    const onRevoke = vi.fn();
+  it("SSoTの3項目を表示し、対応しない確認情報を独自分類しない", () => {
+    render(<SelfCareSection state={{ status: "success", data: result }} onRetry={vi.fn()} />);
+
+    expect(screen.getByText("負荷の手がかり")).toBeDefined();
+    expect(screen.getByText("早めのサイン")).toBeDefined();
+    expect(screen.getByText("合いやすかったこと")).toBeDefined();
+    expect(screen.getByText("予定を一つ減らすと少し楽になった")).toBeDefined();
+    expect(screen.queryByText("今週は肩に力が入っている")).toBeNull();
+    expect(screen.queryByText("長い散歩は余計に疲れた")).toBeNull();
+  });
+
+  it("未登録項目を推定で埋めず、LINEで見つける・追加する操作を表示する", () => {
     render(
       <SelfCareSection
+        state={{ status: "success", data: { items: [], canManage: true } }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("link", { name: "AIと一緒に見つける" })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "自分で追加する" })).toHaveProperty(
+      "href",
+      LINE_OFFICIAL_ACCOUNT_URL,
+    );
+  });
+
+  it("詳細画面とLINE公式トークへの導線だけを置く", () => {
+    render(<SelfCareSection state={{ status: "success", data: result }} onRetry={vi.fn()} />);
+
+    expect(screen.getByRole("link", { name: "詳しく見る" })).toHaveProperty(
+      "pathname",
+      "/me/self-care",
+    );
+    expect(screen.getByRole("link", { name: "AIに聞く" })).toHaveProperty(
+      "href",
+      LINE_OFFICIAL_ACCOUNT_URL,
+    );
+  });
+});
+
+describe("SelfCareDetailsScreen", () => {
+  it("確認済み情報をその分類のまま表示し、本人が撤回できる", () => {
+    const onRevoke = vi.fn();
+    render(
+      <SelfCareDetailsScreen
         state={{ status: "success", data: result }}
         pendingId={null}
         operationError={null}
+        onBack={vi.fn()}
         onRetry={vi.fn()}
         onRevoke={onRevoke}
-        onConsult={vi.fn()}
       />,
     );
-    expect(screen.getByText("予定を一つ減らすと少し楽になった")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "確認を取り消す" }));
-    expect(onRevoke).toHaveBeenCalledWith("self-care-1");
-  });
 
-  it("更新中は別の確認済み情報を含むすべての撤回操作を止める", () => {
-    const firstItem = result.items[0];
-    if (!firstItem) throw new Error("fixture is missing");
-    render(
-      <SelfCareSection
-        state={{
-          status: "success",
-          data: {
-            ...result,
-            items: [...result.items, { ...firstItem, id: "self-care-2", kind: "did-not-work" }],
-          },
-        }}
-        pendingId="self-care-1"
-        operationError={null}
-        onRetry={vi.fn()}
-        onRevoke={vi.fn()}
-        onConsult={vi.fn()}
-      />,
-    );
-    for (const button of screen.getAllByRole("button", { name: "確認を取り消す" })) {
-      expect(button).toHaveProperty("disabled", true);
+    expect(screen.getByText("今週は肩に力が入っている")).toBeDefined();
+    expect(screen.getByText("長い散歩は余計に疲れた")).toBeDefined();
+    const revokeButton = screen.getAllByRole("button", { name: "確認を取り消す" })[0];
+    if (!revokeButton) throw new Error("revoke button is missing");
+    fireEvent.click(revokeButton);
+    expect(onRevoke).toHaveBeenCalledWith("worked-latest");
+    for (const link of screen.getAllByRole("link", { name: "AIに聞く" })) {
+      expect(link).toHaveProperty("href", LINE_OFFICIAL_ACCOUNT_URL);
     }
   });
 
-  it("Freeでは一般案を使うことを案内し、管理操作を出さない", () => {
+  it("未登録時はAIの推定を表示せず2つの開始操作を置く", () => {
     render(
-      <SelfCareSection
-        state={{ status: "success", data: { ...result, canManage: false } }}
+      <SelfCareDetailsScreen
+        state={{ status: "success", data: { items: [], canManage: true } }}
         pendingId={null}
         operationError={null}
+        onBack={vi.fn()}
         onRetry={vi.fn()}
         onRevoke={vi.fn()}
-        onConsult={vi.fn()}
-      />,
-    );
-    expect(screen.getByText(/Freeの相談では一般的な案/u)).toBeDefined();
-    expect(screen.queryByRole("button", { name: "確認を取り消す" })).toBeNull();
-  });
-
-  it("操作エラーを支援技術へ通知する", () => {
-    render(
-      <SelfCareSection
-        state={{ status: "success", data: result }}
-        pendingId={null}
-        operationError="撤回できませんでした。"
-        onRetry={vi.fn()}
-        onRevoke={vi.fn()}
-        onConsult={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole("alert").textContent).toContain("撤回できませんでした");
-  });
-
-  it("選んだ相談目的をLINEへ送り、安全切替を事前に案内する", async () => {
-    const onConsult = vi.fn().mockResolvedValue("sent");
-    render(
-      <SelfCareSection
-        state={{ status: "success", data: result }}
-        pendingId={null}
-        operationError={null}
-        onRetry={vi.fn()}
-        onRevoke={vi.fn()}
-        onConsult={onConsult}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "今しんどい。何からすればいい？" }));
-    expect(onConsult).toHaveBeenCalledWith("今しんどい。何からすればいい？");
-    expect(screen.getByText(/緊急性が高い内容では/u)).toBeDefined();
-    expect(await screen.findByText("LINEのトークへ相談文を送信しました。")).toBeDefined();
-  });
-
-  it("相談開始処理が失敗しても操作中のままにせず再試行できる", async () => {
-    const onConsult = vi.fn().mockRejectedValueOnce(new Error("failed")).mockResolvedValue("sent");
-    render(
-      <SelfCareSection
-        state={{ status: "success", data: result }}
-        pendingId={null}
-        operationError={null}
-        onRetry={vi.fn()}
-        onRevoke={vi.fn()}
-        onConsult={onConsult}
-      />,
-    );
-
-    const button = screen.getByRole("button", { name: "今しんどい。何からすればいい？" });
-    fireEvent.click(button);
-    expect((await screen.findByRole("alert")).textContent).toContain("LINE内から");
-    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
-
-    fireEvent.click(button);
-    expect(await screen.findByText("LINEのトークへ相談文を送信しました。")).toBeDefined();
-    expect(onConsult).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("確認済みのセルフケア情報はまだありません。")).toBeDefined();
+    expect(screen.getByRole("link", { name: "AIと一緒に見つける" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "自分で追加する" })).toBeDefined();
   });
 });
