@@ -557,7 +557,7 @@ export function SwipeDiagnosis({
               className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-sm text-red-700 dark:text-red-300"
               role="alert"
             >
-              あとで回答を保存できませんでした。同じ操作を再試行するか、一覧へ戻ってください。
+              あとで回答を保存できませんでした。同じ操作を再試行してください。
             </p>
           )}
           <button

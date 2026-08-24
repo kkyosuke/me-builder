@@ -24,7 +24,17 @@ import { DiagnosisResultView } from "./components/diagnosis-result";
 import { useDiagnosisDetail } from "./hooks/use-diagnosis-detail";
 import { useDiagnosisList } from "./hooks/use-diagnosis-list";
 
-export default function DiagnosisApplication() {
+interface DiagnosisNavigationGuard {
+  hasUnsavedAnswers: () => boolean;
+  restore: () => void;
+  waitForPendingAnswers: () => Promise<boolean>;
+}
+
+export default function DiagnosisApplication({
+  onNavigationGuardChange,
+}: {
+  onNavigationGuardChange?: (guard: DiagnosisNavigationGuard | null) => void;
+}) {
   const diagnoses = useDiagnosisList();
   const progression = useProfileProgression();
   const detail = useDiagnosisDetail({
@@ -36,6 +46,11 @@ export default function DiagnosisApplication() {
   const [isAnsweredOpen, setIsAnsweredOpen] = useState(false);
   const openedDirectDiagnosisId = useRef<string | null>(null);
   const openedHistoryDiagnosisId = useRef<string | null>(null);
+  const openedHistoryLocation = useRef<string | null>(null);
+  const directDiagnosisLocation = useRef<string | null>(null);
+  const navigationPending = useRef(false);
+  const historyNavigationAttempt = useRef(0);
+  const pendingHistoryNavigationAttempt = useRef<number | null>(null);
   const isHistoryDetailOpen = useRef(
     diagnosisDetailIdFromHistoryState(window.history.state) !== null,
   );
@@ -46,6 +61,9 @@ export default function DiagnosisApplication() {
   const directDiagnosisId =
     diagnosisResultIdFromPathname(requestedPathname) ??
     diagnosisEntryIdFromPathname(requestedPathname);
+  if (directDiagnosisId && directDiagnosisLocation.current === null) {
+    directDiagnosisLocation.current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  }
   const fromProfile = new URLSearchParams(window.location.search).get("from") === "me";
   const directBackHref = fromProfile ? "/me" : "/diagnosis";
   const directBackLabel = fromProfile ? "わたしのまとめへ" : "診断一覧へ";
@@ -58,6 +76,7 @@ export default function DiagnosisApplication() {
     (diagnosis: Parameters<typeof detail.open>[0]) => {
       if (isHistoryDetailOpen.current) return;
       listScrollY.current = window.scrollY;
+      openedHistoryLocation.current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       window.history.pushState(
         createDiagnosisDetailHistoryState(window.history.state, diagnosis.id),
         "",
@@ -70,31 +89,80 @@ export default function DiagnosisApplication() {
     [detail.open],
   );
 
-  const closeDetail = useCallback(() => {
-    if (directDiagnosisId) {
-      detail.close();
-      window.history.replaceState({}, "", directBackHref);
-      window.dispatchEvent(new PopStateEvent("popstate"));
+  const restoreDiagnosisLocation = useCallback(() => {
+    const historyDiagnosisId = openedHistoryDiagnosisId.current;
+    const historyLocation = openedHistoryLocation.current;
+    if (historyDiagnosisId && historyLocation) {
+      if (
+        diagnosisDetailIdFromHistoryState(window.history.state) === historyDiagnosisId &&
+        `${window.location.pathname}${window.location.search}${window.location.hash}` ===
+          historyLocation
+      ) {
+        return;
+      }
+      window.history.pushState(
+        createDiagnosisDetailHistoryState(window.history.state, historyDiagnosisId),
+        "",
+        historyLocation,
+      );
       return;
     }
-    if (!directDiagnosisId && listScrollY.current !== null) {
-      shouldRestoreListScroll.current = true;
-    }
+
+    const directLocation = directDiagnosisLocation.current;
     if (
-      !directDiagnosisId &&
-      isHistoryDetailOpen.current &&
-      diagnosisDetailIdFromHistoryState(window.history.state)
+      directLocation &&
+      `${window.location.pathname}${window.location.search}${window.location.hash}` !==
+        directLocation
     ) {
+      window.history.pushState({}, "", directLocation);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!onNavigationGuardChange) return;
+    onNavigationGuardChange({
+      hasUnsavedAnswers: detail.hasUnsavedAnswers,
+      restore: restoreDiagnosisLocation,
+      waitForPendingAnswers: detail.waitForPendingAnswers,
+    });
+    return () => onNavigationGuardChange(null);
+  }, [
+    detail.hasUnsavedAnswers,
+    detail.waitForPendingAnswers,
+    onNavigationGuardChange,
+    restoreDiagnosisLocation,
+  ]);
+
+  const closeDetail = useCallback(async () => {
+    if (navigationPending.current) return;
+    navigationPending.current = true;
+    const attempt = ++historyNavigationAttempt.current;
+    try {
+      if (!(await detail.waitForPendingAnswers())) return;
+      if (attempt !== historyNavigationAttempt.current) return;
+      if (directDiagnosisId) {
+        detail.close();
+        window.history.replaceState({}, "", directBackHref);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        return;
+      }
+      if (listScrollY.current !== null) {
+        shouldRestoreListScroll.current = true;
+      }
+      if (isHistoryDetailOpen.current && diagnosisDetailIdFromHistoryState(window.history.state)) {
+        isHistoryDetailOpen.current = false;
+        openedHistoryDiagnosisId.current = null;
+        detail.close();
+        window.history.back();
+        return;
+      }
       isHistoryDetailOpen.current = false;
       openedHistoryDiagnosisId.current = null;
       detail.close();
-      window.history.back();
-      return;
+    } finally {
+      navigationPending.current = false;
     }
-    isHistoryDetailOpen.current = false;
-    openedHistoryDiagnosisId.current = null;
-    detail.close();
-  }, [detail.close, directBackHref, directDiagnosisId]);
+  }, [detail.close, detail.waitForPendingAnswers, directBackHref, directDiagnosisId]);
 
   const deferQuestion = useCallback(
     async (questionId: string) => {
@@ -142,36 +210,71 @@ export default function DiagnosisApplication() {
     return () => window.cancelAnimationFrame(frame);
   }, [detail.state.status]);
 
-  const syncDetailWithHistory = useCallback(() => {
-    if (directDiagnosisId) return;
-    const historyDiagnosisId = diagnosisDetailIdFromHistoryState(window.history.state);
-    if (!historyDiagnosisId) {
-      if (!isHistoryDetailOpen.current) return;
-      isHistoryDetailOpen.current = false;
-      openedHistoryDiagnosisId.current = null;
-      listScrollY.current ??= 0;
-      shouldRestoreListScroll.current = true;
-      detail.close();
-      return;
-    }
-    if (
-      diagnoses.state.status !== "success" ||
-      (isHistoryDetailOpen.current && openedHistoryDiagnosisId.current === historyDiagnosisId)
-    ) {
-      return;
-    }
-    const diagnosis = diagnoses.state.data.find(({ id }) => id === historyDiagnosisId);
-    if (!diagnosis) return;
-    listScrollY.current = listScrollY.current === null ? 0 : window.scrollY;
-    isHistoryDetailOpen.current = true;
-    openedHistoryDiagnosisId.current = historyDiagnosisId;
-    void detail.open(diagnosis);
-  }, [detail.close, detail.open, diagnoses.state, directDiagnosisId]);
+  const syncDetailWithHistory = useCallback(
+    (attempt: number) => {
+      if (directDiagnosisId) return;
+      const historyDiagnosisId = diagnosisDetailIdFromHistoryState(window.history.state);
+      if (!historyDiagnosisId) {
+        const openDiagnosisId = openedHistoryDiagnosisId.current;
+        if (
+          !isHistoryDetailOpen.current ||
+          !openDiagnosisId ||
+          pendingHistoryNavigationAttempt.current === attempt
+        ) {
+          return;
+        }
+        pendingHistoryNavigationAttempt.current = attempt;
+        void detail
+          .waitForPendingAnswers()
+          .then((saved) => {
+            if (attempt !== historyNavigationAttempt.current) return;
+            if (!saved) {
+              restoreDiagnosisLocation();
+              return;
+            }
+            isHistoryDetailOpen.current = false;
+            openedHistoryDiagnosisId.current = null;
+            listScrollY.current ??= 0;
+            shouldRestoreListScroll.current = true;
+            detail.close();
+          })
+          .finally(() => {
+            if (pendingHistoryNavigationAttempt.current === attempt) {
+              pendingHistoryNavigationAttempt.current = null;
+            }
+          });
+        return;
+      }
+      if (
+        diagnoses.state.status !== "success" ||
+        (isHistoryDetailOpen.current && openedHistoryDiagnosisId.current === historyDiagnosisId)
+      ) {
+        return;
+      }
+      const diagnosis = diagnoses.state.data.find(({ id }) => id === historyDiagnosisId);
+      if (!diagnosis) return;
+      listScrollY.current = listScrollY.current === null ? 0 : window.scrollY;
+      isHistoryDetailOpen.current = true;
+      openedHistoryDiagnosisId.current = historyDiagnosisId;
+      void detail.open(diagnosis);
+    },
+    [
+      detail.close,
+      detail.open,
+      detail.waitForPendingAnswers,
+      diagnoses.state,
+      directDiagnosisId,
+      restoreDiagnosisLocation,
+    ],
+  );
 
   useEffect(() => {
-    syncDetailWithHistory();
-    window.addEventListener("popstate", syncDetailWithHistory);
-    return () => window.removeEventListener("popstate", syncDetailWithHistory);
+    syncDetailWithHistory(historyNavigationAttempt.current);
+    const handlePopState = () => {
+      syncDetailWithHistory(++historyNavigationAttempt.current);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [syncDetailWithHistory]);
 
   useEffect(() => {

@@ -244,7 +244,7 @@ export async function saveDiagnosisAnswer(
   diagnosisId: string,
   diagnosisQuestionId: string,
   choiceId: string,
-  signal?: AbortSignal,
+  options: { keepalive?: boolean; signal?: AbortSignal } = {},
 ): Promise<SaveDiagnosisAnswerResult> {
   const response = await createAuthenticatedHttpClient(apiUrl).request(
     `/api/diagnoses/${encodeURIComponent(diagnosisId)}/answers/${encodeURIComponent(diagnosisQuestionId)}`,
@@ -254,7 +254,8 @@ export async function saveDiagnosisAnswer(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ choiceId }),
-      ...(signal ? { signal } : {}),
+      ...(options.keepalive ? { keepalive: true } : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
     },
   );
 

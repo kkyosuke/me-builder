@@ -22,7 +22,7 @@ export const loadAdminApplication = memoizeModuleLoader<LazyApplicationModule>((
   })),
 );
 
-export const loadDiagnosisApplication = memoizeModuleLoader<LazyApplicationModule>(() =>
+export const loadDiagnosisApplication = memoizeModuleLoader(() =>
   import("./feature/diagnosis").then((feature) => ({
     default: feature.DiagnosisApplication,
   })),

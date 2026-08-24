@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../../config";
 import { saveDiagnosisAnswer } from "../../infrastructure/diagnosis-api";
 import type { DiagnosisDefinition } from "../../model/diagnosis-definition";
@@ -15,14 +15,49 @@ export function useDiagnosisAnswerSaver({
     },
   ) => void;
 }) {
-  const pendingSaves = useRef(new Map<string, Set<Promise<void>>>());
+  const saves = useRef(
+    new Map<
+      string,
+      Map<string, { state: "pending"; promise: Promise<void> } | { state: "failed" }>
+    >(),
+  );
+  const [unsavedCount, setUnsavedCount] = useState(0);
 
-  const waitForPendingSaves = useCallback(async (diagnosisId: string): Promise<void> => {
-    const saves = pendingSaves.current.get(diagnosisId);
-    if (saves && saves.size > 0) {
-      await Promise.all([...saves]);
-    }
+  const updateUnsavedCount = useCallback(() => {
+    setUnsavedCount(
+      [...saves.current.values()].reduce((count, diagnosisSaves) => {
+        return count + diagnosisSaves.size;
+      }, 0),
+    );
   }, []);
+
+  useEffect(() => {
+    if (unsavedCount === 0) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = true;
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [unsavedCount]);
+
+  const waitForPendingSaves = useCallback(async (diagnosisId: string): Promise<boolean> => {
+    const diagnosisSaves = saves.current.get(diagnosisId);
+    const pending = diagnosisSaves
+      ? [...diagnosisSaves.values()].flatMap((save) =>
+          save.state === "pending" ? [save.promise] : [],
+        )
+      : [];
+    if (pending.length > 0) {
+      await Promise.allSettled(pending);
+    }
+    return (saves.current.get(diagnosisId)?.size ?? 0) === 0;
+  }, []);
+
+  const hasUnsavedSaves = useCallback(
+    (diagnosisId: string): boolean => (saves.current.get(diagnosisId)?.size ?? 0) > 0,
+    [],
+  );
 
   const save = useCallback(
     async (definition: DiagnosisDefinition, answer: DiagnosisAnswer) => {
@@ -31,30 +66,39 @@ export function useDiagnosisAnswerSaver({
         definition.id,
         answer.diagnosisQuestionId,
         answer.choiceId,
+        { keepalive: true },
       );
-      const settledSave = saveRequest.then(
+      const trackedSave = saveRequest.then(
         () => undefined,
         () => undefined,
       );
-      const saves = pendingSaves.current.get(definition.id) ?? new Set();
-      saves.add(settledSave);
-      pendingSaves.current.set(definition.id, saves);
+      const diagnosisSaves = saves.current.get(definition.id) ?? new Map();
+      diagnosisSaves.set(answer.diagnosisQuestionId, {
+        state: "pending",
+        promise: trackedSave,
+      });
+      saves.current.set(definition.id, diagnosisSaves);
+      updateUnsavedCount();
       try {
         const result = await saveRequest;
         onProgress(definition.id, {
           ...result.progress,
           lastAnsweredAt: result.answer.acceptedAt,
         });
+        diagnosisSaves.delete(answer.diagnosisQuestionId);
         return { acceptedAt: result.answer.acceptedAt };
+      } catch (error) {
+        diagnosisSaves.set(answer.diagnosisQuestionId, { state: "failed" });
+        throw error;
       } finally {
-        saves.delete(settledSave);
-        if (saves.size === 0) {
-          pendingSaves.current.delete(definition.id);
+        if (diagnosisSaves.size === 0) {
+          saves.current.delete(definition.id);
         }
+        updateUnsavedCount();
       }
     },
-    [onProgress],
+    [onProgress, updateUnsavedCount],
   );
 
-  return { save, waitForPendingSaves };
+  return { hasUnsavedSaves, save, waitForPendingSaves };
 }
