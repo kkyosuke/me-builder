@@ -43,6 +43,8 @@ describe("requirePulumiGcsBackend", () => {
     const [
       cloudflareProject,
       gcpPlatformProject,
+      gcpPlatformDevelopmentConfig,
+      gcpPlatformProductionConfig,
       gcpPlatformProgram,
       gcpPlatformScript,
       gcpPlatformWorkflow,
@@ -54,6 +56,8 @@ describe("requirePulumiGcsBackend", () => {
     ] = await Promise.all([
       readFile(new URL("../Pulumi.yaml", import.meta.url), "utf8"),
       readFile(new URL("../gcp-platform/Pulumi.yaml", import.meta.url), "utf8"),
+      readFile(new URL("../gcp-platform/Pulumi.development.yaml", import.meta.url), "utf8"),
+      readFile(new URL("../gcp-platform/Pulumi.production.yaml", import.meta.url), "utf8"),
       readFile(new URL("../gcp-platform/index.ts", import.meta.url), "utf8"),
       readFile(new URL("../scripts/gcp-platform.ts", import.meta.url), "utf8"),
       readFile(new URL("../../.github/workflows/deploy-gcp-platform.yml", import.meta.url), "utf8"),
@@ -75,7 +79,6 @@ describe("requirePulumiGcsBackend", () => {
 
     expect(cloudflareProject).toContain(`url: ${pulumiGcsBackends.cloudflare}`);
     expect(gcpPlatformProject).toContain(`url: ${pulumiGcsBackends.gcpPlatform}`);
-    expect(gcpPlatformProgram).toContain('from "../src/gcp-authorization-key-policy.ts"');
     expect(gcpPlatformProgram).toContain('from "../src/gcp-existing-project.ts"');
     expect(gcpPlatformProgram).toContain('from "../src/pulumi-backend.ts"');
     expect(gcpPlatformProgram).toContain("gcp.organizations.getProjectOutput({ projectId })");
@@ -84,9 +87,13 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain("{ dependsOn: cloudBillingApi }");
     expect(gcpPlatformProgram).toContain("verifyExistingGcpProjectBilling");
     expect(gcpPlatformProgram).toContain("new gcp.identityplatform.Tenant(");
+    expect(gcpPlatformProgram).not.toContain("new gcp.serviceaccount.Account(");
+    expect(gcpPlatformProgram).not.toContain("new gcp.projects.IAMCustomRole(");
+    expect(gcpPlatformProgram).not.toContain("new gcp.projects.IAMMember(");
+    expect(gcpPlatformProgram).not.toContain("new gcp.orgpolicy.Policy(");
+    expect(gcpPlatformProgram).not.toContain("serviceAccountEmail:");
     expect(gcpPlatformProgram).toContain('"me-builder-dev"');
     expect(gcpPlatformProgram).toContain('"me-builder-prd"');
-    expect(gcpPlatformProgram).toContain("/^[A-Za-z][A-Za-z0-9-]{3,19}$/u");
     expect(gcpPlatformProgram).not.toContain("`me-builder ${environment}`");
     expect(gcpPlatformProgram).toContain(
       "new gcp.identityplatform.TenantDefaultSupportedIdpConfig(",
@@ -110,9 +117,21 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).not.toContain("new gcp.organizations.Project");
     expect(gcpPlatformProgram).not.toContain("import: projectId");
     expect(gcpPlatformProgram).not.toContain("autoCreateNetwork");
+    expect(gcpPlatformProgram).not.toContain("export const platform");
+    expect(gcpPlatformProgram).not.toContain("vertexSpendCapAmount");
+    for (const stackConfig of [gcpPlatformDevelopmentConfig, gcpPlatformProductionConfig]) {
+      expect(stackConfig).toContain("identityPlatformActiveCredentialSlot");
+      expect(stackConfig).toContain("identityPlatformCredentialGenerations");
+      expect(stackConfig).not.toContain("vertexSpendCapAmount");
+      expect(stackConfig).not.toMatch(/:\s*activeCredentialSlot:/u);
+      expect(stackConfig).not.toMatch(/:\s*credentialGenerations:/u);
+    }
     expect(gcpPlatformScript).toContain(
       'await run(["pulumi", "-C", "gcp-platform", "whoami", "--verbose"]);',
     );
+    expect(gcpPlatformScript).toContain("prepareGcpPlatformStateMigration");
+    expect(gcpPlatformScript).toContain('"export",');
+    expect(gcpPlatformScript).toContain('"import",');
     expect(gcpPlatformWorkflow).toContain(`pulumi login ${pulumiGcsBackends.gcpPlatform}`);
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:preview:${TARGET}"');
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:up:${TARGET}"');
@@ -128,18 +147,14 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).toContain("vars.GOOGLE_OAUTH_CLIENT_ID_PRODUCTION");
     expect(gcpPlatformWorkflow).toContain("secrets.GOOGLE_OAUTH_CLIENT_SECRET_DEVELOPMENT");
     expect(gcpPlatformWorkflow).toContain("secrets.GOOGLE_OAUTH_CLIENT_SECRET_PRODUCTION");
-    expect(gcpPlatformWorkflow).toContain(
-      'if [ -n "${GCP_ORGANIZATION_ID}" ] && [ -n "${GCP_FOLDER_ID}" ]; then',
-    );
-    expect(gcpPlatformWorkflow).toContain("remove_config_if_present organizationId");
-    expect(gcpPlatformWorkflow).toContain("remove_config_if_present folderId");
-    expect(gcpPlatformWorkflow).toContain("Existing standalone project");
-    expect(gcpPlatformWorkflow).toContain("remove_config_if_present projectName");
+    expect(gcpPlatformWorkflow).not.toContain("remove_config_if_present");
+    expect(gcpPlatformWorkflow).not.toContain("Migrate Obsolete Vertex Identity Resources");
+    expect(gcpPlatformWorkflow).not.toContain("state unprotect");
+    expect(gcpPlatformWorkflow).not.toContain("vars.GCP_ORGANIZATION_ID");
+    expect(gcpPlatformWorkflow).not.toContain("vars.GCP_FOLDER_ID");
     expect(gcpPlatformWorkflow).toContain(
       "GOOGLE_OAUTH_CLIENT_ID\n            GOOGLE_OAUTH_CLIENT_SECRET",
     );
-    expect(gcpPlatformWorkflow).not.toContain("remove_config_if_present googleOAuthClientId");
-    expect(gcpPlatformWorkflow).not.toContain("remove_config_if_present googleOAuthClientSecret");
     expect(gcpPlatformWorkflow).not.toContain("GCP_PLATFORM_PROJECT_NAME");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage buckets");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");

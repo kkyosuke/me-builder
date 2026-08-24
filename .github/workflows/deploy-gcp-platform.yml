@@ -45,8 +45,6 @@ jobs:
       GCP_STATE_PROJECT_ID: ${{ vars.GCP_STATE_PROJECT_ID }}
       GCP_PLATFORM_PROJECT_ID: ${{ vars.GCP_PLATFORM_PROJECT_ID }}
       GCP_BILLING_ACCOUNT: ${{ vars.GCP_BILLING_ACCOUNT }}
-      GCP_ORGANIZATION_ID: ${{ vars.GCP_ORGANIZATION_ID }}
-      GCP_FOLDER_ID: ${{ vars.GCP_FOLDER_ID }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
       GOOGLE_OAUTH_CLIENT_ID: ${{ inputs.target == 'development' && vars.GOOGLE_OAUTH_CLIENT_ID_DEVELOPMENT || vars.GOOGLE_OAUTH_CLIENT_ID_PRODUCTION }}
@@ -85,10 +83,6 @@ jobs:
             fi
           done
 
-          if [ -n "${GCP_ORGANIZATION_ID}" ] && [ -n "${GCP_FOLDER_ID}" ]; then
-            echo "::error::GCP_ORGANIZATION_IDとGCP_FOLDER_IDは両方同時に設定できません。"
-            exit 1
-          fi
       - uses: ./.github/actions/setup-bun-workspace
 
       - uses: arduino/setup-task@v2
@@ -130,27 +124,6 @@ jobs:
           pulumi -C infra/gcp-platform config set environment "${TARGET}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set projectId "${GCP_PLATFORM_PROJECT_ID}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set billingAccount "${GCP_BILLING_ACCOUNT}" --stack "${TARGET}"
-
-          remove_config_if_present() {
-            if pulumi -C infra/gcp-platform config get "$1" --stack "${TARGET}" >/dev/null 2>&1; then
-              pulumi -C infra/gcp-platform config rm "$1" --stack "${TARGET}"
-            fi
-          }
-
-          # 旧Stack configを残してもprojectは更新しないが、管理対象外になった値は除去する。
-          remove_config_if_present projectName
-
-          if [ -n "${GCP_ORGANIZATION_ID}" ]; then
-            remove_config_if_present folderId
-            pulumi -C infra/gcp-platform config set organizationId "${GCP_ORGANIZATION_ID}" --stack "${TARGET}"
-          elif [ -n "${GCP_FOLDER_ID}" ]; then
-            remove_config_if_present organizationId
-            pulumi -C infra/gcp-platform config set folderId "${GCP_FOLDER_ID}" --stack "${TARGET}"
-          else
-            remove_config_if_present organizationId
-            remove_config_if_present folderId
-          fi
-
           pulumi -C infra/gcp-platform config set googleOAuthClientId "${GOOGLE_OAUTH_CLIENT_ID}" --stack "${TARGET}"
           pulumi -C infra/gcp-platform config set --secret googleOAuthClientSecret "${GOOGLE_OAUTH_CLIENT_SECRET}" --stack "${TARGET}"
 
@@ -168,18 +141,11 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           identity_platform_tenant_id="$(pulumi -C infra/gcp-platform stack output identityPlatformTenantId --stack "${TARGET}" 2>/dev/null || true)"
-          if [ -n "${GCP_ORGANIZATION_ID}" ]; then
-            project_parent="Existing project in Organization"
-          elif [ -n "${GCP_FOLDER_ID}" ]; then
-            project_parent="Existing project in Folder"
-          else
-            project_parent="Existing standalone project"
-          fi
           {
             echo "### GCP platform ${OPERATION}: ${TARGET}"
             echo
             echo "- Project ID: \`${GCP_PLATFORM_PROJECT_ID}\`"
-            echo "- Project parent: \`${project_parent}\`"
+            echo "- Project: \`Existing project\`"
             echo "- Environment: \`${TARGET}\`"
             if [ -n "${identity_platform_tenant_id}" ]; then
               echo "- Identity Platform tenant ID: \`${identity_platform_tenant_id}\`"
