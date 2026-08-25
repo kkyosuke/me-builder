@@ -21,17 +21,7 @@
 
 ## 2. 現在の残タスク
 
-### 2.1 セルフケア表示とLINE相談導線の現行仕様への追随を確認する
-
-[#367](https://github.com/kkyosuke/me-builder/issues/367)は[#407](https://github.com/kkyosuke/me-builder/pull/407)でclose済みです。その後、[#411](https://github.com/kkyosuke/me-builder/pull/411)が、当時の実装における相談目的の選択からLIFF送信、画面close、外部ブラウザのclipboard fallbackまでをE2Eで固定しました。さらに[#426](https://github.com/kkyosuke/me-builder/pull/426)でWebとLINEの提供境界が更新されたため、現行仕様へ追随する実装とテストを[#462](https://github.com/kkyosuke/me-builder/issues/462)で扱います。
-
-- [#462](https://github.com/kkyosuke/me-builder/issues/462)の完了後に、「わたしのセルフケア」の表示内容と未登録時の操作が[わたしのまとめ仕様 §2.7](../product/profile-summary-experience.md#27-わたしのセルフケアとai相談)と[ストレスの手がかりとAIセルフケア相談体験設計 §5](../product/self-care-ai-consultation-experience.md#5-わたしのまとめ画面への追加)に一致することを確認する
-- 「詳しく見る」から「わたしのセルフケア」へ移動し、「わたしのまとめ」へ戻れることを、[全体画面遷移設計 §4.4](../product/screen-navigation.md#44-わたし配下)に照らして確認する
-- 「AIに聞く」が[ストレスの手がかりとAIセルフケア相談体験設計 §5](../product/self-care-ai-consultation-experience.md#5-わたしのまとめ画面への追加)で定義されたLINE公式トークへの入口に一致することを確認する
-
-完了条件は、各SSoTで定義された表示と遷移をWebとテストで確認でき、「わたしのまとめ」側へ別の表示分類、判定規則、相談開始規則を作っていないことです。
-
-### 2.2 Previewで実際のAI生成を通しで確認する
+### 2.1 Previewで実際のAI生成を通しで確認する
 
 - 診断と日記がある本人Accountから生成を要求する
 - Web、API、Profile Summary Queue、Worker、Gemini、AccountDataを通って新しい版が保存されることを確認する
@@ -41,7 +31,7 @@
 
 完了条件は、個人情報や日記本文をログやチケットへ転記せずに、上記の一連の成功を確認できることです。
 
-### 2.3 生成内容の品質を確認する
+### 2.2 生成内容の品質を確認する
 
 - 診断だけ、日記だけ、診断と日記の両方がある入力をそれぞれ確認する
 - 入力にない人物像、健康状態、将来の行動を断定しないことを確認する
@@ -52,7 +42,7 @@
 
 数値の合格閾値は設けません。診断だけ、日記だけ、診断と日記の両方があるPreviewの実出力をサービス責任者が確認し、承認した記録を公開条件とします。
 
-### 2.4 生成失敗と再試行を実環境相当で確認する
+### 2.3 生成失敗と再試行を実環境相当で確認する
 
 - Geminiの一時エラーとschema不適合でQueueが再試行されることを確認する
 - 最終試行まで失敗した場合に生成要求が`failed`となることを確認する
@@ -61,7 +51,7 @@
 
 完了条件は、一時失敗、最終失敗、再試行成功の各結果を、機微情報を含まない運用ログと保存状態から判定できることです。
 
-### 2.5 PreviewとProductionの構成を確認する
+### 2.4 PreviewとProductionの構成を確認する
 
 - Profile Summary QueueとDLQ、AccountData binding、Geminiの認証情報とモデル設定が各環境へ配布されていることを確認する
 - PreviewとProductionの両方で、初回生成後は入力・形式の変更と7日経過を両方求める再生成判定が維持されることを確認する

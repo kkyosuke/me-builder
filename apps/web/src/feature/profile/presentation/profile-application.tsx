@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { CompatibilityShareContentSection } from "../../compatibility";
-import { closeLiffWindow, sendLiffTextMessage } from "../../liff";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
 import { GoalFollowUpSection } from "./goal-follow-up-section";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
+import { SelfCareDetailsScreen } from "./self-care-details-screen";
 import { SelfCareSection } from "./self-care-section";
 import { useGoalFollowUps } from "./use-goal-follow-ups";
 import { useProfileProgression } from "./use-profile-progression";
@@ -42,6 +42,21 @@ export default function ProfileApplication() {
         generation: result.generation,
       }
     : undefined;
+  if (window.location.pathname.startsWith("/me/self-care")) {
+    return (
+      <SelfCareDetailsScreen
+        state={selfCare.state}
+        pendingId={selfCare.pendingId}
+        operationError={selfCare.operationError}
+        onBack={() => {
+          window.history.replaceState({}, "", "/me");
+          window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+        }}
+        onRetry={() => void selfCare.reload()}
+        onRevoke={(id) => void selfCare.revoke(id)}
+      />
+    );
+  }
   return (
     <ProfileSummaryScreen
       state={screenState}
@@ -70,26 +85,7 @@ export default function ProfileApplication() {
         onAgree={(brainItemId, nextStep) => void goalFollowUps.agree(brainItemId, nextStep)}
         onUpdate={(id, input) => void goalFollowUps.update(id, input)}
       />
-      <SelfCareSection
-        state={selfCare.state}
-        pendingId={selfCare.pendingId}
-        operationError={selfCare.operationError}
-        onRetry={() => void selfCare.reload()}
-        onRevoke={(id) => void selfCare.revoke(id)}
-        onConsult={async (prompt) => {
-          if (await sendLiffTextMessage(prompt)) {
-            closeLiffWindow();
-            return "sent";
-          }
-          try {
-            if (!navigator.clipboard) return "unavailable";
-            await navigator.clipboard.writeText(prompt);
-            return "copied";
-          } catch {
-            return "unavailable";
-          }
-        }}
-      />
+      <SelfCareSection state={selfCare.state} onRetry={() => void selfCare.reload()} />
       <CompatibilityShareContentSection latestProfileSummaryVersionId={latestVersionId} />
     </ProfileSummaryScreen>
   );
