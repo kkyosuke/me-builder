@@ -2,12 +2,45 @@ import { describe, expect, it, vi } from "vitest";
 import { createSsoRolloutAuthorizer } from "../infrastructure/authentication/sso-rollout";
 import type { ExternalSsoProvider } from "../logic/authentication/sso-provider";
 import {
+  type SsoApplicationSessionIssuer,
   SsoAuthenticationError,
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
-  completeSsoLogin,
+  type SsoExistingIdentityResolver,
+  type SsoRolloutAuthorizer,
+  completeSsoCallback,
   startSsoAuthentication,
 } from "../logic/authentication/sso-transaction";
+
+type SsoTransactionCompletionInput = Pick<
+  Parameters<typeof completeSsoCallback>[0],
+  "state" | "code" | "store" | "client" | "now"
+>;
+
+async function completeLoginFixture<SessionResult>(
+  input: SsoTransactionCompletionInput & {
+    identityResolver: SsoExistingIdentityResolver;
+    rolloutAuthorizer: SsoRolloutAuthorizer;
+    sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
+  },
+) {
+  const completed = await completeSsoCallback({
+    ...input,
+    identityLinker: {
+      async link() {
+        throw new Error("login E2E reached the link branch");
+      },
+    },
+  });
+  if (completed.purpose !== "login") {
+    throw new Error("login E2E reached an unexpected callback branch");
+  }
+  return {
+    session: completed.session,
+    returnTo: completed.returnTo,
+    ...(completed.traceId ? { traceId: completed.traceId } : {}),
+  };
+}
 
 function memoryStore(): SsoAuthenticationTransactionStore & {
   transactions: Map<string, SsoAuthenticationTransaction>;
@@ -72,7 +105,7 @@ describe("SSO authentication E2E", () => {
     const sessionIssuer = { issue: vi.fn(async () => ({ cookie: "opaque-session" })) };
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state,
         code: "authorization-code",
         store,
@@ -101,7 +134,7 @@ describe("SSO authentication E2E", () => {
     });
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state,
         code: "authorization-code",
         store,
@@ -127,7 +160,7 @@ describe("SSO authentication E2E", () => {
     const excludedStore = memoryStore();
     const excludedState = await startFlow(excludedStore, client);
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: excludedState,
         code: "authorization-code",
         store: excludedStore,
@@ -148,7 +181,7 @@ describe("SSO authentication E2E", () => {
     const unknownStore = memoryStore();
     const unknownState = await startFlow(unknownStore, client);
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: unknownState,
         code: "authorization-code",
         store: unknownStore,
@@ -169,7 +202,7 @@ describe("SSO authentication E2E", () => {
     const allowedStore = memoryStore();
     const allowedState = await startFlow(allowedStore, client);
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: allowedState,
         code: "authorization-code",
         store: allowedStore,
@@ -211,7 +244,7 @@ describe("SSO authentication E2E", () => {
     const sessionIssuer = { issue: vi.fn() };
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state,
         code: "authorization-code",
         store,
@@ -254,13 +287,13 @@ describe("SSO authentication E2E", () => {
       now: () => 2_000,
     };
 
-    await expect(completeSsoLogin(input)).rejects.toMatchObject({
+    await expect(completeLoginFixture(input)).rejects.toMatchObject({
       callback: {
         returnTo: "/compatibility/invitations/invite-fixture",
         traceId: "00000000-0000-4000-8000-000000000099",
       },
     });
-    await expect(completeSsoLogin(input)).rejects.toEqual(
+    await expect(completeLoginFixture(input)).rejects.toEqual(
       new SsoAuthenticationError("transaction_missing"),
     );
   });

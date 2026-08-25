@@ -129,9 +129,8 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformScript).toContain(
       'await run(["pulumi", "-C", "gcp-platform", "whoami", "--verbose"]);',
     );
-    expect(gcpPlatformScript).toContain("prepareGcpPlatformStateMigration");
-    expect(gcpPlatformScript).toContain('"export",');
-    expect(gcpPlatformScript).toContain('"import",');
+    expect(gcpPlatformScript).not.toContain("stack export");
+    expect(gcpPlatformScript).not.toContain("stack import");
     expect(gcpPlatformWorkflow).toContain(`pulumi login ${pulumiGcsBackends.gcpPlatform}`);
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:preview:${TARGET}"');
     expect(gcpPlatformWorkflow).toContain('task "infra:gcp-platform:up:${TARGET}"');

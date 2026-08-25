@@ -1,19 +1,123 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ExternalSsoProvider } from "./sso-provider";
+import type { ExternalSsoProvider, SsoVerifiedIdentity } from "./sso-provider";
 import {
+  type SsoApplicationSessionIssuer,
   SsoAuthenticationError,
   type SsoAuthenticationTransaction,
   type SsoAuthenticationTransactionStore,
   SsoCallbackCompletionError,
+  type SsoExistingIdentityResolver,
+  type SsoIdentityLinker,
+  type SsoRolloutAuthorizer,
   cancelSsoAuthentication,
-  completeSsoAuthentication,
   completeSsoCallback,
-  completeSsoIdentityLinking,
-  completeSsoLogin,
   normalizeSsoReturnTo,
   startSsoAuthentication,
   startSsoIdentityLinking,
 } from "./sso-transaction";
+
+type SsoTransactionCompletionInput = Pick<
+  Parameters<typeof completeSsoCallback>[0],
+  "state" | "code" | "store" | "client" | "now"
+>;
+
+function completeVerifiedLoginFixture(input: SsoTransactionCompletionInput) {
+  let identity: SsoVerifiedIdentity | undefined;
+  return completeSsoCallback({
+    ...input,
+    identityResolver: {
+      async findAccount(resolvedIdentity) {
+        identity = {
+          ...resolvedIdentity,
+          authenticationMethod: "sso",
+          authenticatedAt: new Date("2026-08-16T00:00:00.000Z"),
+        };
+        return {
+          accountId: "test-account",
+          authenticatedIdentityId: "test-identity",
+          role: "user" as const,
+        };
+      },
+    },
+    identityLinker: {
+      async link() {
+        throw new Error("login test reached the link branch");
+      },
+    },
+    rolloutAuthorizer: {
+      async allows() {
+        return true;
+      },
+    },
+    sessionIssuer: {
+      async issue() {
+        return identity;
+      },
+    },
+  }).then((completed) => {
+    if (completed.purpose !== "login" || !completed.session) {
+      throw new Error("login test reached an unexpected callback branch");
+    }
+    return {
+      identity: completed.session,
+      returnTo: completed.returnTo,
+      ...(completed.traceId ? { traceId: completed.traceId } : {}),
+    };
+  });
+}
+
+async function completeLoginFixture<SessionResult>(
+  input: SsoTransactionCompletionInput & {
+    identityResolver: SsoExistingIdentityResolver;
+    rolloutAuthorizer: SsoRolloutAuthorizer;
+    sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
+  },
+) {
+  const completed = await completeSsoCallback({
+    ...input,
+    identityLinker: {
+      async link() {
+        throw new Error("login test reached the link branch");
+      },
+    },
+  });
+  if (completed.purpose !== "login") {
+    throw new Error("login test reached an unexpected callback branch");
+  }
+  return {
+    session: completed.session,
+    returnTo: completed.returnTo,
+    ...(completed.traceId ? { traceId: completed.traceId } : {}),
+  };
+}
+
+async function completeLinkFixture(
+  input: SsoTransactionCompletionInput & { identityLinker: SsoIdentityLinker },
+) {
+  const completed = await completeSsoCallback({
+    ...input,
+    identityResolver: {
+      async findAccount() {
+        return undefined;
+      },
+    },
+    rolloutAuthorizer: {
+      async allows() {
+        return false;
+      },
+    },
+    sessionIssuer: {
+      async issue() {
+        throw new Error("link test reached the login branch");
+      },
+    },
+  });
+  if (completed.purpose !== "link") {
+    throw new Error("link test reached an unexpected callback branch");
+  }
+  const { purpose: _, ...result } = completed;
+  return result;
+}
 
 function createMemoryStore(): SsoAuthenticationTransactionStore & {
   transactions: Map<string, SsoAuthenticationTransaction>;
@@ -125,7 +229,7 @@ describe("SSO authentication transaction", () => {
     });
 
     await expect(
-      completeSsoAuthentication({
+      completeVerifiedLoginFixture({
         state: "state",
         code: "authorization-code",
         store,
@@ -147,7 +251,7 @@ describe("SSO authentication transaction", () => {
       identityProvisioning: "existing-only",
     });
     await expect(
-      completeSsoAuthentication({ state: "state", code: "code", store, client }),
+      completeVerifiedLoginFixture({ state: "state", code: "code", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
   });
 
@@ -166,7 +270,13 @@ describe("SSO authentication transaction", () => {
     });
 
     await expect(
-      completeSsoAuthentication({ state: "state", code: "code", store, client, now: () => 1_000 }),
+      completeVerifiedLoginFixture({
+        state: "state",
+        code: "code",
+        store,
+        client,
+        now: () => 1_000,
+      }),
     ).rejects.toEqual(
       new SsoCallbackCompletionError(
         { traceId: "trace-token-exchange", returnTo: "/diagnosis/result?from=share" },
@@ -187,10 +297,10 @@ describe("SSO authentication transaction", () => {
     });
 
     await expect(
-      completeSsoAuthentication({ state: "tampered", code: "code", store, client }),
+      completeVerifiedLoginFixture({ state: "tampered", code: "code", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
     await expect(
-      completeSsoAuthentication({
+      completeVerifiedLoginFixture({
         state: "expired",
         code: "code",
         store,
@@ -209,10 +319,10 @@ describe("SSO authentication transaction", () => {
     const client = createClient();
 
     await expect(
-      completeSsoAuthentication({ state: "", code: "code", store, client }),
+      completeVerifiedLoginFixture({ state: "", code: "code", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("invalid_callback"));
     await expect(
-      completeSsoAuthentication({ state: "state", code: "", store, client }),
+      completeVerifiedLoginFixture({ state: "state", code: "", store, client }),
     ).rejects.toEqual(new SsoAuthenticationError("invalid_callback"));
   });
 
@@ -239,7 +349,7 @@ describe("SSO authentication transaction", () => {
     };
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: "state",
         code: "code",
         store,
@@ -282,7 +392,7 @@ describe("SSO authentication transaction", () => {
     const sessionIssuer = { issue: vi.fn() };
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: "state",
         code: "code",
         store,
@@ -394,7 +504,7 @@ describe("SSO authentication transaction", () => {
     const sessionIssuer = { issue: vi.fn() };
 
     await expect(
-      completeSsoLogin({
+      completeLoginFixture({
         state: "state",
         code: "code",
         store,
@@ -453,7 +563,7 @@ describe("SSO authentication transaction", () => {
     const identityLinker = { link: vi.fn(async () => "identity-platform-identity") };
 
     await expect(
-      completeSsoIdentityLinking({
+      completeLinkFixture({
         state: "link-state",
         code: "code",
         store,
@@ -481,7 +591,7 @@ describe("SSO authentication transaction", () => {
       identityProvisioning: "allow",
     });
     await expect(
-      completeSsoIdentityLinking({
+      completeLinkFixture({
         state: "link-state",
         code: "code",
         store,
@@ -489,53 +599,6 @@ describe("SSO authentication transaction", () => {
         identityLinker,
       }),
     ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
-  });
-
-  it("loginとlinkのstateを別用途のcallbackへ差し替えられない", async () => {
-    const store = createMemoryStore();
-    const client = createClient();
-    store.transactions.set("link-state", {
-      purpose: "link",
-      initiatingAccountId: "account-1",
-      nonce: "nonce",
-      codeVerifier: "verifier",
-      returnTo: "/",
-      expiresAt: 2_000,
-    });
-    store.transactions.set("login-state", {
-      purpose: "login",
-      nonce: "nonce",
-      codeVerifier: "verifier",
-      returnTo: "/",
-      expiresAt: 2_000,
-    });
-
-    await expect(
-      completeSsoAuthentication({
-        state: "link-state",
-        code: "code",
-        store,
-        client,
-        now: () => 1_000,
-      }),
-    ).rejects.toMatchObject({
-      reason: "transaction_purpose_mismatch",
-      callback: { returnTo: "/" },
-    });
-    await expect(
-      completeSsoIdentityLinking({
-        state: "login-state",
-        code: "code",
-        store,
-        client,
-        identityLinker: { link: vi.fn() },
-        now: () => 1_000,
-      }),
-    ).rejects.toMatchObject({
-      reason: "transaction_purpose_mismatch",
-      callback: { returnTo: "/" },
-    });
-    expect(client.exchangeAuthorizationCode).not.toHaveBeenCalled();
   });
 
   it.each([

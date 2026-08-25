@@ -39,7 +39,7 @@ unset PREVIEW_BILLING_ID_TOKEN
 
 ## 3. Previewへ反映する順序
 
-1. stack最上位PRへ`deploy`と`e2e`ラベルを付け、Preview CDと外部接続なしE2Eを完了する
+1. stack最上位PRへ`deploy`ラベルを付け、Preview CDと全PRで自動実行される外部接続なしE2Eを完了する
 2. `Setup / Stripe Billing`を対象branch、`dev`、確認文字列`sync-dev`で実行する
 3. 同じbranchの`Scheduled Checks`を手動実行し、Stripe sandbox lifecycleを完了する
 4. Preview LIFFを検証用Accountで開き、公開Plan、初回trial、決済手段の開始時登録、特定商取引法に基づく表記を確認する

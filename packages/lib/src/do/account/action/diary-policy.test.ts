@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { chooseConversationPolicyId } from "./diary";
+import { chooseConversationPolicyId } from "../diary-policy";
 
 const policyIds = ["reflective", "curious", "structured"];
 

@@ -45,7 +45,7 @@ jobs:
               - 'tsconfig.json'
               - 'biome.json'
               - 'knip.json'
-              - 'vitest.config.ts'
+              - 'vitest.config.mts'
               - 'Taskfile.yml'
               - '.github/**'
             docs:
@@ -111,10 +111,15 @@ jobs:
 
       # ルートの vitest を 1 プロセスで回すと、パッケージごとに vitest を起動し直すより速く、
       # かつ apps/web のように個別 CI ではテストされていなかったパッケージまで含められる。
-      # E2E と Worker runtime E2E はここでは実行しない (`e2e` ラベル付きの PR で `ci-e2e.yml` が担当)。
-      - name: Run Tests
+      # E2E と Worker runtime E2E は別jobで実行する。
+      - name: Run Unit Tests
         if: steps.scope.outputs.code == 'true'
         run: bun run test:unit
+
+      # 認証境界は対象を限定した再実行でcoverage floorも検証する。
+      - name: Check Authentication Coverage
+        if: steps.scope.outputs.code == 'true'
+        run: bun run test:coverage
 
       - name: Build Check
         if: steps.scope.outputs.code == 'true'

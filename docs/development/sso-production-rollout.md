@@ -23,7 +23,7 @@
 
 - AUTH-A、AUTH-B、AUTH-Cの必須stackがmergeされ、Production対象commitのCIが成功している
 - Preview Runbookを実IdP、普段使うスマートフォン、PCの主要ブラウザ1つでpassしている
-- `infra/gcp-platform`のPulumi `production` Stackが適用済みで、Production専用GCP project／Identity Platform user store／OAuth client、Vertex AI実行Identity、完全一致callback、secretがDevelopmentから分離されている
+- `infra/gcp-platform`のPulumi `production` Stackが適用済みで、共有GCP project内のProduction Tenant／OAuth client／完全一致callback／runtime secretがDevelopmentから分離されている（所有境界は[インフラ・システム構成 §6.2](../architecture/infrastructure-architecture.md#62-gcp共通リソースの宣言境界)を正とする）
 - SSO開始、callback結果、session発行・失効を匿名trace IDで追える
 - 公開操作、停止、問い合わせ、最終承認を行うサービス管理者をrelease記録へ記載している
 - 少数の協力者へIdentity追加方法、SSO利用方法、問い合わせ先を案内している

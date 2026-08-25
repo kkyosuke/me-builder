@@ -1,15 +1,13 @@
 name: CI / E2E
 
-# E2E は実行時間の大半を占めるため、通常の CI (`ci.yml`) からは外して `e2e` ラベルで明示的に呼ぶ。
-# ラベルが無い PR では job ごと skip され、GitHub Actions の課金対象にならない。
-# `main` へマージする直前の検証としては `cd-production.yml` の `bun run ci` が E2E を含めて実行する。
+# E2E は実行時間の大半を占めるため、通常の CI (`ci.yml`) とは別jobで実行する。
+# mainへ入る前に回帰を検出できるよう、すべてのPR更新で必須実行する。
 on:
   pull_request:
     branches:
       - main
     types:
       - opened
-      - labeled
       - synchronize
       - reopened
   workflow_dispatch:
@@ -24,11 +22,6 @@ concurrency:
 jobs:
   e2e:
     name: End-to-End Tests
-    # 手動実行は無条件。PR 起因の場合は `e2e` ラベルが付いているときだけ。
-    # `synchronize` でも同じ条件を見るため、ラベルを剥がせば以降の push では実行されない。
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'e2e')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
