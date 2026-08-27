@@ -8,8 +8,8 @@ import {
 } from "@me-builder/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getWorkerConfig } from "./config";
+import { WEBHOOK_QUEUE_MAX_ATTEMPTS, handleQueueBatch } from "./handler/queue-dispatch";
 import worker from "./index";
-import { WEBHOOK_QUEUE_MAX_ATTEMPTS, handleQueueBatch } from "./logic/webhook";
 
 const mockPushMessage = vi.fn().mockResolvedValue({});
 const mockReplyMessage = vi.fn().mockResolvedValue({});

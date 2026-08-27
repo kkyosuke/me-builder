@@ -19,24 +19,24 @@ import {
   toSafeOperationalErrorFields,
 } from "@me-builder/shared";
 import { type CloudflareBindings, type WorkerConfig, getWorkerConfig } from "../config";
-import { BILLING_QUEUE_MAX_ATTEMPTS, processBillingMessage } from "../handler/billing";
-import { processBrainVectorSyncMessage } from "../handler/brain-vector-sync";
-import { CHAT_TURN_MAX_ATTEMPTS, processChatTurnMessage } from "../handler/chat-turn";
-import { DAILY_PROMPT_MAX_ATTEMPTS, processDailyPromptMessage } from "../handler/daily-prompt";
+import { processLineWebhook } from "../logic/feature/line";
+import { BILLING_QUEUE_MAX_ATTEMPTS, processBillingMessage } from "./billing";
+import { processBrainVectorSyncMessage } from "./brain-vector-sync";
+import { CHAT_TURN_MAX_ATTEMPTS, processChatTurnMessage } from "./chat-turn";
+import { DAILY_PROMPT_MAX_ATTEMPTS, processDailyPromptMessage } from "./daily-prompt";
 import {
   DIARY_BRAIN_CHECKPOINT_MAX_ATTEMPTS,
   processDiaryBrainCheckpointMessage,
-} from "../handler/diary-brain-checkpoint";
-import { processPhotoDiaryDeletionMessage } from "../handler/photo-diary-deletion";
+} from "./diary-brain-checkpoint";
+import { processPhotoDiaryDeletionMessage } from "./photo-diary-deletion";
 import {
   PROFILE_SUMMARY_GENERATION_MAX_ATTEMPTS,
   processProfileSummaryGenerationMessage,
-} from "../handler/profile-summary-generation";
+} from "./profile-summary-generation";
 import {
   WEEKLY_REFLECTION_MAX_ATTEMPTS,
   processWeeklyReflectionGenerationMessage,
-} from "../handler/weekly-reflection-generation";
-import { processLineWebhook } from "./feature/line";
+} from "./weekly-reflection-generation";
 
 /** 写真取得を含むため、約1時間内に初回と6回の配送機会を持つ。 */
 export const WEBHOOK_QUEUE_MAX_ATTEMPTS = 7;

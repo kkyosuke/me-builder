@@ -8,7 +8,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CloudflareBindings } from "../config";
 import { getWorkerConfig } from "../config";
-import { handleQueueBatch } from "./webhook";
+import { handleQueueBatch } from "./queue-dispatch";
 
 afterEach(() => vi.restoreAllMocks());
 
