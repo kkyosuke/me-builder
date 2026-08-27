@@ -15,12 +15,27 @@ function withoutTrailingSlash(pathname: string): string {
 function hasSingleSegment(pathname: string, prefix: string): boolean {
   if (!pathname.startsWith(prefix)) return false;
   const segment = pathname.slice(prefix.length);
-  return segment.length > 0 && !segment.includes("/");
+  if (segment.length === 0 || segment.includes("/")) return false;
+  try {
+    return decodeURIComponent(segment).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 function hasCompatibilityRelationshipId(pathname: string, prefix: string): boolean {
   if (!pathname.startsWith(prefix)) return false;
   return compatibilityRelationshipId.isValid(pathname.slice(prefix.length));
+}
+
+function hasDiagnosisResultId(pathname: string): boolean {
+  const encodedId = pathname.match(/^\/diagnosis\/([^/]+)\/answers$/u)?.[1];
+  if (!encodedId) return false;
+  try {
+    return decodeURIComponent(encodedId).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 export function resolveWebApplicationRoute(pathname: string): WebApplicationRoute {
@@ -54,7 +69,7 @@ export function resolveWebApplicationRoute(pathname: string): WebApplicationRout
     path === "/app" ||
     path === "/diagnosis" ||
     hasSingleSegment(path, "/diagnosis/") ||
-    /^\/diagnosis\/[^/]+\/answers$/u.test(path)
+    hasDiagnosisResultId(path)
   ) {
     return "diagnosis";
   }

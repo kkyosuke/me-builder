@@ -30,6 +30,8 @@ describe("resolveWebApplicationRoute", () => {
     "/compatibility/invitations/not-a-relationship-id",
     `/compatibility/relationships/${"g".repeat(64)}`,
     "/diagnosis/id/unknown",
+    "/diagnosis/%E0%A4%A",
+    "/diagnosis/%E0%A4%A/answers",
   ])("未知またはprefix衝突の%sを受理しない", (pathname) => {
     expect(resolveWebApplicationRoute(pathname)).toBe("not-found");
   });
