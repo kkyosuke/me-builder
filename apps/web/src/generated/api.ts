@@ -7286,7 +7286,7 @@ export interface operations {
               brainItemId: string;
               statement: string;
               /** @enum {string} */
-              kind: "worked" | "did-not-work" | "recent-state";
+              kind: "stress-trigger" | "early-sign" | "worked" | "did-not-work" | "recent-state";
               /** @enum {string} */
               status: "active" | "revoked";
               /** Format: date-time */
@@ -7376,7 +7376,7 @@ export interface operations {
         "application/json": {
           brainItemId: string;
           /** @enum {string} */
-          kind: "worked" | "did-not-work" | "recent-state";
+          kind: "stress-trigger" | "early-sign" | "worked" | "did-not-work" | "recent-state";
         };
       };
     };
@@ -7393,7 +7393,7 @@ export interface operations {
               brainItemId: string;
               statement: string;
               /** @enum {string} */
-              kind: "worked" | "did-not-work" | "recent-state";
+              kind: "stress-trigger" | "early-sign" | "worked" | "did-not-work" | "recent-state";
               /** @enum {string} */
               status: "active" | "revoked";
               /** Format: date-time */
@@ -7531,7 +7531,7 @@ export interface operations {
               brainItemId: string;
               statement: string;
               /** @enum {string} */
-              kind: "worked" | "did-not-work" | "recent-state";
+              kind: "stress-trigger" | "early-sign" | "worked" | "did-not-work" | "recent-state";
               /** @enum {string} */
               status: "active" | "revoked";
               /** Format: date-time */

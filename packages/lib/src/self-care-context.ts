@@ -1,5 +1,6 @@
-export const selfCareConfirmationKinds = ["worked", "did-not-work", "recent-state"] as const;
-export type SelfCareConfirmationKind = (typeof selfCareConfirmationKinds)[number];
+import type { SelfCareConfirmationKind } from "@me-builder/shared";
+
+export { selfCareConfirmationKinds, type SelfCareConfirmationKind } from "@me-builder/shared";
 
 export type SelfCareConfirmation = Readonly<{
   id: string;

@@ -1,5 +1,6 @@
 export * from "./schema/queue";
 export * from "./schema/conversation-coordinator";
+export * from "./schema/self-care-context";
 export * from "./legal/service-terms";
 export * from "./legal/privacy-policy";
 export * from "./legal/commercial-transactions";

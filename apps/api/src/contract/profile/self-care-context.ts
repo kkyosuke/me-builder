@@ -1,3 +1,4 @@
+import { selfCareConfirmationKinds } from "@me-builder/shared";
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
 import {
@@ -8,7 +9,7 @@ import {
 } from "../shared/errors";
 
 const Text = v.pipe(v.string(), v.trim(), v.nonEmpty());
-const Kind = v.picklist(["worked", "did-not-work", "recent-state"]);
+const Kind = v.picklist(selfCareConfirmationKinds);
 const Item = v.object({
   id: Text,
   brainItemId: Text,
@@ -64,7 +65,7 @@ export const selfCareContextConfirmationRoute = describeRoute({
           type: "object",
           properties: {
             brainItemId: { type: "string", minLength: 1 },
-            kind: { type: "string", enum: ["worked", "did-not-work", "recent-state"] },
+            kind: { type: "string", enum: [...selfCareConfirmationKinds] },
           },
           required: ["brainItemId", "kind"],
         },

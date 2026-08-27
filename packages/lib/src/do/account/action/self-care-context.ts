@@ -6,6 +6,7 @@ import type {
   SelfCareConfirmationResult,
   SelfCareContextReadModel,
 } from "../../../self-care-context";
+import { selfCareConfirmationKinds } from "../../../self-care-context";
 import type { AccountDataDatabase } from "../database";
 import { brainItemEvidenceEdges, brainItems } from "../schema/brain";
 import { sourceRecordTextPayloads } from "../schema/diary";
@@ -147,8 +148,20 @@ export async function revokeSelfCareContext(
 }
 
 const LIMITS = {
-  confirmed: { worked: 1, "did-not-work": 1, "recent-state": 1 },
-  "personalized-history": { worked: 3, "did-not-work": 3, "recent-state": 2 },
+  confirmed: {
+    "stress-trigger": 1,
+    "early-sign": 1,
+    worked: 1,
+    "did-not-work": 1,
+    "recent-state": 1,
+  },
+  "personalized-history": {
+    "stress-trigger": 3,
+    "early-sign": 3,
+    worked: 3,
+    "did-not-work": 3,
+    "recent-state": 2,
+  },
 } as const;
 const RECENT_STATE_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 
@@ -220,7 +233,10 @@ export async function selectSelfCareContextMemories(
     }
     grouped.set(row.confirmationId, [...(grouped.get(row.confirmationId) ?? []), row]);
   }
-  const used = { worked: 0, "did-not-work": 0, "recent-state": 0 };
+  const used = Object.fromEntries(selfCareConfirmationKinds.map((kind) => [kind, 0])) as Record<
+    SelfCareConfirmationKind,
+    number
+  >;
   const selected: BrainChatContextMemory[] = [];
   for (const confirmation of grouped.values()) {
     const first = confirmation[0];

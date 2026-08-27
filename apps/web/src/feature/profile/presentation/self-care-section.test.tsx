@@ -10,6 +10,24 @@ import { SelfCareSection } from "./self-care-section";
 const result: SelfCareContextResult = {
   items: [
     {
+      id: "stress-trigger",
+      brainItemId: "brain-stress-trigger",
+      statement: "急な予定変更が重なると消耗しやすい",
+      kind: "stress-trigger",
+      status: "active",
+      confirmedAt: "2026-08-20T00:00:00.000Z",
+      updatedAt: "2026-08-20T00:00:00.000Z",
+    },
+    {
+      id: "early-sign",
+      brainItemId: "brain-early-sign",
+      statement: "返信を後回しにし始める",
+      kind: "early-sign",
+      status: "active",
+      confirmedAt: "2026-08-19T00:00:00.000Z",
+      updatedAt: "2026-08-19T00:00:00.000Z",
+    },
+    {
       id: "worked-latest",
       brainItemId: "brain-worked-latest",
       statement: "予定を一つ減らすと少し楽になった",
@@ -41,12 +59,14 @@ const result: SelfCareContextResult = {
 };
 
 describe("SelfCareSection", () => {
-  it("SSoTの3項目を表示し、対応しない確認情報を独自分類しない", () => {
+  it("SSoTの3項目へ本人が確認した各分類を最大1件表示する", () => {
     render(<SelfCareSection state={{ status: "success", data: result }} onRetry={vi.fn()} />);
 
     expect(screen.getByText("負荷の手がかり")).toBeDefined();
     expect(screen.getByText("早めのサイン")).toBeDefined();
     expect(screen.getByText("合いやすかったこと")).toBeDefined();
+    expect(screen.getByText("急な予定変更が重なると消耗しやすい")).toBeDefined();
+    expect(screen.getByText("返信を後回しにし始める")).toBeDefined();
     expect(screen.getByText("予定を一つ減らすと少し楽になった")).toBeDefined();
     expect(screen.queryByText("今週は肩に力が入っている")).toBeNull();
     expect(screen.queryByText("長い散歩は余計に疲れた")).toBeNull();
@@ -100,7 +120,7 @@ describe("SelfCareDetailsScreen", () => {
     const revokeButton = screen.getAllByRole("button", { name: "確認を取り消す" })[0];
     if (!revokeButton) throw new Error("revoke button is missing");
     fireEvent.click(revokeButton);
-    expect(onRevoke).toHaveBeenCalledWith("worked-latest");
+    expect(onRevoke).toHaveBeenCalledWith("stress-trigger");
     for (const link of screen.getAllByRole("link", { name: "AIに聞く" })) {
       expect(link).toHaveProperty("href", LINE_OFFICIAL_ACCOUNT_URL);
     }

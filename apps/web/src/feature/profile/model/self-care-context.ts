@@ -1,4 +1,6 @@
-export type SelfCareContextKind = "worked" | "did-not-work" | "recent-state";
+import type { SelfCareConfirmationKind } from "@me-builder/shared";
+
+export type SelfCareContextKind = SelfCareConfirmationKind;
 
 export type SelfCareContextItem = Readonly<{
   id: string;
