@@ -2,6 +2,7 @@ import * as v from "valibot";
 import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
 
 const SsoAuthorizationUrlSchema = v.object({
+  flow: v.literal("same-browser"),
   authorizationUrl: v.pipe(v.string(), v.url()),
 });
 

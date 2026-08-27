@@ -601,6 +601,45 @@ describe("SSO authentication transaction", () => {
     ).rejects.toEqual(new SsoAuthenticationError("transaction_missing"));
   });
 
+  it("LIFF handoff callbackではIdentityをpending化するだけでlinkしない", async () => {
+    const store = createMemoryStore();
+    const client = createClient();
+    store.transactions.set("liff.state", {
+      purpose: "link",
+      initiatingAccountId: "account-at-start",
+      handoff: { attemptId: "attempt-1", confirmationSecretHash: "secret-hash" },
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      returnTo: "/profile",
+      expiresAt: 2_000,
+    });
+    const identityLinker = { link: vi.fn(async () => "identity") };
+    const stage = vi.fn(async () => undefined);
+
+    await expect(
+      completeSsoCallback({
+        state: "liff.state",
+        code: "code",
+        store,
+        client,
+        now: () => 1_000,
+        identityResolver: { findAccount: vi.fn() },
+        identityLinker,
+        rolloutAuthorizer: { allows: vi.fn() },
+        sessionIssuer: { issue: vi.fn() },
+        handoffStager: { stage },
+      }),
+    ).resolves.toMatchObject({ purpose: "link-handoff", attemptId: "attempt-1" });
+    expect(stage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptId: "attempt-1",
+        accountId: "account-at-start",
+        confirmationSecretHash: "secret-hash",
+      }),
+    );
+    expect(identityLinker.link).not.toHaveBeenCalled();
+  });
+
   it.each([
     { purpose: "login" as const, returnTo: "/diagnosis" },
     { purpose: "link" as const, initiatingAccountId: "account-1", returnTo: "/profile" },

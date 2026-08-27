@@ -9,10 +9,12 @@ const unconsentedAuthenticatedAllowlist = [
   "DELETE /api/auth/sso/identity",
   "GET /api/auth/session",
   "GET /api/auth/sso/identity",
+  "GET /api/auth/sso/link-attempts/:attemptId",
   "GET /api/legal/terms",
   "GET /api/legal/terms/acceptances",
   "POST /api/account-recovery/complete",
   "POST /api/auth/sso/link",
+  "POST /api/auth/sso/link-attempts/:attemptId/confirmation",
   "PUT /api/legal/terms/acceptance",
 ] as const;
 

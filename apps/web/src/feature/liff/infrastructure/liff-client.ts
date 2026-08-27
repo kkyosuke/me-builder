@@ -48,6 +48,29 @@ export function openLiffWindow(url: string): boolean {
   }
 }
 
+/** Google OAuthなど埋め込みWebViewで扱えないURLを端末の外部browserで開く。 */
+export function openLiffExternalWindow(url: string): boolean {
+  try {
+    if (!liff.isInClient()) return false;
+    liff.openWindow({ url, external: true });
+    return true;
+  } catch {
+    logger.warn(
+      { event: "liff.external-window.open.failed", outcome: "failed", reason: "sdk-error" },
+      "LIFF から外部 browser を開けませんでした",
+    );
+    return false;
+  }
+}
+
+export function isInLiffClient(): boolean {
+  try {
+    return liff.isInClient();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * LIFFの共有先選択を開始する。利用できない場合は同期的にnullを返し、呼び出し側が
  * ユーザー操作の権限を失う前にWeb Share APIへ切り替えられるようにする。

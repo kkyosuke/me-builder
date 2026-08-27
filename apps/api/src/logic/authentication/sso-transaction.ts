@@ -19,6 +19,7 @@ export type SsoAuthenticationTransaction = SsoAuthenticationTransactionBase &
     | {
         purpose: "link";
         initiatingAccountId: string;
+        handoff?: { attemptId: string; confirmationSecretHash: string } | undefined;
       }
   );
 
@@ -39,6 +40,7 @@ export type SsoAuthenticationFailure =
 export type SsoCallbackContext = {
   traceId?: string;
   returnTo: string;
+  handoff?: { attemptId: string; initiatingAccountId: string };
 };
 
 export class SsoAuthenticationError extends Error {
@@ -65,6 +67,14 @@ function callbackContext(transaction: SsoAuthenticationTransaction): SsoCallback
   return {
     ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
     returnTo: transaction.returnTo,
+    ...(transaction.purpose === "link" && transaction.handoff
+      ? {
+          handoff: {
+            attemptId: transaction.handoff.attemptId,
+            initiatingAccountId: transaction.initiatingAccountId,
+          },
+        }
+      : {}),
   };
 }
 
@@ -117,6 +127,15 @@ export interface SsoIdentityLinker {
   }): Promise<string>;
 }
 
+export interface SsoLinkHandoffStager {
+  stage(input: {
+    attemptId: string;
+    accountId: string;
+    confirmationSecretHash: string;
+    identity: SsoVerifiedIdentity;
+  }): Promise<void>;
+}
+
 function secureRandomBytes(size: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(size));
 }
@@ -153,11 +172,17 @@ export function normalizeSsoReturnTo(value: string): string {
 
 async function startSsoTransaction(
   input: StartSsoAuthenticationInput,
-  purpose: { purpose: "login" } | { purpose: "link"; initiatingAccountId: string },
+  purpose:
+    | { purpose: "login" }
+    | {
+        purpose: "link";
+        initiatingAccountId: string;
+        handoff?: { attemptId: string; confirmationSecretHash: string };
+      },
 ): Promise<URL> {
   const now = input.now?.() ?? Date.now();
   const random = input.randomBytes ?? secureRandomBytes;
-  const state = base64Url(random(RANDOM_VALUE_BYTES));
+  const state = `${purpose.purpose === "link" && purpose.handoff ? "liff." : ""}${base64Url(random(RANDOM_VALUE_BYTES))}`;
   const nonce = base64Url(random(RANDOM_VALUE_BYTES));
   const codeVerifier = base64Url(random(RANDOM_VALUE_BYTES));
   const codeChallenge = await sha256Base64Url(codeVerifier);
@@ -190,12 +215,16 @@ export async function startSsoAuthentication(input: StartSsoAuthenticationInput)
 
 /** 認証済みAccountを固定したlink transactionを保存し、Googleの認可URLを返す。 */
 export async function startSsoIdentityLinking(
-  input: StartSsoAuthenticationInput & { initiatingAccountId: string },
+  input: StartSsoAuthenticationInput & {
+    initiatingAccountId: string;
+    handoff?: { attemptId: string; confirmationSecretHash: string };
+  },
 ): Promise<URL> {
   if (!input.initiatingAccountId) throw new SsoAuthenticationError("invalid_callback");
   return await startSsoTransaction(input, {
     purpose: "link",
     initiatingAccountId: input.initiatingAccountId,
+    ...(input.handoff ? { handoff: input.handoff } : {}),
   });
 }
 
@@ -236,9 +265,11 @@ export async function completeSsoCallback<SessionResult>(
     identityLinker: SsoIdentityLinker;
     rolloutAuthorizer: SsoRolloutAuthorizer;
     sessionIssuer: SsoApplicationSessionIssuer<SessionResult>;
+    handoffStager?: SsoLinkHandoffStager;
   },
 ): Promise<
   | { purpose: "login"; session: SessionResult; returnTo: string; traceId?: string }
+  | { purpose: "link-handoff"; attemptId: string; returnTo: string; traceId?: string }
   | {
       purpose: "link";
       accountId: string;
@@ -297,6 +328,28 @@ export async function completeSsoCallback<SessionResult>(
     };
   }
 
+  if (transaction.handoff) {
+    if (!input.handoffStager) {
+      throw new SsoAuthenticationError("transaction_purpose_mismatch", callback);
+    }
+    try {
+      await input.handoffStager.stage({
+        attemptId: transaction.handoff.attemptId,
+        accountId: transaction.initiatingAccountId,
+        confirmationSecretHash: transaction.handoff.confirmationSecretHash,
+        identity,
+      });
+    } catch (error) {
+      throw new SsoCallbackCompletionError(callback, error);
+    }
+    return {
+      purpose: "link-handoff",
+      attemptId: transaction.handoff.attemptId,
+      returnTo: transaction.returnTo,
+      ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
+    };
+  }
+
   let authenticatedIdentityId: string;
   try {
     authenticatedIdentityId = await input.identityLinker.link({
@@ -324,7 +377,12 @@ export async function cancelSsoAuthentication(input: {
   state: string;
   store: SsoAuthenticationTransactionStore;
   now?: () => number;
-}): Promise<{ purpose: "link" | "login"; returnTo: string; traceId?: string }> {
+}): Promise<{
+  purpose: "link" | "login";
+  returnTo: string;
+  traceId?: string;
+  handoff?: { attemptId: string; initiatingAccountId: string };
+}> {
   if (!input.state) throw new SsoAuthenticationError("invalid_callback");
   const transaction = await input.store.consume(input.state);
   if (!transaction) throw new SsoAuthenticationError("transaction_missing");
@@ -335,5 +393,13 @@ export async function cancelSsoAuthentication(input: {
     purpose: transaction.purpose,
     returnTo: transaction.returnTo,
     ...(transaction.traceId ? { traceId: transaction.traceId } : {}),
+    ...(transaction.purpose === "link" && transaction.handoff
+      ? {
+          handoff: {
+            attemptId: transaction.handoff.attemptId,
+            initiatingAccountId: transaction.initiatingAccountId,
+          },
+        }
+      : {}),
   };
 }

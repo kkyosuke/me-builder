@@ -13,12 +13,33 @@ export const SsoIdentityStatusSchema = v.object({
   canUnlink: v.boolean(),
 });
 
+export const SsoLinkAuthorizationUrlSchema = v.variant("flow", [
+  v.object({
+    flow: v.literal("liff-handoff"),
+    authorizationUrl: v.pipe(v.string(), v.url()),
+    attemptId: v.pipe(v.string(), v.nonEmpty()),
+    confirmationSecret: v.pipe(v.string(), v.nonEmpty()),
+  }),
+  v.object({
+    flow: v.literal("same-browser"),
+    authorizationUrl: v.pipe(v.string(), v.url()),
+  }),
+]);
+
 export const SsoAuthorizationUrlSchema = v.object({
+  flow: v.literal("same-browser"),
   authorizationUrl: v.pipe(v.string(), v.url()),
+});
+
+export const SsoLinkAttemptStatusSchema = v.object({
+  status: v.picklist(["waiting", "ready", "cancelled", "failed", "expired"]),
 });
 
 export const LastIdentityConflictSchema = v.object({
   error: v.literal("Last login identity cannot be unlinked"),
+});
+export const SsoLinkAttemptConflictSchema = v.object({
+  error: v.literal("SSO link attempt cannot be confirmed"),
 });
 
 const applicationSessionSecurity = [{ applicationSession: [] }];
@@ -29,6 +50,19 @@ const returnToParameter = {
   required: false,
   schema: { type: "string", maxLength: 2048 },
   description: "認証後に復元する同一originの相対path",
+} as const;
+const attemptIdParameter = {
+  name: "attemptId",
+  in: "path",
+  required: true,
+  schema: { type: "string", minLength: 1 },
+} as const;
+const confirmationSecretParameter = {
+  name: "X-SSO-Link-Confirmation",
+  in: "header",
+  required: true,
+  schema: { type: "string", minLength: 1 },
+  description: "link開始時に元のLIFFへだけ返した確認secret",
 } as const;
 const commonErrors = {
   401: jsonResponse("application sessionが無効", UnauthorizedErrorSchema),
@@ -52,9 +86,46 @@ export const startSsoIdentityLinkRoute = describeRoute({
   tags: ["Authentication"],
   summary: "認証済みAccountへのSSO Identity追加を開始する",
   security: applicationSessionMutationSecurity,
-  parameters: [returnToParameter],
+  parameters: [
+    returnToParameter,
+    {
+      name: "handoff",
+      in: "query",
+      required: false,
+      schema: { type: "string", enum: ["liff"] },
+    },
+  ],
   responses: {
-    200: jsonResponse("同じbrowserで開くGoogle認可URL", SsoAuthorizationUrlSchema),
+    200: jsonResponse(
+      "Google認可URLと、LIFF handoff時だけ返す確認情報",
+      SsoLinkAuthorizationUrlSchema,
+    ),
+    ...csrfValidationError,
+    ...commonErrors,
+  },
+} satisfies DescribeRouteOptions);
+
+export const getSsoLinkAttemptRoute = describeRoute({
+  operationId: "getSsoLinkAttempt",
+  tags: ["Authentication"],
+  summary: "元のLIFFからGoogle認証の完了状態を確認する",
+  security: applicationSessionSecurity,
+  parameters: [attemptIdParameter, confirmationSecretParameter],
+  responses: {
+    200: jsonResponse("Identityを含まないlink attempt状態", SsoLinkAttemptStatusSchema),
+    ...commonErrors,
+  },
+} satisfies DescribeRouteOptions);
+
+export const confirmSsoLinkAttemptRoute = describeRoute({
+  operationId: "confirmSsoLinkAttempt",
+  tags: ["Authentication"],
+  summary: "元のLIFF AccountでGoogle Identity追加を確定する",
+  security: applicationSessionMutationSecurity,
+  parameters: [attemptIdParameter, confirmationSecretParameter],
+  responses: {
+    200: jsonResponse("確定後の接続状態", SsoIdentityStatusSchema),
+    409: jsonResponse("attemptが確定可能でない", SsoLinkAttemptConflictSchema),
     ...csrfValidationError,
     ...commonErrors,
   },
@@ -79,6 +150,10 @@ export const completeSsoCallbackRoute = describeRoute({
   summary: "SSO callbackを一度だけ処理する",
   security: [],
   responses: {
+    200: {
+      description: "LIFF handoff完了案内",
+      content: { "text/html": { schema: { type: "string" } } },
+    },
     302: { description: "保存済みの同一origin相対pathへredirect" },
     503: jsonResponse("SSOまたはstorage bindingが未設定", ServiceUnavailableErrorSchema),
     ...internalServerError,

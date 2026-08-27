@@ -107,6 +107,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/auth/sso/link-attempts/{attemptId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 元のLIFFからGoogle認証の完了状態を確認する */
+    get: operations["getSsoLinkAttempt"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/sso/link-attempts/{attemptId}/confirmation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 元のLIFF AccountでGoogle Identity追加を確定する */
+    post: operations["confirmSsoLinkAttempt"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/sso/login": {
     parameters: {
       query?: never;
@@ -1861,6 +1895,7 @@ export interface operations {
       query?: {
         /** @description 認証後に復元する同一originの相対path */
         returnTo?: string;
+        handoff?: "liff";
       };
       header?: never;
       path?: never;
@@ -1868,16 +1903,27 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description 同じbrowserで開くGoogle認可URL */
+      /** @description Google認可URLと、LIFF handoff時だけ返す確認情報 */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": {
-            /** Format: uri */
-            authorizationUrl: string;
-          };
+          "application/json":
+            | {
+                /** @constant */
+                flow: "liff-handoff";
+                /** Format: uri */
+                authorizationUrl: string;
+                attemptId: string;
+                confirmationSecret: string;
+              }
+            | {
+                /** @constant */
+                flow: "same-browser";
+                /** Format: uri */
+                authorizationUrl: string;
+              };
         };
       };
       /** @description application sessionが無効 */
@@ -1930,6 +1976,158 @@ export interface operations {
       };
     };
   };
+  getSsoLinkAttempt: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description link開始時に元のLIFFへだけ返した確認secret */
+        "X-SSO-Link-Confirmation": string;
+      };
+      path: {
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Identityを含まないlink attempt状態 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "waiting" | "ready" | "cancelled" | "failed" | "expired";
+          };
+        };
+      };
+      /** @description application sessionが無効 */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description SSOまたはstorage bindingが未設定 */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
+  confirmSsoLinkAttempt: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description link開始時に元のLIFFへだけ返した確認secret */
+        "X-SSO-Link-Confirmation": string;
+      };
+      path: {
+        attemptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 確定後の接続状態 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            linked: boolean;
+            canUnlink: boolean;
+          };
+        };
+      };
+      /** @description application sessionが無効 */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Unauthorized";
+          };
+        };
+      };
+      /** @description OriginまたはCSRF tokenが一致しない */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Forbidden";
+          };
+        };
+      };
+      /** @description attemptが確定可能でない */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "SSO link attempt cannot be confirmed";
+          };
+        };
+      };
+      /** @description 未処理のサーバーエラー */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Internal Server Error";
+          };
+        };
+      };
+      /** @description SSOまたはstorage bindingが未設定 */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @constant */
+            error: "Service Unavailable";
+          };
+        };
+      };
+    };
+  };
   startSsoLogin: {
     parameters: {
       query?: {
@@ -1949,6 +2147,8 @@ export interface operations {
         };
         content: {
           "application/json": {
+            /** @constant */
+            flow: "same-browser";
             /** Format: uri */
             authorizationUrl: string;
           };
@@ -1989,6 +2189,15 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
+      /** @description LIFF handoff完了案内 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/html": string;
+        };
+      };
       /** @description 保存済みの同一origin相対pathへredirect */
       302: {
         headers: {

@@ -5,6 +5,7 @@ import type { AppEnv } from "../types";
 
 const mocks = vi.hoisted(() => {
   class CannotUnlinkLastIdentityError extends Error {}
+  class IdentityAlreadyLinkedError extends Error {}
   class SsoProviderError extends Error {
     constructor(readonly reason: "configuration" | "provider_rejected" | "token_invalid") {
       super(reason);
@@ -28,22 +29,29 @@ const mocks = vi.hoisted(() => {
   }
   return {
     CannotUnlinkLastIdentityError,
+    IdentityAlreadyLinkedError,
     SsoProviderError,
     SsoAuthenticationError,
     SsoCallbackCompletionError,
     createClient: vi.fn(() => ({ client: true })),
     createStore: vi.fn(() => ({ store: true })),
-    createLinker: vi.fn(() => ({ linker: true })),
+    createLinker: vi.fn<() => unknown>(() => ({ linker: true })),
     createResolver: vi.fn(() => ({ resolver: true })),
     getStatus: vi.fn(),
     unlink: vi.fn(),
     invalidateSessions: vi.fn(),
     logoutSession: vi.fn(),
     issueSession: vi.fn(),
+    rotateSession: vi.fn(),
+    linkIdentity: vi.fn(),
     startLinking: vi.fn(),
     startLogin: vi.fn(),
     completeCallback: vi.fn(),
     cancelAuthentication: vi.fn(),
+    putHandoff: vi.fn(),
+    handoffStatus: vi.fn(),
+    consumeReadyHandoff: vi.fn(),
+    markHandoff: vi.fn(),
   };
 });
 
@@ -60,6 +68,7 @@ vi.mock("@me-builder/lib", async (importOriginal) => {
           account: {
             ...actual.D1.shared.action.account,
             CannotUnlinkLastIdentityError: mocks.CannotUnlinkLastIdentityError,
+            IdentityAlreadyLinkedError: mocks.IdentityAlreadyLinkedError,
           },
         },
       },
@@ -83,11 +92,22 @@ vi.mock("../infrastructure/authentication/application-session-runtime", () => ({
       invalidateAccountSessions: mocks.invalidateSessions,
       issue: mocks.issueSession,
       logout: mocks.logoutSession,
+      rotate: mocks.rotateSession,
     },
   })),
 }));
 vi.mock("../infrastructure/authentication/sso-transaction-store", () => ({
   createSsoTransactionStore: mocks.createStore,
+}));
+vi.mock("../infrastructure/authentication/sso-link-handoff-store", () => ({
+  hashSsoLinkSecret: vi.fn(async (value: string) => `hash:${value}`),
+  createSsoLinkHandoffStore: vi.fn(() => ({
+    put: mocks.putHandoff,
+    status: mocks.handoffStatus,
+    consumeReady: mocks.consumeReadyHandoff,
+    mark: mocks.markHandoff,
+    stager: { stage: vi.fn() },
+  })),
 }));
 vi.mock("../infrastructure/authentication/sso-identity-repository", () => ({
   createSsoExistingIdentityResolver: mocks.createResolver,
@@ -108,7 +128,9 @@ import {
   deleteSsoIdentity,
   getSsoCallback,
   getSsoIdentityStatusContents,
+  getSsoLinkAttempt,
   postSsoIdentityLink,
+  postSsoLinkAttemptConfirmation,
   postSsoLogin,
 } from "./sso-identity";
 
@@ -149,6 +171,11 @@ describe("SSO identity controller", () => {
       csrfToken: "csrf-token",
       expiresAt: new Date("2026-09-16T00:00:00.000Z"),
     });
+    mocks.rotateSession.mockResolvedValue({
+      sessionToken: "rotated-session",
+      csrfToken: "rotated-csrf-token",
+      expiresAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -183,6 +210,7 @@ describe("SSO identity controller", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
+      flow: "same-browser",
       authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
     });
     expect(response.headers.get("set-cookie")).toContain(
@@ -210,6 +238,156 @@ describe("SSO identity controller", () => {
       "[SSO] succeeded at authorization.create -> provider-redirect",
     );
     expect(JSON.stringify(log.mock.calls)).not.toContain("account-at-start");
+  });
+
+  it("LIFF handoffではOAuth stateと別の確認情報を返して短命attemptを保存する", async () => {
+    vi.spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000001")
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000002");
+    mocks.startLinking.mockResolvedValue(
+      new URL("https://accounts.google.com/o/oauth2/v2/auth?state=liff.opaque"),
+    );
+    const response = await testApp("/api/auth/sso/link", postSsoIdentityLink).request(
+      "https://api.example.com/api/auth/sso/link?handoff=liff",
+      { method: "POST" },
+      env,
+    );
+
+    const body = (await response.json()) as Record<string, string>;
+    expect(response.status).toBe(200);
+    expect(body.flow).toBe("liff-handoff");
+    expect(body.authorizationUrl).toContain("state=liff.opaque");
+    expect(body.attemptId).toBe("00000000-0000-4000-8000-000000000002");
+    expect(body.confirmationSecret).toMatch(/^[A-Za-z0-9_-]+$/u);
+    expect(mocks.putHandoff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptId: body.attemptId,
+        accountId: "account-at-start",
+        confirmationSecretHash: `hash:${body.confirmationSecret}`,
+        ttlSeconds: 600,
+      }),
+    );
+    expect(mocks.startLinking).toHaveBeenCalledWith(
+      expect.objectContaining({
+        handoff: {
+          attemptId: body.attemptId,
+          confirmationSecretHash: `hash:${body.confirmationSecret}`,
+        },
+      }),
+    );
+  });
+
+  it("LIFFの状態確認は現在のAccountと開始元だけの確認secretへ束縛する", async () => {
+    mocks.handoffStatus.mockResolvedValue("ready");
+    const response = await testApp(
+      "/api/auth/sso/link-attempts/:attemptId",
+      getSsoLinkAttempt,
+    ).request(
+      "https://api.example.com/api/auth/sso/link-attempts/attempt-1",
+      { headers: { "X-SSO-Link-Confirmation": "confirmation-secret" } },
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "ready" });
+    expect(mocks.handoffStatus).toHaveBeenCalledWith({
+      attemptId: "attempt-1",
+      accountId: "account-at-start",
+      confirmationSecret: "confirmation-secret",
+    });
+  });
+
+  it("LIFFでの確定後は元sessionの期限と表示情報を保つrotationを行う", async () => {
+    mocks.consumeReadyHandoff.mockResolvedValue({
+      providerKey: "gcp_identity_platform",
+      subject: "google-subject",
+      authenticationMethod: "sso",
+      authenticatedAt: new Date("2026-08-27T00:00:00.000Z"),
+    });
+    mocks.createLinker.mockReturnValueOnce({ link: mocks.linkIdentity });
+    mocks.linkIdentity.mockResolvedValue("google-identity");
+    mocks.getStatus.mockResolvedValue({ linked: true, canUnlink: true });
+    const response = await testApp(
+      "/api/auth/sso/link-attempts/:attemptId/confirmation",
+      postSsoLinkAttemptConfirmation,
+    ).request(
+      "https://api.example.com/api/auth/sso/link-attempts/attempt-1/confirmation",
+      {
+        method: "POST",
+        headers: {
+          Cookie: "__Host-me_builder_session=existing-liff-session",
+          "X-SSO-Link-Confirmation": "confirmation-secret",
+        },
+      },
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ linked: true, canUnlink: true });
+    expect(mocks.linkIdentity).toHaveBeenCalledWith({
+      accountId: "account-at-start",
+      providerKey: "gcp_identity_platform",
+      subject: "google-subject",
+    });
+    expect(mocks.rotateSession).toHaveBeenCalledWith("existing-liff-session");
+    expect(mocks.logoutSession).not.toHaveBeenCalled();
+    expect(mocks.issueSession).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toContain(
+      "__Host-me_builder_session=rotated-session",
+    );
+  });
+
+  it("別Accountに接続済みのGoogle Identityを奪わず固定409で拒否する", async () => {
+    mocks.consumeReadyHandoff.mockResolvedValue({
+      providerKey: "gcp_identity_platform",
+      subject: "google-subject",
+      authenticationMethod: "sso",
+      authenticatedAt: new Date("2026-08-27T00:00:00.000Z"),
+    });
+    mocks.createLinker.mockReturnValueOnce({ link: mocks.linkIdentity });
+    mocks.linkIdentity.mockRejectedValue(new mocks.IdentityAlreadyLinkedError());
+    const response = await testApp(
+      "/api/auth/sso/link-attempts/:attemptId/confirmation",
+      postSsoLinkAttemptConfirmation,
+    ).request(
+      "https://api.example.com/api/auth/sso/link-attempts/attempt-1/confirmation",
+      {
+        method: "POST",
+        headers: {
+          Cookie: "__Host-me_builder_session=existing-liff-session",
+          "X-SSO-Link-Confirmation": "confirmation-secret",
+        },
+      },
+      env,
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "SSO link attempt cannot be confirmed" });
+    expect(mocks.rotateSession).not.toHaveBeenCalled();
+  });
+
+  it("LIFF handoff callbackはcallback cookieなしでもpending化より先へ進まない", async () => {
+    mocks.completeCallback.mockResolvedValue({
+      purpose: "link-handoff",
+      attemptId: "attempt-1",
+      returnTo: "/profile",
+    });
+    const response = await testApp("/api/auth/sso/callback", getSsoCallback).request(
+      "https://api.example.com/api/auth/sso/callback?state=liff.opaque&code=code",
+      undefined,
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(mocks.completeCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ state: "liff.opaque", handoffStager: expect.anything() }),
+    );
+    expect(mocks.rotateSession).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).not.toContain("me_builder_session=");
   });
 
   it("link callback成功後は保存済みpathだけへ復帰する", async () => {
@@ -352,6 +530,7 @@ describe("SSO identity controller", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
+      flow: "same-browser",
       authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=login",
     });
     expect(mocks.startLogin).toHaveBeenCalledWith(expect.objectContaining({ returnTo: "/admin" }));

@@ -28,6 +28,7 @@ Productionへの公開は[SSO Production段階公開Runbook](sso-production-roll
 - Development OAuth clientにLocalとPreviewの承認済みリダイレクトURIが設計書どおり登録されている
 - `GOOGLE_IDENTITY_PLATFORM_API_KEY`はIdentity Toolkit APIへAPI制限済みで、Development OAuth clientと同じGCP projectを指している
 - application session issuerと失効処理が接続済みで、SSO transactionを同時実行時にも一度だけconsumeできる
+- LIFFプロフィールのGoogle連携が外部browser handoffと元のLIFFでの明示的な確定に分かれ、callbackだけではIdentityを追加しない
 - `SSO_ROLLOUT_MODE=linking`から開始し、SSOを追加する既存Accountを2件以上用意済み
 - LIFF実端末、通常の外部ブラウザ、管理者Account、未linkの別Accountを別々のブラウザprofileで操作可能
 - 検証中にProductionのGCP project、OAuth client、secret、callback URLを使わないことを確認済み
@@ -60,6 +61,7 @@ CIでは、state、nonce、PKCE、return path、同時callbackの一度きりcon
 | P-S06 | 同一Account | LIFFとSSOを順に使う | 同じプロフィール、診断、相性データへ到達する |
 | P-S07 | 2 Account・2タブ | Account Aを2タブで開き、一方をAccount BのLIFFへ切り替える | Aの両sessionが401になり、Bの画面だけを表示して前Accountのcacheと履歴を再利用しない |
 | P-S08 | 外部ブラウザ | session発行後に再訪し、logoutして戻る | cookieでsessionを再利用し、logout後は旧画面を表示せず再認証を案内する |
+| P-S09 | LIFF実端末 | プロフィールで「Googleと連携」を選び、外部browserで認証後にLINEへ戻って確定する | Google認可画面をLIFF内へ表示せず、callback時点では未接続、同じLIFF Accountで確定した後だけ接続済みになる |
 
 ## 5. 失敗・境界経路
 
@@ -74,6 +76,10 @@ CIでは、state、nonce、PKCE、return path、同時callbackの一度きりcon
 | P-N07 | Account復旧完了、Identity解除、Account停止後の旧session | KVの削除反映を待たず旧sessionを拒否し、前Accountの内容を返さない |
 | P-N08 | SSO設定／transaction store欠落 | SSO endpointだけが503になり、LIFF交換は継続する |
 | P-N09 | callback URLを開始元と別ブラウザprofileで開く | callback cookie不一致としてtransactionを処理せず、開始元以外へsessionを発行しない |
+| P-N10 | LIFF連携の外部browser callback後、確定前にLIFF Accountを切り替える | 新しいAccountへIdentityを追加せず、attemptを再利用できない |
+| P-N11 | LIFF連携の認可URLだけを別端末で完了する／確認secretを欠落・改変する | callbackでpendingより先へ進めず、元のLIFFの確認secretなしではIdentityを追加しない |
+| P-N12 | LIFF連携のcallbackまたは確定を同時実行／再送する | callbackとIdentity追加をそれぞれ最大1件とし、再送でsessionやIdentityを重複変更しない |
+| P-N13 | Google認証中に外部browserを閉じる／attemptが期限切れになる | 元のLIFF sessionとAccountを維持し、プロフィールから安全にやり直せる |
 
 ## 6. 運用ログの確認
 

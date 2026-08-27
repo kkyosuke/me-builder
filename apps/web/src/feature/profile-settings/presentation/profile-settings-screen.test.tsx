@@ -204,6 +204,31 @@ describe("ProfileSettingsScreen", () => {
     expect(onLinkSsoIdentity).toHaveBeenCalledOnce();
   });
 
+  it("外部browserのGoogle認証完了後に元のLIFFで明示確定する", async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+        ssoIdentity={{ status: "success", data: { linked: false, canUnlink: false } }}
+        onLinkSsoIdentity={vi.fn()}
+        onUnlinkSsoIdentity={vi.fn()}
+        ssoLinkHandoffStatus="ready"
+        onConfirmSsoLinkHandoff={onConfirm}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Googleと連携" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "このGoogleアカウントを連携" }));
+    expect(await screen.findByText("Googleと連携しました。")).toBeTruthy();
+    expect(onConfirm).toHaveBeenCalledOnce();
+  });
+
   it.each([
     ["linked", "Googleと連携しました。"],
     ["cancelled", "Google連携をキャンセルしました。"],

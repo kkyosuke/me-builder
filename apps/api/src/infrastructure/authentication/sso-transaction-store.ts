@@ -20,6 +20,12 @@ const TransactionSchema = v.variant("purpose", [
     ...TransactionEntries,
     purpose: v.literal("link"),
     initiatingAccountId: v.pipe(v.string(), v.nonEmpty()),
+    handoff: v.optional(
+      v.object({
+        attemptId: v.pipe(v.string(), v.nonEmpty()),
+        confirmationSecretHash: v.pipe(v.string(), v.nonEmpty()),
+      }),
+    ),
   }),
 ]);
 

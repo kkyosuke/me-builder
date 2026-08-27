@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { authSessionRuntime } from "../../auth/infrastructure/auth-session-runtime";
 import {
+  confirmSsoLinkAttempt,
   fetchSsoIdentityStatus,
+  fetchSsoLinkAttemptStatus,
   startSsoIdentityLink,
   unlinkSsoIdentity,
 } from "./sso-identity-api";
@@ -31,13 +33,17 @@ describe("sso identity api", () => {
     authSessionRuntime.setCsrfToken("csrf-token");
     const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       Response.json({
+        flow: "same-browser",
         authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
       }),
     );
 
     await expect(
       startSsoIdentityLink("https://api.example.com/", "/profile?sso=linking"),
-    ).resolves.toBe("https://accounts.google.com/o/oauth2/v2/auth?state=opaque");
+    ).resolves.toEqual({
+      flow: "same-browser",
+      authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
+    });
     expect(fetcher).toHaveBeenCalledWith(
       "https://api.example.com/api/auth/sso/link?returnTo=%2Fprofile%3Fsso%3Dlinking",
       expect.objectContaining({
@@ -47,6 +53,32 @@ describe("sso identity api", () => {
       }),
     );
     expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("LIFF handoffの状態確認と確定に開始元だけの確認secretを付ける", async () => {
+    authSessionRuntime.setCsrfToken("csrf-token");
+    const synchronize = vi
+      .spyOn(authSessionRuntime, "synchronizeAfterSessionChange")
+      .mockResolvedValue();
+    const fetcher = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ status: "ready" }))
+      .mockResolvedValueOnce(Response.json({ linked: true, canUnlink: true }));
+
+    await expect(
+      fetchSsoLinkAttemptStatus("https://api.example.com", "attempt-1", "confirmation-secret"),
+    ).resolves.toBe("ready");
+    await expect(
+      confirmSsoLinkAttempt("https://api.example.com", "attempt-1", "confirmation-secret"),
+    ).resolves.toEqual({ linked: true, canUnlink: true });
+
+    expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get("X-SSO-Link-Confirmation")).toBe(
+      "confirmation-secret",
+    );
+    const confirmationHeaders = new Headers(fetcher.mock.calls[1]?.[1]?.headers);
+    expect(confirmationHeaders.get("X-SSO-Link-Confirmation")).toBe("confirmation-secret");
+    expect(confirmationHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+    expect(synchronize).toHaveBeenCalledOnce();
   });
 
   it("解除requestへapplication sessionのCSRF tokenを付ける", async () => {

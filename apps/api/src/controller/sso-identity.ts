@@ -8,6 +8,9 @@ import {
   LastIdentityConflictSchema,
   SsoAuthorizationUrlSchema,
   SsoIdentityStatusSchema,
+  SsoLinkAttemptConflictSchema,
+  SsoLinkAttemptStatusSchema,
+  SsoLinkAuthorizationUrlSchema,
 } from "../contract/auth/sso-identity";
 import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
 import {
@@ -20,6 +23,10 @@ import {
   getSsoIdentityStatus,
   unlinkSsoIdentity,
 } from "../infrastructure/authentication/sso-identity-repository";
+import {
+  createSsoLinkHandoffStore,
+  hashSsoLinkSecret,
+} from "../infrastructure/authentication/sso-link-handoff-store";
 import {
   createConfiguredSsoProvider,
   ssoIdentityProviderPolicy,
@@ -43,6 +50,7 @@ import { setApplicationSessionCookie } from "./authentication";
 const SSO_CALLBACK_STATE_COOKIE = "me_builder_sso_callback_state";
 const SECURE_SSO_CALLBACK_STATE_COOKIE = "__Host-me_builder_sso_callback_state";
 const SSO_CALLBACK_STATE_TTL_SECONDS = 10 * 60;
+const SSO_LINK_CONFIRMATION_HEADER = "X-SSO-Link-Confirmation";
 
 const SSO_AUTHENTICATION_RESULT_CODES = {
   identity_unlinked: "SSO_IDENTITY_UNLINKED",
@@ -93,12 +101,36 @@ function configured(c: Context<AppEnv>) {
   ) {
     return undefined;
   }
+  const db = D1.shared.client.create(c.env.DB);
   return {
     configuration,
     secureCallback: new URL(configuration.ssoCallbackUrl).protocol === "https:",
-    store: createSsoTransactionStore(D1.shared.client.create(c.env.DB), c.env.SESSION_STORE),
+    db,
+    store: createSsoTransactionStore(db, c.env.SESSION_STORE),
+    handoffs: createSsoLinkHandoffStore(db, c.env.SESSION_STORE),
     client,
   };
+}
+
+function randomSecret(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+function handoffCompletionPage(c: Context<AppEnv>, message: string): Response {
+  c.header("Content-Type", "text/html; charset=UTF-8");
+  c.header(
+    "Content-Security-Policy",
+    "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+  );
+  c.header("Referrer-Policy", "no-referrer");
+  c.header("X-Frame-Options", "DENY");
+  return c.body(
+    `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Google連携</title><body><main><h1>${message}</h1><p>この画面を閉じてLINEへ戻り、プロフィールで連携を確定してください。</p></main></body></html>`,
+    200,
+  );
 }
 
 function resultPath(returnTo: string, result: "cancelled" | "error" | "linked"): string {
@@ -195,14 +227,26 @@ export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response>
   const dependencies = configured(c);
   if (!dependencies) return unavailable(c);
   const traceId = crypto.randomUUID();
+  const liffHandoff = c.req.query("handoff") === "liff";
+  const attemptId = liffHandoff ? crypto.randomUUID() : undefined;
+  const confirmationSecret = liffHandoff ? randomSecret() : undefined;
+  const accountId = authenticatedActor(c).accountId;
   let authorizationUrl: URL;
   try {
     authorizationUrl = await startSsoIdentityLinking({
       traceId,
-      initiatingAccountId: authenticatedActor(c).accountId,
+      initiatingAccountId: accountId,
       returnTo: c.req.query("returnTo") ?? "/profile",
       store: dependencies.store,
       client: dependencies.client,
+      ...(attemptId && confirmationSecret
+        ? {
+            handoff: {
+              attemptId,
+              confirmationSecretHash: await hashSsoLinkSecret(confirmationSecret),
+            },
+          }
+        : {}),
     });
   } catch (error) {
     if (!(error instanceof SsoProviderError)) throw error;
@@ -213,13 +257,81 @@ export async function postSsoIdentityLink(c: Context<AppEnv>): Promise<Response>
     logSsoStartFailure({ traceId, purpose: "link" });
     return unavailable(c);
   }
+  if (attemptId && confirmationSecret) {
+    await dependencies.handoffs.put({
+      attemptId,
+      accountId,
+      confirmationSecretHash: await hashSsoLinkSecret(confirmationSecret),
+      expiresAt: Date.now() + SSO_CALLBACK_STATE_TTL_SECONDS * 1000,
+      ttlSeconds: SSO_CALLBACK_STATE_TTL_SECONDS,
+    });
+  }
   logSsoStarted({
     traceId,
     purpose: "link",
     rolloutMode:
       dependencies.configuration.ssoRolloutMode === "linked-login" ? "linked-login" : "linking",
   });
-  return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
+  return c.json(
+    v.parse(SsoLinkAuthorizationUrlSchema, {
+      flow: attemptId && confirmationSecret ? "liff-handoff" : "same-browser",
+      authorizationUrl: authorizationUrl.href,
+      ...(attemptId && confirmationSecret ? { attemptId, confirmationSecret } : {}),
+    }),
+  );
+}
+
+export async function getSsoLinkAttempt(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  const dependencies = configured(c);
+  if (!dependencies) return unavailable(c);
+  const status = await dependencies.handoffs.status({
+    attemptId: c.req.param("attemptId") ?? "",
+    accountId: authenticatedActor(c).accountId,
+    confirmationSecret: c.req.header(SSO_LINK_CONFIRMATION_HEADER) ?? "",
+  });
+  return c.json(v.parse(SsoLinkAttemptStatusSchema, { status }));
+}
+
+export async function postSsoLinkAttemptConfirmation(c: Context<AppEnv>): Promise<Response> {
+  c.header("Cache-Control", "no-store");
+  const dependencies = configured(c);
+  const runtime = createApplicationSessionService(c.env);
+  if (!dependencies || !runtime) return unavailable(c);
+  const actor = authenticatedActor(c);
+  const identity = await dependencies.handoffs.consumeReady({
+    attemptId: c.req.param("attemptId") ?? "",
+    accountId: actor.accountId,
+    confirmationSecret: c.req.header(SSO_LINK_CONFIRMATION_HEADER) ?? "",
+  });
+  if (!identity) {
+    return c.json(
+      v.parse(SsoLinkAttemptConflictSchema, { error: "SSO link attempt cannot be confirmed" }),
+      409,
+    );
+  }
+  try {
+    await createSsoIdentityLinker(runtime.db, ssoIdentityProviderPolicy).link({
+      accountId: actor.accountId,
+      providerKey: identity.providerKey,
+      subject: identity.subject,
+    });
+  } catch (error) {
+    if (error instanceof D1.shared.action.account.IdentityAlreadyLinkedError) {
+      return c.json(
+        v.parse(SsoLinkAttemptConflictSchema, { error: "SSO link attempt cannot be confirmed" }),
+        409,
+      );
+    }
+    throw error;
+  }
+  const status = await getSsoIdentityStatus(runtime.db, actor.accountId, ssoIdentityProviderPolicy);
+  const previousToken = getCookie(c, APPLICATION_SESSION_COOKIE);
+  if (!previousToken) return unavailable(c);
+  const rotated = await runtime.sessions.rotate(previousToken);
+  if (!rotated) return unavailable(c);
+  setApplicationSessionCookie(c, rotated.sessionToken, rotated.expiresAt);
+  return c.json(v.parse(SsoIdentityStatusSchema, status));
 }
 
 export async function postSsoLogin(c: Context<AppEnv>): Promise<Response> {
@@ -247,7 +359,12 @@ export async function postSsoLogin(c: Context<AppEnv>): Promise<Response> {
     return unavailable(c);
   }
   logSsoStarted({ traceId, purpose: "login", rolloutMode: "linked-login" });
-  return c.json(v.parse(SsoAuthorizationUrlSchema, { authorizationUrl: authorizationUrl.href }));
+  return c.json(
+    v.parse(SsoAuthorizationUrlSchema, {
+      flow: "same-browser",
+      authorizationUrl: authorizationUrl.href,
+    }),
+  );
 }
 
 export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
@@ -260,7 +377,8 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
     : SSO_CALLBACK_STATE_COOKIE;
   const expectedState = getCookie(c, cookieName);
   deleteCookie(c, cookieName, callbackStateCookieOptions(dependencies.secureCallback));
-  if (!state || state !== expectedState) {
+  const isLiffHandoff = state.startsWith("liff.");
+  if (!state || (!isLiffHandoff && state !== expectedState)) {
     logger.warn(
       {
         event: "sso.callback.rejected",
@@ -279,6 +397,17 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
     const providerError = c.req.query("error");
     if (providerError) {
       const cancelled = await cancelSsoAuthentication({ state, store: dependencies.store });
+      if (cancelled.handoff) {
+        const cancelledByUser = providerError === "access_denied";
+        await dependencies.handoffs.mark(
+          cancelled.handoff.attemptId,
+          cancelledByUser ? "cancelled" : "failed",
+        );
+        return handoffCompletionPage(
+          c,
+          cancelledByUser ? "Google連携をキャンセルしました" : "Google連携を完了できませんでした",
+        );
+      }
       if (providerError !== "access_denied") {
         logSsoCallbackFailure({
           ...(cancelled.traceId ? { traceId: cancelled.traceId } : {}),
@@ -327,7 +456,11 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
           return issued;
         },
       },
+      handoffStager: dependencies.handoffs.stager,
     });
+    if (completed.purpose === "link-handoff") {
+      return handoffCompletionPage(c, "Google認証が完了しました");
+    }
     if (completed.purpose === "login") {
       setApplicationSessionCookie(c, completed.session.sessionToken, completed.session.expiresAt);
       logger.info(
@@ -381,6 +514,10 @@ export async function getSsoCallback(c: Context<AppEnv>): Promise<Response> {
         : undefined;
     const providerFailure =
       error instanceof SsoCallbackCompletionError && error.failure instanceof SsoProviderError;
+    if (callback?.handoff) {
+      await dependencies.handoffs.mark(callback.handoff.attemptId, "failed");
+      return handoffCompletionPage(c, "Google連携を完了できませんでした");
+    }
     logSsoCallbackFailure({
       ...(callback?.traceId ? { traceId: callback.traceId } : {}),
       stage: "callback.complete",
