@@ -18,6 +18,11 @@ function hasSingleSegment(pathname: string, prefix: string): boolean {
   return segment.length > 0 && !segment.includes("/");
 }
 
+function hasCompatibilityRelationshipId(pathname: string, prefix: string): boolean {
+  if (!pathname.startsWith(prefix)) return false;
+  return compatibilityRelationshipId.isValid(pathname.slice(prefix.length));
+}
+
 export function resolveWebApplicationRoute(pathname: string): WebApplicationRoute {
   const path = withoutTrailingSlash(pathname);
   if (path === "/account-recovery") return "account-recovery";
@@ -26,8 +31,8 @@ export function resolveWebApplicationRoute(pathname: string): WebApplicationRout
   if (
     path === "/compatibility" ||
     path === "/compatibility/share" ||
-    hasSingleSegment(path, "/compatibility/invitations/") ||
-    hasSingleSegment(path, "/compatibility/relationships/")
+    hasCompatibilityRelationshipId(path, "/compatibility/invitations/") ||
+    hasCompatibilityRelationshipId(path, "/compatibility/relationships/")
   ) {
     return "compatibility";
   }
@@ -56,3 +61,4 @@ export function resolveWebApplicationRoute(pathname: string): WebApplicationRout
   }
   return "not-found";
 }
+import { compatibilityRelationshipId } from "@me-builder/lib/compatibility";

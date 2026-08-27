@@ -76,5 +76,8 @@ describe("RootApplication", () => {
 
     expect(screen.getByRole("heading", { name: "ページが見つかりません" })).toBeTruthy();
     expect(screen.queryByText("本人向けアプリ")).toBeNull();
+    expect(screen.getByRole("link", { name: "診断画面へ戻る" }).getAttribute("href")).toBe(
+      "/diagnosis",
+    );
   });
 });

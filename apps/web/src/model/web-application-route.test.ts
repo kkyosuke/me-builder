@@ -7,8 +7,8 @@ describe("resolveWebApplicationRoute", () => {
     ["/diagnosis", "diagnosis"],
     ["/diagnosis/money-values", "diagnosis"],
     ["/diagnosis/money-values/answers/", "diagnosis"],
-    ["/compatibility/invitations/invite-id", "compatibility"],
-    ["/compatibility/relationships/relationship-id", "compatibility"],
+    [`/compatibility/invitations/${"a".repeat(64)}`, "compatibility"],
+    [`/compatibility/relationships/${"b".repeat(64)}`, "compatibility"],
     ["/me/self-care", "me"],
     ["/profile/photos/entry-id", "profile"],
     ["/admin/statistics", "admin"],
@@ -26,6 +26,8 @@ describe("resolveWebApplicationRoute", () => {
     "/profile/avatar/extra",
     "/me/self-care-anything",
     "/compatibility/invitations/id/extra",
+    "/compatibility/invitations/not-a-relationship-id",
+    `/compatibility/relationships/${"g".repeat(64)}`,
     "/diagnosis/id/unknown",
   ])("未知またはprefix衝突の%sを受理しない", (pathname) => {
     expect(resolveWebApplicationRoute(pathname)).toBe("not-found");

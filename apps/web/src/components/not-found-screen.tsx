@@ -1,5 +1,3 @@
-import { InternalLink } from "./internal-link";
-
 export function NotFoundScreen() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-6 py-12">
@@ -10,12 +8,12 @@ export function NotFoundScreen() {
       <p className="mt-3 leading-relaxed text-slate-600 dark:text-slate-300">
         URLが正しいか確認するか、診断画面へ戻ってください。
       </p>
-      <InternalLink
+      <a
         href="/diagnosis"
         className="mt-6 inline-flex min-h-11 w-fit items-center justify-center rounded-xl bg-violet-600 px-5 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
       >
         診断画面へ戻る
-      </InternalLink>
+      </a>
     </main>
   );
 }
