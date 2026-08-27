@@ -11,7 +11,7 @@ describe("profile navigation", () => {
   it.each([
     ["/profile", "production", "profile"],
     ["/profile/avatar", "production", "avatar"],
-    ["/profile/photos/entry", "production", "photos"],
+    ["/profile/photos", "production", "photos"],
     ["/profile/personal-data", "preview", "personal-data"],
     ["/profile/brain-items", "local", "brain-items"],
     ["/profile/personal-data", "production", "profile"],
@@ -23,6 +23,7 @@ describe("profile navigation", () => {
   it.each([
     "/profile-old",
     "/profile/avatar/extra",
+    "/profile/photos/entry",
     "/profile/photos/entry/extra",
     "/profile/billing-old",
     "/profile/unknown",

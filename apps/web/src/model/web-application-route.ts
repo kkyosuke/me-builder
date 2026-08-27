@@ -41,7 +41,6 @@ export function resolveWebApplicationRoute(pathname: string): WebApplicationRout
     path === "/profile" ||
     path === "/profile/avatar" ||
     path === "/profile/photos" ||
-    hasSingleSegment(path, "/profile/photos/") ||
     path === "/profile/personal-data" ||
     path === "/profile/brain-items" ||
     path === "/profile/family" ||

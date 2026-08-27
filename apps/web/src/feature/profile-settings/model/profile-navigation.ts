@@ -22,7 +22,7 @@ export function isDevelopmentEnvironment(environment: string | undefined): boole
 
 export function resolveProfileView(pathname: string, environment: string | undefined): ProfileView {
   const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
-  if (path === "/profile/photos" || /^\/profile\/photos\/[^/]+$/u.test(path)) return "photos";
+  if (path === "/profile/photos") return "photos";
   if (path === "/profile/mcp") return "mcp";
   if (path === "/profile/billing") return "billing";
   if (path === "/profile/family") return "family";
