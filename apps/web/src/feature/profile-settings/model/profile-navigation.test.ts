@@ -20,6 +20,16 @@ describe("profile navigation", () => {
     expect(resolveProfileView(pathname, environment)).toBe(expected);
   });
 
+  it.each([
+    "/profile-old",
+    "/profile/avatar/extra",
+    "/profile/photos/entry/extra",
+    "/profile/billing-old",
+    "/profile/unknown",
+  ])("未定義のprefix衝突%sをprofileとして扱わない", (pathname) => {
+    expect(resolveProfileView(pathname, "production")).toBe("closed");
+  });
+
   it("History stateから許可済みのviewと復帰pathだけを復元する", () => {
     const state = {
       [PROFILE_HISTORY_STATE_KEY]: "billing",

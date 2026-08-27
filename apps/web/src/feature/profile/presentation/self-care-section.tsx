@@ -3,6 +3,7 @@ import { InternalLink } from "../../../components/internal-link";
 import type { AsyncState } from "../../../model/async-state";
 import { LINE_OFFICIAL_ACCOUNT_URL } from "../../../model/line-official-account";
 import type { SelfCareContextItem, SelfCareContextResult } from "../model/self-care-context";
+import { SELF_CARE_RETURN_PATHNAME_STATE_KEY } from "../model/self-care-navigation";
 
 const summaryItems = [
   {
@@ -115,6 +116,7 @@ export function SelfCareSection({
       <div className="mt-4 grid grid-cols-2 gap-3">
         <InternalLink
           href="/me/self-care"
+          historyState={{ [SELF_CARE_RETURN_PATHNAME_STATE_KEY]: "/me" }}
           className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
         >
           詳しく見る

@@ -43,6 +43,18 @@ describe("InternalLink", () => {
     document.removeEventListener("click", preventNavigation);
   });
 
+  it("遷移元を表すhistory stateを遷移先へ保存する", () => {
+    render(
+      <InternalLink href="/me/self-care" historyState={{ returnPathname: "/me" }}>
+        詳しく見る
+      </InternalLink>,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "詳しく見る" }));
+
+    expect(window.history.state).toEqual({ returnPathname: "/me" });
+  });
+
   it("移動意図を検知した時に遷移先を先読みする", () => {
     const onPreload = vi.fn();
     render(

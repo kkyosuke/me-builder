@@ -8,7 +8,8 @@ import { useAdminStatistics } from "./use-admin-statistics";
 type AdminTab = "accounts" | "statistics";
 
 function currentTab(): AdminTab {
-  return window.location.pathname.startsWith("/admin/statistics") ? "statistics" : "accounts";
+  const pathname = window.location.pathname.replace(/\/$/u, "");
+  return pathname === "/admin/statistics" ? "statistics" : "accounts";
 }
 
 export default function AdminApplication() {

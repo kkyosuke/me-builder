@@ -21,18 +21,19 @@ export function isDevelopmentEnvironment(environment: string | undefined): boole
 }
 
 export function resolveProfileView(pathname: string, environment: string | undefined): ProfileView {
-  if (pathname.startsWith("/profile/photos")) return "photos";
-  if (pathname.startsWith("/profile/mcp")) return "mcp";
-  if (pathname.startsWith("/profile/billing")) return "billing";
-  if (pathname.startsWith("/profile/family")) return "family";
-  if (pathname.startsWith("/profile/avatar")) return "avatar";
-  if (pathname.startsWith("/profile/personal-data")) {
+  const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  if (path === "/profile/photos" || /^\/profile\/photos\/[^/]+$/u.test(path)) return "photos";
+  if (path === "/profile/mcp") return "mcp";
+  if (path === "/profile/billing") return "billing";
+  if (path === "/profile/family") return "family";
+  if (path === "/profile/avatar") return "avatar";
+  if (path === "/profile/personal-data") {
     return isDevelopmentEnvironment(environment) ? "personal-data" : "profile";
   }
-  if (pathname.startsWith("/profile/brain-items")) {
+  if (path === "/profile/brain-items") {
     return isDevelopmentEnvironment(environment) ? "brain-items" : "profile";
   }
-  if (pathname === "/profile" || pathname.startsWith("/profile/")) return "profile";
+  if (path === "/profile") return "profile";
   return "closed";
 }
 
