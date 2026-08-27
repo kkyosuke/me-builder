@@ -13,8 +13,8 @@ import type {
 import { logger } from "@me-builder/shared";
 import { toSafeOperationalErrorFields } from "@me-builder/shared";
 import { getCloudflareBindings, getWorkerConfig } from "../config";
-import { handleQueueBatch } from "../logic/webhook";
 import type { Env } from "../types";
+import { handleQueueBatch } from "./queue-dispatch";
 
 export async function queueHandler(
   batch: MessageBatch<
