@@ -6,16 +6,19 @@ import type { SelfCareContextItem, SelfCareContextResult } from "../model/self-c
 
 const summaryItems = [
   {
+    kind: "stress-trigger",
     heading: "負荷の手がかり",
     emptyLabel: "AIと一緒に見つける",
     tone: "border-sky-100 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/30",
   },
   {
+    kind: "early-sign",
     heading: "早めのサイン",
     emptyLabel: "AIと一緒に見つける",
     tone: "border-amber-100 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/30",
   },
   {
+    kind: "worked",
     heading: "合いやすかったこと",
     emptyLabel: "自分で追加する",
     tone: "border-teal-100 bg-teal-50/70 dark:border-teal-900 dark:bg-teal-950/30",
@@ -80,9 +83,12 @@ export function SelfCareSection({
     );
   }
 
-  const worked = state.data.items.find(
-    (item): item is SelfCareContextItem => item.status === "active" && item.kind === "worked",
-  );
+  const activeByKind = new Map<SelfCareContextItem["kind"], SelfCareContextItem>();
+  for (const item of state.data.items) {
+    if (item.status === "active" && !activeByKind.has(item.kind)) {
+      activeByKind.set(item.kind, item);
+    }
+  }
   return (
     <section className="mt-8" aria-labelledby="self-care-title">
       <div className="flex items-center gap-2">
@@ -95,15 +101,16 @@ export function SelfCareSection({
         負荷がかかりやすい場面、早めのサイン、合いやすかった対処を確認します。
       </p>
       <div className="mt-3 space-y-3">
-        {summaryItems.map((item) => (
-          <SummaryItem
-            key={item.heading}
-            {...item}
-            {...(item.heading === "合いやすかったこと" && worked
-              ? { statement: worked.statement }
-              : {})}
-          />
-        ))}
+        {summaryItems.map((item) => {
+          const active = activeByKind.get(item.kind);
+          return (
+            <SummaryItem
+              key={item.heading}
+              {...item}
+              {...(active ? { statement: active.statement } : {})}
+            />
+          );
+        })}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <InternalLink

@@ -132,6 +132,8 @@ describe("self-care context", () => {
     for (const [id, statement, kind, at] of [
       ["worked-old", "早く寝ると楽だった", "worked", new Date(AT.getTime() - 2_000)],
       ["worked-new", "予定を減らすと楽だった", "worked", new Date(AT.getTime() - 1_000)],
+      ["stress-trigger", "急な予定変更が重なると消耗する", "stress-trigger", AT],
+      ["early-sign", "返信を後回しにし始める", "early-sign", AT],
       ["not-worked", "長い散歩は疲れた", "did-not-work", AT],
       ["old-state", "先月は眠れなかった", "recent-state", old],
       ["state", "今週は肩に力が入っている", "recent-state", AT],
@@ -145,9 +147,19 @@ describe("self-care context", () => {
     expect(
       lite.filter(({ accessLabels }) => accessLabels.includes("self-care-worked")),
     ).toHaveLength(1);
+    expect(lite.map(({ accessLabels }) => accessLabels[0])).toEqual(
+      expect.arrayContaining(["self-care-stress-trigger", "self-care-early-sign"]),
+    );
     const full = await selectSelfCareContextMemories(db, ACCOUNT_ID, "personalized-history", AT);
     expect(full.map(({ brainItemId }) => brainItemId)).toEqual(
-      expect.arrayContaining(["worked-old", "worked-new", "not-worked", "state"]),
+      expect.arrayContaining([
+        "worked-old",
+        "worked-new",
+        "stress-trigger",
+        "early-sign",
+        "not-worked",
+        "state",
+      ]),
     );
     expect(full.map(({ brainItemId }) => brainItemId)).not.toContain("old-state");
   });

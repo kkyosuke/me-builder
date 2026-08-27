@@ -9826,7 +9826,13 @@
                             "minLength": 1
                           },
                           "kind": {
-                            "enum": ["worked", "did-not-work", "recent-state"],
+                            "enum": [
+                              "stress-trigger",
+                              "early-sign",
+                              "worked",
+                              "did-not-work",
+                              "recent-state"
+                            ],
                             "type": "string"
                           },
                           "status": {
@@ -9973,7 +9979,13 @@
                   },
                   "kind": {
                     "type": "string",
-                    "enum": ["worked", "did-not-work", "recent-state"]
+                    "enum": [
+                      "stress-trigger",
+                      "early-sign",
+                      "worked",
+                      "did-not-work",
+                      "recent-state"
+                    ]
                   }
                 },
                 "required": ["brainItemId", "kind"]
@@ -10005,7 +10017,13 @@
                           "minLength": 1
                         },
                         "kind": {
-                          "enum": ["worked", "did-not-work", "recent-state"],
+                          "enum": [
+                            "stress-trigger",
+                            "early-sign",
+                            "worked",
+                            "did-not-work",
+                            "recent-state"
+                          ],
                           "type": "string"
                         },
                         "status": {
@@ -10213,7 +10231,13 @@
                           "minLength": 1
                         },
                         "kind": {
-                          "enum": ["worked", "did-not-work", "recent-state"],
+                          "enum": [
+                            "stress-trigger",
+                            "early-sign",
+                            "worked",
+                            "did-not-work",
+                            "recent-state"
+                          ],
                           "type": "string"
                         },
                         "status": {

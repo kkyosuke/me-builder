@@ -9,6 +9,14 @@ import type {
 } from "../model/self-care-context";
 
 const kindContent: Record<SelfCareContextKind, Readonly<{ heading: string; tone: string }>> = {
+  "stress-trigger": {
+    heading: "負荷の手がかり",
+    tone: "border-sky-100 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/30",
+  },
+  "early-sign": {
+    heading: "早めのサイン",
+    tone: "border-amber-100 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/30",
+  },
   worked: {
     heading: "合いやすかったこと",
     tone: "border-teal-100 bg-teal-50/70 dark:border-teal-900 dark:bg-teal-950/30",

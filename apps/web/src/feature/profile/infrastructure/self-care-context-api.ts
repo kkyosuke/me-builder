@@ -1,3 +1,4 @@
+import { selfCareConfirmationKinds } from "@me-builder/shared";
 import * as v from "valibot";
 import type { operations } from "../../../generated/api";
 import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
@@ -12,7 +13,7 @@ const ItemSchema = v.object({
   id: Text,
   brainItemId: Text,
   statement: Text,
-  kind: v.picklist(["worked", "did-not-work", "recent-state"]),
+  kind: v.picklist(selfCareConfirmationKinds),
   status: v.picklist(["active", "revoked"]),
   confirmedAt: v.pipe(v.string(), v.isoTimestamp()),
   updatedAt: v.pipe(v.string(), v.isoTimestamp()),
