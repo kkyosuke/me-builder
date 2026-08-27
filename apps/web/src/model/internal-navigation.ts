@@ -16,12 +16,12 @@ function isPlainPrimaryClick(event: MouseEvent<HTMLAnchorElement>): boolean {
 export function navigateWithinApp(
   event: MouseEvent<HTMLAnchorElement>,
   href: string,
-  options: { skip?: boolean } = {},
+  options: { skip?: boolean; state?: unknown } = {},
 ): void {
   if (!isPlainPrimaryClick(event)) return;
   event.preventDefault();
   if (options.skip) return;
 
-  window.history.pushState({}, "", href);
+  window.history.pushState(options.state ?? {}, "", href);
   window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
 }

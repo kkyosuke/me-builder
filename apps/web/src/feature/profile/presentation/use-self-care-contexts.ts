@@ -11,6 +11,7 @@ export function useSelfCareContexts() {
   const [state, setState] = useState<AsyncState<SelfCareContextResult>>({ status: "loading" });
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [operationNotice, setOperationNotice] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   const mutationId = useRef<string | null>(null);
 
@@ -38,14 +39,16 @@ export function useSelfCareContexts() {
   }, [load]);
 
   const run = useCallback(
-    async (id: string, operation: () => Promise<unknown>) => {
+    async (id: string, operation: () => Promise<unknown>, successMessage: string) => {
       if (mutationId.current !== null) return;
       mutationId.current = id;
       setPendingId(id);
       setOperationError(null);
+      setOperationNotice(null);
       try {
         await operation();
         await load();
+        setOperationNotice(successMessage);
       } catch (error) {
         setOperationError(
           error instanceof Error ? error.message : "セルフケア情報を更新できませんでした。",
@@ -62,7 +65,13 @@ export function useSelfCareContexts() {
     state,
     pendingId,
     operationError,
+    operationNotice,
     reload: load,
-    revoke: (id: string) => run(id, () => revokeSelfCareContext(config.apiUrl, id)),
+    revoke: (id: string) =>
+      run(
+        id,
+        () => revokeSelfCareContext(config.apiUrl, id),
+        "セルフケア情報の確認を取り消しました。",
+      ),
   };
 }

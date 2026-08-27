@@ -3,6 +3,7 @@ import { navigateWithinApp } from "../model/internal-navigation";
 import { type MainApplicationRoute, preloadMainApplication } from "../routes";
 
 type InternalLinkProps = ComponentPropsWithoutRef<"a"> & {
+  historyState?: unknown;
   href: string;
   onPreload?: () => void;
   preloadRoute?: MainApplicationRoute;
@@ -11,6 +12,7 @@ type InternalLinkProps = ComponentPropsWithoutRef<"a"> & {
 /** 同一アプリ内の通常クリックでは画面状態を保ち、別タブで開く操作はブラウザへ委ねる。 */
 export function InternalLink({
   href,
+  historyState,
   onClick,
   onFocus,
   onPointerEnter,
@@ -29,7 +31,7 @@ export function InternalLink({
       href={href}
       onClick={(event) => {
         onClick?.(event);
-        if (!event.defaultPrevented) navigateWithinApp(event, href);
+        if (!event.defaultPrevented) navigateWithinApp(event, href, { state: historyState });
       }}
       onFocus={(event) => {
         onFocus?.(event);

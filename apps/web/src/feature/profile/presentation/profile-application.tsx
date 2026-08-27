@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CompatibilityShareContentSection } from "../../compatibility";
 import type { ProfileSummaryVersioning } from "../model/profile-summary";
+import { historySelfCareReturnPathname } from "../model/self-care-navigation";
 import { GoalFollowUpSection } from "./goal-follow-up-section";
 import { ProfileSummaryScreen } from "./profile-summary-screen";
 import { SelfCareDetailsScreen } from "./self-care-details-screen";
@@ -12,7 +13,29 @@ import { useSelfCareContexts } from "./use-self-care-contexts";
 import { useWeeklyReflection } from "./use-weekly-reflection";
 import { WeeklyReflectionSection } from "./weekly-reflection-section";
 
-export default function ProfileApplication() {
+function SelfCareDetailsApplication() {
+  const selfCare = useSelfCareContexts();
+  return (
+    <SelfCareDetailsScreen
+      state={selfCare.state}
+      pendingId={selfCare.pendingId}
+      operationError={selfCare.operationError}
+      operationNotice={selfCare.operationNotice}
+      onBack={() => {
+        if (historySelfCareReturnPathname(window.history.state) === "/me") {
+          window.history.back();
+          return;
+        }
+        window.history.replaceState({}, "", "/me");
+        window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+      }}
+      onRetry={() => void selfCare.reload()}
+      onRevoke={(id) => void selfCare.revoke(id)}
+    />
+  );
+}
+
+function ProfileSummaryApplication() {
   const summary = useProfileSummary();
   const progression = useProfileProgression();
   const weeklyReflection = useWeeklyReflection();
@@ -42,21 +65,6 @@ export default function ProfileApplication() {
         generation: result.generation,
       }
     : undefined;
-  if (window.location.pathname.startsWith("/me/self-care")) {
-    return (
-      <SelfCareDetailsScreen
-        state={selfCare.state}
-        pendingId={selfCare.pendingId}
-        operationError={selfCare.operationError}
-        onBack={() => {
-          window.history.replaceState({}, "", "/me");
-          window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
-        }}
-        onRetry={() => void selfCare.reload()}
-        onRevoke={(id) => void selfCare.revoke(id)}
-      />
-    );
-  }
   return (
     <ProfileSummaryScreen
       state={screenState}
@@ -88,5 +96,14 @@ export default function ProfileApplication() {
       <SelfCareSection state={selfCare.state} onRetry={() => void selfCare.reload()} />
       <CompatibilityShareContentSection latestProfileSummaryVersionId={latestVersionId} />
     </ProfileSummaryScreen>
+  );
+}
+
+export default function ProfileApplication() {
+  const pathname = window.location.pathname.replace(/\/$/u, "");
+  return pathname === "/me/self-care" ? (
+    <SelfCareDetailsApplication />
+  ) : (
+    <ProfileSummaryApplication />
   );
 }

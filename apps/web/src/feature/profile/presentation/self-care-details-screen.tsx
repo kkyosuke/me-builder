@@ -80,6 +80,7 @@ export function SelfCareDetailsScreen({
   state,
   pendingId,
   operationError,
+  operationNotice,
   onBack,
   onRetry,
   onRevoke,
@@ -87,12 +88,17 @@ export function SelfCareDetailsScreen({
   state: AsyncState<SelfCareContextResult>;
   pendingId: string | null;
   operationError: string | null;
+  operationNotice: string | null;
   onBack: () => void;
   onRetry: () => void;
   onRevoke: (id: string) => void;
 }) {
   const backButtonRef = useRef<HTMLButtonElement>(null);
+  const listHeadingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => backButtonRef.current?.focus(), []);
+  useEffect(() => {
+    if (operationNotice) listHeadingRef.current?.focus();
+  }, [operationNotice]);
 
   const content = (() => {
     if (state.status === "loading" || state.status === "idle") {
@@ -116,6 +122,11 @@ export function SelfCareDetailsScreen({
           <p role="alert" className="mb-3 text-sm text-rose-600">
             {operationError}
           </p>
+        ) : null}
+        {operationNotice ? (
+          <output className="mb-3 block text-sm text-teal-700 dark:text-teal-300">
+            {operationNotice}
+          </output>
         ) : null}
         {activeItems.length > 0 ? (
           <div className="space-y-3">
@@ -181,7 +192,15 @@ export function SelfCareDetailsScreen({
           あなたが確認した情報だけを表示します。
         </p>
       </header>
-      <section className="mt-8" aria-label="確認済みのセルフケア情報">
+      <section className="mt-8" aria-labelledby="self-care-context-list-title">
+        <h2
+          ref={listHeadingRef}
+          id="self-care-context-list-title"
+          tabIndex={-1}
+          className="sr-only outline-none"
+        >
+          確認済みのセルフケア情報
+        </h2>
         {content}
       </section>
       <a

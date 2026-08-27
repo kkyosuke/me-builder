@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LINE_OFFICIAL_ACCOUNT_URL } from "../../../model/line-official-account";
 import type { SelfCareContextResult } from "../model/self-care-context";
 import { SelfCareDetailsScreen } from "./self-care-details-screen";
 import { SelfCareSection } from "./self-care-section";
+
+afterEach(cleanup);
 
 const result: SelfCareContextResult = {
   items: [
@@ -109,6 +111,7 @@ describe("SelfCareDetailsScreen", () => {
         state={{ status: "success", data: result }}
         pendingId={null}
         operationError={null}
+        operationNotice={null}
         onBack={vi.fn()}
         onRetry={vi.fn()}
         onRevoke={onRevoke}
@@ -132,6 +135,7 @@ describe("SelfCareDetailsScreen", () => {
         state={{ status: "success", data: { items: [], canManage: true } }}
         pendingId={null}
         operationError={null}
+        operationNotice={null}
         onBack={vi.fn()}
         onRetry={vi.fn()}
         onRevoke={vi.fn()}
@@ -141,5 +145,36 @@ describe("SelfCareDetailsScreen", () => {
     expect(screen.getByText("確認済みのセルフケア情報はまだありません。")).toBeDefined();
     expect(screen.getByRole("link", { name: "AIと一緒に見つける" })).toBeDefined();
     expect(screen.getByRole("link", { name: "自分で追加する" })).toBeDefined();
+  });
+
+  it("操作完了を通知してフォーカスを移す", () => {
+    const view = render(
+      <SelfCareDetailsScreen
+        state={{ status: "success", data: result }}
+        pendingId={null}
+        operationError={null}
+        operationNotice={null}
+        onBack={vi.fn()}
+        onRetry={vi.fn()}
+        onRevoke={vi.fn()}
+      />,
+    );
+
+    view.rerender(
+      <SelfCareDetailsScreen
+        state={{ status: "success", data: result }}
+        pendingId={null}
+        operationError={null}
+        operationNotice="セルフケア情報の確認を取り消しました。"
+        onBack={vi.fn()}
+        onRetry={vi.fn()}
+        onRevoke={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toBeDefined();
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 2, name: "確認済みのセルフケア情報" }),
+    );
   });
 });

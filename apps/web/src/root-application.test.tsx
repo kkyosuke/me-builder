@@ -69,4 +69,15 @@ describe("RootApplication", () => {
 
     expect(await screen.findByText("本人向けアプリ")).toBeTruthy();
   });
+
+  it("未知のpathnameでは本人向けアプリへ流さず404を表示する", () => {
+    window.history.replaceState({}, "", "/admin-old");
+    render(<RootApplication />);
+
+    expect(screen.getByRole("heading", { name: "ページが見つかりません" })).toBeTruthy();
+    expect(screen.queryByText("本人向けアプリ")).toBeNull();
+    expect(screen.getByRole("link", { name: "診断画面へ戻る" }).getAttribute("href")).toBe(
+      "/diagnosis",
+    );
+  });
 });

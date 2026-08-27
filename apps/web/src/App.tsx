@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LoadingState } from "./components/loading-state";
+import { NotFoundScreen } from "./components/not-found-screen";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
 import { issueRecoveryCode } from "./feature/account-recovery/infrastructure/account-recovery-api";
@@ -40,6 +41,7 @@ import { useColorTheme, useFontSize } from "./feature/theme";
 import { resolveRequestedPathname } from "./infrastructure/requested-pathname";
 import type { AsyncState } from "./model/async-state";
 import { restoreWindowScroll } from "./model/scroll-restoration";
+import { resolveWebApplicationRoute } from "./model/web-application-route";
 import {
   getIdleMainApplicationRoutes,
   loadAdminApplication,
@@ -97,11 +99,12 @@ function AppContents() {
   const authSession = useAuthSession();
   const [navigation, setNavigation] = useState(() => {
     const requestedPathname = resolveRequestedPathname();
+    const requestedRoute = resolveWebApplicationRoute(requestedPathname);
     const profileView = resolveProfileView(requestedPathname, config.environment);
     const pathname = profileView === "closed" ? requestedPathname : "/me";
     return {
       pathname,
-      mainPathname: pathname.startsWith("/admin") ? null : pathname,
+      mainPathname: requestedRoute === "admin" ? null : pathname,
       profileView,
     };
   });
@@ -111,10 +114,14 @@ function AppContents() {
   const navigationAttempt = useRef(0);
   const shouldRestoreProfileButtonFocus = useRef(false);
   const { pathname, mainPathname, profileView } = navigation;
-  const isAdminPath = pathname.startsWith("/admin");
-  const isCompatibilityPath =
-    mainPathname === "/compatibility" || mainPathname?.startsWith("/compatibility/");
-  const isMePath = mainPathname === "/me" || mainPathname?.startsWith("/me/");
+  const activeRoute = resolveWebApplicationRoute(pathname);
+  const mainApplicationRoute = mainPathname
+    ? resolveWebApplicationRoute(mainPathname)
+    : activeRoute;
+  const isAdminPath = activeRoute === "admin";
+  const isCompatibilityPath = mainApplicationRoute === "compatibility";
+  const isMePath = mainApplicationRoute === "me";
+  const isNotFoundPath = activeRoute === "not-found";
   const isProfileOpen = profileView !== "closed";
   const canUseDevelopmentTools =
     isDevelopmentEnvironment(config.environment) &&
@@ -204,9 +211,10 @@ function AppContents() {
           }
           return {
             pathname: requestedPathname,
-            mainPathname: requestedPathname.startsWith("/admin")
-              ? current.mainPathname
-              : requestedPathname,
+            mainPathname:
+              resolveWebApplicationRoute(requestedPathname) === "admin"
+                ? current.mainPathname
+                : requestedPathname,
             profileView: "closed",
           };
         });
@@ -245,15 +253,15 @@ function AppContents() {
   useEffect(() => {
     const applicationContent = applicationContentRef.current;
     if (!applicationContent) return;
-    if (profileView === "closed" && !isAdminPath) {
+    if (profileView === "closed" && !isAdminPath && !isNotFoundPath) {
       applicationContent.removeAttribute("inert");
     } else {
       applicationContent.setAttribute("inert", "");
     }
-  }, [isAdminPath, profileView]);
+  }, [isAdminPath, isNotFoundPath, profileView]);
 
   useEffect(() => {
-    if (isAdminPath) return;
+    if (isAdminPath || isNotFoundPath) return;
 
     return scheduleIdlePreloadAfter(
       () => loadMainApplication(currentMainRoute),
@@ -264,7 +272,7 @@ function AppContents() {
         preloadProfileSettingsScreen();
       },
     );
-  }, [currentMainRoute, isAdminPath]);
+  }, [currentMainRoute, isAdminPath, isNotFoundPath]);
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -300,7 +308,7 @@ function AppContents() {
   }, [isProfileOpen]);
 
   useEffect(() => {
-    if (isAdminPath) return;
+    if (isAdminPath || isNotFoundPath) return;
     if (authSession.state.status !== "authenticated") return;
     const controller = new AbortController();
     setAvatar(null);
@@ -329,7 +337,7 @@ function AppContents() {
     })();
 
     return () => controller.abort();
-  }, [applyAccountProfile, authSession.state, isAdminPath, profileReloadKey]);
+  }, [applyAccountProfile, authSession.state, isAdminPath, isNotFoundPath, profileReloadKey]);
 
   useEffect(() => {
     if (authSession.state.status !== "authenticated") return;
@@ -551,7 +559,7 @@ function AppContents() {
 
   return (
     <>
-      {!isAdminPath && profileView === "closed" && (
+      {!isAdminPath && !isNotFoundPath && profileView === "closed" && (
         <ProfileMenuButton
           ref={profileButtonRef}
           avatar={avatar}
@@ -565,7 +573,7 @@ function AppContents() {
           onPreload={preloadProfileSettingsScreen}
         />
       )}
-      {mainPathname && (
+      {mainPathname && !isNotFoundPath && (
         <div
           ref={applicationContentRef}
           hidden={isAdminPath}
@@ -594,6 +602,7 @@ function AppContents() {
           </Suspense>
         </RouteErrorBoundary>
       )}
+      {isNotFoundPath && <NotFoundScreen />}
       {isProfileOpen && (
         <RouteErrorBoundary>
           <Suspense
@@ -747,14 +756,17 @@ function AppContents() {
 }
 
 export function App() {
+  const route = resolveWebApplicationRoute(resolveRequestedPathname());
   return (
     <AuthSessionProvider>
-      {resolveRequestedPathname() === "/account-recovery" ? (
+      {route === "account-recovery" ? (
         <AccountRecoveryScreen />
-      ) : resolveRequestedPathname() === "/mcp/authorize" ? (
+      ) : route === "mcp-authorization" ? (
         <ServiceTermsGate>
           <McpAuthorizationScreen />
         </ServiceTermsGate>
+      ) : route === "not-found" ? (
+        <NotFoundScreen />
       ) : (
         <ServiceTermsGate>
           <AppContents />
