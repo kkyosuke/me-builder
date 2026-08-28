@@ -145,7 +145,7 @@ Cloudflare CD does not read or decrypt the GCS Pulumi state. Each Stack owns two
 
 GCP Platformのpreviewとapplyは、保存済みstateだけでなくGCP上の実体を毎回refreshしてから差分を計画します。管理対象resourceが実体側で欠落している場合は、次のapplyで再作成対象として扱い、state上だけ存在する状態をCDへ持ち越しません。
 
-apply時に旧Vertex実装の`vertexRuntime` service accountまたは`vertexInferenceRole` custom roleがStackへ残っている場合は、Pulumi project、resource type、logical nameが完全一致するstateだけの削除保護を解除します。現行resource、external resource、類似名は変更せず、想定外のprovider削除policyでは停止します。対象は続く同じapplyで削除し、移行後のapplyでは処理しません。
+apply時に旧Vertex authorization key実装のservice account、custom role、IAM binding、organization policy、関連API service recordがStackへ残っている場合は、Pulumi project、resource type、logical nameが完全一致するstateだけの削除保護を解除します。現行resource、external resource、類似名は変更せず、想定外のprovider削除policyでは停止します。対象は続く同じapplyで削除し、API service recordはAPIを無効化せずstate ownershipだけを外します。移行後のapplyでは処理しません。
 
 | Stack | Secret Manager ID | CD destination |
 | --- | --- | --- |

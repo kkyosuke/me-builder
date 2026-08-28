@@ -5,6 +5,26 @@ type ObsoleteResource = {
 
 const obsoleteResources = new Map<string, ObsoleteResource>([
   [
+    "allowRestrictedServiceAccountApiKeys",
+    { type: "gcp:orgpolicy/policy:Policy", hasProviderDeletionPolicy: true },
+  ],
+  [
+    "iam-googleapis-com",
+    { type: "gcp:projects/service:Service", hasProviderDeletionPolicy: false },
+  ],
+  [
+    "orgpolicy-googleapis-com",
+    { type: "gcp:projects/service:Service", hasProviderDeletionPolicy: false },
+  ],
+  [
+    "vertex-inference-binding",
+    { type: "gcp:projects/iAMMember:IAMMember", hasProviderDeletionPolicy: false },
+  ],
+  [
+    "vertex-service-usage-binding",
+    { type: "gcp:projects/iAMMember:IAMMember", hasProviderDeletionPolicy: false },
+  ],
+  [
     "vertexInferenceRole",
     { type: "gcp:projects/iAMCustomRole:IAMCustomRole", hasProviderDeletionPolicy: true },
   ],
@@ -47,7 +67,7 @@ function obsoleteResource(resource: PulumiResourceState): ObsoleteResource | und
 }
 
 /**
- * 廃止済みVertex resourceのstateだけを削除可能にする。
+ * 廃止済みVertex authorization key実装のstateだけを削除可能にする。
  * Pulumiのprotectに加えてprovider側のPREVENTも解除し、続くupで実体を削除する。
  */
 export function prepareObsoleteGcpPlatformState(
