@@ -16,23 +16,42 @@ function prepare(resources: Record<string, unknown>[]) {
 }
 
 describe("prepareObsoleteGcpPlatformState", () => {
-  it("廃止済みVertex resourceを削除可能にする", () => {
-    const resources = [
+  it("廃止済みVertex resourceのPulumi protectを解除する", () => {
+    const obsoleteResources: [string, string][] = [
+      ["iam-googleapis-com", "gcp:projects/service:Service"],
+      ["orgpolicy-googleapis-com", "gcp:projects/service:Service"],
+      ["vertex-inference-binding", "gcp:projects/iAMMember:IAMMember"],
+      ["vertex-service-usage-binding", "gcp:projects/iAMMember:IAMMember"],
+      ["vertexRuntime", "gcp:serviceaccount/account:Account"],
+    ];
+    const resources = obsoleteResources.map(([name, type]) => resource(name, type));
+    const result = prepare(resources);
+    const migrated = JSON.parse(result.deployment).deployment.resources;
+
+    expect(migrated).toEqual(resources.map((value) => ({ ...value, protect: false })));
+    expect(result.migratedResourceCount).toBe(obsoleteResources.length);
+  });
+
+  it("provider側の削除禁止をDELETEへ変更する", () => {
+    const result = prepare([
       resource("vertexInferenceRole", "gcp:projects/iAMCustomRole:IAMCustomRole", {
         inputs: { deletionPolicy: "PREVENT" },
         outputs: { deletionPolicy: "PREVENT" },
       }),
-      resource("vertexRuntime", "gcp:serviceaccount/account:Account"),
-    ];
-    const result = prepare(resources);
+      resource("allowRestrictedServiceAccountApiKeys", "gcp:orgpolicy/policy:Policy", {
+        inputs: { deletionPolicy: "PREVENT" },
+        outputs: { deletionPolicy: "PREVENT" },
+      }),
+    ]);
     const migrated = JSON.parse(result.deployment).deployment.resources;
 
-    expect(migrated[0]).toMatchObject({
-      protect: false,
-      inputs: { deletionPolicy: "DELETE" },
-      outputs: { deletionPolicy: "DELETE" },
-    });
-    expect(migrated[1]).toMatchObject({ protect: false });
+    for (const resource of migrated) {
+      expect(resource).toMatchObject({
+        protect: false,
+        inputs: { deletionPolicy: "DELETE" },
+        outputs: { deletionPolicy: "DELETE" },
+      });
+    }
     expect(result.migratedResourceCount).toBe(2);
   });
 
