@@ -143,6 +143,8 @@ The spend cap remains a Console-owned control. Pulumi manages the project budget
 
 Cloudflare CD does not read or decrypt the GCS Pulumi state. Each Stack owns two environment-specific Secret Manager containers, and grants `roles/secretmanager.secretAccessor` only to the matching GitHub Environment principal. CD authenticates with Direct WIF, reads only the active runtime values, masks them, and passes them to `wrangler deploy --secrets-file` with the application version.
 
+GCP Platformのpreviewとapplyは、保存済みstateだけでなくGCP上の実体を毎回refreshしてから差分を計画します。管理対象resourceが実体側で欠落している場合は、次のapplyで再作成対象として扱い、state上だけ存在する状態をCDへ持ち越しません。
+
 | Stack | Secret Manager ID | CD destination |
 | --- | --- | --- |
 | Development | `me-builder-development-identity-platform-api-key` | API `GOOGLE_IDENTITY_PLATFORM_API_KEY` |

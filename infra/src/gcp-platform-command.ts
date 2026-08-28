@@ -27,6 +27,7 @@ export function gcpPlatformCommand(
     "--stack",
     validatedEnvironment,
     "--non-interactive",
+    "--refresh",
     ...(operation === "up" ? ["--yes"] : []),
   ];
 }
