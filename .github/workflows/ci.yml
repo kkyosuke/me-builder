@@ -4,9 +4,9 @@ name: CI
 # それぞれが checkout と bun install (約 25 秒) を払い直したうえ、GitHub Actions の課金は
 # job ごとに分単位へ切り上げられる。検証内容は変えずに単一 job へまとめ、この固定費を 1 回だけ払う。
 on:
+  # Stack PRの後段はbaseが前段のbranchになる。baseをmainへ限定すると検証されないため、
+  # すべてのPRで同じVerify結果を報告する。
   pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
