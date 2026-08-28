@@ -4,8 +4,6 @@ name: CI / E2E
 # mainへ入る前に回帰を検出できるよう、すべてのPR更新で必須実行する。
 on:
   pull_request:
-    branches:
-      - main
     types:
       - opened
       - synchronize
