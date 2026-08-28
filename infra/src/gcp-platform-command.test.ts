@@ -15,6 +15,26 @@ describe("gcpPlatformCommand", () => {
       "--stack",
       "development",
       "--non-interactive",
+      "--refresh",
+    ]);
+  });
+
+  it("apply前に実環境との差分をrefreshする", () => {
+    expect(
+      gcpPlatformCommand("up", "development", {
+        PULUMI_CONFIG_PASSPHRASE: "test-only-passphrase",
+        ALLOW_GCP_PLATFORM_UP: "development",
+      }),
+    ).toEqual([
+      "pulumi",
+      "-C",
+      "gcp-platform",
+      "up",
+      "--stack",
+      "development",
+      "--non-interactive",
+      "--refresh",
+      "--yes",
     ]);
   });
 
