@@ -11,6 +11,9 @@ inputs:
   environment:
     description: GCP platform environment (development or production)
     required: true
+  legacy-vertex-ai-api-key:
+    description: Temporary GitHub Environment fallback until the Vertex Secret has a version
+    required: false
 
 runs:
   using: composite
@@ -52,17 +55,23 @@ runs:
       env:
         GCP_RUNTIME_PROJECT_ID: ${{ inputs.project-id }}
         GCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment }}
+        LEGACY_VERTEX_AI_API_KEY: ${{ inputs.legacy-vertex-ai-api-key }}
       run: |
         load_secret() {
           local environment_variable="$1"
           local secret_id="$2"
+          local fallback_value="${3:-}"
           local secret_value
 
           if ! secret_value="$(gcloud secrets versions access latest \
             --project="${GCP_RUNTIME_PROJECT_ID}" \
             --secret="${secret_id}")"; then
-            echo "::error::Secret Managerから${secret_id}のlatest versionを取得できませんでした。"
-            exit 1
+            if [ -z "${fallback_value}" ]; then
+              echo "::error::Secret Managerから${secret_id}のlatest versionを取得できませんでした。"
+              exit 1
+            fi
+            echo "::warning::${secret_id}は移行期間中のGitHub Environment Secretを使用します。"
+            secret_value="${fallback_value}"
           fi
           if [ -z "${secret_value}" ]; then
             echo "::error::Secret Managerの${secret_id}が空です。"
@@ -83,4 +92,5 @@ runs:
           "${secret_prefix}-identity-platform-api-key"
         load_secret \
           GOOGLE_VERTEX_AI_API_KEY \
-          "${secret_prefix}-vertex-ai-api-key"
+          "${secret_prefix}-vertex-ai-api-key" \
+          "${LEGACY_VERTEX_AI_API_KEY}"

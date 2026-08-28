@@ -76,6 +76,7 @@ jobs:
           project-id: ${{ env.GCP_PLATFORM_PROJECT_ID }}
           workload-identity-provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           environment: development
+          legacy-vertex-ai-api-key: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}
 
       - uses: ./.github/actions/setup-bun-workspace
 

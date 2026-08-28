@@ -172,9 +172,14 @@ describe("requirePulumiGcsBackend", () => {
       expect(workflow).toContain("uses: ./.github/actions/load-gcp-runtime-secrets");
       expect(workflow).toContain("vars.GCP_PLATFORM_PROJECT_ID");
       expect(workflow).not.toContain("secrets.GOOGLE_IDENTITY_PLATFORM_API_KEY");
-      expect(workflow).not.toContain("secrets.GOOGLE_VERTEX_AI_API_KEY");
     }
     expect(previewWorkflow).toContain("environment: development");
+    expect(previewWorkflow).toContain(
+      "legacy-vertex-ai-api-key: ${{ secrets.GOOGLE_VERTEX_AI_API_KEY }}",
+    );
+    for (const workflow of [productionWorkflow, resetWorkflow]) {
+      expect(workflow).not.toContain("secrets.GOOGLE_VERTEX_AI_API_KEY");
+    }
     expect(productionWorkflow).toContain("environment: production");
     expect(resetWorkflow).toContain("environment: development");
     expect(resetWorkflow).toContain("environment: infra");
