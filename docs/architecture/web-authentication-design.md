@@ -232,6 +232,51 @@ LIFF内ではLIFFを本人確認の正とします。既存のSSOセッション
 
 最後の規則は、LIFF内で別のSSO Accountへ黙って切り替わり、以前のAccountの画面を表示する事故を防ぐためです。
 
+#### LIFFプロフィールからGoogle Identityを追加する
+
+Google OAuthの認可画面はLIFF browserやLINEのアプリ内browserへ表示しません。Google OAuthが要求するfull-featured browserを使うため、プロフィールの「Googleと連携」から端末の外部browserを開きます。一方、外部browserのcallbackだけではAccountへIdentityを追加せず、開始元のLIFFへ戻って本人が確定したときだけ追加します。
+
+```mermaid
+sequenceDiagram
+    participant U as 利用者
+    participant L as LIFFプロフィール
+    participant A as API Auth Boundary
+    participant B as 外部browser
+    participant I as Google / Identity Platform
+    participant T as 短命transaction store
+    participant D as Shared D1
+
+    U->>L: Googleと連携
+    L->>A: link開始（application session + CSRF）
+    A->>T: Account、state、PKCE、確認secretのhashを保存
+    A-->>L: 認可URL、attempt ID、確認secret
+    L->>B: liff.openWindow(external: true)
+    B->>I: Google認証
+    I-->>A: callback（state、code）
+    A->>T: stateを一度だけconsumeし、検証済みIdentityをpending保存
+    A-->>B: LINEへ戻る案内（Account情報を表示しない）
+    L->>A: attempt状態を再確認
+    A-->>L: 認証完了・確定待ち
+    U->>L: このGoogleアカウントを連携
+    L->>A: 確定（application session + CSRF + attempt ID + 確認secret）
+    A->>T: pendingを同じAccountで一度だけconsume
+    A->>D: Google IdentityをAccountへ追加
+    A-->>L: session rotation + 接続済み
+```
+
+このflowでは次を守ります。
+
+- 確認secretはGoogle認可URL、OAuth `state`、callback URLへ含めず、開始元のLIFFだけが保持する
+- callbackはissuer、audience、署名、有効期限、nonce、PKCEを検証したIdentityを短命な`pending`として保存するだけで、Identity追加、application session発行、Account情報の表示を行わない
+- 確定時はapplication session、CSRF、確認secretを検証し、transaction開始時と同じAccountにだけIdentityを追加する
+- attempt、callback、pending、確定はすべて10分で失効し、callbackと確定はそれぞれ単一consumeにする
+- LIFFは外部browserから自動的に戻ったことを前提にせず、`visibilitychange`、focus、または本人の再確認操作で状態を取得する
+- 外部browserでキャンセルまたは失敗した場合も、元のLIFF Accountとsessionを変更しない
+- callback URLを別端末で開かれても、開始元LIFFの確認secretなしにIdentityを追加できない
+- 確定前にLIFF sessionのAccountが切り替わった場合は拒否し、新しいAccountへ引き継がない
+
+外部browserで始めた通常のSSO loginとIdentity追加は、従来どおりcallback cookieで同じbrowserへ結びます。callback cookieを省略できるのは、Identity追加をpendingで止め、開始元LIFFの確認を必須にするこのflowだけです。Google認証後の外部browserをそのままログイン済み画面にせず、LIFFと外部browserのsessionを暗黙に共有しません。
+
 ### 5.2 外部ブラウザ
 
 ```mermaid
@@ -355,6 +400,8 @@ OpenAPIのsecurity schemeは`liffIdToken`からprovider非依存のアプリケ�
 - LIFF Identityと既存SSO sessionが別Accountなら、LIFF側へ安全に切り替え、以前の画面データを表示しない
 - 認証失敗、Account未解決、未同意、権限不足を区別して表示する
 - LIFFまたはSSOが一時的に失敗しても白画面にせず、同じ方式の再試行を提示する
+- LIFFプロフィールからGoogle Identity追加を始めると外部browserが開き、callbackだけでは未連携のまま、開始元LIFFで確定した後だけ接続済みになる
+- 外部browserを閉じた、別端末でcallbackを開いた、確認secretを失った、または確定前にAccountが切り替わった場合はIdentityを追加しない
 
 ## 9. Google Cloud Identity Platform接続条件
 

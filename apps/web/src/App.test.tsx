@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   },
   initializeLiffForAuthExchange: vi.fn(),
   readLiffAuthExchangeCredential: vi.fn(),
+  isInLiffClient: vi.fn(),
+  openLiffExternalWindow: vi.fn(),
   authState: {
     status: "authenticated" as const,
     profile: { displayName: "テスト", pictureUrl: undefined as string | undefined },
@@ -73,6 +75,8 @@ vi.mock("./feature/auth", () => ({
 vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiffForAuthExchange: mocks.initializeLiffForAuthExchange,
   readLiffAuthExchangeCredential: mocks.readLiffAuthExchangeCredential,
+  isInLiffClient: mocks.isInLiffClient,
+  openLiffExternalWindow: mocks.openLiffExternalWindow,
 }));
 vi.mock("./feature/profile-settings/infrastructure/profile-api", () => ({
   fetchAccountProfile: mocks.fetchAccountProfile,
@@ -264,6 +268,8 @@ describe("App", () => {
       inClient: true,
     });
     mocks.readLiffAuthExchangeCredential.mockReturnValue("dummy.id.token");
+    mocks.isInLiffClient.mockReturnValue(true);
+    mocks.openLiffExternalWindow.mockReturnValue(true);
     mocks.fetchAccountProfile.mockResolvedValue({
       role: "user",
       displayName: "テスト",

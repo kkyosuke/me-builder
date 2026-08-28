@@ -12,6 +12,7 @@ import {
 } from "./feature/auth/infrastructure/sso-auth-adapter";
 import { createCustomerPortalSession } from "./feature/billing/infrastructure/billing-api";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
+import { isInLiffClient, openLiffExternalWindow } from "./feature/liff/infrastructure/liff-client";
 import { McpAuthorizationScreen } from "./feature/mcp";
 import {
   type AccountProfile,
@@ -23,10 +24,13 @@ import {
   ProfileMenuButton,
   type ResetDevelopmentAccountDataResult,
   type SsoIdentityStatus,
+  type SsoLinkAttemptStatus,
+  confirmSsoLinkAttempt,
   deleteAccountAvatar,
   fetchAccountProfile,
   fetchProfileEntitlement,
   fetchSsoIdentityStatus,
+  fetchSsoLinkAttemptStatus,
   focusMainRouteHeading,
   historyProfileReturnPathname,
   historyProfileView,
@@ -145,6 +149,14 @@ function AppContents() {
   });
   const [ssoIdentityCallbackResult, setSsoIdentityCallbackResult] = useState<
     SsoIdentityCallbackResult | undefined
+  >();
+  const [ssoLinkHandoff, setSsoLinkHandoff] = useState<
+    | {
+        attemptId: string;
+        confirmationSecret: string;
+        status: SsoLinkAttemptStatus;
+      }
+    | undefined
   >();
   const linePictureUrl =
     profileReadState.status === "ready"
@@ -548,9 +560,67 @@ function AppContents() {
   };
 
   const linkSsoIdentity = async (): Promise<void> => {
-    const authorizationUrl = await startSsoIdentityLink(config.apiUrl, "/profile?sso=linking");
-    window.location.assign(authorizationUrl);
+    const liffHandoff = isInLiffClient();
+    const started = await startSsoIdentityLink(
+      config.apiUrl,
+      "/profile?sso=linking",
+      liffHandoff ? "liff" : "same-browser",
+    );
+    if (liffHandoff) {
+      if (started.flow !== "liff-handoff") {
+        throw new Error("Google連携の確認情報を取得できませんでした。");
+      }
+      setSsoLinkHandoff({
+        attemptId: started.attemptId,
+        confirmationSecret: started.confirmationSecret,
+        status: "waiting",
+      });
+      if (!openLiffExternalWindow(started.authorizationUrl)) {
+        setSsoLinkHandoff(undefined);
+        throw new Error("外部ブラウザを開けませんでした。");
+      }
+      return;
+    }
+    if (started.flow !== "same-browser") {
+      throw new Error("Google連携の認可URLを取得できませんでした。");
+    }
+    window.location.assign(started.authorizationUrl);
   };
+
+  const refreshSsoLinkHandoff = useCallback(async (): Promise<void> => {
+    if (!ssoLinkHandoff) return;
+    const attemptId = ssoLinkHandoff.attemptId;
+    const status = await fetchSsoLinkAttemptStatus(
+      config.apiUrl,
+      attemptId,
+      ssoLinkHandoff.confirmationSecret,
+    );
+    setSsoLinkHandoff((current) =>
+      current?.attemptId === attemptId ? { ...current, status } : current,
+    );
+  }, [ssoLinkHandoff]);
+
+  const confirmSsoLinkHandoff = async (): Promise<void> => {
+    if (!ssoLinkHandoff || ssoLinkHandoff.status !== "ready") return;
+    const status = await confirmSsoLinkAttempt(
+      config.apiUrl,
+      ssoLinkHandoff.attemptId,
+      ssoLinkHandoff.confirmationSecret,
+    );
+    setSsoLinkHandoff(undefined);
+    setSsoIdentityState({ status: "success", data: status });
+  };
+
+  useEffect(() => {
+    if (!ssoLinkHandoff) return;
+    const refresh = () => void refreshSsoLinkHandoff().catch(() => undefined);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [refreshSsoLinkHandoff, ssoLinkHandoff]);
 
   const disconnectSsoIdentity = async (): Promise<void> => {
     await unlinkSsoIdentity(config.apiUrl);
@@ -661,6 +731,9 @@ function AppContents() {
                     ssoIdentity: ssoIdentityState,
                     ...(ssoIdentityCallbackResult ? { ssoIdentityCallbackResult } : {}),
                     onLinkSsoIdentity: linkSsoIdentity,
+                    ...(ssoLinkHandoff ? { ssoLinkHandoffStatus: ssoLinkHandoff.status } : {}),
+                    onRefreshSsoLinkHandoff: refreshSsoLinkHandoff,
+                    onConfirmSsoLinkHandoff: confirmSsoLinkHandoff,
                     onUnlinkSsoIdentity: disconnectSsoIdentity,
                   })}
             />

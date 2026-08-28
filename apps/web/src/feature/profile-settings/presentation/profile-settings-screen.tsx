@@ -19,7 +19,7 @@ import type { SsoIdentityCallbackResult } from "../../auth/infrastructure/sso-au
 import type { ColorTheme } from "../../theme/model/color-theme";
 import type { FontSize } from "../../theme/model/font-size";
 import type { ResetDevelopmentAccountDataResult } from "../infrastructure/development-account-data-api";
-import type { SsoIdentityStatus } from "../infrastructure/sso-identity-api";
+import type { SsoIdentityStatus, SsoLinkAttemptStatus } from "../infrastructure/sso-identity-api";
 import { type AvatarSelection, getAvatarName } from "../model/avatar";
 import type { ProfileEntitlement } from "../model/entitlement";
 import { AvatarPreview } from "./components/avatar-preview";
@@ -80,6 +80,9 @@ export function ProfileSettingsScreen({
   ssoIdentityCallbackResult,
   onLinkSsoIdentity,
   onUnlinkSsoIdentity,
+  ssoLinkHandoffStatus,
+  onRefreshSsoLinkHandoff,
+  onConfirmSsoLinkHandoff,
 }: {
   avatar: AvatarSelection | null;
   isAdmin?: boolean;
@@ -113,6 +116,9 @@ export function ProfileSettingsScreen({
   ssoIdentityCallbackResult?: SsoIdentityCallbackResult;
   onLinkSsoIdentity?: () => Promise<void>;
   onUnlinkSsoIdentity?: () => Promise<void>;
+  ssoLinkHandoffStatus?: SsoLinkAttemptStatus;
+  onRefreshSsoLinkHandoff?: () => Promise<void>;
+  onConfirmSsoLinkHandoff?: () => Promise<void>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
@@ -724,23 +730,92 @@ export function ProfileSettingsScreen({
                     Google連携を解除
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={ssoMutationState.status === "loading"}
-                    onClick={() => {
-                      setSsoMutationState({ status: "loading" });
-                      void onLinkSsoIdentity().catch((error) =>
-                        setSsoMutationState({
-                          status: "error",
-                          message: errorMessage(error, "Google連携を開始できませんでした。"),
-                        }),
-                      );
-                    }}
-                    className="mt-4 min-h-11 rounded-xl border border-violet-500 px-4 text-sm font-bold text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-violet-200"
-                  >
-                    Googleと連携
-                  </button>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {!ssoLinkHandoffStatus ||
+                    ["cancelled", "failed", "expired"].includes(ssoLinkHandoffStatus) ? (
+                      <button
+                        type="button"
+                        disabled={ssoMutationState.status === "loading"}
+                        onClick={() => {
+                          setSsoMutationState({ status: "loading" });
+                          void onLinkSsoIdentity()
+                            .then(() => setSsoMutationState({ status: "idle" }))
+                            .catch((error) =>
+                              setSsoMutationState({
+                                status: "error",
+                                message: errorMessage(error, "Google連携を開始できませんでした。"),
+                              }),
+                            );
+                        }}
+                        className="min-h-11 rounded-xl border border-violet-500 px-4 text-sm font-bold text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-violet-200"
+                      >
+                        Googleと連携
+                      </button>
+                    ) : null}
+                    {ssoLinkHandoffStatus === "waiting" && onRefreshSsoLinkHandoff && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSsoMutationState({ status: "loading" });
+                          void onRefreshSsoLinkHandoff()
+                            .then(() => setSsoMutationState({ status: "idle" }))
+                            .catch((error) =>
+                              setSsoMutationState({
+                                status: "error",
+                                message: errorMessage(
+                                  error,
+                                  "Google認証の状態を確認できませんでした。",
+                                ),
+                              }),
+                            );
+                        }}
+                        className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-bold dark:border-slate-600"
+                      >
+                        認証状況を確認
+                      </button>
+                    )}
+                    {ssoLinkHandoffStatus === "ready" && onConfirmSsoLinkHandoff && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSsoMutationState({ status: "loading" });
+                          void onConfirmSsoLinkHandoff()
+                            .then(() =>
+                              setSsoMutationState({
+                                status: "success",
+                                data: "Googleと連携しました。",
+                              }),
+                            )
+                            .catch((error) =>
+                              setSsoMutationState({
+                                status: "error",
+                                message: errorMessage(error, "Google連携を確定できませんでした。"),
+                              }),
+                            );
+                        }}
+                        className="min-h-11 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white"
+                      >
+                        このGoogleアカウントを連携
+                      </button>
+                    )}
+                  </div>
                 ))}
+              {ssoLinkHandoffStatus === "waiting" && (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  外部ブラウザでGoogle認証後、LINEへ戻って認証状況を確認してください。
+                </p>
+              )}
+              {ssoLinkHandoffStatus === "ready" && (
+                <p className="mt-2 text-sm text-violet-700 dark:text-violet-200">
+                  Google認証が完了しました。連携を確定してください。
+                </p>
+              )}
+              {ssoLinkHandoffStatus &&
+                ["cancelled", "failed", "expired"].includes(ssoLinkHandoffStatus) && (
+                  <p role="alert" className="mt-2 text-sm text-rose-700 dark:text-rose-300">
+                    Google認証を完了できませんでした。もう一度お試しください。
+                  </p>
+                )}
               {ssoIdentity.status === "success" &&
                 ssoIdentity.data.linked &&
                 !ssoIdentity.data.canUnlink && (

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   initializeLiffForAuthExchange,
+  isInLiffClient,
+  openLiffExternalWindow,
   openLiffWindow,
   readLiffAuthExchangeCredential,
   shareLiffTextMessage,
@@ -56,6 +58,21 @@ describe("openLiffWindow", () => {
       { event: "liff.window.open.failed", outcome: "failed", reason: "sdk-error" },
       "LIFF から外部 URL を開けませんでした",
     );
+  });
+});
+
+describe("Google OAuth external window", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("LIFF内では端末の外部browserを明示して開く", () => {
+    mockLiff.isInClient.mockReturnValue(true);
+    mockLiff.openWindow.mockImplementation(() => undefined);
+    expect(openLiffExternalWindow("https://accounts.google.com/o/oauth2/v2/auth")).toBe(true);
+    expect(mockLiff.openWindow).toHaveBeenCalledWith({
+      url: "https://accounts.google.com/o/oauth2/v2/auth",
+      external: true,
+    });
+    expect(isInLiffClient()).toBe(true);
   });
 });
 

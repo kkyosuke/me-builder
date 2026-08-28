@@ -19,6 +19,7 @@ describe("SSO auth adapter", () => {
     const navigate = vi.fn();
     const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       Response.json({
+        flow: "same-browser",
         authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
       }),
     );

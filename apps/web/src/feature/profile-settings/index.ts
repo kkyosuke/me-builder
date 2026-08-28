@@ -11,6 +11,9 @@ export {
 } from "./infrastructure/profile-api";
 export {
   type SsoIdentityStatus,
+  type SsoLinkAttemptStatus,
+  confirmSsoLinkAttempt,
+  fetchSsoLinkAttemptStatus,
   fetchSsoIdentityStatus,
   startSsoIdentityLink,
   unlinkSsoIdentity,

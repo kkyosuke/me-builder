@@ -21,13 +21,14 @@
 
 ## 2. 現在の境界
 
-provider非依存application session、LIFF移行、SSO Identity追加、外部ブラウザ入口、匿名運用ログ、server-side rollout gateは実装済みです。次の先行検証も外部IdPやProduction設定へ依存せず自動実行できます。
+provider非依存application session、LIFF移行、同じbrowser内で完結するSSO Identity追加、LIFFから外部browserへ渡して元のLIFFで確定するIdentity追加、外部ブラウザ入口、匿名運用ログ、server-side rollout gateは実装済みです。次の先行検証も外部IdPやProduction設定へ依存せず自動実行できます。
 
 - SSO transactionを共有D1の単一consumeで競合させ、同じstateの同時callbackを一度だけ処理する
 - 期限切れstate、callback再送、開始元と別ブラウザのcallback、logout後の旧画面相当を拒否する
 - ID tokenのemail claimを検証済みIdentityへ引き継がず、`providerKey + subject`が未知ならAccountを解決しない
 - rollout停止中もLIFF交換と既存application sessionを継続し、再開時の0%では管理者だけを許可する
 - session issuer障害時にcookieを発行せず、消費済みcallbackの再送を拒否する
+- LIFFの外部browser callbackではIdentityをpendingに留め、元のLIFF Account、CSRF、確認secretを検証した単一consumeの確定後だけIdentityを追加する
 
 自動検証の成功は実IdP、実cookie、実端末、Production運用の完了を意味しません。残るゲートは次の2件です。
 
@@ -64,6 +65,7 @@ flowchart TD
 - 同じstackのPreview Web、API、D1、session storeをdeployし、[LIFF交換・アプリケーションセッション境界検証Runbook](application-session-boundary-verification.md)を完了する
 - 開発用GCP projectのIdentity PlatformとGoogle providerを使い、普段使うスマートフォンのLINE内ブラウザと外部ブラウザ、PCの主要ブラウザ1つで確認する
 - 各環境でlogin、cancel、logout、`SSO_ROLLOUT_MODE=disabled`への停止後もLIFFが使えることを確認する
+- LIFFプロフィールから外部browserへGoogle認証を渡し、LIFFへ戻って明示的に確定した後だけIdentityが追加されることを確認する
 - 代表ブラウザでnegative、同時callback、別ブラウザ、期限切れ、Identity解除を確認する
 - 未linkのGoogleアカウントが表示名やemailで既存Accountへ統合されず`identity_unlinked`になることを確認する
 - token、Cookie、state、code、subject、Account ID、email、個人内容を証跡へ残さない

@@ -687,22 +687,59 @@
               "maxLength": 2048
             },
             "description": "認証後に復元する同一originの相対path"
+          },
+          {
+            "name": "handoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["liff"]
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "同じbrowserで開くGoogle認可URL",
+            "description": "Google認可URLと、LIFF handoff時だけ返す確認情報",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "authorizationUrl": {
-                      "type": "string",
-                      "format": "uri"
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "flow": {
+                          "const": "liff-handoff"
+                        },
+                        "authorizationUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "attemptId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "confirmationSecret": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["flow", "authorizationUrl", "attemptId", "confirmationSecret"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "flow": {
+                          "const": "same-browser"
+                        },
+                        "authorizationUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": ["flow", "authorizationUrl"]
                     }
-                  },
-                  "required": ["authorizationUrl"]
+                  ]
                 }
               }
             }
@@ -774,6 +811,241 @@
         }
       }
     },
+    "/api/auth/sso/link-attempts/{attemptId}": {
+      "get": {
+        "operationId": "getSsoLinkAttempt",
+        "tags": ["Authentication"],
+        "summary": "元のLIFFからGoogle認証の完了状態を確認する",
+        "security": [
+          {
+            "applicationSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attemptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-SSO-Link-Confirmation",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "link開始時に元のLIFFへだけ返した確認secret"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Identityを含まないlink attempt状態",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "enum": ["waiting", "ready", "cancelled", "failed", "expired"],
+                      "type": "string"
+                    }
+                  },
+                  "required": ["status"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionが無効",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SSOまたはstorage bindingが未設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sso/link-attempts/{attemptId}/confirmation": {
+      "post": {
+        "operationId": "confirmSsoLinkAttempt",
+        "tags": ["Authentication"],
+        "summary": "元のLIFF AccountでGoogle Identity追加を確定する",
+        "security": [
+          {
+            "applicationSession": [],
+            "csrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attemptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-SSO-Link-Confirmation",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "link開始時に元のLIFFへだけ返した確認secret"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "確定後の接続状態",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "linked": {
+                      "type": "boolean"
+                    },
+                    "canUnlink": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["linked", "canUnlink"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "application sessionが無効",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Unauthorized"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "OriginまたはCSRF tokenが一致しない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Forbidden"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "attemptが確定可能でない",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "SSO link attempt cannot be confirmed"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "未処理のサーバーエラー",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Internal Server Error"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SSOまたはstorage bindingが未設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "const": "Service Unavailable"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/sso/login": {
       "post": {
         "operationId": "startSsoLogin",
@@ -800,12 +1072,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "flow": {
+                      "const": "same-browser"
+                    },
                     "authorizationUrl": {
                       "type": "string",
                       "format": "uri"
                     }
                   },
-                  "required": ["authorizationUrl"]
+                  "required": ["flow", "authorizationUrl"]
                 }
               }
             }
@@ -852,6 +1127,16 @@
         "summary": "SSO callbackを一度だけ処理する",
         "security": [],
         "responses": {
+          "200": {
+            "description": "LIFF handoff完了案内",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "302": {
             "description": "保存済みの同一origin相対pathへredirect"
           },

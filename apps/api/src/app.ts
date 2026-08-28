@@ -21,7 +21,9 @@ import { adminBillingReconciliationRoute } from "./contract/admin/billing-reconc
 import { adminStatisticsRoute } from "./contract/admin/statistics";
 import {
   completeSsoCallbackRoute,
+  confirmSsoLinkAttemptRoute,
   getSsoIdentityStatusRoute,
+  getSsoLinkAttemptRoute,
   startSsoIdentityLinkRoute,
   startSsoLoginRoute,
   unlinkSsoIdentityRoute,
@@ -257,7 +259,9 @@ import {
   deleteSsoIdentity,
   getSsoCallback,
   getSsoIdentityStatusContents,
+  getSsoLinkAttempt,
   postSsoIdentityLink,
+  postSsoLinkAttemptConfirmation,
   postSsoLogin,
 } from "./controller/sso-identity";
 import { requireAuthentication } from "./middleware/authentication";
@@ -279,7 +283,7 @@ export function generateOpenApiDocument() {
 
 const webCors = cors({
   origin: (origin, c) => (origin === getConfig(c.env).webOrigin ? origin : undefined),
-  allowHeaders: ["Content-Type", "X-CSRF-Token"],
+  allowHeaders: ["Content-Type", "X-CSRF-Token", "X-SSO-Link-Confirmation"],
   credentials: true,
 });
 
@@ -408,6 +412,18 @@ app.post(
   startSsoIdentityLinkRoute,
   requireAuthentication,
   postSsoIdentityLink,
+);
+app.get(
+  "/api/auth/sso/link-attempts/:attemptId",
+  getSsoLinkAttemptRoute,
+  requireAuthentication,
+  getSsoLinkAttempt,
+);
+app.post(
+  "/api/auth/sso/link-attempts/:attemptId/confirmation",
+  confirmSsoLinkAttemptRoute,
+  requireAuthentication,
+  postSsoLinkAttemptConfirmation,
 );
 app.post("/api/auth/sso/login", startSsoLoginRoute, postSsoLogin);
 app.get("/api/auth/sso/callback", completeSsoCallbackRoute, getSsoCallback);
