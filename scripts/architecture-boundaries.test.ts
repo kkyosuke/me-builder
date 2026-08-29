@@ -22,6 +22,7 @@ function moduleSpecifiers(source: string): string[] {
   return [
     ...source.matchAll(/\bfrom\s+["']([^"']+)["']/g),
     ...source.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g),
+    ...source.matchAll(/\bimport\s*["']([^"']+)["']/g),
   ].flatMap((match) => (match[1] ? [match[1]] : []));
 }
 

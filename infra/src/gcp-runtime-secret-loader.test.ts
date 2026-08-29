@@ -41,13 +41,14 @@ fi
   await chmod(fakeGcloud, 0o755);
   const githubEnv = join(directory, "github-env");
   await writeFile(githubEnv, "");
-  const child = spawn(loader, ["TEST_SECRET", "test-secret", fallback], {
+  const child = spawn(loader, ["TEST_SECRET", "test-secret", "LEGACY_TEST_SECRET"], {
     env: {
       ...process.env,
       PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
       FAKE_GCLOUD_MODE: mode,
       GCP_RUNTIME_PROJECT_ID: "test-project",
       GITHUB_ENV: githubEnv,
+      LEGACY_TEST_SECRET: fallback,
     },
   });
   let stdout = "";
@@ -87,5 +88,15 @@ describe("GCP runtime secret loader", () => {
     expect(result.exitCode).toBe(0);
     expect(result.githubEnv).toBe("TEST_SECRET=active-secret\n");
     expect(result.output).not.toContain("移行期間中");
+  });
+
+  it("fallbackの値をコマンド引数ではなく環境変数から読む", async () => {
+    const action = await readFile(
+      new URL("../../.github/actions/load-gcp-runtime-secrets/action.yml", import.meta.url),
+      "utf8",
+    );
+
+    expect(action).toContain("LEGACY_VERTEX_AI_API_KEY");
+    expect(action).not.toContain('"${LEGACY_VERTEX_AI_API_KEY}"');
   });
 });

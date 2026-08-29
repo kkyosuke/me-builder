@@ -3,7 +3,16 @@ set -euo pipefail
 
 environment_variable="$1"
 secret_id="$2"
-fallback_value="${3:-}"
+fallback_environment_variable="${3:-}"
+fallback_value=""
+
+if [ -n "${fallback_environment_variable}" ]; then
+  if [[ ! "${fallback_environment_variable}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "::error::Fallback environment variable name is invalid."
+    exit 1
+  fi
+  fallback_value="${!fallback_environment_variable:-}"
+fi
 
 if [ -z "${GCP_RUNTIME_PROJECT_ID:-}" ]; then
   echo "::error::GCP_RUNTIME_PROJECT_ID is required."
