@@ -2,7 +2,7 @@ import { Suspense, lazy } from "react";
 import { DocumentMetadata } from "./components/document-metadata";
 import { LoadingState } from "./components/loading-state";
 import { NotFoundScreen } from "./components/not-found-screen";
-import { resolveServiceSiteRoute } from "./feature/service-site/model/service-site-route";
+import { resolveServiceSiteRoute } from "./feature/service-site";
 import {
   hasLiffDeepLinkLocation,
   resolveRequestedPathname,

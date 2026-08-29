@@ -1,4 +1,4 @@
-import { authSessionRuntime } from "../feature/auth/infrastructure/auth-session-runtime";
+import { authSessionRuntime } from "./auth-session-runtime";
 
 export interface HttpClient {
   request(path: string, init?: RequestInit): Promise<Response>;

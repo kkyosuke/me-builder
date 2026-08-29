@@ -68,9 +68,14 @@ vi.mock("./feature/legal", () => ({
   ServiceTermsGate: ({ children }: { children: ReactNode }) => children,
   ServiceTermsAcceptanceHistory: () => null,
 }));
-vi.mock("./feature/auth", () => ({
+vi.mock("./feature/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./feature/auth")>()),
   AuthSessionProvider: ({ children }: { children: ReactNode }) => children,
   useAuthSession: () => ({ state: mocks.authState, retry: mocks.retryAuthSession }),
+}));
+vi.mock("./feature/liff", () => ({
+  isInLiffClient: mocks.isInLiffClient,
+  openLiffExternalWindow: mocks.openLiffExternalWindow,
 }));
 vi.mock("./feature/liff/infrastructure/liff-client", () => ({
   initializeLiffForAuthExchange: mocks.initializeLiffForAuthExchange,

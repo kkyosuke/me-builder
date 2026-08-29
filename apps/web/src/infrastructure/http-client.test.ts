@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authSessionRuntime } from "../feature/auth/infrastructure/auth-session-runtime";
+import { authSessionRuntime } from "./auth-session-runtime";
 import { createAuthenticatedHttpClient, createHttpClient } from "./http-client";
 
 describe("createHttpClient", () => {

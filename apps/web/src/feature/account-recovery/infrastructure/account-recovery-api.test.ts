@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { authSessionRuntime } from "../../auth/infrastructure/auth-session-runtime";
+import { authSessionRuntime } from "../../../infrastructure/auth-session-runtime";
 import { completeRecovery, issueRecoveryCode } from "./account-recovery-api";
 
 describe("account recovery api", () => {

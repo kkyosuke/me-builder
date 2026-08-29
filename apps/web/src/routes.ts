@@ -47,19 +47,19 @@ export const loadDevelopmentBrainItemsApplication = memoizeModuleLoader(() =>
 );
 
 export const loadProfileSettingsScreen = memoizeModuleLoader(() =>
-  import("./feature/profile-settings/presentation/profile-settings-screen").then((feature) => ({
+  import("./feature/profile-settings").then((feature) => ({
     default: feature.ProfileSettingsScreen,
   })),
 );
 
 export const loadAvatarSettingsScreen = memoizeModuleLoader(() =>
-  import("./feature/profile-settings/presentation/avatar-settings-screen").then((feature) => ({
+  import("./feature/profile-settings").then((feature) => ({
     default: feature.AvatarSettingsScreen,
   })),
 );
 
 export const loadPersonalDataApplication = memoizeModuleLoader(() =>
-  import("./feature/profile-settings/presentation/personal-data-application").then((feature) => ({
+  import("./feature/profile-settings").then((feature) => ({
     default: feature.PersonalDataApplication,
   })),
 );

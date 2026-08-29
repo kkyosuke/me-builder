@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AUTH_SESSION_CHANGE_STORAGE_KEY,
   authSessionRuntime,
-} from "../infrastructure/auth-session-runtime";
+} from "../../../infrastructure/auth-session-runtime";
 import { useAuthSessionState } from "./use-auth-session";
 
 const mocks = vi.hoisted(() => ({

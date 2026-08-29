@@ -1,6 +1,6 @@
 import * as v from "valibot";
+import { authSessionRuntime } from "../../../infrastructure/auth-session-runtime";
 import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
-import { authSessionRuntime } from "../../auth/infrastructure/auth-session-runtime";
 
 const SsoIdentityStatusSchema = v.object({
   linked: v.boolean(),

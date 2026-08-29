@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { type MouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { type AsyncState, errorMessage } from "../../../model/async-state";
-import type { SsoIdentityCallbackResult } from "../../auth/infrastructure/sso-auth-adapter";
+import type { SsoIdentityCallbackResult } from "../../auth";
 import type { ColorTheme } from "../../theme/model/color-theme";
 import type { FontSize } from "../../theme/model/font-size";
 import type { ResetDevelopmentAccountDataResult } from "../infrastructure/development-account-data-api";

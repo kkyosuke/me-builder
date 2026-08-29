@@ -156,7 +156,7 @@ apply時に旧Vertex authorization key実装のservice account、custom role、I
 
 Configure `GCP_PLATFORM_PROJECT_ID` as a variable and `GCP_WORKLOAD_IDENTITY_PROVIDER` as a secret in both GitHub Environments `dev` and `prd`. Remove the former `GOOGLE_IDENTITY_PLATFORM_API_KEY` and `GOOGLE_VERTEX_AI_API_KEY` GitHub Secrets only after each CD workflow has read its matching Secret Manager values successfully. Keep `GOOGLE_IDENTITY_PLATFORM_TENANT_ID` and `GOOGLE_OAUTH_CLIENT_ID` as environment variables and keep the manually issued `GOOGLE_OAUTH_CLIENT_SECRET` as an environment secret.
 
-Preview CDは移行期間に限り、DevelopmentのVertex Secretにversionがなければ`dev` Environmentの既存`GOOGLE_VERTEX_AI_API_KEY`へフォールバックします。Secret Managerへ登録してCDがlatest versionを読み取ったことを確認後、このfallbackと旧GitHub Secretを同じreview済み変更で削除してください。Identity Platform keyとProductionにはfallbackを設けません。
+Preview CDは移行期間に限り、DevelopmentのVertex Secretを正常に参照でき、かつ有効なversionが0件の場合だけ`dev` Environmentの既存`GOOGLE_VERTEX_AI_API_KEY`へフォールバックします。WIF、権限、API、version取得の失敗ではfallbackせずCDを停止します。Secret Managerへ登録してCDが有効なversionを読み取ったことを確認後、このfallbackと旧GitHub Secretを同じreview済み変更で削除してください。Identity Platform keyとProductionにはfallbackを設けません。
 
 The Identity Platform API key version is written automatically by Pulumi. Add the existing working Vertex AI key once after the Stack has created its empty Vertex Secret container:
 

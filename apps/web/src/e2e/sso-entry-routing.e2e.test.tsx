@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthSessionProvider, useAuthSession } from "../feature/auth";
-import { authSessionRuntime } from "../feature/auth/infrastructure/auth-session-runtime";
+import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
 
 const mocks = vi.hoisted(() => ({
   config: {

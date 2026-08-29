@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { authSessionRuntime } from "../../auth/infrastructure/auth-session-runtime";
+import { authSessionRuntime } from "../../../infrastructure/auth-session-runtime";
 import { deletePhotoDiary, fetchPhotoDiaries, resolvePhotoDiaryImageUrl } from "./photo-diary-api";
 
 describe("photo diary api", () => {
