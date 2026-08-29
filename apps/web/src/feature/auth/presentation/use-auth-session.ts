@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
+import { authSessionRuntime } from "../../../infrastructure/auth-session-runtime";
 import { resolveRequestedLocation } from "../../../infrastructure/requested-pathname";
 import { type AuthSessionResponse, fetchAuthSession } from "../infrastructure/auth-session-api";
-import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
 import {
   detectAuthEntryEnvironment,
   establishLiffAuthSession,

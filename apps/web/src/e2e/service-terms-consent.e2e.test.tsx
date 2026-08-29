@@ -3,8 +3,8 @@
 import { currentServiceTerms, serviceTermsDocuments } from "@me-builder/shared";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { authSessionRuntime } from "../feature/auth/infrastructure/auth-session-runtime";
 import { ServiceTermsGate } from "../feature/legal";
+import { authSessionRuntime } from "../infrastructure/auth-session-runtime";
 
 const auth = vi.hoisted(() => ({
   state: { status: "authenticated", revision: 1 } as const,

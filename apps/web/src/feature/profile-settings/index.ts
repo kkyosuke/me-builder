@@ -31,3 +31,6 @@ export {
 } from "./model/profile-navigation";
 export { ProfileMenuButton } from "./presentation/components/profile-menu-button";
 export { focusMainRouteHeading } from "./presentation/focus-main-route-heading";
+export { AvatarSettingsScreen } from "./presentation/avatar-settings-screen";
+export { PersonalDataApplication } from "./presentation/personal-data-application";
+export { ProfileSettingsScreen } from "./presentation/profile-settings-screen";

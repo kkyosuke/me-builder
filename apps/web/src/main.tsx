@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { authSessionRuntime } from "./feature/auth/infrastructure/auth-session-runtime";
 import { initializeColorTheme, initializeFontSize } from "./feature/theme";
+import { authSessionRuntime } from "./infrastructure/auth-session-runtime";
 import {
   configureWebErrorCsrfTokenProvider,
   installGlobalWebErrorHandlers,

@@ -3,16 +3,16 @@ import { LoadingState } from "./components/loading-state";
 import { NotFoundScreen } from "./components/not-found-screen";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
 import { config } from "./config";
-import { issueRecoveryCode } from "./feature/account-recovery/infrastructure/account-recovery-api";
-import { AccountRecoveryScreen } from "./feature/account-recovery/presentation/account-recovery-screen";
-import { AuthSessionProvider, useAuthSession } from "./feature/auth";
+import { AccountRecoveryScreen, issueRecoveryCode } from "./feature/account-recovery";
 import {
+  AuthSessionProvider,
   type SsoIdentityCallbackResult,
   consumeSsoIdentityCallbackResult,
-} from "./feature/auth/infrastructure/sso-auth-adapter";
-import { createCustomerPortalSession } from "./feature/billing/infrastructure/billing-api";
+  useAuthSession,
+} from "./feature/auth";
+import { createCustomerPortalSession } from "./feature/billing";
 import { ServiceTermsAcceptanceHistory, ServiceTermsGate } from "./feature/legal";
-import { isInLiffClient, openLiffExternalWindow } from "./feature/liff/infrastructure/liff-client";
+import { isInLiffClient, openLiffExternalWindow } from "./feature/liff";
 import { McpAuthorizationScreen } from "./feature/mcp";
 import {
   type AccountProfile,

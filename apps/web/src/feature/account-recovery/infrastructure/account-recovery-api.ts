@@ -1,7 +1,7 @@
 import * as v from "valibot";
+import { authSessionRuntime } from "../../../infrastructure/auth-session-runtime";
 import { OperationError, ValidationError } from "../../../infrastructure/errors";
 import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
-import { authSessionRuntime } from "../../auth/infrastructure/auth-session-runtime";
 
 const RecoveryCodeSchema = v.object({
   code: v.pipe(v.string(), v.nonEmpty()),

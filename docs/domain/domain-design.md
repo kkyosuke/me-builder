@@ -297,15 +297,17 @@ MCPの具体的な接続モデルやツール設計は後続で検討します�
 | 3 | Sourceドメインを設計し、Brain Itemの由来を確定する | 一部完了（ドメイン境界、由来、エッジ、原本のライフサイクルまで） |
 | 3.1 | Phase 1のDiagnosisドメインを設計する | 完了（論理モデル） |
 | 4 | Source RecordからBrain Itemを生成し、本人の訂正を反映する流れを設計する | 完了（診断と日記からの生成、登録、訂正の共通方式） |
-| 5 | MCP接続、権限、監査の詳細を設計する | 未着手 |
+| 5 | MCP接続、権限、監査の詳細を設計する | 完了（管理者限定の初期提供範囲） |
 | 6 | 永続化と検索方式を選定する | 一部（Brain ItemとEvidenceを含むAccountData schemaまで） |
 
 step 1は、Phase 1に必要な範囲（対応チャネルと入力形式、チャネルの役割分担、ログイン手段と復旧方針、質問の作成主体と版管理）を確定させたことで完了とみなします。詳細は[プロジェクト概要 §4](../product/project-overview.md#4-想定する利用体験)と[§5](../product/project-overview.md#5-アカウントと本人識別)にあります。
 
 step 3は当初「質問・回答のドメインを設計する」としていましたが、日記と診断の回答に加えて購買履歴や移動履歴も取り込む前提が加わったため、取り込み元を限定しないSourceドメインの設計へ置き換えました。この文書の[§5](#5-source-domain)と[§6](#6-ドメイン間の関係)で、Source domainの責務、Source Recordの粒度とkind、Brain Itemとの多重度、由来の必須性、本人の操作の切り分けを確定しています。根拠を表現するエッジは[根拠・反証・改訂のエッジ設計](brain/evidence-edge-design.md)、原本の不変性と訂正・削除の波及は[Source Recordのライフサイクル設計](source/source-record-lifecycle-design.md)で確定しました。外部連携時のAccess Label既定値は未決のため、一部完了とします。
 
-step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)で確定しました。D1の物理モデルはstep 6で具体化済みで、API契約は後続作業です。
+step 3.1では、Phase 1の質問配信と回答保存に必要なQuestion、Diagnosis、DiagnosisResponseの集約、状態、不変条件、Account / Sourceとの関係を[Phase 1 診断ドメイン設計](../diagnosis/diagnosis-domain-design.md)で確定しました。D1の物理モデルはstep 6、公開済みのHTTP境界は[診断API契約](../development/diagnosis-api.md)で具体化済みです。
 
 step 4は、Source RecordからBrain Itemを生成する共通入出力と、診断・日記それぞれの登録、利用開始、本人による否定・修正、改訂を[Brain Item生成設計](brain/brain-item-generation-design.md)で確定しました。
+
+step 5は、管理者本人に限定したMCPのtransport、認証・認可、Scope、Access Profile、同意、監査、解除と停止境界を[MCP連携設計](../architecture/mcp-integration-design.md)で確定しました。一般利用者への公開や書き込みtoolは、この完了範囲に含めません。
 
 step 6は、利用するCloudflareコンポーネントの選定が[インフラ・システム構成](../architecture/infrastructure-architecture.md)で確定し、AccountData上のDiagnosis、Source Record、Brain Item、Evidence、Revision、Access Label、Vectorize同期jobのschemaを具体化しました。Vectorizeは通常チャットの候補検索へ利用し、AccountDataで再認可します。メディアの参照方式は後続設計です。

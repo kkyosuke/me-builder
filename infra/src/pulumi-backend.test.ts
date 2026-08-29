@@ -161,11 +161,10 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");
     expect(loadGcpRuntimeSecretsAction).toContain("uses: google-github-actions/auth@v2");
     expect(loadGcpRuntimeSecretsAction).toContain("uses: google-github-actions/setup-gcloud@v3");
-    expect(loadGcpRuntimeSecretsAction).toContain("gcloud secrets versions access latest");
+    expect(loadGcpRuntimeSecretsAction).toContain("${GITHUB_ACTION_PATH}/load-secret.sh");
     expect(loadGcpRuntimeSecretsAction).toContain("me-builder-${GCP_RUNTIME_ENVIRONMENT}");
     expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_IDENTITY_PLATFORM_API_KEY");
     expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_VERTEX_AI_API_KEY");
-    expect(loadGcpRuntimeSecretsAction).toContain('>> "${GITHUB_ENV}"');
     expect(loadGcpRuntimeSecretsAction).not.toContain("pulumi");
     for (const workflow of [previewWorkflow, productionWorkflow, resetWorkflow]) {
       expect(workflow).toContain("id-token: write");
