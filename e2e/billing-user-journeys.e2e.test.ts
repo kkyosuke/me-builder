@@ -124,6 +124,17 @@ async function createPaidAccount() {
   return { db, account: account.account };
 }
 
+function keepCurrentSubscriptionActiveForRecovery(): void {
+  const now = Date.now();
+  const currentPeriodStart = new Date(now - 24 * 60 * 60 * 1_000).toISOString();
+  currentSubscription = {
+    ...currentSubscription,
+    currentPeriodStart,
+    currentPeriodEnd: new Date(now + 30 * 24 * 60 * 60 * 1_000).toISOString(),
+    createdAt: currentPeriodStart,
+  };
+}
+
 describe("billing user journeys E2E", () => {
   beforeEach(async () => {
     localD1 = await createLocalD1(`billing-user-journey-${crypto.randomUUID()}`);
@@ -212,6 +223,7 @@ describe("billing user journeys E2E", () => {
 
   it("LINE Account喪失後も同じ有料Accountへ復旧し、競合と総当たりを拒否する", async () => {
     const { db, account } = await createPaidAccount();
+    keepCurrentSubscriptionActiveForRecovery();
     const activated = stripeEvent({
       id: "evt_recovery_paid",
       type: "customer.subscription.created",
@@ -380,6 +392,7 @@ describe("billing user journeys E2E", () => {
     const warnLog = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
     const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     const { db, account } = await createPaidAccount();
+    keepCurrentSubscriptionActiveForRecovery();
     await acceptWebhook(
       stripeEvent({
         id: "evt_recovery_race_paid",
