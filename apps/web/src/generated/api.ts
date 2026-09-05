@@ -10926,6 +10926,7 @@ export interface operations {
                   questionVersion: number;
                   text: string;
                   hint: string | null;
+                  backsideOfDiagnosisQuestionId: string | null;
                   /** @constant */
                   format: "single_choice";
                   choices: {
@@ -10940,6 +10941,7 @@ export interface operations {
                   questionVersion: number;
                   text: string;
                   hint: string | null;
+                  backsideOfDiagnosisQuestionId: string | null;
                   /** @constant */
                   format: "likert_5";
                   choices: {

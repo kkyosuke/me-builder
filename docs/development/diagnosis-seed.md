@@ -30,6 +30,7 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 - `created_at`などの日時はDrizzleの`timestamp` modeに合わせたUnix秒で記録する
 - 採点設定の意味と計算規則は各スコアリング設計を正とし、実行時の設定値をseedから版付きの不変な行として登録する
 - 公開済みDiagnosisが参照する採点設定行を更新せず、変更時は新しい設定IDとversionを追加する
+- 表裏カードを登録する場合は、表面のDiagnosis Questionを先に配置し、直後の裏面の`backside_of_diagnosis_question_id`から表面のDiagnosis Question IDを参照する。表裏それぞれのQuestion Versionと採点規則を明示する
 - seedのcatalog内容を変更したら、同じ変更で`catalog_versions`のversionを1つ上げる
 
 `INSERT OR IGNORE`は同じ主キーの既存行を変更しません。そのため再実行前には、既存行がseedの期待内容と一致しているかを確認します。意図しない差分がある場合、SQLの上書き更新で解消せず、Question VersionまたはDiagnosisを新しく作ります。
@@ -126,9 +127,10 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 2. Question VersionとChoiceを`approved`として追加する
 3. 新しいIDとversionで採点設定を追加する
 4. 新しいDiagnosis ID、採点設定への参照、固定した質問順を追加する
-5. `catalog_versions`のversionを1つ上げる
-6. localへ適用し、再実行と取得結果を検証する
-7. マージ後、preview CDの適用結果をAPIとWebから確認する
-8. production CDの対象DBと適用結果を確認する
+5. 表裏カードを使う場合は、裏面を表面の直後へ置き、`backside_of_diagnosis_question_id`を設定する
+6. `catalog_versions`のversionを1つ上げる
+7. localへ適用し、再実行と取得結果を検証する
+8. マージ後、preview CDの適用結果をAPIとWebから確認する
+9. production CDの対象DBと適用結果を確認する
 
 公開済みの内容を改訂するときは、既存のSQL行を書き換えて既存DBへ反映させようとしてはいけません。新しいQuestion VersionとDiagnosisを追記し、過去の回答が参照する版を残します。

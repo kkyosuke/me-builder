@@ -23,6 +23,7 @@ const DiagnosisQuestionBase = {
   questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
   text: NonEmptyStringSchema,
   hint: v.nullable(NonEmptyStringSchema),
+  backsideOfDiagnosisQuestionId: v.nullable(NonEmptyStringSchema),
 };
 
 const DiagnosisQuestionSchema = v.variant("format", [

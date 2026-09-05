@@ -388,7 +388,7 @@ describe("AccountDataRepository", () => {
     ).toEqual({ outcome: "released", reference: null });
   });
 
-  it("Diagnosis回答・Source・projection requestを同じAccount SQLiteへ保存する", async () => {
+  it("表裏のDiagnosis Questionを依存順に同期し、回答・Source・projection requestを保存する", async () => {
     const repository = createRepository();
     await repository.initialize();
     repository.bindAccount("account-1");
@@ -396,7 +396,10 @@ describe("AccountDataRepository", () => {
     const lifecycle = { createdAt: at, updatedAt: at, deletedAt: null, isDeleted: false };
     repository.syncDiagnosisCatalog({
       version: 1,
-      questions: [{ id: "question-1", ...lifecycle }],
+      questions: [
+        { id: "question-1", ...lifecycle },
+        { id: "question-2", ...lifecycle },
+      ],
       questionVersions: [
         {
           questionId: "question-1",
@@ -409,10 +412,30 @@ describe("AccountDataRepository", () => {
           retiredAt: null,
           ...lifecycle,
         },
+        {
+          questionId: "question-2",
+          version: 1,
+          state: "approved",
+          text: "Backside question",
+          hint: null,
+          format: "single_choice",
+          approvedAt: at,
+          retiredAt: null,
+          ...lifecycle,
+        },
       ],
       questionChoices: [
         {
           questionId: "question-1",
+          questionVersion: 1,
+          choiceId: "yes",
+          label: "Yes",
+          position: 1,
+          presentation: null,
+          ...lifecycle,
+        },
+        {
+          questionId: "question-2",
           questionVersion: 1,
           choiceId: "yes",
           label: "Yes",
@@ -440,33 +463,74 @@ describe("AccountDataRepository", () => {
       ],
       diagnosisQuestions: [
         {
+          id: "diagnosis-question-2",
+          diagnosisId: "diagnosis-1",
+          questionId: "question-2",
+          questionVersion: 1,
+          position: 2,
+          backsideOfDiagnosisQuestionId: "diagnosis-question-1",
+          ...lifecycle,
+        },
+        {
           id: "diagnosis-question-1",
           diagnosisId: "diagnosis-1",
           questionId: "question-1",
           questionVersion: 1,
           position: 1,
+          backsideOfDiagnosisQuestionId: null,
           ...lifecycle,
         },
       ],
     });
 
-    const saved = await DO.account.action.diagnosis.saveDiagnosisAnswer(repository.client, {
+    expect(
+      await repository.client
+        .select({
+          id: DO.account.schema.diagnosisQuestions.id,
+          backsideOfDiagnosisQuestionId:
+            DO.account.schema.diagnosisQuestions.backsideOfDiagnosisQuestionId,
+        })
+        .from(DO.account.schema.diagnosisQuestions)
+        .all(),
+    ).toEqual(
+      expect.arrayContaining([
+        { id: "diagnosis-question-1", backsideOfDiagnosisQuestionId: null },
+        {
+          id: "diagnosis-question-2",
+          backsideOfDiagnosisQuestionId: "diagnosis-question-1",
+        },
+      ]),
+    );
+
+    const savedFront = await DO.account.action.diagnosis.saveDiagnosisAnswer(repository.client, {
       accountId: "account-1",
       diagnosisId: "diagnosis-1",
       diagnosisQuestionId: "diagnosis-question-1",
       choiceId: "yes",
       at,
     });
+    expect(savedFront).toMatchObject({
+      type: "saved",
+      progress: { responseStatus: "in-progress" },
+    });
 
-    expect(saved).toMatchObject({ type: "saved", progress: { responseStatus: "answered" } });
+    const savedBack = await DO.account.action.diagnosis.saveDiagnosisAnswer(repository.client, {
+      accountId: "account-1",
+      diagnosisId: "diagnosis-1",
+      diagnosisQuestionId: "diagnosis-question-2",
+      choiceId: "yes",
+      at,
+    });
+
+    expect(savedBack).toMatchObject({ type: "saved", progress: { responseStatus: "answered" } });
     expect(
       await repository.client.select().from(DO.account.schema.sourceRecords).all(),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(
       await repository.client
         .select()
         .from(DO.account.schema.diagnosisBrainProjectionRequests)
         .all(),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
   });
 });

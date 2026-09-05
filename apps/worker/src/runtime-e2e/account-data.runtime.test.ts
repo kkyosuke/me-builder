@@ -282,6 +282,10 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
       state.storage.sql.exec("DROP TABLE photo_diary_media");
+      state.storage.sql.exec("DROP INDEX diagnosis_question_backside_active_idx");
+      state.storage.sql.exec(
+        "ALTER TABLE diagnosis_questions DROP COLUMN backside_of_diagnosis_question_id",
+      );
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786666843277");
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
@@ -546,6 +550,10 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
       state.storage.sql.exec("DROP TABLE photo_diary_media");
+      state.storage.sql.exec("DROP INDEX diagnosis_question_backside_active_idx");
+      state.storage.sql.exec(
+        "ALTER TABLE diagnosis_questions DROP COLUMN backside_of_diagnosis_question_id",
+      );
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
       const repository = Reflect.get(instance, "repository") as {
@@ -689,6 +697,10 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP TABLE weekly_reflections");
       state.storage.sql.exec("DROP TABLE weekly_reflection_generations");
       state.storage.sql.exec("DROP TABLE photo_diary_media");
+      state.storage.sql.exec("DROP INDEX diagnosis_question_backside_active_idx");
+      state.storage.sql.exec(
+        "ALTER TABLE diagnosis_questions DROP COLUMN backside_of_diagnosis_question_id",
+      );
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
       const repository = Reflect.get(instance, "repository") as {

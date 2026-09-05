@@ -120,6 +120,49 @@ describe("findOpenDiagnosisDetail", () => {
     });
   });
 
+  it("直前の2択を参照する質問をカードの裏面として返す", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "paired-detail" });
+    await db
+      .update(schema.diagnosisQuestions)
+      .set({ backsideOfDiagnosisQuestionId: "paired-detail-sq1" })
+      .where(eq(schema.diagnosisQuestions.id, "paired-detail-sq2"));
+
+    const result = await findOpenDiagnosisDetail(
+      db,
+      "paired-detail",
+      new Date("2026-08-03T00:00:00Z"),
+    );
+
+    expect(result).toMatchObject({
+      type: "found",
+      diagnosis: {
+        questions: [
+          { diagnosisQuestionId: "paired-detail-sq1", backsideOfDiagnosisQuestionId: null },
+          {
+            diagnosisQuestionId: "paired-detail-sq2",
+            backsideOfDiagnosisQuestionId: "paired-detail-sq1",
+          },
+        ],
+      },
+    });
+  });
+
+  it("直前の表面以外を参照する裏面をpublished catalogから返さない", async () => {
+    const db = createTestDb();
+    await insertDiagnosis(db, { id: "invalid-paired-detail" });
+    await db
+      .update(schema.diagnosisQuestions)
+      .set({ backsideOfDiagnosisQuestionId: "invalid-paired-detail-sq2" })
+      .where(eq(schema.diagnosisQuestions.id, "invalid-paired-detail-sq1"));
+
+    await expect(
+      findOpenDiagnosisDetail(db, "invalid-paired-detail", new Date("2026-08-03T00:00:00Z")),
+    ).rejects.toThrow(
+      "Published diagnosis backside must immediately follow a standalone single-choice front",
+    );
+  });
+
   it("未設計の回答形式をpublished catalogから返さない", async () => {
     const db = createTestDb();
     await insertDiagnosis(db, { id: "unsupported-format" });

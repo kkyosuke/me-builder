@@ -99,6 +99,7 @@ const ApiDiagnosisDetailSchema = v.object({
       questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
       text: v.pipe(v.string(), v.nonEmpty()),
       hint: v.nullable(v.pipe(v.string(), v.nonEmpty())),
+      backsideOfDiagnosisQuestionId: v.nullable(v.pipe(v.string(), v.nonEmpty())),
       format: v.picklist(["single_choice", "likert_5"]),
       choices: v.pipe(
         v.array(
@@ -192,6 +193,9 @@ export async function fetchDiagnosisDefinition(
           questionVersion: question.questionVersion,
           text: question.text,
           ...(question.hint ? { hint: question.hint } : {}),
+          ...(question.backsideOfDiagnosisQuestionId
+            ? { backsideOfDiagnosisQuestionId: question.backsideOfDiagnosisQuestionId }
+            : {}),
           format: "single_choice" as const,
           left: {
             choiceId: left.choiceId,

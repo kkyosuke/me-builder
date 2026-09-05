@@ -37,6 +37,30 @@ const twoQuestionDiagnosis: DiagnosisDefinition = {
   ],
 };
 
+const pairedQuestionDiagnosis: DiagnosisDefinition = {
+  ...diagnosis,
+  title: "表裏テスト",
+  questions: [
+    {
+      diagnosisQuestionId: "dq-front",
+      questionId: "q-front",
+      questionVersion: 1,
+      text: "休日は家で過ごすことが多い？",
+      left: { choiceId: "no", label: "いいえ" },
+      right: { choiceId: "yes", label: "はい" },
+    },
+    {
+      diagnosisQuestionId: "dq-back",
+      questionId: "q-back",
+      questionVersion: 1,
+      text: "休日は家で過ごしたい？",
+      backsideOfDiagnosisQuestionId: "dq-front",
+      left: { choiceId: "no", label: "いいえ" },
+      right: { choiceId: "yes", label: "はい" },
+    },
+  ],
+};
+
 const likertDiagnosis: DiagnosisDefinition = {
   ...diagnosis,
   questions: [
@@ -60,6 +84,81 @@ const likertDiagnosis: DiagnosisDefinition = {
 afterEach(() => cleanup());
 
 describe("SwipeDiagnosis answer persistence", () => {
+  it("裏面のある表は回答方向から反転し、裏の回答で従来どおり完了する", async () => {
+    const onSaveAnswer = vi.fn().mockResolvedValue({
+      acceptedAt: "2026-08-05T00:00:02.000Z",
+    });
+    const onComplete = vi.fn();
+    render(
+      <SwipeDiagnosis
+        diagnosis={pairedQuestionDiagnosis}
+        onBack={vi.fn()}
+        onSaveAnswer={onSaveAnswer}
+        onDeferQuestion={vi.fn()}
+        onComplete={onComplete}
+      />,
+    );
+
+    expect(screen.getByLabelText("普段の行動 1/2")).toBeTruthy();
+    const frontYes = screen
+      .getAllByRole<HTMLButtonElement>("button", { name: "はい" })
+      .find(({ disabled }) => !disabled);
+    if (!frontYes) throw new Error("表面の回答ボタンがありません");
+    fireEvent.click(frontYes);
+
+    expect(document.querySelector('[style*="rotateY(-180deg)"]')).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole<HTMLButtonElement>("button", { name: "いいえ" })
+          .find(({ disabled }) => !disabled),
+      ).toBeTruthy(),
+    );
+    expect(onSaveAnswer.mock.calls[0]?.[0]).toMatchObject({
+      diagnosisQuestionId: "dq-front",
+      choiceId: "yes",
+    });
+
+    const backNo = screen
+      .getAllByRole<HTMLButtonElement>("button", { name: "いいえ" })
+      .find(({ disabled }) => !disabled);
+    if (!backNo) throw new Error("裏面の回答ボタンがありません");
+    fireEvent.click(backNo);
+
+    await waitFor(() => expect(onSaveAnswer).toHaveBeenCalledTimes(2));
+    expect(onSaveAnswer.mock.calls[1]?.[0]).toMatchObject({
+      diagnosisQuestionId: "dq-back",
+      choiceId: "no",
+    });
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+  });
+
+  it("表面だけ保存済みなら大切にしたいことの裏面から再開する", () => {
+    render(
+      <SwipeDiagnosis
+        diagnosis={pairedQuestionDiagnosis}
+        initialAnswers={[
+          {
+            kind: "answer",
+            diagnosisQuestionId: "dq-front",
+            questionId: "q-front",
+            questionVersion: 1,
+            choiceId: "yes",
+            direction: "right",
+            acceptedAt: "2026-08-05T00:00:01.000Z",
+          },
+        ]}
+        onBack={vi.fn()}
+        onSaveAnswer={vi.fn()}
+        onDeferQuestion={vi.fn()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("大切にしたいこと 2/2")).toBeTruthy();
+    expect(screen.getByText("休日は家で過ごしたい？")).toBeTruthy();
+  });
+
   it("5段階は5つのボタンから選択し、左右キーを回答に使わない", async () => {
     const onSaveAnswer = vi.fn().mockResolvedValue({
       acceptedAt: "2026-08-05T00:00:02.000Z",
