@@ -4,8 +4,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RootApplication } from "./root-application";
 
+vi.mock("./config", () => ({ config: { environment: "test" } }));
+
 vi.mock("./App", () => ({
   App: () => <main>本人向けアプリ</main>,
+}));
+
+vi.mock("./feature/diagnosis/presentation/diagnosis-card-preview", () => ({
+  default: () => <main>表裏カード開発用プレビュー</main>,
 }));
 
 vi.mock("./feature/service-site", async (importOriginal) => {
@@ -87,5 +93,13 @@ describe("RootApplication", () => {
     expect(screen.getByRole("link", { name: "診断画面へ戻る" }).getAttribute("href")).toBe(
       "/diagnosis",
     );
+  });
+
+  it("開発用pathでは認証アプリを介さず表裏カードプレビューを表示する", async () => {
+    window.history.replaceState({}, "", "/development/diagnosis-card-preview");
+    render(<RootApplication />);
+
+    expect(await screen.findByText("表裏カード開発用プレビュー")).toBeTruthy();
+    expect(screen.queryByText("本人向けアプリ")).toBeNull();
   });
 });

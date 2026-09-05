@@ -48,6 +48,8 @@ AIは回答のChoice、表示文言、Question Versionとこのscoreを入力と
 - 通信結果が未確定の間は同じChoiceだけを保持して再送する。未保存と確定した場合だけ未回答へ戻し、新しく選び直せる
 - 端末に別Choiceを一時保存して切り替えたり、再送時にAIやclientがChoiceを置換したりしない
 
+表裏カードの表示だけを確認するときは、`VITE_ENVIRONMENT=local task dev:ui`でWebを起動し、`/development/diagnosis-card-preview`を開きます。この開発用画面はソース内のダミー診断を`SwipeDiagnosis`へ直接渡し、回答も画面内のメモリだけで処理します。診断API、seed、DBは使用せず、Preview環境とProduction環境では表示しません。
+
 ## 5. 採点と比較
 
 - 採点は版付きscoring configを使い、5段階scoreは`-1..1`へ正規化済みの値として扱う

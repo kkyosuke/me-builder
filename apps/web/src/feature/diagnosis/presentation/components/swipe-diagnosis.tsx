@@ -35,6 +35,26 @@ import { SwipeCard } from "./swipe-card";
 
 /** 回答の確定に使える操作。スワイプ以外の手段も同じ関数へ流します。 */
 type DiagnosisAction = SwipeDirection | "skip";
+type DiagnosisQuestion = DiagnosisDefinition["questions"][number];
+
+/** 配列上で表面の直後に並ぶ、未回答の裏面を返します。 */
+function resolveImmediateBackside(
+  questions: DiagnosisQuestion[],
+  frontIndex: number,
+): DiagnosisQuestion | undefined {
+  const front = questions[frontIndex];
+  const candidate = questions[frontIndex + 1];
+  if (
+    !front ||
+    front.format === "likert_5" ||
+    !candidate ||
+    candidate.format === "likert_5" ||
+    candidate.backsideOfDiagnosisQuestionId !== front.diagnosisQuestionId
+  ) {
+    return undefined;
+  }
+  return candidate;
+}
 
 type BackgroundSave = {
   answer: DiagnosisAnswer;
@@ -286,21 +306,18 @@ export function SwipeDiagnosis({
   );
 
   const current = questions?.[index];
-  const configuredBackside = useMemo(
+  const pairedFrontQuestionIds = useMemo(
     () =>
-      current
-        ? diagnosis.questions.find(
-            (question) =>
-              "backsideOfDiagnosisQuestionId" in question &&
-              question.backsideOfDiagnosisQuestionId === current.diagnosisQuestionId,
-          )
-        : undefined,
-    [current, diagnosis.questions],
+      new Set(
+        diagnosis.questions.flatMap((question) =>
+          question.format !== "likert_5" && question.backsideOfDiagnosisQuestionId
+            ? [question.backsideOfDiagnosisQuestionId]
+            : [],
+        ),
+      ),
+    [diagnosis.questions],
   );
-  const pendingBackside =
-    configuredBackside?.diagnosisQuestionId === questions[index + 1]?.diagnosisQuestionId
-      ? questions[index + 1]
-      : undefined;
+  const pendingBackside = resolveImmediateBackside(questions, index);
   const isBusy = flyOut !== null || turnOver !== null || deferState === "saving";
 
   const advance = useCallback(
@@ -482,15 +499,21 @@ export function SwipeDiagnosis({
     () => (progressMilestone ? pickProgressMessage(progressMilestone) : null),
     [progressMilestone],
   );
-  const visibleSwipeQuestions = useMemo(() => {
-    const visible: Array<(typeof questions)[number]> = [];
-    for (const question of questions.slice(index)) {
-      if (pendingBackside?.diagnosisQuestionId === question.diagnosisQuestionId) continue;
-      visible.push(question);
-      if (visible.length >= VISIBLE_STACK_SIZE) break;
+  const visibleSwipeCards = useMemo(() => {
+    const visible: Array<{
+      question: DiagnosisQuestion;
+      backsideQuestion?: DiagnosisQuestion;
+    }> = [];
+    let questionIndex = index;
+    while (questionIndex < questions.length && visible.length < VISIBLE_STACK_SIZE) {
+      const question = questions[questionIndex];
+      if (!question) break;
+      const backsideQuestion = resolveImmediateBackside(questions, questionIndex);
+      visible.push({ question, ...(backsideQuestion ? { backsideQuestion } : {}) });
+      questionIndex += backsideQuestion ? 2 : 1;
     }
     return visible;
-  }, [index, pendingBackside, questions]);
+  }, [index, questions]);
 
   useEffect(() => {
     if (!finished || !allAnswered || backgroundSaves.length > 0 || completionNotified.current) {
@@ -545,18 +568,18 @@ export function SwipeDiagnosis({
         {current?.format === "likert_5" ? (
           <Likert5Card question={current} disabled={isBusy} onSelect={commitLikert5} />
         ) : (
-          visibleSwipeQuestions.map((question, offset) =>
+          visibleSwipeCards.map(({ question, backsideQuestion }, offset) =>
             question.format === "likert_5" ? null : (
               <SwipeCard
                 key={`${question.diagnosisQuestionId}-v${question.questionVersion}`}
                 question={question}
-                {...(offset === 0 && pendingBackside && pendingBackside.format !== "likert_5"
-                  ? { backsideQuestion: pendingBackside }
+                {...(backsideQuestion && backsideQuestion.format !== "likert_5"
+                  ? { backsideQuestion }
                   : {})}
                 face={
                   question.backsideOfDiagnosisQuestionId
                     ? "value"
-                    : offset === 0 && configuredBackside
+                    : pairedFrontQuestionIds.has(question.diagnosisQuestionId)
                       ? "behavior"
                       : "single"
                 }

@@ -5,6 +5,7 @@ import {
   SWIPE_TRANSITION_MS,
   buildDragTransform,
   buildFlyOutTransform,
+  buildTurnOverPreviewTransform,
   buildTurnOverTransform,
   isTapGesture,
   resolveChoiceProgress,
@@ -172,7 +173,12 @@ function SwipeCardFace({
 
   return (
     <div
-      className="absolute inset-0 flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-950/50 select-none dark:border-slate-700 dark:bg-slate-800"
+      data-card-face={face}
+      className={`absolute inset-0 flex flex-col justify-between rounded-3xl border p-6 shadow-2xl select-none ${
+        face === "value"
+          ? "border-violet-300 bg-violet-50 shadow-violet-950/30 dark:border-violet-700 dark:bg-violet-950"
+          : "border-slate-200 bg-white shadow-slate-950/50 dark:border-slate-700 dark:bg-slate-800"
+      }`}
       style={style}
       aria-hidden={hidden || undefined}
     >
@@ -237,6 +243,7 @@ export function SwipeCard({
   onPointerCancel,
 }: SwipeCardProps) {
   const isFront = depth === 0;
+  const previewsTurnOver = isFront && face === "behavior" && backsideQuestion !== undefined;
   const layer = resolveStackLayer(depth);
 
   const style: CSSProperties = {
@@ -245,7 +252,7 @@ export function SwipeCard({
     transform: layer.transform,
     // ドラッグ中は指へ即座に追従させるためtransitionを切ります。
     transition: reducedMotion || drag ? undefined : `transform ${SWIPE_TRANSITION_MS}ms ease-out`,
-    perspective: "1200px",
+    perspective: "800px",
   };
 
   if (isFront && flyOut) {
@@ -254,7 +261,7 @@ export function SwipeCard({
     style.transition = reducedMotion
       ? undefined
       : `transform ${SWIPE_TRANSITION_MS}ms ease-out, opacity ${SWIPE_TRANSITION_MS}ms ease-out`;
-  } else if (isFront && drag) {
+  } else if (isFront && drag && !previewsTurnOver) {
     style.transform = buildDragTransform(drag, cardWidth);
   }
 
@@ -265,9 +272,19 @@ export function SwipeCard({
     height: "100%",
     position: "relative",
     transformStyle: "preserve-3d",
-    transform: turnOver ? buildTurnOverTransform(turnOver) : undefined,
-    transition:
-      turnOver && !reducedMotion ? `transform ${SWIPE_TRANSITION_MS}ms ease-in-out` : undefined,
+    willChange: previewsTurnOver || turnOver ? "transform" : undefined,
+    transform: turnOver
+      ? buildTurnOverTransform(turnOver)
+      : previewsTurnOver && drag
+        ? buildTurnOverPreviewTransform(drag.dx, threshold)
+        : undefined,
+    transition: reducedMotion
+      ? undefined
+      : turnOver
+        ? `transform ${SWIPE_TRANSITION_MS}ms ease-in-out`
+        : previewsTurnOver && !drag
+          ? `transform ${SWIPE_TRANSITION_MS}ms ease-out`
+          : undefined,
   };
   const frontFaceStyle: CSSProperties = { backfaceVisibility: "hidden" };
   const backFaceStyle: CSSProperties = {
