@@ -91,6 +91,8 @@ const diagnosisResult = {
       choiceId: "yes",
       choiceLabel: "はい",
       acceptedAt: "2026-08-10T00:00:00.000Z",
+      perspective: "single",
+      pairId: null,
     },
   ],
   scoring: null,
