@@ -202,7 +202,9 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
       "questionText": "相手から頼まれても、自分に余裕がなければ断りたい。",
       "choiceId": "yes",
       "choiceLabel": "はい",
-      "acceptedAt": "2026-08-05T00:00:00.000Z"
+      "acceptedAt": "2026-08-05T00:00:00.000Z",
+      "perspective": "single",
+      "pairId": null
     }
   ],
   "scoring": {
@@ -214,16 +216,42 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
         "label": "自分／相手の優先",
         "lowLabel": "相手を優先しやすい",
         "highLabel": "自分の余裕を優先しやすい",
+        "resultKind": "aggregate",
         "score": 75,
         "coverage": 100,
-        "band": "high"
+        "band": "high",
+        "behavior": null,
+        "comparison": null
+      },
+      {
+        "id": "family-time",
+        "label": "家族との時間",
+        "lowLabel": "自分の時間を優先する",
+        "highLabel": "家族との時間を優先する",
+        "resultKind": "behavior_desired",
+        "score": 100,
+        "coverage": 100,
+        "band": "high",
+        "behavior": {
+          "score": 0,
+          "coverage": 100,
+          "band": "low"
+        },
+        "comparison": {
+          "difference": 100,
+          "relation": "desired_higher"
+        }
       }
     ]
   }
 }
 ```
 
-`scoring`は、採点設定版、中央帯の表示名、計算済みパラメータを一体で返します。採点設定をまだ持たない、または保存済み設定の検証に失敗したDiagnosisでは`null`とし、回答内容の閲覧は妨げません。設定の検証失敗はAPI Serverが採点設定IDとともにエラーログへ記録し、設定本体や回答内容はログへ出力しません。これによりDiagnosisの一覧・質問追加はWeb UIのリリースや診断ID対応表の更新を前提にしません。
+`answers[].perspective`は独立質問を`single`、表面を`behavior`、裏面を`desired`として返します。表裏では両方の`pairId`に表面のDiagnosis Question IDを返し、独立質問では`null`です。
+
+`scoring`は、採点設定版、中央帯の表示名、計算済みパラメータを一体で返します。`resultKind: aggregate`は従来どおり`score`、`coverage`、`band`が単一の集計結果で、`behavior`と`comparison`は`null`です。`resultKind: behavior_desired`では、トップレベルの3フィールドを「大切にしたいこと」の主スコア、`behavior`を「普段の行動」のスコアとし、`comparison.difference`は`desired.score - behavior.score`を返します。`relation`は`same_band`、`desired_higher`、`behavior_higher`のいずれかで、片方が回答不足なら`comparison`は`null`です。表裏を足し合わせた単一平均は返しません。
+
+採点設定をまだ持たない、または保存済み設定の検証に失敗したDiagnosisでは`scoring`を`null`とし、回答内容の閲覧は妨げません。設定の検証失敗はAPI Serverが採点設定IDとともにエラーログへ記録し、設定本体や回答内容はログへ出力しません。これによりDiagnosisの一覧・質問追加はWeb UIのリリースや診断ID対応表の更新を前提にしません。
 
 回答内容取得固有のエラーは次のとおりです。
 

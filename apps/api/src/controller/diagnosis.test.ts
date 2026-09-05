@@ -352,6 +352,8 @@ describe("GET /api/diagnoses/:diagnosisId/answers", () => {
             choiceId: "yes",
             choiceLabel: "はい",
             acceptedAt: "2026-08-05T00:00:00.000Z",
+            perspective: "single",
+            pairId: null,
           },
         ],
       },

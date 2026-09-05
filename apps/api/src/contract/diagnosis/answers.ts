@@ -11,7 +11,7 @@ import { RelationshipCategorySchema } from "./shared";
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
 const CountSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 
-const DiagnosisAnswerSchema = v.object({
+const DiagnosisAnswerEntries = {
   diagnosisQuestionId: NonEmptyStringSchema,
   questionId: NonEmptyStringSchema,
   questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
@@ -19,17 +19,54 @@ const DiagnosisAnswerSchema = v.object({
   choiceId: NonEmptyStringSchema,
   choiceLabel: NonEmptyStringSchema,
   acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
-});
+};
 
-const ScoredParameterSchema = v.object({
-  id: NonEmptyStringSchema,
-  label: NonEmptyStringSchema,
-  lowLabel: NonEmptyStringSchema,
-  highLabel: NonEmptyStringSchema,
+const DiagnosisAnswerSchema = v.variant("perspective", [
+  v.object({
+    ...DiagnosisAnswerEntries,
+    perspective: v.literal("single"),
+    pairId: v.null(),
+  }),
+  v.object({
+    ...DiagnosisAnswerEntries,
+    perspective: v.picklist(["behavior", "desired"]),
+    pairId: NonEmptyStringSchema,
+  }),
+]);
+
+const ParameterScoreSchema = v.object({
   score: v.nullable(v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100))),
   coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
   band: v.picklist(["low", "balanced", "high", "insufficient"]),
 });
+
+const ScoredParameterEntries = {
+  id: NonEmptyStringSchema,
+  label: NonEmptyStringSchema,
+  lowLabel: NonEmptyStringSchema,
+  highLabel: NonEmptyStringSchema,
+  ...ParameterScoreSchema.entries,
+};
+
+const ParameterComparisonSchema = v.object({
+  difference: v.pipe(v.number(), v.safeInteger(), v.minValue(-100), v.maxValue(100)),
+  relation: v.picklist(["same_band", "desired_higher", "behavior_higher"]),
+});
+
+const ScoredParameterSchema = v.variant("resultKind", [
+  v.object({
+    ...ScoredParameterEntries,
+    resultKind: v.literal("aggregate"),
+    behavior: v.null(),
+    comparison: v.null(),
+  }),
+  v.object({
+    ...ScoredParameterEntries,
+    resultKind: v.literal("behavior_desired"),
+    behavior: ParameterScoreSchema,
+    comparison: v.nullable(ParameterComparisonSchema),
+  }),
+]);
 
 const DiagnosisScoringSchema = v.object({
   scoringVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),

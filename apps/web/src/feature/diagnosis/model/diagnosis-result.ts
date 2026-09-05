@@ -1,6 +1,6 @@
 import type { RelationshipCategory } from "./relationship-category";
 
-export interface DiagnosisResultAnswer {
+interface DiagnosisResultAnswerBase {
   diagnosisQuestionId: string;
   questionId: string;
   questionVersion: number;
@@ -10,15 +10,39 @@ export interface DiagnosisResultAnswer {
   acceptedAt: string;
 }
 
-export interface ScoredParameter {
-  id: string;
-  label: string;
-  lowLabel: string;
-  highLabel: string;
+export type DiagnosisResultAnswer = DiagnosisResultAnswerBase &
+  (
+    | { perspective: "single"; pairId: null }
+    | { perspective: "behavior" | "desired"; pairId: string }
+  );
+
+export interface ParameterScore {
   score: number | null;
   coverage: number;
   band: "low" | "balanced" | "high" | "insufficient";
 }
+
+interface ScoredParameterBase extends ParameterScore {
+  id: string;
+  label: string;
+  lowLabel: string;
+  highLabel: string;
+}
+
+interface ParameterComparison {
+  difference: number;
+  relation: "same_band" | "desired_higher" | "behavior_higher";
+}
+
+export type ScoredParameter = ScoredParameterBase &
+  (
+    | { resultKind: "aggregate"; behavior: null; comparison: null }
+    | {
+        resultKind: "behavior_desired";
+        behavior: ParameterScore;
+        comparison: ParameterComparison | null;
+      }
+  );
 
 interface DiagnosisScoring {
   scoringVersion: number;

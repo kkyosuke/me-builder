@@ -176,7 +176,7 @@ Brain Itemの`derivation`は導出契機になったEvidence edgeから集計し
 | 変換方法 | 版付き設定によるルールベース計算 | 構造化出力を使うAI抽出 |
 | 主な追加入力 | Question、Choice、採点設定 | 未処理チェックポイント範囲の会話 |
 | 作成単位 | 計算可能なParameterごとに1件 | 意味的に独立した命題ごとに1件、1チェックポイント最大3件 |
-| 分類 | 最初は`Preference` | 本人が明言した`Memory`、`Behavior Pattern`、`Value / Motivation`、`Decision System`、`Preference`、`Goal` |
+| 分類 | 独立質問の集計と表裏の`desired`は`Preference`、表裏の`behavior`は`Behavior Pattern` | 本人が明言した`Memory`、`Behavior Pattern`、`Value / Motivation`、`Decision System`、`Preference`、`Goal` |
 | Derivation | `deterministic` | `ai` |
 | Evidence | Parameterへ寄与したAnswerのSource Record | 候補が参照したuser messageのSource Record |
 | 利用開始 | 生成時点 | 生成時点。ただしAI推定として区別する |
@@ -197,14 +197,14 @@ Parameter Profileの計算方法は[診断回答のパラメータ変換設計](
 
 ### 6.2 出力
 
-`score`を計算できるParameter 1件につき、`Preference` Brain Itemを1件作ります。
+独立質問だけのParameterは、`score`を計算できるParameter 1件につき`Preference` Brain Itemを1件作ります。表裏Parameterは、計算できた`behavior`を`Behavior Pattern`、`desired`を`Preference`として別々に作ります。現在と望みの比較は表示時に決定的に再計算できるため、第三のBrain Itemにしません。
 
 | 出力 | 値 |
 | --- | --- |
-| `statement` | `{Parameter表示名}は「{bandの表示名}」の傾向がある` |
-| `attributes` | Diagnosis ID、採点設定ID・版、Parameter ID、score、coverage、band |
+| `statement` | 独立質問は`{Parameter表示名}は「{bandの表示名}」の傾向がある`。表裏は観点を明示して`{Parameter表示名}の普段の行動は…`または`{Parameter表示名}で大切にしたいことは…` |
+| `attributes` | Diagnosis ID、採点設定ID・版、Parameter ID、表裏では観点、score、coverage、band |
 | `derivation` | `deterministic` |
-| Evidence | そのParameterの0以外の重みへ寄与した現在有効なAnswerのSource Record |
+| Evidence | 独立質問ではそのParameterへ寄与したAnswer、表裏では生成する観点へ寄与したAnswerだけのSource Record |
 
 `score = null`または`band = insufficient`ならBrain Itemを作りません。`coverage`は回答充足率であり、Confidenceへ転用しません。
 
@@ -232,7 +232,7 @@ sequenceDiagram
 
 利用者から見ると診断完了直後に登録します。回答保存transaction内でBrain Itemまで作らず、失敗しても残るprojection要求を登録します。
 
-同じAccount、Diagnosis、採点設定版、Parameter IDを同じprojection単位とします。再回答で内容が変われば旧Itemを`superseded`にし、新ItemとのRevisionを作ります。内容が同じならItemを増やしません。
+同じAccount、Diagnosis、採点設定版、Parameter ID、観点を同じprojection単位とします。独立質問の観点は`aggregate`、表裏は`behavior`と`desired`です。再回答で内容が変われば同じ観点の旧Itemを`superseded`にし、新ItemとのRevisionを作ります。内容が同じならItemを増やしません。
 
 ## 7. 日記チャットからの生成
 

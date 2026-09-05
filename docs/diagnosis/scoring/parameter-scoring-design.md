@@ -14,11 +14,20 @@
 
 ```mermaid
 flowchart LR
-    A[現在有効なAnswer] --> E[共通スコアリングエンジン]
+    A[現在有効なAnswer] --> S{表裏の観点}
+    S -->|独立質問| E[従来の集計]
+    S -->|普段の行動| B[行動Parameter Profile]
+    S -->|大切にしたいこと| W[望みParameter Profile]
+    B --> C[同じParameter上で比較]
+    W --> C
     D[(D1の版付き設定)] --> E
-    E --> P[Parameter Profile]
+    D --> B
+    D --> W
+    E --> P[集計Parameter Profile]
+    C --> P2[表裏Parameter Profile]
     D --> V[設定版]
     V --> P
+    V --> P2
 ```
 
 診断固有の設定が持つものは次のとおりです。
@@ -35,6 +44,8 @@ flowchart LR
 | `balancedLabel` | 中央帯の表示名 |
 
 質問文、選択肢、重み、パラメータの意味は診断固有です。回答の検証、集計、正規化、回答不足判定、帯域判定は共通です。
+
+表裏の関連はDiagnosis Questionが所有し、採点設定へ同じ関連を重複して持ちません。採点時は、裏面が参照する表面を「普段の行動」、裏面を「大切にしたいこと」として、同じParameterの別の観点へ振り分けます。表裏の質問内容と関連付けの規則は[診断回答形式の実装境界](../../development/diagnosis-format-remaining-tasks.md)を正とします。
 
 ## 3. 設定形式
 
@@ -97,6 +108,24 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 5. `coverage`が`minimumCoverage`未満なら、スコアを`null`にする
 6. それ以外は0〜100へ正規化し、低・中央・高の帯域を決める
 
+### 4.1 表裏質問の計算
+
+表裏質問が寄与するParameterは、表面と裏面を1つの加重和へ混ぜません。同じ`choiceScores`、同じParameter、同じ重みを使い、表面だけから`behavior`、裏面だけから`desired`をそれぞれ前節の式で計算します。`coverage`と帯域も観点ごとに判定します。
+
+表裏Parameterの主スコアは`desired`とします。相性比較の位置と`relationshipRequests`はこの主スコアだけから決め、現在の行動を本人の望みとして扱いません。計算結果は次を持ちます。
+
+| 出力 | 意味 |
+| --- | --- |
+| `resultKind = behavior_desired` | 表裏を分離集計したParameterであること |
+| `score`、`coverage`、`band` | `desired`の値。既存の結果利用先が参照する主スコア |
+| `behavior` | 表面だけから計算した`score`、`coverage`、`band` |
+| `comparison.difference` | `desired.score - behavior.score`。-100〜100の整数 |
+| `comparison.relation` | 同じ帯域なら`same_band`、望みが高い側なら`desired_higher`、行動が高い側なら`behavior_higher` |
+
+`behavior`または`desired`のスコアが`null`なら`comparison`も`null`とし、差を推定で補いません。独立質問だけが寄与する既存Parameterは`resultKind = aggregate`とし、従来どおり1つの`score`、`coverage`、`band`を返します。
+
+表裏の関係は、全問へ回答して`DiagnosisResponse`が回答済みになった後だけ計算・表示します。表面への回答直後に途中結果を見せて裏面の回答を誘導しません。質問ごとの回答内容は変換前の原本として閲覧できますが、Parameterへ変換する前の2回答を診断結果として評価しません。
+
 ## 5. 不変条件
 
 設定を外部ファイルやDBから受け取る場合は、次の不変条件を共通スキーマで検証してから計算します。コード内の設定は型検査と単体テストで同じ条件を保証し、保存済み回答のQuestion VersionやChoice IDが設定と一致しない場合は採点対象から除外します。
@@ -109,6 +138,8 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 - 質問定義とスコアリング設定のQuestion IDは過不足なく一致させる
 - 同じQuestion IDのQuestion Versionは質問定義とスコアリング設定で一致させる
 - 質問が持つ選択値は`choiceScores`に定義する
+- 表裏の一方がParameterへ寄与する場合は、もう一方も同じParameterへ同じ重みで寄与させる
+- 1つのParameterへ、独立質問と表裏質問を混在させない
 - `minimumCoverage`は0〜1とする
 - 帯域境界は0〜100に置き、`lowMaximum < highMinimum`とする
 - 同じ入力回答と同じ設定版からは、常に同じ出力を返す
@@ -138,13 +169,13 @@ coverage = 回答済み重み ÷ そのパラメータの全重み
 
 ## 8. Brain Itemへのprojection
 
-全問へ回答して`DiagnosisResponse`が回答済みになった後、Parameter ProfileをBrain domainへprojectionします。診断と日記に共通する生成入出力、診断projectionが作るBrain ItemとEvidence、登録タイミング、再回答時の改訂は[Brain Item生成設計 §6](../../domain/brain/brain-item-generation-design.md#6-診断回答からの生成)を正とします。
+全問へ回答して`DiagnosisResponse`が回答済みになった後、Parameter ProfileをBrain domainへprojectionします。表裏Parameterでは`behavior`と`desired`を別のBrain Itemへ変換し、`comparison`自体はBrain Itemにしません。診断と日記に共通する生成入出力、診断projectionが作るBrain ItemとEvidence、登録タイミング、再回答時の改訂は[Brain Item生成設計 §6](../../domain/brain/brain-item-generation-design.md#6-診断回答からの生成)を正とします。
 
 この文書が所有するのは、projectionの入力となるParameter Profileの計算方式です。Parameter Profileは変換中だけの値であり、独立したレコードとして保存しません。
 
 ## 9. 現在の実装境界
 
-`diagnosis_scoring_configs`が設定版と設定JSONを保持し、公開済みDiagnosisの`scoring_config_id`は変更しません。初回導入時の未設定`relationshipRequests`だけは前節の条件で補完しますが、採点パラメータ、重み、境界、設定版は変更しません。API ServerはDBから取得した設定をValibotで検証し、AnswerのQuestion ID、Question Version、Choice IDから表示のたびに結果を再計算します。
+`diagnosis_scoring_configs`が設定版と設定JSONを保持し、公開済みDiagnosisの`scoring_config_id`は変更しません。初回導入時の未設定`relationshipRequests`だけは前節の条件で補完しますが、採点パラメータ、重み、境界、設定版は変更しません。API ServerはDBから取得した設定をValibotで検証し、AnswerのQuestion ID、Question Version、Choice IDとDiagnosis Questionの表裏関連から表示のたびに結果を再計算します。
 
 クライアントの算出値は正として扱いません。Brain Item projectionはサーバー側で同じ共通スコアリングエンジンと版付き採点設定を使用します。採点設定を持たないDiagnosisでは回答内容だけを返し、Brain Itemを生成しません。
 

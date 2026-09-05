@@ -2,16 +2,41 @@ import * as v from "valibot";
 
 export type ParameterBand = "low" | "balanced" | "high" | "insufficient";
 
-export type ScoredParameter = Readonly<{
-  id: string;
-  label: string;
-  lowLabel: string;
-  highLabel: string;
+export type ParameterScore = Readonly<{
   score: number | null;
   coverage: number;
   band: ParameterBand;
-  relationshipRequest?: string;
 }>;
+
+export type ParameterComparison = Readonly<{
+  /** `desired.score - behavior.score`。正なら望みが高い側です。 */
+  difference: number;
+  relation: "same_band" | "desired_higher" | "behavior_higher";
+}>;
+
+type ScoredParameterBase = ParameterScore &
+  Readonly<{
+    id: string;
+    label: string;
+    lowLabel: string;
+    highLabel: string;
+    relationshipRequest?: string;
+  }>;
+
+export type ScoredParameter =
+  | (ScoredParameterBase &
+      Readonly<{
+        resultKind: "aggregate";
+        behavior: null;
+        comparison: null;
+      }>)
+  | (ScoredParameterBase &
+      Readonly<{
+        /** トップレベルのスコアは主スコアである`desired`です。 */
+        resultKind: "behavior_desired";
+        behavior: ParameterScore;
+        comparison: ParameterComparison | null;
+      }>);
 
 export type DiagnosisScoring = Readonly<{
   scoringVersion: number;
@@ -32,12 +57,15 @@ export type ProjectionScoringAnswer = ScoringAnswer &
 
 export type DiagnosisParameterProjection = Readonly<{
   parameterId: string;
+  perspective: "aggregate" | "behavior" | "desired";
+  category: "preference" | "behavior_pattern";
   statement: string;
   attributes: {
     diagnosisId: string;
     scoringConfigId: string;
     scoringVersion: number;
     parameterId: string;
+    perspective?: "behavior" | "desired";
     score: number;
     coverage: number;
     band: Exclude<ParameterBand, "insufficient">;
@@ -50,11 +78,15 @@ export type StoredScoringConfig = Readonly<{
   version: number;
   definition: unknown;
   questions: readonly Readonly<{
+    diagnosisQuestionId?: string | undefined;
     questionId: string;
     questionVersion: number;
     choiceIds: readonly string[];
+    backsideOfDiagnosisQuestionId?: string | null | undefined;
   }>[];
 }>;
+
+type QuestionPerspective = "aggregate" | "behavior" | "desired";
 
 const VersionSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(1));
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
@@ -151,6 +183,7 @@ const DiagnosisQuestionScoringSchema = v.pipe(
     questions: v.pipe(
       v.array(
         v.object({
+          diagnosisQuestionId: v.optional(NonEmptyStringSchema),
           questionId: NonEmptyStringSchema,
           questionVersion: VersionSchema,
           choiceIds: v.pipe(
@@ -161,12 +194,30 @@ const DiagnosisQuestionScoringSchema = v.pipe(
               "同じ質問のchoice idが重複しています",
             ),
           ),
+          backsideOfDiagnosisQuestionId: v.optional(v.nullable(NonEmptyStringSchema)),
         }),
       ),
       v.check(
         (questions) =>
           new Set(questions.map(({ questionId }) => questionId)).size === questions.length,
         "question idが重複しています",
+      ),
+      v.check((questions) => {
+        const ids = questions.flatMap(({ diagnosisQuestionId }) =>
+          diagnosisQuestionId ? [diagnosisQuestionId] : [],
+        );
+        return new Set(ids).size === ids.length;
+      }, "diagnosis question idが重複しています"),
+      v.check(
+        (questions) =>
+          questions.every((question, index) => {
+            if (!question.backsideOfDiagnosisQuestionId) return true;
+            return (
+              question.diagnosisQuestionId !== undefined &&
+              questions[index - 1]?.diagnosisQuestionId === question.backsideOfDiagnosisQuestionId
+            );
+          }),
+        "裏面は直前の表面Diagnosis Questionを参照してください",
       ),
     ),
     config: ScoringConfigSchema,
@@ -194,6 +245,54 @@ const DiagnosisQuestionScoringSchema = v.pipe(
       ),
     "質問の選択値がchoiceScoresに定義されていません",
   ),
+  v.check(({ questions, config }) => {
+    for (const [index, question] of questions.entries()) {
+      if (!question.backsideOfDiagnosisQuestionId) continue;
+      const front = questions[index - 1];
+      if (!front) return false;
+      const frontWeights = config.questions[front.questionId]?.weights;
+      const desiredWeights = config.questions[question.questionId]?.weights;
+      if (!frontWeights || !desiredWeights) return false;
+      const parameterIds = new Set([...Object.keys(frontWeights), ...Object.keys(desiredWeights)]);
+      if (
+        [...parameterIds].some(
+          (parameterId) => frontWeights[parameterId] !== desiredWeights[parameterId],
+        )
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }, "表裏質問は同じParameterへ同じ重みで寄与させてください"),
+  v.check(({ questions, config }) => {
+    const referencedFrontIds = new Set(
+      questions.flatMap(({ backsideOfDiagnosisQuestionId }) =>
+        backsideOfDiagnosisQuestionId ? [backsideOfDiagnosisQuestionId] : [],
+      ),
+    );
+    const perspectives = new Map<string, QuestionPerspective>();
+    for (const question of questions) {
+      perspectives.set(
+        question.questionId,
+        question.backsideOfDiagnosisQuestionId
+          ? "desired"
+          : question.diagnosisQuestionId && referencedFrontIds.has(question.diagnosisQuestionId)
+            ? "behavior"
+            : "aggregate",
+      );
+    }
+    return config.parameters.every((parameter) => {
+      const contributing = new Set(
+        Object.entries(config.questions).flatMap(([questionId, rule]) =>
+          rule.weights[parameter.id] === undefined ? [] : [perspectives.get(questionId)],
+        ),
+      );
+      return !(
+        contributing.has("aggregate") &&
+        (contributing.has("behavior") || contributing.has("desired"))
+      );
+    });
+  }, "1つのParameterへ独立質問と表裏質問を混在させることはできません"),
 );
 
 function resolveBand(score: number | null, config: ScoringConfig): ParameterBand {
@@ -203,47 +302,134 @@ function resolveBand(score: number | null, config: ScoringConfig): ParameterBand
   return "balanced";
 }
 
+function resolveQuestionPerspectives(
+  questions: StoredScoringConfig["questions"],
+): Map<string, QuestionPerspective> {
+  const referencedFrontIds = new Set(
+    questions.flatMap(({ backsideOfDiagnosisQuestionId }) =>
+      backsideOfDiagnosisQuestionId ? [backsideOfDiagnosisQuestionId] : [],
+    ),
+  );
+  return new Map(
+    questions.map((question) => [
+      question.questionId,
+      question.backsideOfDiagnosisQuestionId
+        ? "desired"
+        : question.diagnosisQuestionId && referencedFrontIds.has(question.diagnosisQuestionId)
+          ? "behavior"
+          : "aggregate",
+    ]),
+  );
+}
+
+function scoreParameter(
+  parameterId: string,
+  answers: ReadonlyMap<string, ScoringAnswer>,
+  config: ScoringConfig,
+  maximumChoiceMagnitude: number,
+  perspectives: ReadonlyMap<string, QuestionPerspective>,
+  includedPerspective: QuestionPerspective,
+): ParameterScore {
+  let totalWeight = 0;
+  let answeredWeight = 0;
+  let weightedSum = 0;
+
+  for (const [questionId, rule] of Object.entries(config.questions)) {
+    const weight = rule.weights[parameterId];
+    if (weight === undefined || perspectives.get(questionId) !== includedPerspective) continue;
+
+    const comparableWeight = Math.abs(weight) * maximumChoiceMagnitude;
+    totalWeight += comparableWeight;
+    const answer = answers.get(questionId);
+    if (!answer || answer.questionVersion !== rule.questionVersion) continue;
+
+    const choiceScore = config.choiceScores[answer.choiceId];
+    if (choiceScore === undefined) continue;
+    answeredWeight += comparableWeight;
+    weightedSum += choiceScore * weight;
+  }
+
+  const coverage = totalWeight === 0 ? 0 : answeredWeight / totalWeight;
+  const score =
+    coverage < config.minimumCoverage || answeredWeight === 0
+      ? null
+      : Math.round(50 + 50 * (weightedSum / answeredWeight));
+  return {
+    score,
+    coverage: Math.round(coverage * 100),
+    band: resolveBand(score, config),
+  };
+}
+
+function compareParameterScores(
+  behavior: ParameterScore,
+  desired: ParameterScore,
+): ParameterComparison | null {
+  if (behavior.score === null || desired.score === null) return null;
+  const difference = desired.score - behavior.score;
+  return {
+    difference,
+    relation:
+      behavior.band === desired.band
+        ? "same_band"
+        : difference > 0
+          ? "desired_higher"
+          : "behavior_higher",
+  };
+}
+
 function scoreParameters(
   answers: readonly ScoringAnswer[],
   config: ScoringConfig,
+  perspectives: ReadonlyMap<string, QuestionPerspective>,
 ): DiagnosisScoring {
   const currentAnswers = new Map(answers.map((answer) => [answer.questionId, answer]));
   const maximumChoiceMagnitude = Math.max(...Object.values(config.choiceScores).map(Math.abs));
 
   const parameters = config.parameters.map((parameter): ScoredParameter => {
-    let totalWeight = 0;
-    let answeredWeight = 0;
-    let weightedSum = 0;
-
-    for (const [questionId, rule] of Object.entries(config.questions)) {
-      const weight = rule.weights[parameter.id];
-      if (weight === undefined) continue;
-
-      const comparableWeight = Math.abs(weight) * maximumChoiceMagnitude;
-      totalWeight += comparableWeight;
-      const answer = currentAnswers.get(questionId);
-      if (!answer || answer.questionVersion !== rule.questionVersion) continue;
-
-      const choiceScore = config.choiceScores[answer.choiceId];
-      if (choiceScore === undefined) continue;
-      answeredWeight += comparableWeight;
-      weightedSum += choiceScore * weight;
-    }
-
-    const coverage = totalWeight === 0 ? 0 : answeredWeight / totalWeight;
-    const score =
-      coverage < config.minimumCoverage || answeredWeight === 0
-        ? null
-        : Math.round(50 + 50 * (weightedSum / answeredWeight));
-    const band = resolveBand(score, config);
+    const isBehaviorDesired = Object.entries(config.questions).some(
+      ([questionId, rule]) =>
+        rule.weights[parameter.id] !== undefined && perspectives.get(questionId) === "behavior",
+    );
+    const desiredOrAggregate = scoreParameter(
+      parameter.id,
+      currentAnswers,
+      config,
+      maximumChoiceMagnitude,
+      perspectives,
+      isBehaviorDesired ? "desired" : "aggregate",
+    );
     const { relationshipRequests, ...displayParameter } = parameter;
-    const relationshipRequest = band === "insufficient" ? undefined : relationshipRequests?.[band];
-    return {
+    const relationshipRequest =
+      desiredOrAggregate.band === "insufficient"
+        ? undefined
+        : relationshipRequests?.[desiredOrAggregate.band];
+    const result = {
       ...displayParameter,
-      score,
-      coverage: Math.round(coverage * 100),
-      band,
+      ...desiredOrAggregate,
       ...(relationshipRequest ? { relationshipRequest } : {}),
+    };
+    if (!isBehaviorDesired) {
+      return {
+        ...result,
+        resultKind: "aggregate",
+        behavior: null,
+        comparison: null,
+      };
+    }
+    const behavior = scoreParameter(
+      parameter.id,
+      currentAnswers,
+      config,
+      maximumChoiceMagnitude,
+      perspectives,
+      "behavior",
+    );
+    return {
+      ...result,
+      resultKind: "behavior_desired",
+      behavior,
+      comparison: compareParameterScores(behavior, desiredOrAggregate),
     };
   });
 
@@ -265,8 +451,11 @@ export function scoreDiagnosisAnswers(
       ...v.parse(v.record(v.string(), v.unknown()), storedConfig.definition),
       version: storedConfig.version,
     });
-    v.parse(DiagnosisQuestionScoringSchema, { questions: storedConfig.questions, config });
-    return scoreParameters(answers, config);
+    const validated = v.parse(DiagnosisQuestionScoringSchema, {
+      questions: storedConfig.questions,
+      config,
+    });
+    return scoreParameters(answers, config, resolveQuestionPerspectives(validated.questions));
   } catch (error) {
     if (error instanceof v.ValiError) throw new InvalidDiagnosisScoringConfigError(error);
     throw error;
@@ -294,42 +483,69 @@ export function projectDiagnosisParameters(input: {
     throw error;
   }
   const currentAnswers = new Map(input.answers.map((answer) => [answer.questionId, answer]));
+  const questionPerspectives = resolveQuestionPerspectives(input.storedConfig.questions);
 
   return scoring.parameters.flatMap((parameter): DiagnosisParameterProjection[] => {
-    if (parameter.score === null || parameter.band === "insufficient") return [];
-    const bandLabel =
-      parameter.band === "low"
-        ? parameter.lowLabel
-        : parameter.band === "high"
-          ? parameter.highLabel
-          : scoring.balancedLabel;
-    const evidenceSourceRecordIds = Object.entries(config.questions)
-      .filter(([, rule]) => rule.weights[parameter.id] !== undefined)
-      .flatMap(([questionId, rule]) => {
-        const answer = currentAnswers.get(questionId);
-        return answer?.questionVersion === rule.questionVersion ? [answer.sourceRecordId] : [];
-      })
-      .sort();
-    if (evidenceSourceRecordIds.length === 0) return [];
+    const createProjection = (
+      perspective: DiagnosisParameterProjection["perspective"],
+      category: DiagnosisParameterProjection["category"],
+      value: ParameterScore,
+    ): DiagnosisParameterProjection[] => {
+      if (value.score === null || value.band === "insufficient") return [];
+      const bandLabel =
+        value.band === "low"
+          ? parameter.lowLabel
+          : value.band === "high"
+            ? parameter.highLabel
+            : scoring.balancedLabel;
+      const evidenceSourceRecordIds = Object.entries(config.questions)
+        .filter(
+          ([questionId, rule]) =>
+            rule.weights[parameter.id] !== undefined &&
+            questionPerspectives.get(questionId) === perspective,
+        )
+        .flatMap(([questionId, rule]) => {
+          const answer = currentAnswers.get(questionId);
+          return answer?.questionVersion === rule.questionVersion ? [answer.sourceRecordId] : [];
+        })
+        .sort();
+      if (evidenceSourceRecordIds.length === 0) return [];
 
-    const attributes = {
-      diagnosisId: input.diagnosisId,
-      scoringConfigId: input.scoringConfigId,
-      scoringVersion: scoring.scoringVersion,
-      parameterId: parameter.id,
-      score: parameter.score,
-      coverage: parameter.coverage,
-      band: parameter.band,
-    };
-    const statement = `${parameter.label}は「${bandLabel}」の傾向がある`;
-    return [
-      {
+      const attributes = {
+        diagnosisId: input.diagnosisId,
+        scoringConfigId: input.scoringConfigId,
+        scoringVersion: scoring.scoringVersion,
         parameterId: parameter.id,
-        statement,
-        attributes,
-        evidenceSourceRecordIds,
-        contentSignature: JSON.stringify({ statement, attributes }),
-      },
+        ...(perspective === "aggregate" ? {} : { perspective }),
+        score: value.score,
+        coverage: value.coverage,
+        band: value.band,
+      };
+      const statement =
+        perspective === "behavior"
+          ? `${parameter.label}の普段の行動は「${bandLabel}」の傾向がある`
+          : perspective === "desired"
+            ? `${parameter.label}で大切にしたいことは「${bandLabel}」の傾向がある`
+            : `${parameter.label}は「${bandLabel}」の傾向がある`;
+      return [
+        {
+          parameterId: parameter.id,
+          perspective,
+          category,
+          statement,
+          attributes,
+          evidenceSourceRecordIds,
+          contentSignature: JSON.stringify({ statement, attributes }),
+        },
+      ];
+    };
+
+    if (parameter.resultKind === "aggregate") {
+      return createProjection("aggregate", "preference", parameter);
+    }
+    return [
+      ...createProjection("behavior", "behavior_pattern", parameter.behavior),
+      ...createProjection("desired", "preference", parameter),
     ];
   });
 }

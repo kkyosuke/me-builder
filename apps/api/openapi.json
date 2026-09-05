@@ -16387,46 +16387,111 @@
                     "answers": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "diagnosisQuestionId": {
-                            "type": "string",
-                            "minLength": 1
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "diagnosisQuestionId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "questionId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "questionVersion": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "questionText": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "choiceId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "choiceLabel": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "acceptedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "perspective": {
+                                "const": "single"
+                              },
+                              "pairId": {
+                                "type": "null"
+                              }
+                            },
+                            "required": [
+                              "diagnosisQuestionId",
+                              "questionId",
+                              "questionVersion",
+                              "questionText",
+                              "choiceId",
+                              "choiceLabel",
+                              "acceptedAt",
+                              "perspective",
+                              "pairId"
+                            ]
                           },
-                          "questionId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "questionVersion": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 9007199254740991
-                          },
-                          "questionText": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "choiceId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "choiceLabel": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "acceptedAt": {
-                            "type": "string",
-                            "format": "date-time"
+                          {
+                            "type": "object",
+                            "properties": {
+                              "diagnosisQuestionId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "questionId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "questionVersion": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "questionText": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "choiceId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "choiceLabel": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "acceptedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "perspective": {
+                                "enum": ["behavior", "desired"],
+                                "type": "string"
+                              },
+                              "pairId": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "diagnosisQuestionId",
+                              "questionId",
+                              "questionVersion",
+                              "questionText",
+                              "choiceId",
+                              "choiceLabel",
+                              "acceptedAt",
+                              "perspective",
+                              "pairId"
+                            ]
                           }
-                        },
-                        "required": [
-                          "diagnosisQuestionId",
-                          "questionId",
-                          "questionVersion",
-                          "questionText",
-                          "choiceId",
-                          "choiceLabel",
-                          "acceptedAt"
                         ]
                       },
                       "minItems": 1
@@ -16448,54 +16513,180 @@
                             "parameters": {
                               "type": "array",
                               "items": {
-                                "type": "object",
-                                "properties": {
-                                  "id": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "label": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "lowLabel": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "highLabel": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "score": {
-                                    "anyOf": [
-                                      {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "lowLabel": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "highLabel": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "score": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "coverage": {
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 100
                                       },
-                                      {
+                                      "band": {
+                                        "enum": ["low", "balanced", "high", "insufficient"],
+                                        "type": "string"
+                                      },
+                                      "resultKind": {
+                                        "const": "aggregate"
+                                      },
+                                      "behavior": {
+                                        "type": "null"
+                                      },
+                                      "comparison": {
                                         "type": "null"
                                       }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "lowLabel",
+                                      "highLabel",
+                                      "score",
+                                      "coverage",
+                                      "band",
+                                      "resultKind",
+                                      "behavior",
+                                      "comparison"
                                     ]
                                   },
-                                  "coverage": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 100
-                                  },
-                                  "band": {
-                                    "enum": ["low", "balanced", "high", "insufficient"],
-                                    "type": "string"
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "lowLabel": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "highLabel": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "score": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "coverage": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 100
+                                      },
+                                      "band": {
+                                        "enum": ["low", "balanced", "high", "insufficient"],
+                                        "type": "string"
+                                      },
+                                      "resultKind": {
+                                        "const": "behavior_desired"
+                                      },
+                                      "behavior": {
+                                        "type": "object",
+                                        "properties": {
+                                          "score": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 100
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "coverage": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                          },
+                                          "band": {
+                                            "enum": ["low", "balanced", "high", "insufficient"],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["score", "coverage", "band"]
+                                      },
+                                      "comparison": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "difference": {
+                                                "type": "integer",
+                                                "minimum": -100,
+                                                "maximum": 100
+                                              },
+                                              "relation": {
+                                                "enum": [
+                                                  "same_band",
+                                                  "desired_higher",
+                                                  "behavior_higher"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["difference", "relation"]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "lowLabel",
+                                      "highLabel",
+                                      "score",
+                                      "coverage",
+                                      "band",
+                                      "resultKind",
+                                      "behavior",
+                                      "comparison"
+                                    ]
                                   }
-                                },
-                                "required": [
-                                  "id",
-                                  "label",
-                                  "lowLabel",
-                                  "highLabel",
-                                  "score",
-                                  "coverage",
-                                  "band"
                                 ]
                               },
                               "minItems": 1

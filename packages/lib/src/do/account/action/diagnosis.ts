@@ -102,9 +102,11 @@ type DiagnosisAnswers = Readonly<{
     version: number;
     definition: unknown;
     questions: Array<{
+      diagnosisQuestionId: string;
       questionId: string;
       questionVersion: number;
       choiceIds: string[];
+      backsideOfDiagnosisQuestionId: string | null;
     }>;
   } | null;
   answers: Array<{
@@ -115,6 +117,8 @@ type DiagnosisAnswers = Readonly<{
     choiceId: string;
     choiceLabel: string;
     acceptedAt: string;
+    perspective: "single" | "behavior" | "desired";
+    pairId: string | null;
   }>;
 }>;
 
@@ -867,9 +871,11 @@ export async function findDiagnosisAnswers(
       .get(),
     db
       .select({
+        diagnosisQuestionId: diagnosisQuestions.id,
         questionId: diagnosisQuestions.questionId,
         questionVersion: diagnosisQuestions.questionVersion,
         choiceId: questionChoices.choiceId,
+        backsideOfDiagnosisQuestionId: diagnosisQuestions.backsideOfDiagnosisQuestionId,
       })
       .from(diagnosisQuestions)
       .innerJoin(
@@ -956,16 +962,36 @@ export async function findDiagnosisAnswers(
   const scoringQuestions: NonNullable<DiagnosisAnswers["scoringConfig"]>["questions"] = [];
   for (const row of scoringQuestionRows) {
     const previous = scoringQuestions.at(-1);
-    if (previous?.questionId === row.questionId) {
+    if (previous?.diagnosisQuestionId === row.diagnosisQuestionId) {
       previous.choiceIds.push(row.choiceId);
     } else {
       scoringQuestions.push({
+        diagnosisQuestionId: row.diagnosisQuestionId,
         questionId: row.questionId,
         questionVersion: row.questionVersion,
         choiceIds: [row.choiceId],
+        backsideOfDiagnosisQuestionId: row.backsideOfDiagnosisQuestionId,
       });
     }
   }
+  const pairedFrontIds = new Set(
+    scoringQuestions.flatMap(({ backsideOfDiagnosisQuestionId }) =>
+      backsideOfDiagnosisQuestionId ? [backsideOfDiagnosisQuestionId] : [],
+    ),
+  );
+  const questionPairing = new Map(
+    scoringQuestions.map((question) => [
+      question.diagnosisQuestionId,
+      question.backsideOfDiagnosisQuestionId
+        ? ({
+            perspective: "desired",
+            pairId: question.backsideOfDiagnosisQuestionId,
+          } as const)
+        : pairedFrontIds.has(question.diagnosisQuestionId)
+          ? ({ perspective: "behavior", pairId: question.diagnosisQuestionId } as const)
+          : ({ perspective: "single", pairId: null } as const),
+    ]),
+  );
   return {
     type: "found",
     diagnosis: {
@@ -990,6 +1016,10 @@ export async function findDiagnosisAnswers(
       answers: rows.map((answer) => ({
         ...answer,
         acceptedAt: answer.acceptedAt.toISOString(),
+        ...(questionPairing.get(answer.diagnosisQuestionId) ?? {
+          perspective: "single" as const,
+          pairId: null,
+        }),
       })),
     },
   };

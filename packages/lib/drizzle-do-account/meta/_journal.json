@@ -253,6 +253,13 @@
       "when": 1788577683281,
       "tag": "0035_powerful_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1788603725043,
+      "tag": "0036_careful_meteorite",
+      "breakpoints": true
     }
   ]
 }

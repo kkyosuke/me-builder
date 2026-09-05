@@ -187,6 +187,43 @@ describe("Diagnosis Brain projection", () => {
     ).toEqual([{ status: "applied" }, { status: "applied" }]);
   });
 
+  it("表裏質問は行動と望みを別のBrain Itemとheadへ投影する", async () => {
+    const db = createTestDb();
+    const at = await insertFixture(db, true);
+    await db
+      .update(schema.diagnosisQuestions)
+      .set({ backsideOfDiagnosisQuestionId: "diagnosis-question-1" })
+      .where(eq(schema.diagnosisQuestions.id, "diagnosis-question-2"));
+
+    await expect(
+      processDiagnosisBrainProjectionRequest(db, "request-1", at),
+    ).resolves.toMatchObject({ applied: 1, failed: 0 });
+
+    expect(
+      await db
+        .select({
+          category: schema.brainItems.category,
+          statement: schema.brainItems.statement,
+        })
+        .from(schema.brainItems),
+    ).toEqual([
+      {
+        category: "behavior_pattern",
+        statement: "計画性の普段の行動は「計画的」の傾向がある",
+      },
+      {
+        category: "preference",
+        statement: "計画性で大切にしたいことは「計画的」の傾向がある",
+      },
+    ]);
+    expect(
+      await db
+        .select({ perspective: schema.diagnosisBrainProjectionHeads.perspective })
+        .from(schema.diagnosisBrainProjectionHeads),
+    ).toEqual([{ perspective: "behavior" }, { perspective: "desired" }]);
+    expect(await db.select().from(schema.brainItemEvidenceEdges)).toHaveLength(2);
+  });
+
   it("回答途中ならItemを作らず正常終了する", async () => {
     const db = createTestDb();
     const at = await insertFixture(db, false);

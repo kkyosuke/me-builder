@@ -1,0 +1,3 @@
+DROP INDEX `diagnosis_brain_projection_identity_idx`;--> statement-breakpoint
+ALTER TABLE `diagnosis_brain_projection_heads` ADD `perspective` text DEFAULT 'aggregate' NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `diagnosis_brain_projection_identity_idx` ON `diagnosis_brain_projection_heads` (`account_id`,`diagnosis_id`,`scoring_config_id`,`scoring_config_version`,`parameter_id`,`perspective`);

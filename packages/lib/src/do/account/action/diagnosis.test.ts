@@ -442,7 +442,7 @@ describe("listVisibleDiagnoses", () => {
 });
 
 describe("findDiagnosisAnswers", () => {
-  it("受付終了後も本人の回答とDiagnosisが固定した採点設定を返す", async () => {
+  it("受付終了後も本人の回答・表裏の観点・Diagnosisが固定した採点設定を返す", async () => {
     const db = createTestDb();
     await db
       .insert(schema.accountDataIdentity)
@@ -461,6 +461,10 @@ describe("findDiagnosisAnswers", () => {
       closesAt: new Date("2026-08-04T00:00:00Z"),
       scoringConfigId: "result-scoring-v2",
     });
+    await db
+      .update(schema.diagnosisQuestions)
+      .set({ backsideOfDiagnosisQuestionId: "result-target-sq1" })
+      .where(eq(schema.diagnosisQuestions.id, "result-target-sq2"));
     const base = {
       accountId: "account-result",
       diagnosisId: "result-target",
@@ -494,14 +498,18 @@ describe("findDiagnosisAnswers", () => {
           definition: scoringDefinition,
           questions: [
             {
+              diagnosisQuestionId: "result-target-sq1",
               questionId: "result-target-q1",
               questionVersion: 1,
               choiceIds: ["no", "yes"],
+              backsideOfDiagnosisQuestionId: null,
             },
             {
+              diagnosisQuestionId: "result-target-sq2",
               questionId: "result-target-q2",
               questionVersion: 1,
               choiceIds: ["no", "yes"],
+              backsideOfDiagnosisQuestionId: "result-target-sq1",
             },
           ],
         },
@@ -511,11 +519,15 @@ describe("findDiagnosisAnswers", () => {
             questionText: "result-target-q1の質問",
             choiceId: "no",
             choiceLabel: "いいえ",
+            perspective: "behavior",
+            pairId: "result-target-sq1",
           }),
           expect.objectContaining({
             diagnosisQuestionId: "result-target-sq2",
             choiceId: "yes",
             choiceLabel: "はい",
+            perspective: "desired",
+            pairId: "result-target-sq1",
           }),
         ],
       }),

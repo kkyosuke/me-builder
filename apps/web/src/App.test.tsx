@@ -205,6 +205,8 @@ const result: DiagnosisResult = {
       choiceId: "yes",
       choiceLabel: "はい",
       acceptedAt: "2026-08-05T00:00:00.000Z",
+      perspective: "single",
+      pairId: null,
     },
   ],
   scoring: { scoringVersion: 1, balancedLabel: "中間", parameters: [] },
