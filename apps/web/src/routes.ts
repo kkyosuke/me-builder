@@ -28,6 +28,10 @@ export const loadDiagnosisApplication = memoizeModuleLoader(() =>
   })),
 );
 
+export const loadDiagnosisCardPreview = memoizeModuleLoader<LazyApplicationModule>(
+  () => import("./feature/diagnosis/presentation/diagnosis-card-preview"),
+);
+
 export const loadCompatibilityApplication = memoizeModuleLoader<LazyApplicationModule>(() =>
   import("./feature/compatibility").then((feature) => ({
     default: feature.CompatibilityApplication,
