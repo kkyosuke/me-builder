@@ -70,6 +70,14 @@ describe("RootApplication", () => {
     expect(await screen.findByText("本人向けアプリ")).toBeTruthy();
   });
 
+  it("liff.init後にendpointと結合されたdeep linkでも本人向けアプリを表示する", async () => {
+    window.history.replaceState({}, "", "/app/diagnosis?v=d2115a1656f1");
+    render(<RootApplication />);
+
+    expect(await screen.findByText("本人向けアプリ")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "ページが見つかりません" })).toBeNull();
+  });
+
   it("未知のpathnameでは本人向けアプリへ流さず404を表示する", () => {
     window.history.replaceState({}, "", "/admin-old");
     render(<RootApplication />);
