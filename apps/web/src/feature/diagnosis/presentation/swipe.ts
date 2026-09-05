@@ -108,7 +108,14 @@ export function buildFlyOutTransform(direction: SwipeDirection, cardWidth: numbe
 
 /** 表面の回答方向に合わせ、同じカードの裏面が現れるまでY軸で半回転させます。 */
 export function buildTurnOverTransform(direction: SwipeDirection): string {
-  return direction === "right" ? "rotateY(-180deg)" : "rotateY(180deg)";
+  return direction === "right" ? "rotateY(180deg)" : "rotateY(-180deg)";
+}
+
+/** 表面のドラッグ中は平行移動せず、回答方向へ少し傾けて反転を予告します。 */
+export function buildTurnOverPreviewTransform(dx: number, threshold: number): string {
+  if (threshold <= 0) return "rotateY(0.00deg)";
+  const rotation = clamp(dx / threshold, -1, 1) * 28;
+  return `rotateY(${rotation.toFixed(2)}deg)`;
 }
 
 /** 重なりの奥行きに応じた見え方。`depth` 0 が最前面。 */

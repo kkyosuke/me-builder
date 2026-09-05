@@ -106,7 +106,7 @@ describe("SwipeDiagnosis answer persistence", () => {
     if (!frontYes) throw new Error("表面の回答ボタンがありません");
     fireEvent.click(frontYes);
 
-    expect(document.querySelector('[style*="rotateY(-180deg)"]')).toBeTruthy();
+    expect(document.querySelector('[style*="rotateY(180deg)"]')).toBeTruthy();
     await waitFor(() =>
       expect(
         screen

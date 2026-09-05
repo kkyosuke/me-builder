@@ -5,6 +5,7 @@ import {
   SWIPE_TRANSITION_MS,
   buildDragTransform,
   buildFlyOutTransform,
+  buildTurnOverPreviewTransform,
   buildTurnOverTransform,
   isTapGesture,
   resolveChoiceProgress,
@@ -237,6 +238,7 @@ export function SwipeCard({
   onPointerCancel,
 }: SwipeCardProps) {
   const isFront = depth === 0;
+  const previewsTurnOver = isFront && face === "behavior" && backsideQuestion !== undefined;
   const layer = resolveStackLayer(depth);
 
   const style: CSSProperties = {
@@ -254,7 +256,7 @@ export function SwipeCard({
     style.transition = reducedMotion
       ? undefined
       : `transform ${SWIPE_TRANSITION_MS}ms ease-out, opacity ${SWIPE_TRANSITION_MS}ms ease-out`;
-  } else if (isFront && drag) {
+  } else if (isFront && drag && !previewsTurnOver) {
     style.transform = buildDragTransform(drag, cardWidth);
   }
 
@@ -265,9 +267,18 @@ export function SwipeCard({
     height: "100%",
     position: "relative",
     transformStyle: "preserve-3d",
-    transform: turnOver ? buildTurnOverTransform(turnOver) : undefined,
-    transition:
-      turnOver && !reducedMotion ? `transform ${SWIPE_TRANSITION_MS}ms ease-in-out` : undefined,
+    transform: turnOver
+      ? buildTurnOverTransform(turnOver)
+      : previewsTurnOver && drag
+        ? buildTurnOverPreviewTransform(drag.dx, threshold)
+        : undefined,
+    transition: reducedMotion
+      ? undefined
+      : turnOver
+        ? `transform ${SWIPE_TRANSITION_MS}ms ease-in-out`
+        : previewsTurnOver && !drag
+          ? `transform ${SWIPE_TRANSITION_MS}ms ease-out`
+          : undefined,
   };
   const frontFaceStyle: CSSProperties = { backfaceVisibility: "hidden" };
   const backFaceStyle: CSSProperties = {
