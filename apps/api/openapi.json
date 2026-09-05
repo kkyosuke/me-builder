@@ -16043,6 +16043,17 @@
                                   }
                                 ]
                               },
+                              "backsideOfDiagnosisQuestionId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "format": {
                                 "const": "single_choice"
                               },
@@ -16082,6 +16093,7 @@
                               "questionVersion",
                               "text",
                               "hint",
+                              "backsideOfDiagnosisQuestionId",
                               "format",
                               "choices"
                             ]
@@ -16107,6 +16119,17 @@
                                 "minLength": 1
                               },
                               "hint": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "backsideOfDiagnosisQuestionId": {
                                 "anyOf": [
                                   {
                                     "type": "string",
@@ -16156,6 +16179,7 @@
                               "questionVersion",
                               "text",
                               "hint",
+                              "backsideOfDiagnosisQuestionId",
                               "format",
                               "choices"
                             ]

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnySQLiteColumn,
   foreignKey,
   integer,
   primaryKey,
@@ -104,6 +105,10 @@ export const diagnosisQuestions = sqliteTable(
       .references(() => questions.id),
     questionVersion: integer("question_version").notNull(),
     position: integer("position").notNull(),
+    /** この項目を直前の表面に対する「大切にしたいこと」の裏面として表示します。 */
+    backsideOfDiagnosisQuestionId: text("backside_of_diagnosis_question_id").references(
+      (): AnySQLiteColumn => diagnosisQuestions.id,
+    ),
   },
   (table) => [
     foreignKey({
@@ -115,6 +120,9 @@ export const diagnosisQuestions = sqliteTable(
       .where(sql`is_deleted = 0`),
     uniqueIndex("diagnosis_question_position_active_idx")
       .on(table.diagnosisId, table.position)
+      .where(sql`is_deleted = 0`),
+    uniqueIndex("diagnosis_question_backside_active_idx")
+      .on(table.backsideOfDiagnosisQuestionId)
       .where(sql`is_deleted = 0`),
   ],
 );

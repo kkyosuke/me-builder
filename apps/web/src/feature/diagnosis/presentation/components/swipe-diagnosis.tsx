@@ -247,6 +247,7 @@ export function SwipeDiagnosis({
   const [interactions, setInteractions] = useState<DiagnosisInteraction[]>(initialAnswers);
   const [drag, setDrag] = useState<DragOffset | null>(null);
   const [flyOut, setFlyOut] = useState<SwipeDirection | null>(null);
+  const [turnOver, setTurnOver] = useState<SwipeDirection | null>(null);
   const [backgroundSaves, setBackgroundSaves] = useState<BackgroundSave[]>([]);
   const [deferState, setDeferState] = useState<"idle" | "saving" | "failed">("idle");
 
@@ -285,10 +286,25 @@ export function SwipeDiagnosis({
   );
 
   const current = questions?.[index];
-  const isBusy = flyOut !== null || deferState === "saving";
+  const configuredBackside = useMemo(
+    () =>
+      current
+        ? diagnosis.questions.find(
+            (question) =>
+              "backsideOfDiagnosisQuestionId" in question &&
+              question.backsideOfDiagnosisQuestionId === current.diagnosisQuestionId,
+          )
+        : undefined,
+    [current, diagnosis.questions],
+  );
+  const pendingBackside =
+    configuredBackside?.diagnosisQuestionId === questions[index + 1]?.diagnosisQuestionId
+      ? questions[index + 1]
+      : undefined;
+  const isBusy = flyOut !== null || turnOver !== null || deferState === "saving";
 
   const advance = useCallback(
-    (direction: SwipeDirection) => {
+    (direction: SwipeDirection, revealBackside: boolean) => {
       if (reducedMotion) {
         setIndex((previous) => previous + 1);
         queueMicrotask(() => {
@@ -296,10 +312,15 @@ export function SwipeDiagnosis({
         });
         return;
       }
-      setFlyOut(direction);
+      if (revealBackside) {
+        setTurnOver(direction);
+      } else {
+        setFlyOut(direction);
+      }
       advanceTimer.current = setTimeout(() => {
         setIndex((previous) => previous + 1);
         setFlyOut(null);
+        setTurnOver(null);
         advanceTimer.current = null;
         actionPending.current = false;
       }, SWIPE_TRANSITION_MS);
@@ -371,10 +392,10 @@ export function SwipeDiagnosis({
       }
       const answer = createDiagnosisAnswer(current, action, new Date());
       setInteractions((previous) => [...previous, answer]);
-      advance(action);
+      advance(action, pendingBackside !== undefined);
       void persistAnswer(answer);
     },
-    [advance, current, isBusy, onDeferQuestion, persistAnswer],
+    [advance, current, isBusy, onDeferQuestion, pendingBackside, persistAnswer],
   );
 
   const commitLikert5 = useCallback(
@@ -461,6 +482,15 @@ export function SwipeDiagnosis({
     () => (progressMilestone ? pickProgressMessage(progressMilestone) : null),
     [progressMilestone],
   );
+  const visibleSwipeQuestions = useMemo(() => {
+    const visible: Array<(typeof questions)[number]> = [];
+    for (const question of questions.slice(index)) {
+      if (pendingBackside?.diagnosisQuestionId === question.diagnosisQuestionId) continue;
+      visible.push(question);
+      if (visible.length >= VISIBLE_STACK_SIZE) break;
+    }
+    return visible;
+  }, [index, pendingBackside, questions]);
 
   useEffect(() => {
     if (!finished || !allAnswered || backgroundSaves.length > 0 || completionNotified.current) {
@@ -515,28 +545,37 @@ export function SwipeDiagnosis({
         {current?.format === "likert_5" ? (
           <Likert5Card question={current} disabled={isBusy} onSelect={commitLikert5} />
         ) : (
-          questions
-            ?.slice(index, index + VISIBLE_STACK_SIZE)
-            .map((question, offset) =>
-              question.format === "likert_5" ? null : (
-                <SwipeCard
-                  key={`${question.diagnosisQuestionId}-v${question.questionVersion}`}
-                  question={question}
-                  depth={offset}
-                  drag={offset === 0 ? drag : null}
-                  flyOut={offset === 0 ? flyOut : null}
-                  cardWidth={cardWidth}
-                  threshold={threshold}
-                  reducedMotion={reducedMotion}
-                  disabled={isBusy}
-                  onSelect={commit}
-                  onPointerDown={onPointerDown}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                  onPointerCancel={onPointerCancel}
-                />
-              ),
-            )
+          visibleSwipeQuestions.map((question, offset) =>
+            question.format === "likert_5" ? null : (
+              <SwipeCard
+                key={`${question.diagnosisQuestionId}-v${question.questionVersion}`}
+                question={question}
+                {...(offset === 0 && pendingBackside && pendingBackside.format !== "likert_5"
+                  ? { backsideQuestion: pendingBackside }
+                  : {})}
+                face={
+                  question.backsideOfDiagnosisQuestionId
+                    ? "value"
+                    : offset === 0 && configuredBackside
+                      ? "behavior"
+                      : "single"
+                }
+                depth={offset}
+                drag={offset === 0 ? drag : null}
+                flyOut={offset === 0 ? flyOut : null}
+                turnOver={offset === 0 ? turnOver : null}
+                cardWidth={cardWidth}
+                threshold={threshold}
+                reducedMotion={reducedMotion}
+                disabled={isBusy}
+                onSelect={commit}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerCancel}
+              />
+            ),
+          )
         )}
       </div>
 

@@ -211,6 +211,7 @@ describe("fetchDiagnosisDefinition", () => {
             questionVersion: 2,
             text: "API question",
             hint: null,
+            backsideOfDiagnosisQuestionId: null,
             format: "single_choice",
             choices: [
               { choiceId: "no", label: "いいえ", score: null },
@@ -241,6 +242,57 @@ describe("fetchDiagnosisDefinition", () => {
     });
   });
 
+  it("表面との関連を保ったまま裏面の質問を回答画面へ渡す", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          id: "paired",
+          title: "いまと大切にしたいこと",
+          description: "説明",
+          relationshipCategory: "general",
+          opensAt: "2026-08-04T00:00:00.000Z",
+          closesAt: null,
+          questions: [
+            {
+              diagnosisQuestionId: "dq-front",
+              questionId: "q-front",
+              questionVersion: 1,
+              text: "家で過ごすことが多い？",
+              hint: null,
+              backsideOfDiagnosisQuestionId: null,
+              format: "single_choice",
+              choices: [
+                { choiceId: "no", label: "いいえ", score: null },
+                { choiceId: "yes", label: "はい", score: null },
+              ],
+            },
+            {
+              diagnosisQuestionId: "dq-back",
+              questionId: "q-back",
+              questionVersion: 1,
+              text: "家で過ごしたい？",
+              hint: null,
+              backsideOfDiagnosisQuestionId: "dq-front",
+              format: "single_choice",
+              choices: [
+                { choiceId: "no", label: "いいえ", score: null },
+                { choiceId: "yes", label: "はい", score: null },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+
+    const definition = await fetchDiagnosisDefinition(API_URL, "paired");
+
+    expect(definition.questions).toMatchObject([
+      { diagnosisQuestionId: "dq-front" },
+      { diagnosisQuestionId: "dq-back", backsideOfDiagnosisQuestionId: "dq-front" },
+    ]);
+  });
+
   it("5段階のChoiceとscoreを順序どおり回答画面へ渡す", async () => {
     const labels = [
       "まったく当てはまらない",
@@ -266,6 +318,7 @@ describe("fetchDiagnosisDefinition", () => {
               questionVersion: 1,
               text: "質問",
               hint: null,
+              backsideOfDiagnosisQuestionId: null,
               format: "likert_5",
               choices: labels.map((label, index) => ({
                 choiceId: `level-${index + 1}`,

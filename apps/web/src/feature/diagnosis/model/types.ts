@@ -21,6 +21,7 @@ const SingleChoiceQuestionSchema = v.pipe(
     questionVersion: PositiveIntegerSchema,
     text: NonEmptyStringSchema,
     hint: v.optional(NonEmptyStringSchema),
+    backsideOfDiagnosisQuestionId: v.optional(NonEmptyStringSchema),
     format: v.optional(v.literal("single_choice")),
     left: DiagnosisChoiceSchema,
     right: DiagnosisChoiceSchema,

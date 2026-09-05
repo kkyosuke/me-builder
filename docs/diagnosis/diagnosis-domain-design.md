@@ -131,6 +131,8 @@ stateDiagram-v2
 
 Diagnosis QuestionはDiagnosis内の項目であり、特定のQuestion Versionへの参照と表示順を持ちます。将来同じQuestion Versionを別のDiagnosisで再利用しても、回答がどのDiagnosis上の項目に対するものかを区別できます。
 
+2択のDiagnosis Questionは、直前の別のDiagnosis Questionを表面として参照し、「普段の行動」に対する「大切にしたいこと」の裏面になれます。表裏はそれぞれ独立したQuestion VersionとAnswerを持ち、UIだけが1枚のカードとして連続表示します。関連付けの不変条件と回答操作は[診断回答形式の実装境界](../development/diagnosis-format-remaining-tasks.md)を正とします。
+
 Relationship Categoryは回答時に利用者が選ぶ設定ではなく、運営がDiagnosisを作る段階で質問内容と一緒に固定します。相手によって回答が変わり得るため、異なるカテゴリで同じテーマを扱う場合はカテゴリごとにDiagnosisを分けます。
 
 | 値 | 利用者向けラベル | 用途 |
@@ -166,6 +168,8 @@ stateDiagram-v2
 - Diagnosisは1件以上のDiagnosis Questionを持つ
 - DiagnosisはRelationship Categoryを1つ持つ
 - 同じQuestionを1つのDiagnosisへ重複して含めない
+- 裏面は同じDiagnosis内の直前のDiagnosis Questionだけを参照し、参照先は裏面ではない2択とする
+- 1つの表面が持つ裏面は最大1件とし、5段階尺度へ裏面を設定しない
 - Diagnosis公開時点で、すべてのDiagnosis QuestionがapprovedのQuestion Versionを参照している
 - 受付終了時点がある場合、受付開始時点より後にする
 - published以降はタイトル、短い説明、Relationship Category、受付期間、質問の組み合わせ、参照する版、順序を変更しない

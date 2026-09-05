@@ -106,6 +106,11 @@ export function buildFlyOutTransform(direction: SwipeDirection, cardWidth: numbe
   return `translate3d(${Math.round(x)}px, 24px, 0) rotate(${rotation}deg)`;
 }
 
+/** 表面の回答方向に合わせ、同じカードの裏面が現れるまでY軸で半回転させます。 */
+export function buildTurnOverTransform(direction: SwipeDirection): string {
+  return direction === "right" ? "rotateY(-180deg)" : "rotateY(180deg)";
+}
+
 /** 重なりの奥行きに応じた見え方。`depth` 0 が最前面。 */
 export function resolveStackLayer(depth: number): {
   transform: string;

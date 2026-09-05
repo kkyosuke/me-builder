@@ -15,6 +15,20 @@ describe("DiagnosisQuestionSchema", () => {
       }),
     ).toThrow(/Choice ID/);
   });
+
+  it("表面を参照する裏面の質問を受け付ける", () => {
+    expect(
+      v.parse(DiagnosisQuestionSchema, {
+        diagnosisQuestionId: "diagnosis-question-back",
+        questionId: "question-back",
+        questionVersion: 1,
+        text: "大切にしたいですか？",
+        backsideOfDiagnosisQuestionId: "diagnosis-question-front",
+        left: { choiceId: "no", label: "いいえ" },
+        right: { choiceId: "yes", label: "はい" },
+      }),
+    ).toMatchObject({ backsideOfDiagnosisQuestionId: "diagnosis-question-front" });
+  });
 });
 
 describe("DiagnosisAnswerSchema", () => {

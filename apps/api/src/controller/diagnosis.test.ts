@@ -270,6 +270,7 @@ describe("GET /api/diagnoses/:diagnosisId", () => {
             questionVersion: 1,
             text: "質問",
             hint: null,
+            backsideOfDiagnosisQuestionId: null,
             format: "single_choice",
             choices: [
               { choiceId: "no", label: "いいえ", score: null },

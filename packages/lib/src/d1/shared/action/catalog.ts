@@ -24,6 +24,7 @@ export type DiagnosisDetail = Readonly<{
     text: string;
     hint: string | null;
     format: "single_choice" | "likert_5";
+    backsideOfDiagnosisQuestionId: string | null;
     choices: Array<{
       choiceId: string;
       label: string;
@@ -89,6 +90,7 @@ export async function findOpenDiagnosisDetail(
       text: questionVersions.text,
       hint: questionVersions.hint,
       format: questionVersions.format,
+      backsideOfDiagnosisQuestionId: diagnosisQuestions.backsideOfDiagnosisQuestionId,
       choiceId: questionChoices.choiceId,
       choiceLabel: questionChoices.label,
     })
@@ -144,6 +146,7 @@ export async function findOpenDiagnosisDetail(
         text: row.text,
         hint: row.hint,
         format: row.format,
+        backsideOfDiagnosisQuestionId: row.backsideOfDiagnosisQuestionId,
         choices: [choice],
       });
     }
@@ -170,6 +173,21 @@ export async function findOpenDiagnosisDetail(
     )
   ) {
     throw new Error("Published likert-5 diagnosis question must use the fixed five choices");
+  }
+  for (const [index, question] of questions.entries()) {
+    if (!question.backsideOfDiagnosisQuestionId) continue;
+    const front = questions[index - 1];
+    if (
+      !front ||
+      question.backsideOfDiagnosisQuestionId !== front.diagnosisQuestionId ||
+      front.backsideOfDiagnosisQuestionId !== null ||
+      front.format !== "single_choice" ||
+      question.format !== "single_choice"
+    ) {
+      throw new Error(
+        "Published diagnosis backside must immediately follow a standalone single-choice front",
+      );
+    }
   }
 
   return {

@@ -65,7 +65,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
 
 存在しない、公開前、本人の`DiagnosisResponse`がない公開停止、削除済みは公開状態を外部へ漏らさないため同じ`404 diagnosis_not_found`として扱います。受付終了後は、回答済みであってもこのAPIから新しい回答を開始させず、`409 diagnosis_closed`を返します。受付終了後の本人の回答閲覧は、後続の回答内容APIが所有します。
 
-質問はDiagnosis内の`position`、ChoiceはQuestion Version内の`position`の昇順で返します。削除済みのDiagnosis Question、Question Version、Choiceは含めません。Question VersionはDiagnosis Questionが参照している版を返し、現在の最新版へ暗黙に置き換えません。
+質問はDiagnosis内の`position`、ChoiceはQuestion Version内の`position`の昇順で返します。削除済みのDiagnosis Question、Question Version、Choiceは含めません。Question VersionはDiagnosis Questionが参照している版を返し、現在の最新版へ暗黙に置き換えません。`backsideOfDiagnosisQuestionId`は、表裏カードの裏面なら直前の表面のDiagnosis Question ID、それ以外は`null`です。表裏の不変条件は[診断回答形式の実装境界](diagnosis-format-remaining-tasks.md)を正とします。
 
 ```json
 {
@@ -82,6 +82,7 @@ Diagnosisが`published`かつ削除されておらず、サーバー時刻が受
       "questionVersion": 1,
       "text": "相手から頼まれても、自分に余裕がなければ断りたい。",
       "hint": null,
+      "backsideOfDiagnosisQuestionId": null,
       "choices": [
         { "choiceId": "no", "label": "いいえ" },
         { "choiceId": "yes", "label": "はい" }

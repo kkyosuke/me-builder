@@ -1,0 +1,2 @@
+ALTER TABLE `diagnosis_questions` ADD `backside_of_diagnosis_question_id` text REFERENCES diagnosis_questions(id);--> statement-breakpoint
+CREATE UNIQUE INDEX `diagnosis_question_backside_active_idx` ON `diagnosis_questions` (`backside_of_diagnosis_question_id`) WHERE is_deleted = 0;

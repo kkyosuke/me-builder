@@ -5,6 +5,7 @@ import {
   VISIBLE_STACK_SIZE,
   buildDragTransform,
   buildFlyOutTransform,
+  buildTurnOverTransform,
   isTapGesture,
   resolveCardRotationDeg,
   resolveChoiceProgress,
@@ -130,6 +131,13 @@ describe("buildFlyOutTransform", () => {
   it("スワイプした向きへ画面外まで飛ばすこと", () => {
     expect(buildFlyOutTransform("right", CARD_WIDTH)).toContain("translate3d(700px");
     expect(buildFlyOutTransform("left", CARD_WIDTH)).toContain("translate3d(-700px");
+  });
+});
+
+describe("buildTurnOverTransform", () => {
+  it("回答した左右それぞれの方向からカードを半回転させること", () => {
+    expect(buildTurnOverTransform("right")).toBe("rotateY(-180deg)");
+    expect(buildTurnOverTransform("left")).toBe("rotateY(180deg)");
   });
 });
 

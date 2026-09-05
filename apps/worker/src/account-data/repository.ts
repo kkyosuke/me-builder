@@ -128,7 +128,13 @@ export class AccountDataRepository {
           .onConflictDoUpdate({ target: D1.shared.schema.diagnoses.id, set: row })
           .run();
       }
-      for (const row of snapshot.diagnosisQuestions) {
+      // 裏面は表面への自己外部キーを持つため、snapshotの取得順に依存せず表面を先に同期します。
+      const orderedDiagnosisQuestions = [...snapshot.diagnosisQuestions].sort(
+        (left, right) =>
+          Number(left.backsideOfDiagnosisQuestionId !== null) -
+          Number(right.backsideOfDiagnosisQuestionId !== null),
+      );
+      for (const row of orderedDiagnosisQuestions) {
         this.database
           .insert(D1.shared.schema.diagnosisQuestions)
           .values(row)
