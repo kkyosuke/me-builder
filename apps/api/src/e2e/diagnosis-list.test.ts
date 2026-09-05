@@ -247,9 +247,9 @@ describe("GET /api/diagnoses local D1 E2E", () => {
         lastAnsweredAt: string | null;
       }>;
     };
-    expect(initialBody.diagnoses).toHaveLength(14);
+    expect(initialBody.diagnoses).toHaveLength(15);
     expect(initialBody.diagnoses.map(({ displayOrder }) => displayOrder)).toEqual([
-      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140,
+      10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150,
     ]);
     expect(initialBody.diagnoses.find(({ id }) => id === "life-priorities")).toMatchObject({
       relationshipCategory: "general",
@@ -295,6 +295,11 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     });
     expect(initialBody.diagnoses.find(({ id }) => id === "friend-trust-boundaries")).toMatchObject({
       relationshipCategory: "friend",
+      responseStatus: "unanswered",
+      questionCount: 10,
+    });
+    expect(initialBody.diagnoses.find(({ id }) => id === "family-holiday-style")).toMatchObject({
+      relationshipCategory: "family",
       responseStatus: "unanswered",
       questionCount: 10,
     });
@@ -527,7 +532,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     const body = (await response.json()) as {
       diagnoses: Array<{ responseStatus: string; answeredCount: number }>;
     };
-    expect(body.diagnoses).toHaveLength(14);
+    expect(body.diagnoses).toHaveLength(15);
     expect(body.diagnoses).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ responseStatus: "unanswered", answeredCount: 0 }),
@@ -834,6 +839,71 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
       "友達との約束を変える可能性が出たものの、まだ予定が確定していないときは、変更が確定するまで伝えず、まず自分で調整したい。",
       "友達に答えたくない個人的なことを聞かれたときは、その場で答えたくないと伝えたい。",
       "友達に答えたくない個人的なことを聞かれたときは、その場では話題を変え、あとで落ち着いてから境界を伝えたい。",
+    ]);
+  });
+
+  it("家族との休日の表裏5組をseedから返すこと", async () => {
+    const response = await request("known-token", "/api/diagnoses/family-holiday-style");
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      id: string;
+      title: string;
+      relationshipCategory: string;
+      questions: Array<{
+        diagnosisQuestionId: string;
+        text: string;
+        backsideOfDiagnosisQuestionId: string | null;
+      }>;
+    };
+
+    expect(body).toMatchObject({
+      id: "family-holiday-style",
+      title: "家族との休日：今と理想",
+      relationshipCategory: "family",
+    });
+    expect(body.questions).toEqual([
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-01",
+        text: "予定のない休日は、家族と一緒に過ごす時間を取ることが多い。",
+        backsideOfDiagnosisQuestionId: null,
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-02",
+        text: "予定のない休日は、家族と一緒に過ごす時間を取りたい。",
+        backsideOfDiagnosisQuestionId: "dq-family-holiday-style-01",
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-03",
+        backsideOfDiagnosisQuestionId: null,
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-04",
+        backsideOfDiagnosisQuestionId: "dq-family-holiday-style-03",
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-05",
+        backsideOfDiagnosisQuestionId: null,
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-06",
+        backsideOfDiagnosisQuestionId: "dq-family-holiday-style-05",
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-07",
+        backsideOfDiagnosisQuestionId: null,
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-08",
+        backsideOfDiagnosisQuestionId: "dq-family-holiday-style-07",
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-09",
+        backsideOfDiagnosisQuestionId: null,
+      }),
+      expect.objectContaining({
+        diagnosisQuestionId: "dq-family-holiday-style-10",
+        backsideOfDiagnosisQuestionId: "dq-family-holiday-style-09",
+      }),
     ]);
   });
 

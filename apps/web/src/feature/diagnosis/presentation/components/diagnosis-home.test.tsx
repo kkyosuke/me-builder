@@ -277,7 +277,12 @@ describe("DiagnosisHome", () => {
               title: "友達との信頼・秘密・境界線",
               displayOrder: 11,
             }),
-            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 12 }),
+            diagnosis({
+              id: "family-holiday-style",
+              title: "家族との休日：今と理想",
+              displayOrder: 12,
+            }),
+            diagnosis({ id: "new-diagnosis", title: "新しい診断", displayOrder: 13 }),
           ],
         }}
         onOpenDiagnosis={vi.fn()}
@@ -309,6 +314,9 @@ describe("DiagnosisHome", () => {
     });
     const friendTrustBoundariesCard = screen.getByRole("button", {
       name: /友達との信頼・秘密・境界線/,
+    });
+    const familyHolidayStyleCard = screen.getByRole("button", {
+      name: /家族との休日：今と理想/,
     });
     const fallbackCard = screen.getByRole("button", { name: /新しい診断/ });
 
@@ -344,6 +352,9 @@ describe("DiagnosisHome", () => {
     );
     expect(friendTrustBoundariesCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/friend-trust-boundaries.jpg",
+    );
+    expect(familyHolidayStyleCard.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/diagnoses/family-holiday-style.jpg",
     );
     expect(fallbackCard.querySelector("img")?.getAttribute("src")).toBe(
       "/images/diagnoses/default.jpg",

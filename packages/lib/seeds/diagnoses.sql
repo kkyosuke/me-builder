@@ -15,8 +15,9 @@
 -- decision-making-style, and
 -- 2026-08-15T00:00:00.000Z for work-priority-style, and
 -- 2026-08-15T01:00:00.000Z for family-expectation-choice, and
--- 2026-08-15T02:00:00.000Z for friend-trust-boundaries
--- 2026-08-15T03:00:00.000Z for the initial relationship request metadata backfill
+-- 2026-08-15T02:00:00.000Z for friend-trust-boundaries, and
+-- 2026-08-15T03:00:00.000Z for the initial relationship request metadata backfill, and
+-- 2026-09-05T15:00:00.000Z (2026-09-06T00:00:00.000+09:00) for family-holiday-style
 -- (Unix seconds, Drizzle timestamp mode).
 
 INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
@@ -1174,18 +1175,189 @@ INSERT OR IGNORE INTO diagnosis_questions (
   ('dq-friend-trust-boundaries-10', 1786759200, 1786759200, 0, 'friend-trust-boundaries', 'q-friend-trust-boundaries-10', 1, 9);
 --> statement-breakpoint
 
+INSERT OR IGNORE INTO questions (id, created_at, updated_at, is_deleted) VALUES
+  ('q-family-holiday-style-01', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-02', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-03', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-04', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-05', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-06', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-07', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-08', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-09', 1788620400, 1788620400, 0),
+  ('q-family-holiday-style-10', 1788620400, 1788620400, 0);
+--> statement-breakpoint
+
+INSERT OR IGNORE INTO question_versions (
+  created_at,
+  updated_at,
+  is_deleted,
+  question_id,
+  version,
+  state,
+  text,
+  format,
+  approved_at
+) VALUES
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-01', 1, 'approved', '予定のない休日は、家族と一緒に過ごす時間を取ることが多い。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-02', 1, 'approved', '予定のない休日は、家族と一緒に過ごす時間を取りたい。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-03', 1, 'approved', '家族と同じ場所で過ごせる休日は、同じことを一緒にする時間を取ることが多い。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-04', 1, 'approved', '家族と同じ場所で過ごせる休日は、同じことを一緒にする時間を取りたい。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-05', 1, 'approved', '休日に家族と食事できるときは、一緒に食卓を囲むことが多い。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-06', 1, 'approved', '休日に家族と食事できるときは、一緒に食卓を囲みたい。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-07', 1, 'approved', '家族それぞれに予定がある休日も、家族で集まる時間を作ることが多い。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-08', 1, 'approved', '家族それぞれに予定がある休日も、家族で集まる時間を作りたい。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-09', 1, 'approved', '休日に家族と話せるときは、近況を話す時間を取ることが多い。', 'single_choice', 1788620400),
+  (1788620400, 1788620400, 0, 'q-family-holiday-style-10', 1, 'approved', '休日に家族と話せるときは、近況を話す時間を取りたい。', 'single_choice', 1788620400);
+--> statement-breakpoint
+
+INSERT OR IGNORE INTO question_choices (
+  created_at,
+  updated_at,
+  is_deleted,
+  question_id,
+  question_version,
+  choice_id,
+  label,
+  position
+)
+SELECT 1788620400, 1788620400, 0, id, 1, 'no', 'いいえ', 0
+FROM questions
+WHERE id IN (
+  'q-family-holiday-style-01', 'q-family-holiday-style-02',
+  'q-family-holiday-style-03', 'q-family-holiday-style-04',
+  'q-family-holiday-style-05', 'q-family-holiday-style-06',
+  'q-family-holiday-style-07', 'q-family-holiday-style-08',
+  'q-family-holiday-style-09', 'q-family-holiday-style-10'
+);
+--> statement-breakpoint
+
+INSERT OR IGNORE INTO question_choices (
+  created_at,
+  updated_at,
+  is_deleted,
+  question_id,
+  question_version,
+  choice_id,
+  label,
+  position
+)
+SELECT 1788620400, 1788620400, 0, id, 1, 'yes', 'はい', 1
+FROM questions
+WHERE id IN (
+  'q-family-holiday-style-01', 'q-family-holiday-style-02',
+  'q-family-holiday-style-03', 'q-family-holiday-style-04',
+  'q-family-holiday-style-05', 'q-family-holiday-style-06',
+  'q-family-holiday-style-07', 'q-family-holiday-style-08',
+  'q-family-holiday-style-09', 'q-family-holiday-style-10'
+);
+--> statement-breakpoint
+
+INSERT OR IGNORE INTO diagnosis_scoring_configs (
+  id,
+  created_at,
+  updated_at,
+  is_deleted,
+  version,
+  definition
+) VALUES (
+  'family-holiday-style-v1',
+  1788620400,
+  1788620400,
+  0,
+  1,
+  '{
+    "parameters": [
+      {"id":"family-holiday-togetherness","label":"家族と過ごす休日","lowLabel":"それぞれの時間を中心に過ごす","highLabel":"家族と一緒の時間を持つ","relationshipRequests":{"low":"休日は、それぞれの時間も大切にできるとうれしいです。","balanced":"休日の過ごし方を、その時々で相談できるとうれしいです。","high":"休日に、一緒に過ごす時間を作ってもらえるとうれしいです。"}}
+    ],
+    "choiceScores": {"yes":1,"no":-1},
+    "questions": {
+      "q-family-holiday-style-01":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-02":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-03":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-04":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-05":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-06":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-07":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-08":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-09":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}},
+      "q-family-holiday-style-10":{"questionVersion":1,"weights":{"family-holiday-togetherness":1}}
+    },
+    "minimumCoverage":0.6,
+    "lowMaximum":35,
+    "highMinimum":65,
+    "balancedLabel":"状況に応じて家族と一緒の時間を持つ"
+  }'
+);
+--> statement-breakpoint
+
+INSERT OR IGNORE INTO diagnoses (
+  id,
+  created_at,
+  updated_at,
+  is_deleted,
+  title,
+  description,
+  relationship_category,
+  scoring_config_id,
+  display_order,
+  opens_at,
+  state,
+  published_at
+) VALUES (
+  'family-holiday-style',
+  1788620400,
+  1788620400,
+  0,
+  '家族との休日：今と理想',
+  '家族と過ごす休日について、普段の過ごし方と大切にしたい過ごし方を同じ軸で見ます。',
+  'family',
+  'family-holiday-style-v1',
+  150,
+  1788620400,
+  'published',
+  1788620400
+)
+ON CONFLICT(id) DO UPDATE SET
+  display_order = excluded.display_order
+WHERE diagnoses.display_order <> excluded.display_order;
+--> statement-breakpoint
+
+INSERT OR IGNORE INTO diagnosis_questions (
+  id,
+  created_at,
+  updated_at,
+  is_deleted,
+  diagnosis_id,
+  question_id,
+  question_version,
+  position,
+  backside_of_diagnosis_question_id
+) VALUES
+  ('dq-family-holiday-style-01', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-01', 1, 0, NULL),
+  ('dq-family-holiday-style-02', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-02', 1, 1, 'dq-family-holiday-style-01'),
+  ('dq-family-holiday-style-03', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-03', 1, 2, NULL),
+  ('dq-family-holiday-style-04', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-04', 1, 3, 'dq-family-holiday-style-03'),
+  ('dq-family-holiday-style-05', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-05', 1, 4, NULL),
+  ('dq-family-holiday-style-06', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-06', 1, 5, 'dq-family-holiday-style-05'),
+  ('dq-family-holiday-style-07', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-07', 1, 6, NULL),
+  ('dq-family-holiday-style-08', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-08', 1, 7, 'dq-family-holiday-style-07'),
+  ('dq-family-holiday-style-09', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-09', 1, 8, NULL),
+  ('dq-family-holiday-style-10', 1788620400, 1788620400, 0, 'family-holiday-style', 'q-family-holiday-style-10', 1, 9, 'dq-family-holiday-style-09');
+--> statement-breakpoint
+
 -- AccountDataがsnapshotを再同期するか判断する版。
 -- このseedのcatalog内容を変更したら、必ずversionを1つ上げる。
-INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 13, 1786762800)
+INSERT INTO catalog_versions (catalog_id, version, updated_at) VALUES ('diagnosis', 14, 1788620400)
   ON CONFLICT(catalog_id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at;
 --> statement-breakpoint
 
--- Expected result: diagnosis_count=14, question_version_count=140,
--- choice_count=280, diagnosis_question_count=140, scoring_config_count=14, catalog_version=13.
+-- Expected result: diagnosis_count=15, question_version_count=150,
+-- choice_count=300, diagnosis_question_count=150, scoring_config_count=15, catalog_version=14.
 SELECT
-  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values', 'decision-making-style') AND relationship_category = 'general') OR (id IN ('work-relationship-style', 'work-priority-style') AND relationship_category = 'work') OR (id IN ('family-support-style', 'family-expectation-choice') AND relationship_category = 'family') OR (id IN ('friendship-style', 'friend-trust-boundaries') AND relationship_category = 'friend')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
-  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%' OR question_id LIKE 'q-friend-trust-boundaries-%')) AS question_version_count,
-  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%' OR question_id LIKE 'q-friend-trust-boundaries-%')) AS choice_count,
-  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values', 'work-relationship-style', 'family-support-style', 'friendship-style', 'decision-making-style', 'work-priority-style', 'family-expectation-choice', 'friend-trust-boundaries') AND is_deleted = 0) AS diagnosis_question_count,
-  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1', 'work-values-v1', 'work-relationship-style-v1', 'family-support-style-v1', 'friendship-style-v1', 'decision-making-style-v1', 'work-priority-style-v1', 'family-expectation-choice-v1', 'friend-trust-boundaries-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
+  (SELECT COUNT(*) FROM diagnoses WHERE ((id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion') AND relationship_category = 'partner') OR (id IN ('life-priorities', 'work-values', 'decision-making-style') AND relationship_category = 'general') OR (id IN ('work-relationship-style', 'work-priority-style') AND relationship_category = 'work') OR (id IN ('family-support-style', 'family-expectation-choice', 'family-holiday-style') AND relationship_category = 'family') OR (id IN ('friendship-style', 'friend-trust-boundaries') AND relationship_category = 'friend')) AND state = 'published' AND description <> '' AND is_deleted = 0) AS diagnosis_count,
+  (SELECT COUNT(*) FROM question_versions WHERE version = 1 AND state = 'approved' AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%' OR question_id LIKE 'q-friend-trust-boundaries-%' OR question_id LIKE 'q-family-holiday-style-%')) AS question_version_count,
+  (SELECT COUNT(*) FROM question_choices WHERE question_version = 1 AND is_deleted = 0 AND (question_id LIKE 'q-relationship-priority-%' OR question_id LIKE 'q-money-%' OR question_id LIKE 'q-leisure-style-%' OR question_id LIKE 'q-time-planning-%' OR question_id LIKE 'q-conversation-emotion-%' OR question_id LIKE 'q-life-priorities-%' OR question_id LIKE 'q-work-values-%' OR question_id LIKE 'q-work-relationship-style-%' OR question_id LIKE 'q-family-support-style-%' OR question_id LIKE 'q-friendship-style-%' OR question_id LIKE 'q-decision-making-style-%' OR question_id LIKE 'q-work-priority-style-%' OR question_id LIKE 'q-family-expectation-choice-%' OR question_id LIKE 'q-friend-trust-boundaries-%' OR question_id LIKE 'q-family-holiday-style-%')) AS choice_count,
+  (SELECT COUNT(*) FROM diagnosis_questions WHERE diagnosis_id IN ('relationship-priority', 'money-values', 'leisure-style', 'time-planning', 'conversation-emotion', 'life-priorities', 'work-values', 'work-relationship-style', 'family-support-style', 'friendship-style', 'decision-making-style', 'work-priority-style', 'family-expectation-choice', 'friend-trust-boundaries', 'family-holiday-style') AND is_deleted = 0) AS diagnosis_question_count,
+  (SELECT COUNT(*) FROM diagnosis_scoring_configs WHERE id IN ('relationship-priority-v1', 'money-values-v1', 'leisure-style-v1', 'time-planning-v1', 'conversation-emotion-v1', 'life-priorities-v1', 'work-values-v1', 'work-relationship-style-v1', 'family-support-style-v1', 'friendship-style-v1', 'decision-making-style-v1', 'work-priority-style-v1', 'family-expectation-choice-v1', 'friend-trust-boundaries-v1', 'family-holiday-style-v1') AND version = 1 AND is_deleted = 0) AS scoring_config_count,
   (SELECT version FROM catalog_versions WHERE catalog_id = 'diagnosis') AS catalog_version;

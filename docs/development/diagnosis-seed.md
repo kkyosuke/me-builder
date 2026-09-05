@@ -57,8 +57,9 @@ seedは必ずmigration適用後に実行します。localでは開発者が明�
 | 120 | `work-priority-style` | 仕事の進め方・優先順位 | `work` | すべてversion 1 | 2026-08-15 00:00:00 UTC（2026-08-15 09:00:00 JST） |
 | 130 | `family-expectation-choice` | 家族の期待と自分の選択 | `family` | すべてversion 1 | 2026-08-15 01:00:00 UTC（2026-08-15 10:00:00 JST） |
 | 140 | `friend-trust-boundaries` | 友達との信頼・秘密・境界線 | `friend` | すべてversion 1 | 2026-08-15 02:00:00 UTC（2026-08-15 11:00:00 JST） |
+| 150 | `family-holiday-style` | 家族との休日：今と理想 | `family` | すべてversion 1 | 2026-09-05 15:00:00 UTC（2026-09-06 00:00:00 JST） |
 
-いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。先行5件の質問は交際、家計、パートナーとの余暇、一緒に過ごす時間、愛情表現など、パートナーとの関係を前提にしているため`partner`とします。「優先順位と人生の方向性」「仕事の価値観・働き方」「決め方・迷いとの向き合い方」は、特定の相手との関係を前提にせず本人の価値観や意思決定を尋ねるため`general`とします。「仕事の変化・周囲との関わり方」と「仕事の進め方・優先順位」は、仕事で関わる相手または個人作業を含む仕事の場面を前提にするため`work`とします。「家族との距離感・支え合い」と「家族の期待と自分の選択」は、回答時に思い浮かべた家族との場面を前提にするため`family`とします。「友達との距離感・付き合い方」と「友達との信頼・秘密・境界線」は、友達との連絡、予定、秘密、悩みの共有などの場面を前提にするため`friend`とします。Relationship Category追加時のmigrationで既存行へ入る`general`は、先行5件に限りseedの条件付きUPSERTで`partner`へ補正します。すでに別カテゴリを持つ行は上書きしません。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。
+いずれも終了日時を持たず、Question Versionは`approved`、Diagnosisは`published`として登録します。先行5件の質問は交際、家計、パートナーとの余暇、一緒に過ごす時間、愛情表現など、パートナーとの関係を前提にしているため`partner`とします。「優先順位と人生の方向性」「仕事の価値観・働き方」「決め方・迷いとの向き合い方」は、特定の相手との関係を前提にせず本人の価値観や意思決定を尋ねるため`general`とします。「仕事の変化・周囲との関わり方」と「仕事の進め方・優先順位」は、仕事で関わる相手または個人作業を含む仕事の場面を前提にするため`work`とします。「家族との距離感・支え合い」「家族の期待と自分の選択」「家族との休日：今と理想」は、回答時に思い浮かべた家族との場面を前提にするため`family`とします。「友達との距離感・付き合い方」と「友達との信頼・秘密・境界線」は、友達との連絡、予定、秘密、悩みの共有などの場面を前提にするため`friend`とします。Relationship Category追加時のmigrationで既存行へ入る`general`は、先行5件に限りseedの条件付きUPSERTで`partner`へ補正します。すでに別カテゴリを持つ行は上書きしません。Diagnosisには一覧表示用の短い説明、表示順、版付き採点設定への参照を持たせます。Choiceは「いいえ」「はい」の2件です。表示順は診断内容ではなく一覧上の優先順位として変更でき、将来の差し込みに備えて10刻みで設定します。「家族との休日：今と理想」は5組10問を表裏カードとして登録し、表面を「普段の行動」、裏面を「大切にしたいこと」に使う最初の公開Diagnosisです。
 
 ## 5. 実行方法
 
@@ -95,16 +96,16 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 
 | 項目 | 期待値 |
 | --- | ---: |
-| Diagnosis | 14 |
-| Question Version | 140 |
-| Choice | 280 |
-| Diagnosis Question | 140 |
-| Diagnosis Scoring Config | 14 |
+| Diagnosis | 15 |
+| Question Version | 150 |
+| Choice | 300 |
+| Diagnosis Question | 150 |
+| Diagnosis Scoring Config | 15 |
 
 件数だけでなく、次も確認します。
 
 - Diagnosisが`published`で、受付開始日時を過ぎている
-- 先行5件のRelationship Categoryが`partner`であり、「優先順位と人生の方向性」「仕事の価値観・働き方」「決め方・迷いとの向き合い方」が`general`、「仕事の変化・周囲との関わり方」「仕事の進め方・優先順位」が`work`、「家族との距離感・支え合い」「家族の期待と自分の選択」が`family`、「友達との距離感・付き合い方」「友達との信頼・秘密・境界線」が`friend`である
+- 先行5件のRelationship Categoryが`partner`であり、「優先順位と人生の方向性」「仕事の価値観・働き方」「決め方・迷いとの向き合い方」が`general`、「仕事の変化・周囲との関わり方」「仕事の進め方・優先順位」が`work`、「家族との距離感・支え合い」「家族の期待と自分の選択」「家族との休日：今と理想」が`family`、「友達との距離感・付き合い方」「友達との信頼・秘密・境界線」が`friend`である
 - 1つのDiagnosisにposition 0から9までの10問がある
 - 各Question Versionが`approved`である
 - 各Question Versionにposition 0の「いいえ」とposition 1の「はい」がある
@@ -113,6 +114,7 @@ SQL末尾の検証クエリは、現在のseedだけを適用した場合に次�
 - `relationship-priority-v1`の`priority-balance`に、低・中央・高の審査済み`relationshipRequests`がある
 - seedを2回実行しても件数と内容が変わらない
 - 採点設定とQuestion ID、Question Version、Choice IDが一致する
+- `family-holiday-style`の全10問が5組の表裏として隣接し、各組が同じParameterへ同じ重みで寄与する
 - `catalog_versions`の`diagnosis`が今回のseedのversionと一致する
 
 `catalog_versions`は、AccountDataが保持する公開定義snapshotを再同期するか判断する版です。AccountDataは共有D1のversionと自分が同期済みのversionが一致する間、公開定義を読み直しません。versionを上げ忘れると、新しい診断が利用者へ表示されません。境界の定義は[Accountデータ分離設計](../architecture/account-data-isolation.md)を正とします。

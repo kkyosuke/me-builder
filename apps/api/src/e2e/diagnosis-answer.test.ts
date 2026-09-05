@@ -1243,6 +1243,61 @@ describe("PUT /api/diagnoses/:diagnosisId/answers/:diagnosisQuestionId local D1 
     e2eTimeoutMs,
   );
 
+  it(
+    "家族との休日の普段と望みを分け、望みを主スコアとして採点する",
+    async () => {
+      for (let index = 1; index <= 10; index += 1) {
+        const suffix = String(index).padStart(2, "0");
+        const response = await putAnswer(
+          `dq-family-holiday-style-${suffix}`,
+          index % 2 === 1 ? "no" : "yes",
+          "family-holiday-style",
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const response = await getAnswers("family-holiday-style");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: "family-holiday-style",
+        relationshipCategory: "family",
+        responseStatus: "answered",
+        answers: expect.arrayContaining([
+          expect.objectContaining({
+            diagnosisQuestionId: "dq-family-holiday-style-01",
+            perspective: "behavior",
+            pairId: "dq-family-holiday-style-01",
+          }),
+          expect.objectContaining({
+            diagnosisQuestionId: "dq-family-holiday-style-02",
+            perspective: "desired",
+            pairId: "dq-family-holiday-style-01",
+          }),
+        ]),
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況に応じて家族と一緒の時間を持つ",
+          parameters: [
+            {
+              id: "family-holiday-togetherness",
+              label: "家族と過ごす休日",
+              lowLabel: "それぞれの時間を中心に過ごす",
+              highLabel: "家族と一緒の時間を持つ",
+              resultKind: "behavior_desired",
+              score: 100,
+              coverage: 100,
+              band: "high",
+              behavior: { score: 0, coverage: 100, band: "low" },
+              comparison: { difference: 100, relation: "desired_higher" },
+            },
+          ],
+        },
+      });
+    },
+    e2eTimeoutMs,
+  );
+
   it(`${diagnosisAnswerCases.missingContents.id}: ${diagnosisAnswerCases.missingContents.name}`, async () => {
     const response = await getAnswers();
     expect(response.status).toBe(404);

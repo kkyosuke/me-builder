@@ -77,6 +77,7 @@ docs/
 - [「仕事の進め方・優先順位」パラメータ変換設計](diagnosis/scoring/work-priority-style-parameter-design.md) — 12個目の診断固有のパラメータ、重み、表示設定、Relationship Category
 - [「家族の期待と自分の選択」パラメータ変換設計](diagnosis/scoring/family-expectation-choice-parameter-design.md) — 13個目の診断固有のパラメータ、重み、表示設定、Relationship Category
 - [「友達との信頼・秘密・境界線」パラメータ変換設計](diagnosis/scoring/friend-trust-boundaries-parameter-design.md) — 14個目の診断固有のパラメータ、重み、表示設定、Relationship Category
+- [「家族との休日：今と理想」パラメータ変換設計](diagnosis/scoring/family-holiday-style-parameter-design.md) — 最初の表裏診断のParameter、観点別集計、表示設定、Relationship Category
 
 ### ドメインを設計する
 
