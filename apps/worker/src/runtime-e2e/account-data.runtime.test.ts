@@ -286,6 +286,13 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec(
         "ALTER TABLE diagnosis_questions DROP COLUMN backside_of_diagnosis_question_id",
       );
+      state.storage.sql.exec("DROP INDEX diagnosis_brain_projection_identity_idx");
+      state.storage.sql.exec(
+        "ALTER TABLE diagnosis_brain_projection_heads DROP COLUMN perspective",
+      );
+      state.storage.sql.exec(
+        "CREATE UNIQUE INDEX diagnosis_brain_projection_identity_idx ON diagnosis_brain_projection_heads (account_id, diagnosis_id, scoring_config_id, scoring_config_version, parameter_id)",
+      );
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786666843277");
 
       const repository = Reflect.get(instance, "repository") as { initialize(): Promise<void> };
@@ -554,6 +561,13 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec(
         "ALTER TABLE diagnosis_questions DROP COLUMN backside_of_diagnosis_question_id",
       );
+      state.storage.sql.exec("DROP INDEX diagnosis_brain_projection_identity_idx");
+      state.storage.sql.exec(
+        "ALTER TABLE diagnosis_brain_projection_heads DROP COLUMN perspective",
+      );
+      state.storage.sql.exec(
+        "CREATE UNIQUE INDEX diagnosis_brain_projection_identity_idx ON diagnosis_brain_projection_heads (account_id, diagnosis_id, scoring_config_id, scoring_config_version, parameter_id)",
+      );
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at > 1786361220917");
 
       const repository = Reflect.get(instance, "repository") as {
@@ -700,6 +714,13 @@ describe("AccountData Workers runtime E2E", () => {
       state.storage.sql.exec("DROP INDEX diagnosis_question_backside_active_idx");
       state.storage.sql.exec(
         "ALTER TABLE diagnosis_questions DROP COLUMN backside_of_diagnosis_question_id",
+      );
+      state.storage.sql.exec("DROP INDEX diagnosis_brain_projection_identity_idx");
+      state.storage.sql.exec(
+        "ALTER TABLE diagnosis_brain_projection_heads DROP COLUMN perspective",
+      );
+      state.storage.sql.exec(
+        "CREATE UNIQUE INDEX diagnosis_brain_projection_identity_idx ON diagnosis_brain_projection_heads (account_id, diagnosis_id, scoring_config_id, scoring_config_version, parameter_id)",
       );
       state.storage.sql.exec("DELETE FROM __drizzle_migrations WHERE created_at >= 1786415351981");
 
