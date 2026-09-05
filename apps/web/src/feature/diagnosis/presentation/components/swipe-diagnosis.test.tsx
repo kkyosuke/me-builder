@@ -61,6 +61,30 @@ const pairedQuestionDiagnosis: DiagnosisDefinition = {
   ],
 };
 
+const twoPairedQuestionDiagnosis: DiagnosisDefinition = {
+  ...pairedQuestionDiagnosis,
+  questions: [
+    ...pairedQuestionDiagnosis.questions,
+    {
+      diagnosisQuestionId: "dq-next-front",
+      questionId: "q-next-front",
+      questionVersion: 1,
+      text: "意見が違うとき、まず相手の話を聞く？",
+      left: { choiceId: "no", label: "いいえ" },
+      right: { choiceId: "yes", label: "はい" },
+    },
+    {
+      diagnosisQuestionId: "dq-next-back",
+      questionId: "q-next-back",
+      questionVersion: 1,
+      text: "互いの考えを尊重したい？",
+      backsideOfDiagnosisQuestionId: "dq-next-front",
+      left: { choiceId: "no", label: "いいえ" },
+      right: { choiceId: "yes", label: "はい" },
+    },
+  ],
+};
+
 const likertDiagnosis: DiagnosisDefinition = {
   ...diagnosis,
   questions: [
@@ -84,6 +108,21 @@ const likertDiagnosis: DiagnosisDefinition = {
 afterEach(() => cleanup());
 
 describe("SwipeDiagnosis answer persistence", () => {
+  it("スタック奥にある次の両面カードにも面タブを表示する", () => {
+    render(
+      <SwipeDiagnosis
+        diagnosis={twoPairedQuestionDiagnosis}
+        onBack={vi.fn()}
+        onSaveAnswer={vi.fn()}
+        onDeferQuestion={vi.fn()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    expect(document.querySelectorAll('[aria-label="普段の行動 1/2"]')).toHaveLength(2);
+    expect(document.querySelectorAll('[aria-label="大切にしたいこと 2/2"]')).toHaveLength(2);
+  });
+
   it("裏面のある表は回答方向から反転し、裏の回答で従来どおり完了する", async () => {
     const onSaveAnswer = vi.fn().mockResolvedValue({
       acceptedAt: "2026-08-05T00:00:02.000Z",

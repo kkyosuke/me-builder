@@ -16,7 +16,7 @@ describe("DiagnosisCardPreview", () => {
     render(<DiagnosisCardPreview />);
 
     expect(screen.getByText("DBへ保存しない開発用プレビュー")).toBeTruthy();
-    expect(screen.getByLabelText("普段の行動 1/2")).toBeTruthy();
+    expect(screen.getAllByLabelText("普段の行動 1/2")).toHaveLength(2);
 
     const frontAnswer = screen
       .getAllByRole<HTMLButtonElement>("button", { name: "はい" })
@@ -36,6 +36,6 @@ describe("DiagnosisCardPreview", () => {
 
     expect(await screen.findByText("回答を中断しました")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "もう一度試す" }));
-    expect(screen.getByLabelText("普段の行動 1/2")).toBeTruthy();
+    expect(screen.getAllByLabelText("普段の行動 1/2")).toHaveLength(2);
   });
 });

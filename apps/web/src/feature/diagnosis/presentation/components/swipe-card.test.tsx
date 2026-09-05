@@ -48,6 +48,9 @@ describe("SwipeCard drag preview", () => {
 
     expect(card.style.transform).toBe("translate3d(0, 0px, 0) scale(1.00)");
     expect(flipper.style.transform).toBe("rotateY(36.00deg)");
+    expect(container.querySelector('[data-card-face="value"]')?.className).toContain(
+      "bg-violet-50",
+    );
   });
 
   it("裏面のないカードは従来どおりドラッグ方向へ移動する", () => {

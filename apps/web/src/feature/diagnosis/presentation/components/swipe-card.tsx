@@ -173,7 +173,12 @@ function SwipeCardFace({
 
   return (
     <div
-      className="absolute inset-0 flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-950/50 select-none dark:border-slate-700 dark:bg-slate-800"
+      data-card-face={face}
+      className={`absolute inset-0 flex flex-col justify-between rounded-3xl border p-6 shadow-2xl select-none ${
+        face === "value"
+          ? "border-violet-300 bg-violet-50 shadow-violet-950/30 dark:border-violet-700 dark:bg-violet-950"
+          : "border-slate-200 bg-white shadow-slate-950/50 dark:border-slate-700 dark:bg-slate-800"
+      }`}
       style={style}
       aria-hidden={hidden || undefined}
     >
