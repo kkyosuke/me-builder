@@ -3,7 +3,7 @@ import { DocumentMetadata } from "./components/document-metadata";
 import { LoadingState } from "./components/loading-state";
 import { NotFoundScreen } from "./components/not-found-screen";
 import { config } from "./config";
-import { shouldShowDiagnosisCardPreview } from "./feature/diagnosis/model/diagnosis-card-preview";
+import { shouldShowDiagnosisCardPreview } from "./feature/diagnosis";
 import { resolveServiceSiteRoute } from "./feature/service-site";
 import {
   hasLiffDeepLinkLocation,
