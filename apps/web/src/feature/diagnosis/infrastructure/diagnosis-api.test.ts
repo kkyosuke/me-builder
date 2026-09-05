@@ -451,6 +451,78 @@ describe("fetchDiagnosisResult", () => {
     expect(result?.scoring?.parameters).toHaveLength(1);
   });
 
+  it("回答の観点とParameter種別に矛盾するレスポンスを拒否する", async () => {
+    const responseBody = {
+      id: "relationship-priority",
+      title: "自分と相手の優先・境界線",
+      description: "説明",
+      relationshipCategory: "general",
+      responseStatus: "answered",
+      answeredCount: 1,
+      questionCount: 1,
+      answers: [
+        {
+          diagnosisQuestionId: "dq-1",
+          questionId: "q-1",
+          questionVersion: 1,
+          questionText: "質問",
+          choiceId: "yes",
+          choiceLabel: "はい",
+          acceptedAt: "2026-08-05T00:00:00.000Z",
+          perspective: "single",
+          pairId: null,
+        },
+      ],
+      scoring: {
+        scoringVersion: 1,
+        balancedLabel: "中間",
+        parameters: [
+          {
+            id: "priority",
+            label: "優先傾向",
+            lowLabel: "相手を優先",
+            highLabel: "自分を優先",
+            resultKind: "aggregate",
+            score: 75,
+            coverage: 100,
+            band: "high",
+            behavior: null,
+            comparison: null,
+          },
+        ],
+      },
+    };
+    const inconsistentResponses = [
+      {
+        ...responseBody,
+        answers: [{ ...responseBody.answers[0], pairId: "dq-1" }],
+      },
+      {
+        ...responseBody,
+        scoring: {
+          ...responseBody.scoring,
+          parameters: [
+            {
+              ...responseBody.scoring.parameters[0],
+              behavior: { score: 25, coverage: 100, band: "low" },
+            },
+          ],
+        },
+      },
+    ];
+
+    for (const body of inconsistentResponses) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => Response.json(body)),
+      );
+
+      await expect(fetchDiagnosisResult(API_URL, "relationship-priority")).rejects.toMatchObject({
+        code: "DIAGNOSIS_ANSWERS_INVALID_RESPONSE",
+      });
+    }
+  });
+
   it.each([
     [401, AuthenticationError, "AUTHENTICATION_REQUIRED"],
     [404, OperationError, "DIAGNOSIS_ANSWERS_NOT_FOUND"],

@@ -11068,45 +11068,76 @@ export interface operations {
             responseStatus: "in-progress" | "answered";
             answeredCount: number;
             questionCount: number;
-            answers: {
-              diagnosisQuestionId: string;
-              questionId: string;
-              questionVersion: number;
-              questionText: string;
-              choiceId: string;
-              choiceLabel: string;
-              /** Format: date-time */
-              acceptedAt: string;
-              /** @enum {string} */
-              perspective: "single" | "behavior" | "desired";
-              pairId: string | null;
-            }[];
+            answers: (
+              | {
+                  diagnosisQuestionId: string;
+                  questionId: string;
+                  questionVersion: number;
+                  questionText: string;
+                  choiceId: string;
+                  choiceLabel: string;
+                  /** Format: date-time */
+                  acceptedAt: string;
+                  /** @constant */
+                  perspective: "single";
+                  pairId: null;
+                }
+              | {
+                  diagnosisQuestionId: string;
+                  questionId: string;
+                  questionVersion: number;
+                  questionText: string;
+                  choiceId: string;
+                  choiceLabel: string;
+                  /** Format: date-time */
+                  acceptedAt: string;
+                  /** @enum {string} */
+                  perspective: "behavior" | "desired";
+                  pairId: string;
+                }
+            )[];
             scoring: {
               scoringVersion: number;
               balancedLabel: string;
-              parameters: {
-                id: string;
-                label: string;
-                lowLabel: string;
-                highLabel: string;
-                /** @enum {string} */
-                resultKind: "aggregate" | "behavior_desired";
-                score: number | null;
-                coverage: number;
-                /** @enum {string} */
-                band: "low" | "balanced" | "high" | "insufficient";
-                behavior: {
-                  score: number | null;
-                  coverage: number;
-                  /** @enum {string} */
-                  band: "low" | "balanced" | "high" | "insufficient";
-                } | null;
-                comparison: {
-                  difference: number;
-                  /** @enum {string} */
-                  relation: "same_band" | "desired_higher" | "behavior_higher";
-                } | null;
-              }[];
+              parameters: (
+                | {
+                    id: string;
+                    label: string;
+                    lowLabel: string;
+                    highLabel: string;
+                    score: number | null;
+                    coverage: number;
+                    /** @enum {string} */
+                    band: "low" | "balanced" | "high" | "insufficient";
+                    /** @constant */
+                    resultKind: "aggregate";
+                    behavior: null;
+                    comparison: null;
+                  }
+                | {
+                    id: string;
+                    label: string;
+                    lowLabel: string;
+                    highLabel: string;
+                    score: number | null;
+                    coverage: number;
+                    /** @enum {string} */
+                    band: "low" | "balanced" | "high" | "insufficient";
+                    /** @constant */
+                    resultKind: "behavior_desired";
+                    behavior: {
+                      score: number | null;
+                      coverage: number;
+                      /** @enum {string} */
+                      band: "low" | "balanced" | "high" | "insufficient";
+                    };
+                    comparison: {
+                      difference: number;
+                      /** @enum {string} */
+                      relation: "same_band" | "desired_higher" | "behavior_higher";
+                    } | null;
+                  }
+              )[];
             } | null;
           };
         };

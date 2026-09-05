@@ -390,6 +390,35 @@ export async function deferDiagnosisQuestion(
   }
 }
 
+const DiagnosisResultAnswerEntries = {
+  diagnosisQuestionId: v.pipe(v.string(), v.nonEmpty()),
+  questionId: v.pipe(v.string(), v.nonEmpty()),
+  questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+  questionText: v.pipe(v.string(), v.nonEmpty()),
+  choiceId: v.pipe(v.string(), v.nonEmpty()),
+  choiceLabel: v.pipe(v.string(), v.nonEmpty()),
+  acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
+};
+
+const ParameterScoreEntries = {
+  score: v.nullable(v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100))),
+  coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
+  band: v.picklist(["low", "balanced", "high", "insufficient"]),
+};
+
+const ScoredParameterEntries = {
+  id: v.pipe(v.string(), v.nonEmpty()),
+  label: v.pipe(v.string(), v.nonEmpty()),
+  lowLabel: v.pipe(v.string(), v.nonEmpty()),
+  highLabel: v.pipe(v.string(), v.nonEmpty()),
+  ...ParameterScoreEntries,
+};
+
+const ParameterComparisonSchema = v.object({
+  difference: v.pipe(v.number(), v.safeInteger(), v.minValue(-100), v.maxValue(100)),
+  relation: v.picklist(["same_band", "desired_higher", "behavior_higher"]),
+});
+
 const DiagnosisAnswersResponseSchema = v.object({
   id: v.pipe(v.string(), v.nonEmpty()),
   title: v.pipe(v.string(), v.nonEmpty()),
@@ -400,17 +429,18 @@ const DiagnosisAnswersResponseSchema = v.object({
   questionCount: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
   answers: v.pipe(
     v.array(
-      v.object({
-        diagnosisQuestionId: v.pipe(v.string(), v.nonEmpty()),
-        questionId: v.pipe(v.string(), v.nonEmpty()),
-        questionVersion: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
-        questionText: v.pipe(v.string(), v.nonEmpty()),
-        choiceId: v.pipe(v.string(), v.nonEmpty()),
-        choiceLabel: v.pipe(v.string(), v.nonEmpty()),
-        acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
-        perspective: v.picklist(["single", "behavior", "desired"]),
-        pairId: v.nullable(v.pipe(v.string(), v.nonEmpty())),
-      }),
+      v.variant("perspective", [
+        v.object({
+          ...DiagnosisResultAnswerEntries,
+          perspective: v.literal("single"),
+          pairId: v.null(),
+        }),
+        v.object({
+          ...DiagnosisResultAnswerEntries,
+          perspective: v.picklist(["behavior", "desired"]),
+          pairId: v.pipe(v.string(), v.nonEmpty()),
+        }),
+      ]),
     ),
     v.minLength(1),
   ),
@@ -420,31 +450,20 @@ const DiagnosisAnswersResponseSchema = v.object({
       balancedLabel: v.pipe(v.string(), v.nonEmpty()),
       parameters: v.pipe(
         v.array(
-          v.object({
-            id: v.pipe(v.string(), v.nonEmpty()),
-            label: v.pipe(v.string(), v.nonEmpty()),
-            lowLabel: v.pipe(v.string(), v.nonEmpty()),
-            highLabel: v.pipe(v.string(), v.nonEmpty()),
-            resultKind: v.picklist(["aggregate", "behavior_desired"]),
-            score: v.nullable(v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100))),
-            coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
-            band: v.picklist(["low", "balanced", "high", "insufficient"]),
-            behavior: v.nullable(
-              v.object({
-                score: v.nullable(
-                  v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
-                ),
-                coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
-                band: v.picklist(["low", "balanced", "high", "insufficient"]),
-              }),
-            ),
-            comparison: v.nullable(
-              v.object({
-                difference: v.pipe(v.number(), v.safeInteger(), v.minValue(-100), v.maxValue(100)),
-                relation: v.picklist(["same_band", "desired_higher", "behavior_higher"]),
-              }),
-            ),
-          }),
+          v.variant("resultKind", [
+            v.object({
+              ...ScoredParameterEntries,
+              resultKind: v.literal("aggregate"),
+              behavior: v.null(),
+              comparison: v.null(),
+            }),
+            v.object({
+              ...ScoredParameterEntries,
+              resultKind: v.literal("behavior_desired"),
+              behavior: v.object(ParameterScoreEntries),
+              comparison: v.nullable(ParameterComparisonSchema),
+            }),
+          ]),
         ),
         v.minLength(1),
       ),

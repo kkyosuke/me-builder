@@ -170,6 +170,19 @@ describe("scoreDiagnosisAnswers", () => {
     });
   });
 
+  it("普段の行動と望みが同じ帯域なら同じ傾向の範囲として返す", () => {
+    const scoring = scoreDiagnosisAnswers(
+      [answer("q-family-behavior", 1, "yes"), answer("q-family-desired", 1, "yes")],
+      PAIRED_CONFIG,
+    );
+
+    expect(scoring?.parameters[0]).toMatchObject({
+      score: 100,
+      behavior: { score: 100 },
+      comparison: { difference: 0, relation: "same_band" },
+    });
+  });
+
   it("表裏の片方が回答不足なら比較しない", () => {
     const scoring = scoreDiagnosisAnswers([answer("q-family-behavior", 1, "yes")], PAIRED_CONFIG);
 

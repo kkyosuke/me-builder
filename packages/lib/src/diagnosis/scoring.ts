@@ -14,20 +14,29 @@ export type ParameterComparison = Readonly<{
   relation: "same_band" | "desired_higher" | "behavior_higher";
 }>;
 
-export type ScoredParameter = Readonly<{
-  id: string;
-  label: string;
-  lowLabel: string;
-  highLabel: string;
-  /** 表裏では主スコアである`desired`、独立質問では従来の集計値です。 */
-  resultKind: "aggregate" | "behavior_desired";
-  score: ParameterScore["score"];
-  coverage: ParameterScore["coverage"];
-  band: ParameterScore["band"];
-  behavior: ParameterScore | null;
-  comparison: ParameterComparison | null;
-  relationshipRequest?: string;
-}>;
+type ScoredParameterBase = ParameterScore &
+  Readonly<{
+    id: string;
+    label: string;
+    lowLabel: string;
+    highLabel: string;
+    relationshipRequest?: string;
+  }>;
+
+export type ScoredParameter =
+  | (ScoredParameterBase &
+      Readonly<{
+        resultKind: "aggregate";
+        behavior: null;
+        comparison: null;
+      }>)
+  | (ScoredParameterBase &
+      Readonly<{
+        /** トップレベルのスコアは主スコアである`desired`です。 */
+        resultKind: "behavior_desired";
+        behavior: ParameterScore;
+        comparison: ParameterComparison | null;
+      }>);
 
 export type DiagnosisScoring = Readonly<{
   scoringVersion: number;
@@ -390,28 +399,37 @@ function scoreParameters(
       perspectives,
       isBehaviorDesired ? "desired" : "aggregate",
     );
-    const behavior = isBehaviorDesired
-      ? scoreParameter(
-          parameter.id,
-          currentAnswers,
-          config,
-          maximumChoiceMagnitude,
-          perspectives,
-          "behavior",
-        )
-      : null;
     const { relationshipRequests, ...displayParameter } = parameter;
     const relationshipRequest =
       desiredOrAggregate.band === "insufficient"
         ? undefined
         : relationshipRequests?.[desiredOrAggregate.band];
-    return {
+    const result = {
       ...displayParameter,
-      resultKind: isBehaviorDesired ? "behavior_desired" : "aggregate",
       ...desiredOrAggregate,
-      behavior,
-      comparison: behavior ? compareParameterScores(behavior, desiredOrAggregate) : null,
       ...(relationshipRequest ? { relationshipRequest } : {}),
+    };
+    if (!isBehaviorDesired) {
+      return {
+        ...result,
+        resultKind: "aggregate",
+        behavior: null,
+        comparison: null,
+      };
+    }
+    const behavior = scoreParameter(
+      parameter.id,
+      currentAnswers,
+      config,
+      maximumChoiceMagnitude,
+      perspectives,
+      "behavior",
+    );
+    return {
+      ...result,
+      resultKind: "behavior_desired",
+      behavior,
+      comparison: compareParameterScores(behavior, desiredOrAggregate),
     };
   });
 
@@ -525,7 +543,6 @@ export function projectDiagnosisParameters(input: {
     if (parameter.resultKind === "aggregate") {
       return createProjection("aggregate", "preference", parameter);
     }
-    if (!parameter.behavior) return [];
     return [
       ...createProjection("behavior", "behavior_pattern", parameter.behavior),
       ...createProjection("desired", "preference", parameter),

@@ -10,7 +10,7 @@ import {
   getRelationshipCategoryBadgeClassName,
   getRelationshipCategoryLabel,
 } from "../../model/relationship-category";
-import { getParameterScoreSummary } from "../parameter-summary";
+import { getParameterComparisonSummary, getParameterScoreSummary } from "../parameter-summary";
 
 function formatAcceptedAt(value: string): string {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -76,18 +76,6 @@ function ParameterMeter({
       <p className="mt-1 text-[10px] text-slate-500">{`回答充足度 ${value.coverage}%`}</p>
     </div>
   );
-}
-
-function getComparisonSummary(parameter: ScoredParameter): string {
-  if (!parameter.comparison) return "まだ比較できません。";
-  switch (parameter.comparison.relation) {
-    case "same_band":
-      return "普段の行動と大切にしたいことは、同じ傾向です。";
-    case "desired_higher":
-      return `大切にしたいことの方が、普段の行動より「${parameter.highLabel}」側です。`;
-    case "behavior_higher":
-      return `普段の行動の方が、大切にしたいことより「${parameter.highLabel}」側です。`;
-  }
 }
 
 export function DiagnosisResultView({
@@ -211,7 +199,7 @@ export function DiagnosisResultView({
           >
             {scoring.parameters.map((parameter) => (
               <div key={parameter.id} className="py-3.5">
-                {parameter.resultKind === "behavior_desired" && parameter.behavior ? (
+                {parameter.resultKind === "behavior_desired" ? (
                   <>
                     <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                       {parameter.label}
@@ -230,7 +218,7 @@ export function DiagnosisResultView({
                         balancedLabel={scoring.balancedLabel}
                       />
                       <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                        {getComparisonSummary(parameter)}
+                        {getParameterComparisonSummary(parameter)}
                       </p>
                     </div>
                   </>
