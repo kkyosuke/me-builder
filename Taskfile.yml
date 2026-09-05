@@ -67,7 +67,7 @@ tasks:
       - bun run test
 
   ci:
-    desc: 'Run full CI checks locally (dependency audit, generated files, lint, typecheck, test, build)'
+    desc: 'Optionally reproduce full CI locally (dependency audit, generated files, lint, typecheck, test, build)'
     cmds:
       - bun run ci
 
