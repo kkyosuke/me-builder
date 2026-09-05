@@ -145,13 +145,13 @@ describe("buildTurnOverTransform", () => {
 describe("buildTurnOverPreviewTransform", () => {
   it("横へ動かさず、ドラッグした方向へY軸回転を予告すること", () => {
     expect(buildTurnOverPreviewTransform(0, 100)).toBe("rotateY(0.00deg)");
-    expect(buildTurnOverPreviewTransform(50, 100)).toBe("rotateY(14.00deg)");
-    expect(buildTurnOverPreviewTransform(-50, 100)).toBe("rotateY(-14.00deg)");
+    expect(buildTurnOverPreviewTransform(50, 100)).toBe("rotateY(36.00deg)");
+    expect(buildTurnOverPreviewTransform(-50, 100)).toBe("rotateY(-36.00deg)");
   });
 
-  it("しきい値を超えても予告角度を28度に留めること", () => {
-    expect(buildTurnOverPreviewTransform(200, 100)).toBe("rotateY(28.00deg)");
-    expect(buildTurnOverPreviewTransform(-200, 100)).toBe("rotateY(-28.00deg)");
+  it("しきい値を超えても表面が見える72度に留めること", () => {
+    expect(buildTurnOverPreviewTransform(200, 100)).toBe("rotateY(72.00deg)");
+    expect(buildTurnOverPreviewTransform(-200, 100)).toBe("rotateY(-72.00deg)");
     expect(buildTurnOverPreviewTransform(50, 0)).toBe("rotateY(0.00deg)");
   });
 });

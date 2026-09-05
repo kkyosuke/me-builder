@@ -247,7 +247,7 @@ export function SwipeCard({
     transform: layer.transform,
     // ドラッグ中は指へ即座に追従させるためtransitionを切ります。
     transition: reducedMotion || drag ? undefined : `transform ${SWIPE_TRANSITION_MS}ms ease-out`,
-    perspective: "1200px",
+    perspective: "800px",
   };
 
   if (isFront && flyOut) {
@@ -267,6 +267,7 @@ export function SwipeCard({
     height: "100%",
     position: "relative",
     transformStyle: "preserve-3d",
+    willChange: previewsTurnOver || turnOver ? "transform" : undefined,
     transform: turnOver
       ? buildTurnOverTransform(turnOver)
       : previewsTurnOver && drag

@@ -114,7 +114,9 @@ export function buildTurnOverTransform(direction: SwipeDirection): string {
 /** 表面のドラッグ中は平行移動せず、回答方向へ少し傾けて反転を予告します。 */
 export function buildTurnOverPreviewTransform(dx: number, threshold: number): string {
   if (threshold <= 0) return "rotateY(0.00deg)";
-  const rotation = clamp(dx / threshold, -1, 1) * 28;
+  // 確定直前にはカードが十分細く見える角度まで傾け、横移動との違いを明確にします。
+  // 90度未満に留めることで、指を離すまでは表面の回答を読み取れる状態を保ちます。
+  const rotation = clamp(dx / threshold, -1, 1) * 72;
   return `rotateY(${rotation.toFixed(2)}deg)`;
 }
 

@@ -47,7 +47,7 @@ describe("SwipeCard drag preview", () => {
     const flipper = card.firstElementChild as HTMLElement;
 
     expect(card.style.transform).toBe("translate3d(0, 0px, 0) scale(1.00)");
-    expect(flipper.style.transform).toBe("rotateY(14.00deg)");
+    expect(flipper.style.transform).toBe("rotateY(36.00deg)");
   });
 
   it("裏面のないカードは従来どおりドラッグ方向へ移動する", () => {
