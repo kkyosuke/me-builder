@@ -1,6 +1,7 @@
 import { line } from "@me-builder/lib";
 import { logger } from "@me-builder/shared";
 import { config } from "../src/config";
+import { LIFF_ENDPOINT_PATHNAME } from "../src/model/liff-navigation";
 
 /**
  * デプロイ済みの Web の URL を LIFF アプリのエンドポイント URL へ反映します。
@@ -18,7 +19,9 @@ if (targetEnv !== "preview" && targetEnv !== "production") {
   process.exit(0);
 }
 
-const endpointUrl = config.baseUrl ? new URL("/app", config.baseUrl).toString() : undefined;
+const endpointUrl = config.baseUrl
+  ? new URL(LIFF_ENDPOINT_PATHNAME, config.baseUrl).toString()
+  : undefined;
 
 logger.info(`[Script] Executing LIFF endpoint registration for ${targetEnv}...`);
 

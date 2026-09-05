@@ -461,6 +461,16 @@ describe("App", () => {
     );
   });
 
+  it("liff.init後の/app/diagnosisで404にせず診断一覧を表示する", async () => {
+    window.history.replaceState({}, "", "/app/diagnosis?v=d2115a1656f1");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "わたしの診断" })).toBeTruthy();
+    expect(await screen.findByText("テスト診断")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "ページが見つかりません" })).toBeNull();
+  });
+
   it("未設定時はLINEプロフィール画像を右上アイコンに表示する", async () => {
     const linePictureUrl = "https://example.com/line-profile.jpg";
     mocks.authState.profile.pictureUrl = linePictureUrl;

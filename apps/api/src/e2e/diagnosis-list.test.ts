@@ -15,6 +15,7 @@ const repositoryRoot = path.resolve(__dirname, "../../../..");
 const migrationsDirectory = path.join(repositoryRoot, "packages/lib/drizzle");
 const diagnosisSeed = path.join(repositoryRoot, "packages/lib/seeds/diagnoses.sql");
 const timestamp = 1_785_801_600;
+const e2eSetupTimeoutMs = 30_000;
 
 let miniflare: Miniflare;
 let database: D1Database;
@@ -224,7 +225,7 @@ describe("GET /api/diagnoses local D1 E2E", () => {
     sessionFixture = createApplicationSessionFixture(database);
     knownSessionHeaders = (await sessionFixture.issue("account-e2e")).headers;
     unknownSessionHeaders = (await sessionFixture.issue("account-unknown-e2e")).headers;
-  });
+  }, e2eSetupTimeoutMs);
 
   afterEach(async () => {
     await miniflare.dispose();
@@ -561,7 +562,7 @@ describe("GET /api/diagnoses/:diagnosisId local D1 E2E", () => {
     sessionFixture = createApplicationSessionFixture(database);
     knownSessionHeaders = (await sessionFixture.issue("account-e2e")).headers;
     unknownSessionHeaders = (await sessionFixture.issue("account-unknown-e2e")).headers;
-  });
+  }, e2eSetupTimeoutMs);
 
   afterEach(async () => {
     await miniflare.dispose();

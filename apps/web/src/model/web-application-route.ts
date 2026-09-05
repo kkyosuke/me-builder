@@ -1,3 +1,6 @@
+import { compatibilityRelationshipId } from "@me-builder/lib/compatibility";
+import { LIFF_ENDPOINT_PATHNAME } from "./liff-navigation";
+
 export type WebApplicationRoute =
   | "account-recovery"
   | "admin"
@@ -66,7 +69,7 @@ export function resolveWebApplicationRoute(pathname: string): WebApplicationRout
   }
   if (
     path === "/" ||
-    path === "/app" ||
+    path === LIFF_ENDPOINT_PATHNAME ||
     path === "/diagnosis" ||
     hasSingleSegment(path, "/diagnosis/") ||
     hasDiagnosisResultId(path)
@@ -75,4 +78,3 @@ export function resolveWebApplicationRoute(pathname: string): WebApplicationRout
   }
   return "not-found";
 }
-import { compatibilityRelationshipId } from "@me-builder/lib/compatibility";
