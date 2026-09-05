@@ -6,7 +6,7 @@ PRタイトル規約: <type>(<scope>): <簡潔な説明>
 
 Type: feat, fix, docs, style, refactor, test, chore, ci
 Scope: web, api, mcp, shared, deps, docs
-詳細は docs/pull-request-guidelines.md を参照してください。
+詳細は docs/development/pull-request-guidelines.md を参照してください。
 -->
 
 ## 概要 (Summary)
@@ -20,8 +20,8 @@ Scope: web, api, mcp, shared, deps, docs
 -
 
 ## 動作確認・検証手順 (Verification / How to Test)
-<!-- どのように動作確認を行ったか記述してください (例: task ci 実行、ローカル開発サーバーでの画面確認など) -->
-- [ ] `task ci` を実行し、Lint / 型チェック / テスト / ビルドがすべて成功することを確認
+<!-- 対象テストやローカル開発サーバーでの画面確認など、変更範囲に応じて実施した内容を記述してください -->
+- [ ] 変更内容に応じたローカル検証または手動確認を実施（不要な場合は理由を記載）
 -
 
 ## 事前チェックリスト (Checklist)
