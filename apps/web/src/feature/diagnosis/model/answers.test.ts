@@ -121,6 +121,8 @@ describe("restoreDiagnosisProgress", () => {
           choiceId: QUESTION.right.choiceId,
           choiceLabel: QUESTION.right.label,
           acceptedAt: ANSWERED_AT.toISOString(),
+          perspective: "single",
+          pairId: null,
         },
       ],
     );
@@ -148,6 +150,8 @@ describe("restoreDiagnosisProgress", () => {
             choiceId: "yes",
             choiceLabel: "はい",
             acceptedAt: ANSWERED_AT.toISOString(),
+            perspective: "single",
+            pairId: null,
           },
         ],
       ),

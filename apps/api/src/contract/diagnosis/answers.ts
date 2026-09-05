@@ -19,6 +19,14 @@ const DiagnosisAnswerSchema = v.object({
   choiceId: NonEmptyStringSchema,
   choiceLabel: NonEmptyStringSchema,
   acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
+  perspective: v.picklist(["single", "behavior", "desired"]),
+  pairId: v.nullable(NonEmptyStringSchema),
+});
+
+const ParameterScoreSchema = v.object({
+  score: v.nullable(v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100))),
+  coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
+  band: v.picklist(["low", "balanced", "high", "insufficient"]),
 });
 
 const ScoredParameterSchema = v.object({
@@ -26,9 +34,15 @@ const ScoredParameterSchema = v.object({
   label: NonEmptyStringSchema,
   lowLabel: NonEmptyStringSchema,
   highLabel: NonEmptyStringSchema,
-  score: v.nullable(v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100))),
-  coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
-  band: v.picklist(["low", "balanced", "high", "insufficient"]),
+  resultKind: v.picklist(["aggregate", "behavior_desired"]),
+  ...ParameterScoreSchema.entries,
+  behavior: v.nullable(ParameterScoreSchema),
+  comparison: v.nullable(
+    v.object({
+      difference: v.pipe(v.number(), v.safeInteger(), v.minValue(-100), v.maxValue(100)),
+      relation: v.picklist(["same_band", "desired_higher", "behavior_higher"]),
+    }),
+  ),
 });
 
 const DiagnosisScoringSchema = v.object({

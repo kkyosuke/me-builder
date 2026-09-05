@@ -78,6 +78,9 @@ export const diagnosisBrainProjectionHeads = sqliteTable(
       .references(() => diagnosisScoringConfigs.id),
     scoringConfigVersion: integer("scoring_config_version").notNull(),
     parameterId: text("parameter_id").notNull(),
+    perspective: text("perspective", { enum: ["aggregate", "behavior", "desired"] })
+      .notNull()
+      .default("aggregate"),
     currentBrainItemId: text("current_brain_item_id")
       .notNull()
       .references(() => brainItems.id),
@@ -90,6 +93,7 @@ export const diagnosisBrainProjectionHeads = sqliteTable(
       table.scoringConfigId,
       table.scoringConfigVersion,
       table.parameterId,
+      table.perspective,
     ),
   ],
 );

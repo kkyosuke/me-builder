@@ -408,6 +408,8 @@ const DiagnosisAnswersResponseSchema = v.object({
         choiceId: v.pipe(v.string(), v.nonEmpty()),
         choiceLabel: v.pipe(v.string(), v.nonEmpty()),
         acceptedAt: v.pipe(v.string(), v.isoTimestamp()),
+        perspective: v.picklist(["single", "behavior", "desired"]),
+        pairId: v.nullable(v.pipe(v.string(), v.nonEmpty())),
       }),
     ),
     v.minLength(1),
@@ -423,9 +425,25 @@ const DiagnosisAnswersResponseSchema = v.object({
             label: v.pipe(v.string(), v.nonEmpty()),
             lowLabel: v.pipe(v.string(), v.nonEmpty()),
             highLabel: v.pipe(v.string(), v.nonEmpty()),
+            resultKind: v.picklist(["aggregate", "behavior_desired"]),
             score: v.nullable(v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100))),
             coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
             band: v.picklist(["low", "balanced", "high", "insufficient"]),
+            behavior: v.nullable(
+              v.object({
+                score: v.nullable(
+                  v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
+                ),
+                coverage: v.pipe(v.number(), v.safeInteger(), v.minValue(0), v.maxValue(100)),
+                band: v.picklist(["low", "balanced", "high", "insufficient"]),
+              }),
+            ),
+            comparison: v.nullable(
+              v.object({
+                difference: v.pipe(v.number(), v.safeInteger(), v.minValue(-100), v.maxValue(100)),
+                relation: v.picklist(["same_band", "desired_higher", "behavior_higher"]),
+              }),
+            ),
           }),
         ),
         v.minLength(1),

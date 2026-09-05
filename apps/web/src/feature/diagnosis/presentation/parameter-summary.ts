@@ -1,11 +1,15 @@
-import type { ScoredParameter } from "../model/diagnosis-result";
+import type { ParameterScore, ScoredParameter } from "../model/diagnosis-result";
 
-export function getParameterSummary(parameter: ScoredParameter, balancedLabel: string): string {
-  switch (parameter.band) {
+export function getParameterScoreSummary(
+  score: ParameterScore,
+  labels: Pick<ScoredParameter, "lowLabel" | "highLabel">,
+  balancedLabel: string,
+): string {
+  switch (score.band) {
     case "low":
-      return parameter.lowLabel;
+      return labels.lowLabel;
     case "high":
-      return parameter.highLabel;
+      return labels.highLabel;
     case "balanced":
       return balancedLabel;
     case "insufficient":

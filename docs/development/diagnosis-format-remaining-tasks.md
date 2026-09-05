@@ -55,7 +55,7 @@ AIは回答のChoice、表示文言、Question Versionとこのscoreを入力と
 - 採点は版付きscoring configを使い、5段階scoreは`-1..1`へ正規化済みの値として扱う
 - 相性比較へ含められるのは、同じDiagnosis、同じQuestion Version、同じscoring configの回答だけとする
 - 2択と5段階は同じDiagnosisに混在しないため、形式をまたいで同一設問として比較しない
-- 表と裏は別のQuestion Versionとして採点設定へ明示し、普段の行動と大切にしたいことを暗黙に同じ値へまとめない
+- 表と裏は別のQuestion Versionとして採点設定へ明示し、普段の行動と大切にしたいことを暗黙に同じ値へまとめない。観点別の集計と比較は[診断回答のパラメータ変換設計](../diagnosis/scoring/parameter-scoring-design.md#41-表裏質問の計算)を正とする
 - 未回答を0点として補完しない
 
 ## 6. 公開前の完了条件

@@ -76,6 +76,7 @@ async function loadProjectionInput(db: AccountDataDatabase, diagnosisResponseId:
         questionId: diagnosisQuestions.questionId,
         questionVersion: diagnosisQuestions.questionVersion,
         choiceId: questionChoices.choiceId,
+        backsideOfDiagnosisQuestionId: diagnosisQuestions.backsideOfDiagnosisQuestionId,
       })
       .from(diagnosisQuestions)
       .innerJoin(
@@ -130,19 +131,23 @@ async function loadProjectionInput(db: AccountDataDatabase, diagnosisResponseId:
   }
 
   const scoringQuestions: Array<{
+    diagnosisQuestionId: string;
     questionId: string;
     questionVersion: number;
     choiceIds: string[];
+    backsideOfDiagnosisQuestionId: string | null;
   }> = [];
   for (const row of questionRows) {
     const previous = scoringQuestions.at(-1);
-    if (previous?.questionId === row.questionId) {
+    if (previous?.diagnosisQuestionId === row.diagnosisQuestionId) {
       previous.choiceIds.push(row.choiceId);
     } else {
       scoringQuestions.push({
+        diagnosisQuestionId: row.diagnosisQuestionId,
         questionId: row.questionId,
         questionVersion: row.questionVersion,
         choiceIds: [row.choiceId],
+        backsideOfDiagnosisQuestionId: row.backsideOfDiagnosisQuestionId,
       });
     }
   }
@@ -188,6 +193,7 @@ async function saveProjection(
           projection.attributes.scoringVersion,
         ),
         eq(diagnosisBrainProjectionHeads.parameterId, projection.parameterId),
+        eq(diagnosisBrainProjectionHeads.perspective, projection.perspective),
         eq(diagnosisBrainProjectionHeads.isDeleted, false),
       ),
     )
@@ -264,6 +270,7 @@ async function saveProjection(
         scoringConfigId: input.scoringConfigId,
         scoringConfigVersion: projection.attributes.scoringVersion,
         parameterId: projection.parameterId,
+        perspective: projection.perspective,
         currentBrainItemId: brainItemId,
         contentSignature: projection.contentSignature,
       });
@@ -274,7 +281,7 @@ async function saveProjection(
       item: {
         id: brainItemId,
         accountId: input.accountId,
-        category: "preference",
+        category: projection.category,
         statement: projection.statement,
         attributes: projection.attributes,
         derivation: "deterministic",

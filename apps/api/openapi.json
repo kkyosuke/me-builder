@@ -16417,6 +16417,21 @@
                           "acceptedAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "perspective": {
+                            "enum": ["single", "behavior", "desired"],
+                            "type": "string"
+                          },
+                          "pairId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -16426,7 +16441,9 @@
                           "questionText",
                           "choiceId",
                           "choiceLabel",
-                          "acceptedAt"
+                          "acceptedAt",
+                          "perspective",
+                          "pairId"
                         ]
                       },
                       "minItems": 1
@@ -16466,6 +16483,10 @@
                                     "type": "string",
                                     "minLength": 1
                                   },
+                                  "resultKind": {
+                                    "enum": ["aggregate", "behavior_desired"],
+                                    "type": "string"
+                                  },
                                   "score": {
                                     "anyOf": [
                                       {
@@ -16486,6 +16507,66 @@
                                   "band": {
                                     "enum": ["low", "balanced", "high", "insufficient"],
                                     "type": "string"
+                                  },
+                                  "behavior": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "score": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 100
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "coverage": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 100
+                                          },
+                                          "band": {
+                                            "enum": ["low", "balanced", "high", "insufficient"],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["score", "coverage", "band"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "comparison": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "difference": {
+                                            "type": "integer",
+                                            "minimum": -100,
+                                            "maximum": 100
+                                          },
+                                          "relation": {
+                                            "enum": [
+                                              "same_band",
+                                              "desired_higher",
+                                              "behavior_higher"
+                                            ],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["difference", "relation"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -16493,9 +16574,12 @@
                                   "label",
                                   "lowLabel",
                                   "highLabel",
+                                  "resultKind",
                                   "score",
                                   "coverage",
-                                  "band"
+                                  "band",
+                                  "behavior",
+                                  "comparison"
                                 ]
                               },
                               "minItems": 1

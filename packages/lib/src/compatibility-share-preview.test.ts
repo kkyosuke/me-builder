@@ -21,27 +21,36 @@ describe("buildCompatibilitySharePreviewThemes", () => {
                 label: "低い軸",
                 lowLabel: "その場で決めたい",
                 highLabel: "早めに決めたい",
+                resultKind: "aggregate",
                 score: 20,
                 coverage: 100,
                 band: "low",
+                behavior: null,
+                comparison: null,
               },
               {
                 id: "balanced",
                 label: "中央の軸",
                 lowLabel: "少なめ",
                 highLabel: "多め",
+                resultKind: "aggregate",
                 score: 50,
                 coverage: 100,
                 band: "balanced",
+                behavior: null,
+                comparison: null,
               },
               {
                 id: "high",
                 label: "高い軸",
                 lowLabel: "ゆっくり",
                 highLabel: "すばやく",
+                resultKind: "aggregate",
                 score: 80,
                 coverage: 100,
                 band: "high",
+                behavior: null,
+                comparison: null,
                 relationshipRequest: "早めに共有してもらえるとうれしいです。",
               },
             ],
@@ -127,14 +136,50 @@ describe("buildCompatibilitySharePreviewThemes", () => {
                 label: "未確定",
                 lowLabel: "低い",
                 highLabel: "高い",
+                resultKind: "aggregate",
                 score: null,
                 coverage: 20,
                 band: "insufficient",
+                behavior: null,
+                comparison: null,
               },
             ],
           },
         },
       ]),
     ).toEqual([]);
+  });
+
+  it("表裏質問では大切にしたいことの主スコアを相性表示へ使う", () => {
+    const [theme] = buildCompatibilitySharePreviewThemes([
+      {
+        diagnosisId: "diagnosis-1",
+        title: "家族との時間",
+        scoringConfigId: "family-v1",
+        scoring: {
+          scoringVersion: 1,
+          balancedLabel: "状況による",
+          parameters: [
+            {
+              id: "family-time",
+              label: "家族との時間",
+              lowLabel: "自分の時間を優先する",
+              highLabel: "家族との時間を優先する",
+              resultKind: "behavior_desired",
+              score: 100,
+              coverage: 100,
+              band: "high",
+              behavior: { score: 0, coverage: 100, band: "low" },
+              comparison: { difference: 100, relation: "desired_higher" },
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(theme?.parameters[0]).toMatchObject({
+      position: 100,
+      statement: "「家族との時間を優先する」傾向があります",
+    });
   });
 });

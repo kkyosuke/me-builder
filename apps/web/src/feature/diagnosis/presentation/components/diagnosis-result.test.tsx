@@ -5,6 +5,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DiagnosisResult } from "../../model/diagnosis-result";
 import { DiagnosisResultView } from "./diagnosis-result";
 
+const resultAnswer = {
+  diagnosisQuestionId: "dq-1",
+  questionId: "q-1",
+  questionVersion: 1,
+  questionText: "自分の余裕を優先したい。",
+  choiceId: "yes",
+  choiceLabel: "はい",
+  acceptedAt: "2026-08-05T00:00:00.000Z",
+  perspective: "single" as const,
+  pairId: null,
+};
+
 const result: DiagnosisResult = {
   id: "diagnosis-1",
   title: "価値観診断",
@@ -22,23 +34,16 @@ const result: DiagnosisResult = {
         label: "優先傾向",
         lowLabel: "相手を優先",
         highLabel: "自分を優先",
+        resultKind: "aggregate",
         score: 75,
         coverage: 100,
         band: "high",
+        behavior: null,
+        comparison: null,
       },
     ],
   },
-  answers: [
-    {
-      diagnosisQuestionId: "dq-1",
-      questionId: "q-1",
-      questionVersion: 1,
-      questionText: "自分の余裕を優先したい。",
-      choiceId: "yes",
-      choiceLabel: "はい",
-      acceptedAt: "2026-08-05T00:00:00.000Z",
-    },
-  ],
+  answers: [resultAnswer],
 };
 
 describe("DiagnosisResultView", () => {
@@ -72,6 +77,68 @@ describe("DiagnosisResultView", () => {
     expect(screen.getByRole("link", { name: "わたしのまとめを見る" }).getAttribute("href")).toBe(
       "/me",
     );
+  });
+
+  it("表裏質問は普段の行動と大切にしたいことを別々に表示する", () => {
+    render(
+      <DiagnosisResultView
+        result={{
+          ...result,
+          answeredCount: 2,
+          questionCount: 2,
+          scoring: {
+            scoringVersion: 1,
+            balancedLabel: "状況に応じて調整",
+            parameters: [
+              {
+                id: "family_time",
+                label: "家族との時間",
+                lowLabel: "自分の時間を優先",
+                highLabel: "家族との時間を優先",
+                resultKind: "behavior_desired",
+                score: 100,
+                coverage: 100,
+                band: "high",
+                behavior: { score: 0, coverage: 100, band: "low" },
+                comparison: { difference: 100, relation: "desired_higher" },
+              },
+            ],
+          },
+          answers: [
+            {
+              ...resultAnswer,
+              perspective: "behavior",
+              pairId: "dq-1",
+              questionText: "休日は家族と過ごしている。",
+              choiceLabel: "いいえ",
+            },
+            {
+              ...resultAnswer,
+              diagnosisQuestionId: "dq-2",
+              perspective: "desired",
+              pairId: "dq-1",
+              questionText: "休日は家族と過ごしたい。",
+            },
+          ],
+        }}
+        onBack={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/回答から見える普段の行動と、大切にしたいこと/)).toBeTruthy();
+    expect(
+      screen
+        .getByRole("meter", { name: "家族との時間・普段の行動の傾向" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("0");
+    expect(
+      screen
+        .getByRole("meter", { name: "家族との時間・大切にしたいことの傾向" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("100");
+    expect(
+      screen.getByText("大切にしたいことの方が、普段の行動より「家族との時間を優先」側です。"),
+    ).toBeTruthy();
   });
 
   it("サマリーから開いた回答結果ではサマリーへの戻り先を表示する", () => {

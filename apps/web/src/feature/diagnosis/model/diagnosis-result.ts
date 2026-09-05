@@ -8,16 +8,27 @@ export interface DiagnosisResultAnswer {
   choiceId: string;
   choiceLabel: string;
   acceptedAt: string;
+  perspective: "single" | "behavior" | "desired";
+  pairId: string | null;
 }
 
-export interface ScoredParameter {
+export interface ParameterScore {
+  score: number | null;
+  coverage: number;
+  band: "low" | "balanced" | "high" | "insufficient";
+}
+
+export interface ScoredParameter extends ParameterScore {
   id: string;
   label: string;
   lowLabel: string;
   highLabel: string;
-  score: number | null;
-  coverage: number;
-  band: "low" | "balanced" | "high" | "insufficient";
+  resultKind: "aggregate" | "behavior_desired";
+  behavior: ParameterScore | null;
+  comparison: {
+    difference: number;
+    relation: "same_band" | "desired_higher" | "behavior_higher";
+  } | null;
 }
 
 interface DiagnosisScoring {

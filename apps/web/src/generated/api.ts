@@ -11077,6 +11077,9 @@ export interface operations {
               choiceLabel: string;
               /** Format: date-time */
               acceptedAt: string;
+              /** @enum {string} */
+              perspective: "single" | "behavior" | "desired";
+              pairId: string | null;
             }[];
             scoring: {
               scoringVersion: number;
@@ -11086,10 +11089,23 @@ export interface operations {
                 label: string;
                 lowLabel: string;
                 highLabel: string;
+                /** @enum {string} */
+                resultKind: "aggregate" | "behavior_desired";
                 score: number | null;
                 coverage: number;
                 /** @enum {string} */
                 band: "low" | "balanced" | "high" | "insufficient";
+                behavior: {
+                  score: number | null;
+                  coverage: number;
+                  /** @enum {string} */
+                  band: "low" | "balanced" | "high" | "insufficient";
+                } | null;
+                comparison: {
+                  difference: number;
+                  /** @enum {string} */
+                  relation: "same_band" | "desired_higher" | "behavior_higher";
+                } | null;
               }[];
             } | null;
           };

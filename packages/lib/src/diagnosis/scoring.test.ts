@@ -32,6 +32,45 @@ const CONFIG = {
   },
 } as const;
 
+const PAIRED_CONFIG = {
+  version: 4,
+  questions: [
+    {
+      diagnosisQuestionId: "diagnosis-question-behavior",
+      questionId: "q-family-behavior",
+      questionVersion: 1,
+      choiceIds: ["yes", "no"],
+      backsideOfDiagnosisQuestionId: null,
+    },
+    {
+      diagnosisQuestionId: "diagnosis-question-desired",
+      questionId: "q-family-desired",
+      questionVersion: 1,
+      choiceIds: ["yes", "no"],
+      backsideOfDiagnosisQuestionId: "diagnosis-question-behavior",
+    },
+  ],
+  definition: {
+    parameters: [
+      {
+        id: "family_time",
+        label: "家族との時間",
+        lowLabel: "自分の時間を優先する",
+        highLabel: "家族との時間を優先する",
+      },
+    ],
+    choiceScores: { yes: 1, no: -1 },
+    questions: {
+      "q-family-behavior": { questionVersion: 1, weights: { family_time: 1 } },
+      "q-family-desired": { questionVersion: 1, weights: { family_time: 1 } },
+    },
+    minimumCoverage: 1,
+    lowMaximum: 35,
+    highMinimum: 65,
+    balancedLabel: "どちらもある",
+  },
+} as const;
+
 const answer = (questionId: string, questionVersion: number, choiceId: string) => ({
   questionId,
   questionVersion,
@@ -54,9 +93,12 @@ describe("scoreDiagnosisAnswers", () => {
           label: "計画性",
           lowLabel: "即興",
           highLabel: "計画的",
+          resultKind: "aggregate",
           score: 100,
           coverage: 100,
           band: "high",
+          behavior: null,
+          comparison: null,
           relationshipRequest: "予定を早めに相談してもらえるとうれしいです。",
         },
         {
@@ -64,9 +106,12 @@ describe("scoreDiagnosisAnswers", () => {
           label: "柔軟性",
           lowLabel: "予定を守る",
           highLabel: "変更を楽しむ",
+          resultKind: "aggregate",
           score: 0,
           coverage: 100,
           band: "low",
+          behavior: null,
+          comparison: null,
         },
       ],
     });
@@ -90,6 +135,49 @@ describe("scoreDiagnosisAnswers", () => {
     );
 
     expect(scoring?.parameters[0]).toMatchObject({ score: 100, coverage: 100 });
+  });
+
+  it("表裏質問を普段の行動と大切にしたいことへ分けて同じParameter上で採点する", () => {
+    const scoring = scoreDiagnosisAnswers(
+      [answer("q-family-behavior", 1, "no"), answer("q-family-desired", 1, "yes")],
+      PAIRED_CONFIG,
+    );
+
+    expect(scoring?.parameters[0]).toEqual({
+      id: "family_time",
+      label: "家族との時間",
+      lowLabel: "自分の時間を優先する",
+      highLabel: "家族との時間を優先する",
+      resultKind: "behavior_desired",
+      score: 100,
+      coverage: 100,
+      band: "high",
+      behavior: { score: 0, coverage: 100, band: "low" },
+      comparison: { difference: 100, relation: "desired_higher" },
+    });
+  });
+
+  it("普段の行動の方が高い場合も望みを主スコアにして向きを返す", () => {
+    const scoring = scoreDiagnosisAnswers(
+      [answer("q-family-behavior", 1, "yes"), answer("q-family-desired", 1, "no")],
+      PAIRED_CONFIG,
+    );
+
+    expect(scoring?.parameters[0]).toMatchObject({
+      score: 0,
+      behavior: { score: 100 },
+      comparison: { difference: -100, relation: "behavior_higher" },
+    });
+  });
+
+  it("表裏の片方が回答不足なら比較しない", () => {
+    const scoring = scoreDiagnosisAnswers([answer("q-family-behavior", 1, "yes")], PAIRED_CONFIG);
+
+    expect(scoring?.parameters[0]).toMatchObject({
+      score: null,
+      behavior: { score: 100 },
+      comparison: null,
+    });
   });
 
   it("採点設定がない診断はnullを返す", () => {
@@ -142,6 +230,40 @@ describe("scoreDiagnosisAnswers", () => {
   ])("質問定義と一致しない採点設定を拒否する: $name", ({ questions }) => {
     expect(() => scoreDiagnosisAnswers([], { ...CONFIG, questions })).toThrow();
   });
+
+  it("表裏質問の寄与先や重みが一致しない採点設定を拒否する", () => {
+    expect(() =>
+      scoreDiagnosisAnswers([], {
+        ...PAIRED_CONFIG,
+        definition: {
+          ...PAIRED_CONFIG.definition,
+          questions: {
+            ...PAIRED_CONFIG.definition.questions,
+            "q-family-desired": { questionVersion: 1, weights: { family_time: -1 } },
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
+  it("同じParameterへ表裏質問と独立質問を混在させた設定を拒否する", () => {
+    expect(() =>
+      scoreDiagnosisAnswers([], {
+        ...PAIRED_CONFIG,
+        questions: [
+          ...PAIRED_CONFIG.questions,
+          { questionId: "q-single", questionVersion: 1, choiceIds: ["yes", "no"] },
+        ],
+        definition: {
+          ...PAIRED_CONFIG.definition,
+          questions: {
+            ...PAIRED_CONFIG.definition.questions,
+            "q-single": { questionVersion: 1, weights: { family_time: 1 } },
+          },
+        },
+      }),
+    ).toThrow();
+  });
 });
 
 describe("projectDiagnosisParameters", () => {
@@ -159,6 +281,8 @@ describe("projectDiagnosisParameters", () => {
     expect(projections).toEqual([
       expect.objectContaining({
         parameterId: "planning",
+        perspective: "aggregate",
+        category: "preference",
         statement: "計画性は「計画的」の傾向がある",
         attributes: {
           diagnosisId: "diagnosis-1",
@@ -188,5 +312,39 @@ describe("projectDiagnosisParameters", () => {
         storedConfig: CONFIG,
       }),
     ).toEqual([]);
+  });
+
+  it("表裏の結果をBehavior PatternとPreferenceへ別々にprojectionする", () => {
+    const projections = projectDiagnosisParameters({
+      diagnosisId: "diagnosis-1",
+      scoringConfigId: "scoring-1",
+      answers: [
+        {
+          ...answer("q-family-behavior", 1, "no"),
+          sourceRecordId: "source-behavior",
+        },
+        { ...answer("q-family-desired", 1, "yes"), sourceRecordId: "source-desired" },
+      ],
+      storedConfig: PAIRED_CONFIG,
+    });
+
+    expect(projections).toEqual([
+      expect.objectContaining({
+        parameterId: "family_time",
+        perspective: "behavior",
+        category: "behavior_pattern",
+        statement: "家族との時間の普段の行動は「自分の時間を優先する」の傾向がある",
+        attributes: expect.objectContaining({ perspective: "behavior", score: 0 }),
+        evidenceSourceRecordIds: ["source-behavior"],
+      }),
+      expect.objectContaining({
+        parameterId: "family_time",
+        perspective: "desired",
+        category: "preference",
+        statement: "家族との時間で大切にしたいことは「家族との時間を優先する」の傾向がある",
+        attributes: expect.objectContaining({ perspective: "desired", score: 100 }),
+        evidenceSourceRecordIds: ["source-desired"],
+      }),
+    ]);
   });
 });

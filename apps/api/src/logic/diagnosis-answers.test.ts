@@ -70,6 +70,8 @@ describe("getDiagnosisAnswers", () => {
           choiceId: "yes",
           choiceLabel: "はい",
           acceptedAt: "2026-08-05T00:00:00.000Z",
+          perspective: "single" as const,
+          pairId: null,
         },
       ],
     };
