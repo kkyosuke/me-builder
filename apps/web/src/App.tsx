@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { LoadingState } from "./components/loading-state";
 import { NotFoundScreen } from "./components/not-found-screen";
 import { RouteErrorBoundary } from "./components/route-error-boundary";
+import { WebStartupSkeleton } from "./components/web-startup-skeleton";
 import { config } from "./config";
 import { AccountRecoveryScreen, issueRecoveryCode } from "./feature/account-recovery";
 import {
@@ -183,9 +184,12 @@ function AppContents() {
     setProfileLinePictureUrl(profile.avatar?.source === "line" ? profile.avatar.url : undefined);
     setProfileReadState({ status: "ready" });
   }, []);
+  const [settledDiagnosisKey, setSettledDiagnosisKey] = useState<string | null>(null);
+  const diagnosisKey = `${sessionRevision}:${accountDataResetKey}`;
   const loadAuxiliaryProfile = useCallback(() => {
+    setSettledDiagnosisKey(diagnosisKey);
     profileLoadRef.current?.();
-  }, []);
+  }, [diagnosisKey]);
 
   useLayoutEffect(() => {
     const previous = previousMainRoute.current;
@@ -285,6 +289,8 @@ function AppContents() {
   useEffect(() => {
     if (isAdminPath || isNotFoundPath) return;
 
+    if (currentMainRoute === "diagnosis" && settledDiagnosisKey !== diagnosisKey) return;
+
     return scheduleIdlePreloadAfter(
       () => loadMainApplication(currentMainRoute),
       () => {
@@ -294,7 +300,7 @@ function AppContents() {
         preloadProfileSettingsScreen();
       },
     );
-  }, [currentMainRoute, isAdminPath, isNotFoundPath]);
+  }, [currentMainRoute, diagnosisKey, isAdminPath, isNotFoundPath, settledDiagnosisKey]);
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -694,7 +700,7 @@ function AppContents() {
           aria-hidden={profileView !== "closed" || isAdminPath ? true : undefined}
         >
           <RouteErrorBoundary>
-            <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
+            <Suspense fallback={<WebStartupSkeleton route={currentMainRoute} />}>
               {isCompatibilityPath ? (
                 <CompatibilityApplication key={`${sessionRevision}:${accountDataResetKey}`} />
               ) : isMePath ? (
@@ -712,7 +718,7 @@ function AppContents() {
       )}
       {isAdminPath && (
         <RouteErrorBoundary>
-          <Suspense fallback={<LoadingState message="画面を読み込んでいます..." />}>
+          <Suspense fallback={<WebStartupSkeleton route="admin" />}>
             <AdminApplication key={sessionRevision} />
           </Suspense>
         </RouteErrorBoundary>

@@ -20,6 +20,7 @@ import { useDiagnosisAnswerSaver } from "./use-diagnosis-answer-saver";
 
 const MINIMUM_LOADING_MS = 400;
 
+// 通信前に開始し、待機時間を通信に加算せず max(400ms, 通信時間) にする。
 const waitForMinimumLoading = (): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, MINIMUM_LOADING_MS));
 

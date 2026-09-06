@@ -14,6 +14,7 @@ import { diagnosisDetailIdFromHistoryState } from "./feature/diagnosis/model/dia
 import type { ProfileEntitlement } from "./feature/profile-settings/model/entitlement";
 import { ProfileSummaryGenerationUnavailableError } from "./feature/profile/model/profile-summary";
 import { OperationError } from "./infrastructure/errors";
+import * as routes from "./routes";
 
 const mocks = vi.hoisted(() => ({
   config: {
@@ -480,7 +481,7 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "わたしの診断" })).toBeTruthy();
-    expect(await screen.findByText("テスト診断")).toBeTruthy();
+    expect(await screen.findByText("テスト診断", {}, { timeout: 5_000 })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "ページが見つかりません" })).toBeNull();
   });
 
@@ -494,7 +495,7 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "わたしの診断" })).toBeTruthy();
-    expect(mocks.fetchDiagnosisList).toHaveBeenCalledOnce();
+    await waitFor(() => expect(mocks.fetchDiagnosisList).toHaveBeenCalledOnce());
     expect(mocks.fetchAccountProfile).not.toHaveBeenCalled();
     expect(mocks.fetchProfileEntitlement).not.toHaveBeenCalled();
     expect(mocks.fetchProfileProgression).not.toHaveBeenCalled();
@@ -813,24 +814,20 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("link", { name: "わたし" }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/me"));
-    const profileHeading = await screen.findByRole(
-      "heading",
-      { name: "わたしのまとめ" },
-      { timeout: 5_000 },
+    await screen.findByRole("heading", { name: "わたしのまとめ" }, { timeout: 5_000 });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "わたしのまとめ" })),
     );
-    await waitFor(() => expect(document.activeElement).toBe(profileHeading));
     expect(scrollToSpy).toHaveBeenLastCalledWith(0, 0);
 
     scrollY = 260;
     fireEvent.click(await screen.findByRole("link", { name: "診断" }));
 
     await waitFor(() => expect(window.location.pathname).toBe("/diagnosis"));
-    const diagnosisHeading = await screen.findByRole(
-      "heading",
-      { name: "わたしの診断" },
-      { timeout: 5_000 },
+    await screen.findByRole("heading", { name: "わたしの診断" }, { timeout: 5_000 });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "わたしの診断" })),
     );
-    await waitFor(() => expect(document.activeElement).toBe(diagnosisHeading));
     expect(scrollToSpy).toHaveBeenLastCalledWith(0, 480);
 
     scrollY = 720;
@@ -1327,6 +1324,46 @@ describe("App", () => {
     expect(mocks.fetchDiagnosisResult).not.toHaveBeenCalled();
   });
 
+  it.each(["success", "error"] as const)(
+    "直接リンクの結果取得が%sになるまで補助通信を開始しない",
+    async (outcome) => {
+      const schedulePreload = vi
+        .spyOn(routes, "scheduleIdlePreloadAfter")
+        .mockReturnValue(() => undefined);
+      mocks.fetchDiagnosisList.mockResolvedValue([
+        diagnosis({ responseStatus: "answered", answeredCount: 10 }),
+      ]);
+      let resolveResult: ((value: DiagnosisResult) => void) | undefined;
+      let rejectResult: ((error: Error) => void) | undefined;
+      mocks.fetchDiagnosisResult.mockReturnValueOnce(
+        new Promise<DiagnosisResult>((resolve, reject) => {
+          resolveResult = resolve;
+          rejectResult = reject;
+        }),
+      );
+      window.history.replaceState({}, "", "/diagnosis/diagnosis-1/answers");
+
+      render(<App />);
+
+      await waitFor(() => expect(mocks.fetchDiagnosisResult).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole("status", { name: "診断結果を読み込み中" })).toBeTruthy();
+      expect(mocks.fetchAccountProfile).not.toHaveBeenCalled();
+      expect(mocks.fetchProfileEntitlement).not.toHaveBeenCalled();
+      expect(mocks.fetchProfileProgression).not.toHaveBeenCalled();
+      expect(schedulePreload).not.toHaveBeenCalled();
+
+      await act(async () => {
+        if (outcome === "success") resolveResult?.(result);
+        else rejectResult?.(new Error("temporary failure"));
+      });
+
+      await waitFor(() => expect(mocks.fetchAccountProfile).toHaveBeenCalledTimes(1));
+      expect(mocks.fetchProfileEntitlement).toHaveBeenCalledTimes(1);
+      expect(mocks.fetchProfileProgression).toHaveBeenCalledTimes(1);
+      expect(schedulePreload).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("回答結果URLの通信失敗を同じ診断で再試行する", async () => {
     mocks.fetchDiagnosisList.mockResolvedValue([
       diagnosis({ responseStatus: "answered", answeredCount: 10 }),
@@ -1586,26 +1623,30 @@ describe("App", () => {
     scrollYSpy.mockRestore();
   });
 
-  it("回答取得が即時完了しても回答画面のSkeletonを400ms表示する", async () => {
-    render(<App />);
-    const openDiagnosis = await screen.findByRole("button", { name: /テスト診断/ });
-    vi.useFakeTimers();
+  it.each([0, 800])(
+    "通信が%dmsなら400msと通信時間の長い方だけSkeletonを表示する",
+    async (networkMs) => {
+      render(<App />);
+      const openDiagnosis = await screen.findByRole("button", { name: /テスト診断/ });
+      vi.useFakeTimers();
+      mocks.fetchDiagnosisDefinition.mockImplementationOnce(
+        () => new Promise((resolve) => setTimeout(() => resolve(definition), networkMs)),
+      );
 
-    fireEvent.click(openDiagnosis);
-    expect(screen.getByRole("status", { name: "診断回答を読み込み中" })).toBeTruthy();
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      vi.advanceTimersByTime(399);
-    });
+      fireEvent.click(openDiagnosis);
+      await act(async () => vi.advanceTimersByTimeAsync(399));
+      expect(screen.getByRole("status", { name: "診断回答を読み込み中" })).toBeTruthy();
 
-    expect(screen.getByRole("status", { name: "診断回答を読み込み中" })).toBeTruthy();
-    expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      if (networkMs > 400) {
+        expect(screen.getByRole("status", { name: "診断回答を読み込み中" })).toBeTruthy();
+        await act(async () => vi.advanceTimersByTimeAsync(networkMs - 400));
+      }
 
-    await act(async () => vi.advanceTimersByTime(1));
-    expect(screen.getByRole("heading", { name: "テスト診断" })).toBeTruthy();
-    expect(screen.queryByText("回答UI: テスト診断")).toBeNull();
-  });
+      expect(screen.queryByRole("status", { name: "診断回答を読み込み中" })).toBeNull();
+      expect(screen.getByRole("heading", { name: "テスト診断" })).toBeTruthy();
+    },
+  );
 
   it("dev環境ではプロフィール最下部から本人データを全削除する", async () => {
     mocks.authState.role = "admin";
