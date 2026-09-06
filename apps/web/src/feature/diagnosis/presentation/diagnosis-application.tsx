@@ -38,7 +38,6 @@ export default function DiagnosisApplication({
   onPrimaryContentSettled?: () => void;
 }) {
   const diagnoses = useDiagnosisList();
-  const progression = useProfileProgression({ enabled: diagnoses.state.status === "success" });
   const detail = useDiagnosisDetail({
     onProgress: diagnoses.updateProgress,
   });
@@ -74,11 +73,21 @@ export default function DiagnosisApplication({
       ? diagnoses.state.data.find(({ id }) => id === directDiagnosisId)
       : undefined;
 
+  const primaryContentSettled =
+    diagnoses.state.status === "error" ||
+    (diagnoses.state.status === "success" &&
+      (!directDiagnosisId ||
+        !directDiagnosis ||
+        detail.state.status === "success" ||
+        detail.state.status === "error"));
+  const [auxiliaryEnabled, setAuxiliaryEnabled] = useState(false);
+  const progression = useProfileProgression({ enabled: auxiliaryEnabled });
+
   useEffect(() => {
-    if (diagnoses.state.status === "success" || diagnoses.state.status === "error") {
-      onPrimaryContentSettled?.();
-    }
-  }, [diagnoses.state.status, onPrimaryContentSettled]);
+    if (!primaryContentSettled) return;
+    setAuxiliaryEnabled(true);
+    onPrimaryContentSettled?.();
+  }, [primaryContentSettled, onPrimaryContentSettled]);
 
   const openDiagnosis = useCallback(
     (diagnosis: Parameters<typeof detail.open>[0]) => {
