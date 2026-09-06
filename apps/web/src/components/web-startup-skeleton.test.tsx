@@ -20,4 +20,11 @@ describe("WebStartupSkeleton", () => {
     expect(screen.getByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
     expect(screen.getByText("これまでに見つかったことを準備しています。")).toBeTruthy();
   });
+
+  it("規約導線では診断画面ではなく利用規約の骨格を表示する", () => {
+    render(<WebStartupSkeleton route="terms" />);
+
+    expect(screen.getByRole("heading", { name: "利用規約" })).toBeTruthy();
+    expect(screen.getByText("現在の利用条件を確認しています。")).toBeTruthy();
+  });
 });

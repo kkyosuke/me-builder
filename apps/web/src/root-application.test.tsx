@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RootApplication } from "./root-application";
+
+const mocks = vi.hoisted(() => ({
+  preloadWebApplicationRoute: vi.fn(),
+}));
 
 vi.mock("./App", () => ({
   App: () => <main>本人向けアプリ</main>,
@@ -16,8 +20,13 @@ vi.mock("./feature/service-site", async (importOriginal) => {
   };
 });
 
+vi.mock("./routes", () => ({
+  preloadWebApplicationRoute: mocks.preloadWebApplicationRoute,
+}));
+
 describe("RootApplication", () => {
   beforeEach(() => {
+    mocks.preloadWebApplicationRoute.mockReset();
     window.history.replaceState({}, "", "/");
   });
 
@@ -53,6 +62,7 @@ describe("RootApplication", () => {
     render(<RootApplication />);
 
     expect(await screen.findByText("本人向けアプリ")).toBeTruthy();
+    await waitFor(() => expect(mocks.preloadWebApplicationRoute).toHaveBeenCalledWith("me"));
   });
 
   it("LIFF deep linkの規約導線は公開規約ページではなく本人向けアプリへ渡す", async () => {
@@ -61,6 +71,7 @@ describe("RootApplication", () => {
 
     expect(await screen.findByText("本人向けアプリ")).toBeTruthy();
     expect(screen.queryByText("サービス紹介トップ")).toBeNull();
+    await waitFor(() => expect(mocks.preloadWebApplicationRoute).toHaveBeenCalledWith("terms"));
   });
 
   it("LIFFの共通endpointでは本人向けアプリを表示する", async () => {

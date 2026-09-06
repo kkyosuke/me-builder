@@ -9,6 +9,7 @@ export type WebApplicationRoute =
   | "mcp-authorization"
   | "me"
   | "profile"
+  | "terms"
   | "not-found";
 
 function withoutTrailingSlash(pathname: string): string {
@@ -45,6 +46,7 @@ export function resolveWebApplicationRoute(pathname: string): WebApplicationRout
   const path = withoutTrailingSlash(pathname);
   if (path === "/account-recovery") return "account-recovery";
   if (path === "/mcp/authorize") return "mcp-authorization";
+  if (path === "/terms") return "terms";
   if (path === "/admin" || path === "/admin/statistics") return "admin";
   if (
     path === "/compatibility" ||

@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
     revision: 1,
   },
   retryAuthSession: vi.fn(),
+  serviceTermsStartupRoute: vi.fn(),
   fetchAccountProfile: vi.fn(),
   fetchProfileEntitlement: vi.fn(),
   saveAccountAvatar: vi.fn(),
@@ -65,7 +66,16 @@ vi.mock("./config", () => ({
   config: mocks.config,
 }));
 vi.mock("./feature/legal", () => ({
-  ServiceTermsGate: ({ children }: { children: ReactNode }) => children,
+  ServiceTermsGate: ({
+    children,
+    startupRoute,
+  }: {
+    children: ReactNode;
+    startupRoute?: string;
+  }) => {
+    mocks.serviceTermsStartupRoute(startupRoute);
+    return children;
+  },
   ServiceTermsAcceptanceHistory: () => null,
 }));
 vi.mock("./feature/auth", async (importOriginal) => ({
@@ -1261,6 +1271,15 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("LIFFの規約導線を404にせず規約確認へ渡す", async () => {
+    window.history.replaceState({}, "", "/app?liff.state=%2Fterms");
+
+    render(<App />);
+
+    await waitFor(() => expect(mocks.serviceTermsStartupRoute).toHaveBeenCalledWith("terms"));
+    expect(screen.queryByRole("heading", { name: "ページが見つかりません" })).toBeNull();
   });
 
   it("Strict Modeでもまとめ取得を多重実行しない", async () => {

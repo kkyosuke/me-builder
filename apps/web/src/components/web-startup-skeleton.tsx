@@ -58,6 +58,14 @@ function startupCopy(route: WebApplicationRoute): StartupCopy {
       layout: "rows",
     };
   }
+  if (route === "terms") {
+    return {
+      eyebrow: "利用条件",
+      title: "利用規約",
+      description: "現在の利用条件を確認しています。",
+      layout: "rows",
+    };
+  }
   return {
     eyebrow: "私をひもとく",
     title: "わたしの診断",

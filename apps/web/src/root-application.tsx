@@ -24,11 +24,7 @@ export function RootApplication() {
   const requestedPathname = resolveRequestedPathname();
   const hasLiffDeepLink = hasLiffDeepLinkLocation();
   const route = hasLiffDeepLink ? null : resolveServiceSiteRoute(requestedPathname);
-  const webRoute = route
-    ? null
-    : hasLiffDeepLink
-      ? "diagnosis"
-      : resolveWebApplicationRoute(requestedPathname);
+  const webRoute = route ? null : resolveWebApplicationRoute(requestedPathname);
 
   useEffect(() => {
     if (webRoute && webRoute !== "not-found") preloadWebApplicationRoute(webRoute);

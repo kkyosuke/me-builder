@@ -14,6 +14,7 @@ describe("resolveWebApplicationRoute", () => {
     ["/admin/statistics", "admin"],
     ["/account-recovery", "account-recovery"],
     ["/mcp/authorize", "mcp-authorization"],
+    ["/terms", "terms"],
   ] as const)("%sを%sとして解決する", (pathname, route) => {
     expect(resolveWebApplicationRoute(pathname)).toBe(route);
   });
