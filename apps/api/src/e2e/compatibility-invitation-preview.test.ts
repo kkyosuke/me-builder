@@ -98,7 +98,9 @@ function headersForToken(token: string): Record<string, string> {
   return token.startsWith("inviter") ? sessionHeaders.inviter : sessionHeaders.recipient;
 }
 
-async function issueInvitationForInviter(): Promise<string> {
+async function issueInvitationForInviter(
+  relationshipCategory: "partner" | "family" = "partner",
+): Promise<string> {
   const consentResponse = await app.request(
     "/api/compatibility/share-consent",
     { headers: sessionHeaders.inviter },
@@ -114,7 +116,7 @@ async function issueInvitationForInviter(): Promise<string> {
         ...sessionHeaders.inviter,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ relationshipCategory: "partner" }),
+      body: JSON.stringify({ relationshipCategory }),
     },
     env(),
   );
@@ -123,7 +125,7 @@ async function issueInvitationForInviter(): Promise<string> {
     invitationUrl: string;
     relationshipCategory: string;
   };
-  expect(issued.relationshipCategory).toBe("partner");
+  expect(issued.relationshipCategory).toBe(relationshipCategory);
   expect(issued.invitationUrl).toMatch(
     /^https:\/\/liff\.line\.me\/1234567890-testliff\/compatibility\/invitations\/[a-f0-9]{64}$/,
   );
@@ -136,6 +138,7 @@ async function completeDiagnosis(
   token: string,
   diagnosisId = "relationship-priority",
   questionIdPrefix = diagnosisId,
+  choiceIdForIndex: (index: number) => "yes" | "no" = () => "yes",
 ): Promise<void> {
   for (let index = 1; index <= 10; index += 1) {
     const questionId = `dq-${questionIdPrefix}-${String(index).padStart(2, "0")}`;
@@ -144,7 +147,7 @@ async function completeDiagnosis(
       {
         method: "PUT",
         headers: { ...headersForToken(token), "Content-Type": "application/json" },
-        body: JSON.stringify({ choiceId: "yes" }),
+        body: JSON.stringify({ choiceId: choiceIdForIndex(index) }),
       },
       env(),
     );
@@ -638,6 +641,64 @@ describe("GET /api/compatibility/invitations/:relationshipId E2E", () => {
           .prepare("SELECT COUNT(*) AS count FROM compatibility_references")
           .get(),
       ).toEqual({ count: 0 });
+    },
+    e2eTimeoutMs,
+  );
+
+  it(
+    "家族との休日では望み側のスコアと関わり方文を相性シートへ使う",
+    async () => {
+      const behaviorNoDesiredYes = (index: number) => (index % 2 === 1 ? "no" : "yes");
+      await Promise.all([
+        completeDiagnosis(
+          "inviter-token",
+          "family-holiday-style",
+          "family-holiday-style",
+          behaviorNoDesiredYes,
+        ),
+        completeDiagnosis(
+          "recipient-token",
+          "family-holiday-style",
+          "family-holiday-style",
+          behaviorNoDesiredYes,
+        ),
+      ]);
+      await Promise.all([
+        generateShareProfile("inviter", "私は、家族との休日に一緒の時間を持ちたいです"),
+        generateShareProfile("recipient", "私は、家族との休日に一緒の時間を持ちたいです"),
+      ]);
+      const relationshipId = await issueInvitationForInviter("family");
+      const acceptResponse = await app.request(
+        `/api/compatibility/invitations/${relationshipId}/accept`,
+        { method: "POST", headers: sessionHeaders.recipient },
+        env(),
+      );
+      expect(acceptResponse.status).toBe(200);
+
+      const detailResponse = await app.request(
+        `/api/compatibility/relationships/${relationshipId}`,
+        { headers: sessionHeaders.recipient },
+        env(),
+      );
+      expect(detailResponse.status).toBe(200);
+      const detail = await detailResponse.json();
+      const expectedTheme = expect.objectContaining({
+        diagnosisId: "family-holiday-style",
+        parameters: [
+          expect.objectContaining({
+            id: "family-holiday-togetherness",
+            position: 100,
+            band: "high",
+            request: "休日に、一緒に過ごす時間を作ってもらえるとうれしいです。",
+          }),
+        ],
+      });
+      expect(detail).toMatchObject({
+        status: "ready",
+        relationshipCategory: "family",
+        partner: { themes: [expectedTheme] },
+        viewer: { themes: [expectedTheme] },
+      });
     },
     e2eTimeoutMs,
   );

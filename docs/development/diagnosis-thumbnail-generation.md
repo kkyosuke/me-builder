@@ -26,7 +26,8 @@ apps/web/public/images/diagnoses/
 ├── decision-making-style.jpg
 ├── work-priority-style.jpg
 ├── family-expectation-choice.jpg
-└── friend-trust-boundaries.jpg
+├── friend-trust-boundaries.jpg
+└── family-holiday-style.jpg
 ```
 
 ## 3. 共通スタイル
@@ -230,7 +231,23 @@ Materials/textures: Matte paper and soft clay, subtle depth and soft shadows.
 Constraints: Exactly two equal figures. No third figure. No text, letters, numbers, logos, watermark, brand marks, hearts, locks, keys, chains, warning signs, checkmarks, crosses, surveillance imagery, or romantic symbols. Do not assign age, gender, hierarchy, dependency, or fixed social roles. Do not make stricter confidentiality, contextual sharing, asking permission, anonymous consultation, per-photo consent, prior agreement, early notice, waiting until confirmed, immediate boundary-setting, or delayed boundary-setting look safer, kinder, more moral, or superior.
 ```
 
-## 15. 新しい診断へ展開する手順
+## 15. 「家族との休日：今と理想」生成プロンプト
+
+```text
+Use case: stylized-concept
+Asset type: 16:9 diagnosis card thumbnail for a web application
+Primary request: Create a polished neutral 3D paper-cut/clay-style illustration representing both how a family currently spends time together on holidays and how they would like to spend that time, without presenting either as better.
+Scene/backdrop: A calm abstract home-and-holiday setting with a centered reversible-card motif made from two softly layered matching panels. Around it, balanced symbols suggest shared time: a simple home outline, a round dining table, two equal conversation shapes, and a small blank activity tile. The two panels represent current behavior and desired experience but must have equal prominence and no labels.
+Subject: An inclusive abstract group of three equal rounded tokens arranged around an open circle, without fixed ages, genders, hierarchy, or family roles. Include a separate nearby resting space so time together and individual time both look comfortable and valid.
+Style/medium: Soft layered 3D paper-cut and clay render matching a premium editorial app illustration.
+Composition/framing: Wide 16:9, centered, clear silhouettes, important objects away from edges, suitable for a small card crop. Keep both sides of the reversible-card motif equal in size, lighting, contrast, and visual weight.
+Lighting/mood: Warm soft studio lighting, calm, reflective, caring, and welcoming.
+Color palette: Deep navy background, muted slate blue, warm cream, coral accents, small golden accents; consistent with the existing me-builder diagnosis thumbnails.
+Materials/textures: Matte paper and soft clay, subtle depth and shadows.
+Constraints: No text, letters, numbers, logos, watermark, brand marks, arrows, rankings, checkmarks, crosses, or a highlighted correct side. Do not imply a stereotyped nuclear family, specific age, gender, culture, religion, cohabitation, or that spending more or less time together is morally superior. Current behavior and desired experience must remain visually equal.
+```
+
+## 16. 新しい診断へ展開する手順
 
 1. §4の`Primary request`、`Scene/backdrop`、`Subject`を新しい診断のテーマへ置き換える
 2. §3の共通スタイルと`Composition/framing`、`Constraints`を維持する

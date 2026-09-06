@@ -169,6 +169,7 @@ describe("buildCompatibilitySharePreviewThemes", () => {
               score: 100,
               coverage: 100,
               band: "high",
+              relationshipRequest: "一緒に過ごす時間を作ってもらえるとうれしいです。",
               behavior: { score: 0, coverage: 100, band: "low" },
               comparison: { difference: 100, relation: "desired_higher" },
             },
@@ -180,6 +181,7 @@ describe("buildCompatibilitySharePreviewThemes", () => {
     expect(theme?.parameters[0]).toMatchObject({
       position: 100,
       statement: "「家族との時間を優先する」傾向があります",
+      request: "一緒に過ごす時間を作ってもらえるとうれしいです。",
     });
   });
 });
