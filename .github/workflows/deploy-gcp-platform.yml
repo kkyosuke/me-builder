@@ -140,16 +140,13 @@ jobs:
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          identity_platform_tenant_id="$(pulumi -C infra/gcp-platform stack output identityPlatformTenantId --stack "${TARGET}" 2>/dev/null || true)"
           {
             echo "### GCP platform ${OPERATION}: ${TARGET}"
             echo
             echo "- Project ID: \`${GCP_PLATFORM_PROJECT_ID}\`"
             echo "- Project: \`Existing project\`"
             echo "- Environment: \`${TARGET}\`"
-            if [ -n "${identity_platform_tenant_id}" ]; then
-              echo "- Identity Platform tenant ID: \`${identity_platform_tenant_id}\`"
-            fi
+            echo "- Runtime SSO settings: environment-scoped Secret Manager"
             echo "- Operation: \`${OPERATION}\`"
             echo "- Workflow run: [open run](${RUN_URL})"
           } >> "${GITHUB_STEP_SUMMARY}"
