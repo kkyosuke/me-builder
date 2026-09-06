@@ -139,7 +139,7 @@ export function ProfileSettingsScreen({
 
   const planDate =
     entitlement?.status === "success"
-      ? entitlement.data.source === "free"
+      ? entitlement.data.source === "free" || entitlement.data.source === "development"
         ? { label: "AI利用枠リセット", value: entitlement.data.aiReply.resetsAt }
         : {
             label: "利用可能期限",
@@ -348,9 +348,11 @@ export function ProfileSettingsScreen({
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {entitlement.data.status === "safe-default"
                           ? "確認中（Free権限で利用中）"
-                          : entitlement.data.status === "free"
-                            ? "無料プラン"
-                            : "契約中"}
+                          : entitlement.data.source === "development"
+                            ? "開発環境"
+                            : entitlement.data.status === "free"
+                              ? "無料プラン"
+                              : "契約中"}
                       </p>
                     </div>
                     <dl className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -398,7 +400,8 @@ export function ProfileSettingsScreen({
                     onClick={onOpenBillingPlans}
                     className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl bg-violet-700 px-4 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
                   >
-                    {entitlement.data.source === "subscription"
+                    {entitlement.data.source === "subscription" ||
+                    entitlement.data.source === "development"
                       ? "料金プランを比較"
                       : "プランをアップグレードする"}
                     <ChevronRight className="size-5" aria-hidden="true" />

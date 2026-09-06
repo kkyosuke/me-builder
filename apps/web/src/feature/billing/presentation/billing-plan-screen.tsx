@@ -61,6 +61,8 @@ export function BillingPlanScreen({
   const paidSubscription =
     entitlement.status === "success" && entitlement.data.source === "subscription";
   const familySeat = entitlement.status === "success" && entitlement.data.source === "family-seat";
+  const developmentAccess =
+    entitlement.status === "success" && entitlement.data.source === "development";
   const safeDefault =
     entitlement.status === "success" && entitlement.data.status === "safe-default";
   const currentPlan = entitlement.status === "success" ? entitlement.data.plan : "free";
@@ -86,7 +88,10 @@ export function BillingPlanScreen({
           .slice(0, -1)
       : [];
   const goalCheckUnavailable =
-    selectedPlanIsDowngrade && selected?.code === "lite" && goalFollowUps.status !== "success";
+    !developmentAccess &&
+    selectedPlanIsDowngrade &&
+    selected?.code === "lite" &&
+    goalFollowUps.status !== "success";
 
   useEffect(() => {
     backButtonRef.current?.focus();
@@ -223,6 +228,15 @@ export function BillingPlanScreen({
                 解決しない場合は問い合わせる
               </a>
             </div>
+          </section>
+        )}
+
+        {paidPlansAvailable && developmentAccess && (
+          <section className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-950 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100">
+            <h2 className="font-bold">開発環境ではFullを利用できます</h2>
+            <p className="mt-2 text-sm">
+              この環境では請求状態にかかわらずFullの機能が有効です。購入やプラン変更は行いません。
+            </p>
           </section>
         )}
 
@@ -435,6 +449,7 @@ export function BillingPlanScreen({
         {paidPlansAvailable &&
           selected &&
           !familySeat &&
+          !developmentAccess &&
           !safeDefault &&
           entitlement.status === "success" && (
             <>

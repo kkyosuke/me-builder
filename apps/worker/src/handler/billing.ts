@@ -97,7 +97,10 @@ export async function processBillingMessage(
       await reconcileFamilyPack(db, projectedAccountId);
       if (!accountData) throw new Error("ACCOUNT_DATA_BINDING_MISSING");
       const entitlement = await new billing.EntitlementService(
-        new billing.FamilyAwareAccountPlanAssignmentProvider(db),
+        billing.accountPlanAssignmentProviderForEnvironment(
+          config.environment,
+          new billing.FamilyAwareAccountPlanAssignmentProvider(db),
+        ),
       ).resolve(projectedAccountId);
       const activeLimit =
         entitlement.policy.goalFollowUp === "none"

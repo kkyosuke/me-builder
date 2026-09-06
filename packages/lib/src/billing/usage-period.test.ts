@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { FakeAccountPlanAssignmentProvider } from "./account-plan-assignment";
+import {
+  DevelopmentFullPlanAssignmentProvider,
+  FakeAccountPlanAssignmentProvider,
+} from "./account-plan-assignment";
 import { EntitlementService } from "./entitlement";
 import { resolveEntitlementUsagePeriod } from "./usage-period";
 
@@ -37,6 +40,25 @@ describe("resolveEntitlementUsagePeriod", () => {
       key: "assignment-month:2026-01-31T10:30:00.000Z:1",
       start: new Date("2026-02-28T10:30:00.000Z"),
       end: new Date("2026-03-31T10:30:00.000Z"),
+    });
+  });
+
+  it("開発用FullのAI返信をUTC暦月へ解決する", async () => {
+    const at = new Date("2026-08-15T12:00:00.000Z");
+    const entitlement = await new EntitlementService(
+      new DevelopmentFullPlanAssignmentProvider(),
+    ).resolve("account-1", at);
+
+    expect(entitlement).toMatchObject({
+      plan: "full",
+      source: "development",
+      resolution: "assignment",
+      policy: { aiReply: { limit: 600 } },
+    });
+    expect(resolveEntitlementUsagePeriod(entitlement, "ai-reply", at)).toEqual({
+      key: "free-month:2026-08",
+      start: new Date("2026-08-01T00:00:00.000Z"),
+      end: new Date("2026-09-01T00:00:00.000Z"),
     });
   });
 });

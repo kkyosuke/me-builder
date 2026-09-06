@@ -18,7 +18,7 @@ const UsageSchema = v.object({
 const ResponseSchema = v.object({
   status: v.picklist(["free", "active", "safe-default"]),
   plan: v.picklist(["free", "lite", "full", "family"]),
-  source: v.picklist(["free", "subscription", "family-seat"]),
+  source: v.picklist(["free", "subscription", "family-seat", "development"]),
   effectiveAt: v.pipe(v.string(), v.isoTimestamp()),
   availableUntil: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   aiReply: UsageSchema,

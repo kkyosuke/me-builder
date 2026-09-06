@@ -6279,7 +6279,7 @@ export interface operations {
             /** @enum {string} */
             plan: "free" | "lite" | "full" | "family";
             /** @enum {string} */
-            source: "free" | "subscription" | "family-seat";
+            source: "free" | "subscription" | "family-seat" | "development";
             /** Format: date-time */
             effectiveAt: string;
             availableUntil: string | null;

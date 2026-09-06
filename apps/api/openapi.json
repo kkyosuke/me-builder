@@ -8142,7 +8142,7 @@
                       "type": "string"
                     },
                     "source": {
-                      "enum": ["free", "subscription", "family-seat"],
+                      "enum": ["free", "subscription", "family-seat", "development"],
                       "type": "string"
                     },
                     "effectiveAt": {

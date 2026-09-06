@@ -56,6 +56,10 @@ flowchart LR
 
 Account不一致、不明なPlan・付与元、不正な日時、適用開始前、期限切れ、provider障害は、有料権限を推測せずFreeへ倒します。ファミリー席はFamily plan、本人とは異なる支払者Account、`family-seat`付与元が揃った場合だけファミリー由来として解決します。原因分類は運用上の区別に使い、決済事業者固有の状態を機能側へ公開しません。
 
+ローカル開発環境（`ENVIRONMENT=development | local`）では、決済データの有無にかかわらず全AccountへFullのpolicyを適用します。APIとWorkerは共通の開発用`AccountPlanAssignmentProvider`から、付与元`development`、期限なしの合成割当を解決します。この割当は共有D1やStripeへ保存せず、支払者Accountを持たず、AI利用期間はUTC暦月とします。テストが明示的に注入したproviderを優先し、Plan別の自動検証を維持します。
+
+この上書きはLocalだけに限定します。共有PreviewはStripe sandboxからのPlan収束を検証する環境であるため適用せず、Productionも契約projectionを唯一の有料Plan付与元とします。
+
 ### 3.2 AI利用量ledger
 
 AI返信とプロフィール要約は、生成開始前に共通Entitlementから得た期間・上限でAccountDataへ利用枠を予約します。利用者へ正常に返した処理だけを確定し、開始前の中止は解放します。request IDを冪等keyにするため、QueueやRPCのretryで二重消費しません。

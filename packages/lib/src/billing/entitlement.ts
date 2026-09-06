@@ -183,6 +183,14 @@ function validateAssignment(
       return "invalid-assignment";
     }
   }
+  if (
+    assignment.source === "development" &&
+    (assignment.plan !== "full" ||
+      assignment.availableUntil !== null ||
+      assignment.payerAccountId !== null)
+  ) {
+    return "invalid-assignment";
+  }
   if (assignment.plan !== "free" && assignment.source === "free") {
     return "invalid-assignment";
   }

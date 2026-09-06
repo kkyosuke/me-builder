@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { FakeAccountPlanAssignmentProvider } from "./account-plan-assignment";
+import {
+  DevelopmentFullPlanAssignmentProvider,
+  FakeAccountPlanAssignmentProvider,
+  accountPlanAssignmentProviderForEnvironment,
+} from "./account-plan-assignment";
 
 describe("FakeAccountPlanAssignmentProvider", () => {
   it("returns a provider-independent assignment", async () => {
@@ -32,4 +36,36 @@ describe("FakeAccountPlanAssignmentProvider", () => {
       payerAccountId: null,
     });
   });
+});
+
+describe("DevelopmentFullPlanAssignmentProvider", () => {
+  it("任意のAccountへ期限なしのFull開発割当を返す", async () => {
+    const provider = new DevelopmentFullPlanAssignmentProvider();
+
+    await expect(provider.findCurrent("account-1")).resolves.toEqual({
+      accountId: "account-1",
+      plan: "full",
+      source: "development",
+      effectiveAt: "1970-01-01T00:00:00.000Z",
+      availableUntil: null,
+      payerAccountId: null,
+    });
+  });
+
+  it.each(["development", "local"])("%sでは開発用Full providerへ差し替える", (environment) => {
+    const fallback = new FakeAccountPlanAssignmentProvider();
+
+    expect(accountPlanAssignmentProviderForEnvironment(environment, fallback)).toBeInstanceOf(
+      DevelopmentFullPlanAssignmentProvider,
+    );
+  });
+
+  it.each(["preview", "production", "test", undefined])(
+    "%sでは指定されたproviderを維持する",
+    (environment) => {
+      const fallback = new FakeAccountPlanAssignmentProvider();
+
+      expect(accountPlanAssignmentProviderForEnvironment(environment, fallback)).toBe(fallback);
+    },
+  );
 });
