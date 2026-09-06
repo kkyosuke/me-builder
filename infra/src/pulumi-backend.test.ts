@@ -199,6 +199,7 @@ describe("requirePulumiGcsBackend", () => {
     for (const workflow of [previewWorkflow, productionWorkflow]) {
       expect(workflow).toContain("BASE_URL: https://api.${{ vars.BASE_DOMAIN }}");
       expect(workflow).toContain("WEB_ORIGIN: https://${{ vars.BASE_DOMAIN }}");
+      expect(workflow).not.toMatch(/^ {6}BASE_URL:/mu);
     }
     expect(resetWorkflow).toContain("environment: development");
     expect(resetWorkflow).toContain("environment: infra");
