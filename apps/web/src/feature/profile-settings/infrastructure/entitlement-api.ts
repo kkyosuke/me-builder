@@ -22,6 +22,7 @@ const ResponseSchema = v.object({
   effectiveAt: v.pipe(v.string(), v.isoTimestamp()),
   availableUntil: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   aiReply: UsageSchema,
+  capabilities: v.object({ familySeats: v.boolean(), accountRecovery: v.boolean() }),
 }) satisfies v.GenericSchema<ApiResponse>;
 
 export async function fetchProfileEntitlement(

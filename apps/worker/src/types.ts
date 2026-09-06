@@ -30,6 +30,7 @@ export type Env = Omit<
   | "PHOTO_DIARY_DELETION_QUEUE"
 > & {
   ENVIRONMENT?: string;
+  ENTITLEMENT_CATALOG?: string;
   AVATAR_BUCKET?: WorkerBindings["AVATAR_BUCKET"];
   AVATAR_CLEANUP_MODE?: "dry-run" | "delete";
   PHOTO_DIARY_BUCKET?: WorkerBindings["PHOTO_DIARY_BUCKET"];

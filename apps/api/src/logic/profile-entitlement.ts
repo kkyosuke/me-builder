@@ -49,6 +49,10 @@ export async function getProfileEntitlement({
     effectiveAt: entitlement.effectiveAt,
     availableUntil: entitlement.availableUntil,
     aiReply: usageResponse(aiReply),
+    capabilities: {
+      familySeats: entitlement.policy.familySeatLimit > 0,
+      accountRecovery: entitlement.policy.accountRecovery,
+    },
   };
 }
 

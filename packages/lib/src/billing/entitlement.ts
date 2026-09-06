@@ -1,4 +1,3 @@
-import { AI_REPLY_MONTHLY_LIMITS } from "@me-builder/shared";
 import {
   type AccountPlanAssignment,
   type AccountPlanAssignmentProvider,
@@ -9,107 +8,14 @@ import {
   planCodes,
 } from "./account-plan-assignment";
 
+import {
+  type EntitlementCatalog,
+  type EntitlementPolicy,
+  entitlementPolicy,
+} from "./entitlement-policy";
+
+export * from "./entitlement-policy";
 export { AI_REPLY_MONTHLY_LIMITS } from "@me-builder/shared";
-
-export const entitlementFeatures = [
-  "weekly-reflection",
-  "monthly-change",
-  "goal-follow-up",
-  "personalized-self-care",
-  "relationship-reflection",
-] as const;
-export type EntitlementFeature = (typeof entitlementFeatures)[number];
-
-export type EntitlementPolicy = Readonly<{
-  aiReply: Readonly<{ limit: number; period: "assignment-month" }>;
-  semanticSearchDays: number | null;
-  relationshipQuestionContext: "current-message" | "session-and-diagnosis" | "confirmed-history";
-  monthlyChange: "none" | "brief" | "full";
-  goalFollowUp: "none" | "selected-one" | "relevant-active";
-  selfCareContext: "general" | "confirmed" | "personalized-history";
-  /** 同じfamily pack内を除く、同時に振り返りを割り当てられる外部関係数。 */
-  concurrentRelationshipLimit: number;
-  /** 双方のpayerAccountIdが一致するfamily参加者間を、外部関係枠を消費せず利用対象に含める。 */
-  familyPackInternalRelationshipsIncluded: boolean;
-  /** 支払者が管理できるactiveなfamily席数。 */
-  familySeatLimit: number;
-  features: Readonly<Record<EntitlementFeature, boolean>>;
-}>;
-
-const policies = {
-  free: {
-    aiReply: { limit: AI_REPLY_MONTHLY_LIMITS.free, period: "assignment-month" },
-    semanticSearchDays: 30,
-    relationshipQuestionContext: "current-message",
-    monthlyChange: "none",
-    goalFollowUp: "none",
-    selfCareContext: "general",
-    concurrentRelationshipLimit: 0,
-    familyPackInternalRelationshipsIncluded: false,
-    familySeatLimit: 0,
-    features: {
-      "weekly-reflection": false,
-      "monthly-change": false,
-      "goal-follow-up": false,
-      "personalized-self-care": false,
-      "relationship-reflection": false,
-    },
-  },
-  lite: {
-    aiReply: { limit: AI_REPLY_MONTHLY_LIMITS.lite, period: "assignment-month" },
-    semanticSearchDays: 365,
-    relationshipQuestionContext: "session-and-diagnosis",
-    monthlyChange: "brief",
-    goalFollowUp: "selected-one",
-    selfCareContext: "confirmed",
-    concurrentRelationshipLimit: 1,
-    familyPackInternalRelationshipsIncluded: false,
-    familySeatLimit: 0,
-    features: {
-      "weekly-reflection": true,
-      "monthly-change": true,
-      "goal-follow-up": true,
-      "personalized-self-care": true,
-      "relationship-reflection": true,
-    },
-  },
-  full: {
-    aiReply: { limit: AI_REPLY_MONTHLY_LIMITS.full, period: "assignment-month" },
-    semanticSearchDays: null,
-    relationshipQuestionContext: "confirmed-history",
-    monthlyChange: "full",
-    goalFollowUp: "relevant-active",
-    selfCareContext: "personalized-history",
-    concurrentRelationshipLimit: 5,
-    familyPackInternalRelationshipsIncluded: false,
-    familySeatLimit: 0,
-    features: {
-      "weekly-reflection": true,
-      "monthly-change": true,
-      "goal-follow-up": true,
-      "personalized-self-care": true,
-      "relationship-reflection": true,
-    },
-  },
-  family: {
-    aiReply: { limit: AI_REPLY_MONTHLY_LIMITS.family, period: "assignment-month" },
-    semanticSearchDays: null,
-    relationshipQuestionContext: "confirmed-history",
-    monthlyChange: "full",
-    goalFollowUp: "relevant-active",
-    selfCareContext: "personalized-history",
-    concurrentRelationshipLimit: 5,
-    familyPackInternalRelationshipsIncluded: true,
-    familySeatLimit: 4,
-    features: {
-      "weekly-reflection": true,
-      "monthly-change": true,
-      "goal-follow-up": true,
-      "personalized-self-care": true,
-      "relationship-reflection": true,
-    },
-  },
-} as const satisfies Readonly<Record<PlanCode, EntitlementPolicy>>;
 
 export const entitlementFallbackReasons = [
   "provider-unavailable",
@@ -142,7 +48,13 @@ export class EntitlementService {
       const assignment = await this.assignmentProvider.findCurrent(accountId, at);
       const invalidReason = validateAssignment(assignment, accountId, at);
       if (invalidReason !== null) return safeDefault(accountId, at, invalidReason);
-      return resolved(assignment, at, "assignment", null);
+      return resolved(
+        assignment,
+        at,
+        "assignment",
+        null,
+        this.assignmentProvider.entitlementCatalog,
+      );
     } catch {
       return safeDefault(accountId, at, "provider-unavailable");
     }
@@ -216,11 +128,12 @@ function resolved(
   at: Date,
   resolution: ResolvedEntitlement["resolution"],
   fallbackReason: EntitlementFallbackReason | null,
+  catalog: EntitlementCatalog = "standard",
 ): ResolvedEntitlement {
   return Object.freeze({
     ...assignment,
     grantedByFamily: assignment.source === "family-seat",
-    policy: policies[assignment.plan],
+    policy: entitlementPolicy(assignment.plan, catalog),
     resolution,
     fallbackReason,
     resolvedAt: at.toISOString(),

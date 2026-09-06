@@ -1,3 +1,4 @@
+import { billing } from "@me-builder/lib";
 import { resolveLiffConfiguration } from "@me-builder/lib/line/liff-configuration";
 import { getEnv, logger, parseAdminLineUserIds } from "@me-builder/shared";
 import * as v from "valibot";
@@ -87,6 +88,10 @@ export function getWorkerConfig(env?: Record<string, unknown>): WorkerConfig {
 
   const rawConfig = {
     environment: rawEnvironment,
+    entitlementCatalog: billing.entitlementCatalogForEnvironment(
+      rawEnvironment,
+      getEnv("ENTITLEMENT_CATALOG", env),
+    ),
     baseDomain: rawBaseDomain,
     baseUrl: rawBaseUrl,
     apiUrl: rawApiUrl,

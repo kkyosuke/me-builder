@@ -94,12 +94,16 @@ export async function processBillingMessage(
       resolvePlan: (priceId) => (priceId ? (config.billingPricePlanMap[priceId] ?? null) : null),
     });
     if (projectedAccountId) {
-      await reconcileFamilyPack(db, projectedAccountId);
+      await reconcileFamilyPack(db, projectedAccountId, new Date(), config.entitlementCatalog);
       if (!accountData) throw new Error("ACCOUNT_DATA_BINDING_MISSING");
       const entitlement = await new billing.EntitlementService(
-        billing.accountPlanAssignmentProviderForEnvironment(
-          config.environment,
-          new billing.FamilyAwareAccountPlanAssignmentProvider(db),
+        new billing.FamilyAwareAccountPlanAssignmentProvider(
+          db,
+          billing.accountPlanAssignmentProviderForEnvironment(
+            config.environment,
+            new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db),
+            config.entitlementCatalog,
+          ),
         ),
       ).resolve(projectedAccountId);
       const activeLimit =
@@ -190,6 +194,7 @@ export async function reconcileFamilyPack(
   db: D1.shared.Client,
   accountId: string,
   at = new Date(),
+  catalog: billing.EntitlementCatalog = "standard",
 ): Promise<void> {
   const assignment = await new D1.shared.action.billing.D1AccountPlanAssignmentProvider(
     db,
@@ -198,5 +203,7 @@ export async function reconcileFamilyPack(
     await D1.shared.action.familySeat.createFamilyPack(db, accountId, at);
     return;
   }
-  await D1.shared.action.familySeat.endFamilyPack(db, accountId, at);
+  if (!billing.entitlementPolicy(assignment.plan, catalog).familyPackWithoutSubscription) {
+    await D1.shared.action.familySeat.endFamilyPack(db, accountId, at);
+  }
 }

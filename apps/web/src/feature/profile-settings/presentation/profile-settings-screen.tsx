@@ -383,7 +383,7 @@ export function ProfileSettingsScreen({
                     </dd>
                   </div>
                 </dl>
-                {entitlement.data.plan === "family" && onOpenFamily && (
+                {entitlement.data.capabilities.familySeats && onOpenFamily && (
                   <button
                     type="button"
                     onClick={onOpenFamily}

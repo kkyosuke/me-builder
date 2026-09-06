@@ -59,7 +59,7 @@
 | [MCP連携設計](../docs/architecture/mcp-integration-design.md) | 管理者限定MCPのtransport、認証・認可、同意、開示、監査、解除、仕様更新と停止境界 |
 | [LINE写真日記入力設計](../docs/architecture/photo-diary-input-design.md) | LINE写真日記の取得、検証、原本・派生物、容量、安全性、AI利用、削除の境界 |
 | [Web認証・アプリケーションセッション設計](../docs/architecture/web-authentication-design.md) | LIFF／SSOの入口選択、外部Identity検証、Account解決、provider非依存session、認証と認可の境界、移行順序 |
-| [課金・Plan紐付け実装設計](../docs/architecture/billing-implementation-design.md) | Stripe、Billing Queue、共有D1、AccountPlanAssignmentの境界と収束原則 |
+| [課金・Plan紐付け実装設計](../docs/architecture/billing-implementation-design.md) | Stripe、Billing Queue、共有D1、AccountPlanAssignmentの境界と収束原則、環境別の利用権限解決 |
 | [Account復旧設計](../docs/architecture/account-recovery-design.md) | LINE Account喪失時の復旧資格情報、Identity再接続、監査、復旧不能時の境界 |
 | [Accountデータ分離設計](../docs/architecture/account-data-isolation.md) | 1 Account = 1 AccountData DO、保存先の判定規則、内部module、共有D1が保存するもの |
 | [相性共有データ実装設計](../docs/architecture/compatibility-data-design.md) | CompatibilityData DO、AccountData一覧参照、相手単位の継続同意、状態遷移、migration規則 |

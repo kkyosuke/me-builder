@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  DevelopmentFullPlanAssignmentProvider,
   FakeAccountPlanAssignmentProvider,
   accountPlanAssignmentProviderForEnvironment,
 } from "./account-plan-assignment";
@@ -38,34 +37,52 @@ describe("FakeAccountPlanAssignmentProvider", () => {
   });
 });
 
-describe("DevelopmentFullPlanAssignmentProvider", () => {
-  it("任意のAccountへ期限なしのFull開発割当を返す", async () => {
-    const provider = new DevelopmentFullPlanAssignmentProvider();
+describe("environment plan mapping", () => {
+  it.each(["development", "local", "dev", "preview"])(
+    "%sは実Planを維持し開発catalogを選択する",
+    async (environment) => {
+      const fallback = new FakeAccountPlanAssignmentProvider();
+      const provider = accountPlanAssignmentProviderForEnvironment(environment, fallback);
+      expect(provider.entitlementCatalog).toBe("development");
+      await expect(provider.findCurrent("account-1")).resolves.toMatchObject({
+        plan: "free",
+        source: "free",
+      });
+    },
+  );
 
-    await expect(provider.findCurrent("account-1")).resolves.toEqual({
-      accountId: "account-1",
-      plan: "full",
-      source: "development",
-      effectiveAt: "1970-01-01T00:00:00.000Z",
-      availableUntil: null,
-      payerAccountId: null,
-    });
-  });
-
-  it.each(["development", "local"])("%sでは開発用Full providerへ差し替える", (environment) => {
-    const fallback = new FakeAccountPlanAssignmentProvider();
-
-    expect(accountPlanAssignmentProviderForEnvironment(environment, fallback)).toBeInstanceOf(
-      DevelopmentFullPlanAssignmentProvider,
-    );
-  });
-
-  it.each(["preview", "production", "test", undefined])(
-    "%sでは指定されたproviderを維持する",
+  it.each(["production", "test", "unknown", undefined])(
+    "%sでは通常catalogを維持する",
     (environment) => {
       const fallback = new FakeAccountPlanAssignmentProvider();
-
       expect(accountPlanAssignmentProviderForEnvironment(environment, fallback)).toBe(fallback);
     },
   );
+
+  it("課金検証の明示設定は開発環境でも通常catalogへ戻せる", () => {
+    const fallback = new FakeAccountPlanAssignmentProvider();
+    expect(accountPlanAssignmentProviderForEnvironment("preview", fallback, "standard")).toBe(
+      fallback,
+    );
+  });
+
+  it.each(["production", "unknown", undefined])("%sで開発catalogを指定できない", (environment) => {
+    expect(() =>
+      accountPlanAssignmentProviderForEnvironment(
+        environment,
+        new FakeAccountPlanAssignmentProvider(),
+        "development",
+      ),
+    ).toThrow("Invalid ENTITLEMENT_CATALOG");
+  });
+
+  it("不明なcatalog名を拒否する", () => {
+    expect(() =>
+      accountPlanAssignmentProviderForEnvironment(
+        "local",
+        new FakeAccountPlanAssignmentProvider(),
+        "typo",
+      ),
+    ).toThrow("Invalid ENTITLEMENT_CATALOG");
+  });
 });

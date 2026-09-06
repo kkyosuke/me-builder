@@ -7,6 +7,7 @@ export const DEFAULT_CHAT_CONTEXT_MESSAGE_LIMIT = 20;
 
 export const WorkerConfigSchema = v.object({
   environment: v.optional(v.string(), "development"),
+  entitlementCatalog: v.optional(v.picklist(["standard", "development"])),
   baseDomain: v.optional(v.string()),
   baseUrl: v.optional(v.string()),
   apiUrl: v.optional(v.string()),

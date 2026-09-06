@@ -64,6 +64,10 @@ export class FamilyAwareAccountPlanAssignmentProvider implements AccountPlanAssi
     this.#family = new FamilySeatAccountPlanAssignmentProvider(db, primary);
   }
 
+  get entitlementCatalog() {
+    return this.#primary.entitlementCatalog ?? "standard";
+  }
+
   async findCurrent(accountId: string, at = new Date()): Promise<AccountPlanAssignment> {
     const results = await Promise.allSettled([
       this.#primary.findCurrent(accountId, at),

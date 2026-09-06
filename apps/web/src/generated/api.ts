@@ -6341,6 +6341,10 @@ export interface operations {
               /** Format: date-time */
               resetsAt: string;
             };
+            capabilities: {
+              familySeats: boolean;
+              accountRecovery: boolean;
+            };
           };
         };
       };

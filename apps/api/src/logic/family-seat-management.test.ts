@@ -1,5 +1,5 @@
 import path from "node:path";
-import { D1 } from "@me-builder/lib";
+import { D1, billing } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -229,4 +229,95 @@ describe("family seat API authorization", () => {
       seat: { status: "left" },
     });
   });
+});
+
+describe("開発catalogのファミリー管理", () => {
+  it.each(["local", "preview"])(
+    "%sで契約なしに招待・参加・退出でき、実PlanはFreeを維持する",
+    async (environment) => {
+      const db = createTestDb();
+      const payer = await account(db, "development-payer");
+      const member = await account(db, "development-member");
+      const provider = billing.accountPlanAssignmentProviderForEnvironment(
+        environment,
+        new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db),
+      );
+      const payerParams = { ...params(db, payer), planAssignmentProvider: provider };
+      const memberParams = { ...params(db, member), planAssignmentProvider: provider };
+      expect(await getFamilySeatManagement(payerParams)).toEqual({
+        type: "resolved",
+        role: "payer",
+        maxSeats: 4,
+        seats: [],
+      });
+      expect(await D1.shared.action.familySeat.readFamilyPackByPayer(db, payer)).toBeNull();
+      const issued = await issueFamilySeatInvitation(payerParams, at());
+      if (issued.type !== "created") throw new Error("invitation was not created");
+      expect(
+        await acceptFamilyInvitation({ ...memberParams, token: issued.token }, at()),
+      ).toMatchObject({ type: "updated", seat: { status: "active" } });
+      expect(await issueFamilySeatInvitation(memberParams, at())).toEqual({
+        type: "no-membership",
+      });
+      expect(await getFamilySeatManagement(memberParams)).toMatchObject({ role: "member" });
+      const service = new billing.EntitlementService(
+        new billing.FamilyAwareAccountPlanAssignmentProvider(db, provider),
+      );
+      for (const id of [payer, member]) {
+        expect(await service.resolve(id)).toMatchObject({
+          plan: "free",
+          source: "free",
+          policy: { familySeatLimit: 4 },
+        });
+      }
+      expect(await db.query.billingSubscriptionProjections.findMany()).toEqual([]);
+      expect(await db.query.billingTrialUsages.findMany()).toEqual([]);
+      expect(await leaveFamilyPack(memberParams, at())).toMatchObject({
+        type: "updated",
+        seat: { status: "left" },
+      });
+    },
+  );
+
+  it.each(["production", "test"])("%sのFreeではpackを作成しない", async (environment) => {
+    const db = createTestDb();
+    const payer = await account(db, "normal-payer");
+    const planAssignmentProvider = billing.accountPlanAssignmentProviderForEnvironment(
+      environment,
+      new billing.FakeAccountPlanAssignmentProvider(),
+    );
+    const input = { ...params(db, payer), planAssignmentProvider };
+    expect(await getFamilySeatManagement(input)).toEqual({ type: "no-membership" });
+    expect(await issueFamilySeatInvitation(input, at())).toEqual({ type: "no-membership" });
+    expect(await D1.shared.action.familySeat.readFamilyPackByPayer(db, payer)).toBeNull();
+  });
+});
+
+it("通常catalogへ戻した後は開発用packから新たな権限を付与しない", async () => {
+  const db = createTestDb();
+  const payer = await account(db, "switched-payer");
+  const member = await account(db, "switched-member");
+  const base = new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db);
+  const dev = billing.accountPlanAssignmentProviderForEnvironment("preview", base);
+  const issued = await issueFamilySeatInvitation(
+    { ...params(db, payer), planAssignmentProvider: dev },
+    at(),
+  );
+  if (issued.type !== "created") throw new Error("invitation was not created");
+  const standard = billing.accountPlanAssignmentProviderForEnvironment("preview", base, "standard");
+  expect(
+    await getFamilySeatManagement({ ...params(db, payer), planAssignmentProvider: standard }),
+  ).toEqual({ type: "no-membership" });
+  expect(
+    await issueFamilySeatInvitation(
+      { ...params(db, payer), planAssignmentProvider: standard },
+      at(),
+    ),
+  ).toEqual({ type: "no-membership" });
+  expect(
+    await acceptFamilyInvitation(
+      { ...params(db, member), planAssignmentProvider: standard, token: issued.token },
+      at(),
+    ),
+  ).toEqual({ type: "forbidden" });
 });

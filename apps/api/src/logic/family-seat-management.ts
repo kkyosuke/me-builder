@@ -1,4 +1,4 @@
-import { D1 } from "@me-builder/lib";
+import { D1, billing } from "@me-builder/lib";
 import { inArray } from "drizzle-orm";
 import type { AuthenticatedActor } from "./authentication/types";
 
@@ -15,6 +15,7 @@ export type PublicFamilySeat = Readonly<{
 type Params = Readonly<{
   actor: AuthenticatedActor;
   db: D1.shared.Client;
+  planAssignmentProvider?: billing.AccountPlanAssignmentProvider;
 }>;
 
 type Dependencies = Readonly<{ now: () => Date }>;
@@ -49,6 +50,18 @@ async function hashFamilyInvitationToken(token: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+async function familyPolicy(
+  params: Params,
+  at = new Date(),
+  accountId = params.actor.accountId,
+): Promise<billing.EntitlementPolicy | undefined> {
+  if (!params.planAssignmentProvider) return undefined;
+  const entitlement = await new billing.EntitlementService(
+    new billing.FamilyAwareAccountPlanAssignmentProvider(params.db, params.planAssignmentProvider),
+  ).resolve(accountId, at);
+  return entitlement.policy;
+}
+
 export async function getFamilySeatManagement(params: Params): Promise<
   | Readonly<{
       type: "resolved";
@@ -58,6 +71,8 @@ export async function getFamilySeatManagement(params: Params): Promise<
     }>
   | Readonly<{ type: "no-membership" }>
 > {
+  const policy = await familyPolicy(params);
+  if (policy && policy.familySeatLimit === 0) return { type: "no-membership" };
   const payerPack = await D1.shared.action.familySeat.readFamilyPackByPayer(
     params.db,
     params.actor.accountId,
@@ -112,7 +127,9 @@ export async function getFamilySeatManagement(params: Params): Promise<
           ),
         ],
       }
-    : { type: "no-membership" };
+    : policy?.familyPackWithoutSubscription
+      ? { type: "resolved", role: "payer", maxSeats: 4, seats: [] }
+      : { type: "no-membership" };
 }
 
 export async function issueFamilySeatInvitation(
@@ -122,10 +139,20 @@ export async function issueFamilySeatInvitation(
   | Readonly<{ type: "created"; token: string; expiresAt: string; seat: PublicFamilySeat }>
   | Readonly<{ type: "no-membership" | "capacity-reached" }>
 > {
+  const at = dependencies.now();
+  const policy = await familyPolicy(params, at);
+  if (policy && policy.familySeatLimit === 0) return { type: "no-membership" };
   const token = rawToken();
   const tokenHash = await hashFamilyInvitationToken(token);
-  const at = dependencies.now();
   const expiresAt = new Date(at.getTime() + INVITATION_TTL_MS);
+  if (policy?.familyPackWithoutSubscription) {
+    const membership = await D1.shared.action.familySeat.readActiveFamilySeatByMember(
+      params.db,
+      params.actor.accountId,
+    );
+    if (membership) return { type: "no-membership" };
+    await D1.shared.action.familySeat.createFamilyPack(params.db, params.actor.accountId, at);
+  }
   const result = await D1.shared.action.familySeat.createFamilySeatInvitation(params.db, {
     payerAccountId: params.actor.accountId,
     tokenHash,
@@ -171,9 +198,18 @@ export async function acceptFamilyInvitation(
   params: Params & Readonly<{ token: string }>,
   dependencies: Dependencies = defaults,
 ): Promise<InvitationActionOutcome> {
+  const tokenHash = await hashFamilyInvitationToken(params.token);
+  if (params.planAssignmentProvider) {
+    const invitation = await params.db.query.familySeatInvitations.findFirst({
+      where: (table, { eq }) => eq(table.tokenHash, tokenHash),
+    });
+    if (!invitation) return { type: "not-found" };
+    const policy = await familyPolicy(params, dependencies.now(), invitation.inviterAccountId);
+    if (!policy || policy.familySeatLimit === 0) return { type: "forbidden" };
+  }
   const result = await D1.shared.action.familySeat.acceptFamilySeatInvitation(
     params.db,
-    await hashFamilyInvitationToken(params.token),
+    tokenHash,
     params.actor.accountId,
     dependencies.now(),
   );

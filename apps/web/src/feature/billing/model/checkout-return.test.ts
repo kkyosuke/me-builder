@@ -10,6 +10,7 @@ const entitlement = (source: ProfileEntitlement["source"]): ProfileEntitlement =
   source,
   effectiveAt: "2026-08-16T00:00:00.000Z",
   availableUntil: source === "subscription" ? "2026-09-16T00:00:00.000Z" : null,
+  capabilities: { familySeats: false, accountRecovery: source === "subscription" },
   aiReply: {
     limit: source === "subscription" ? 150 : 60,
     used: 0,

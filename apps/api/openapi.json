@@ -8398,6 +8398,18 @@
                         "periodStartsAt",
                         "resetsAt"
                       ]
+                    },
+                    "capabilities": {
+                      "type": "object",
+                      "properties": {
+                        "familySeats": {
+                          "type": "boolean"
+                        },
+                        "accountRecovery": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["familySeats", "accountRecovery"]
                     }
                   },
                   "required": [
@@ -8406,7 +8418,8 @@
                     "source",
                     "effectiveAt",
                     "availableUntil",
-                    "aiReply"
+                    "aiReply",
+                    "capabilities"
                   ]
                 }
               }

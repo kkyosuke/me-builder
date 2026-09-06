@@ -1,3 +1,5 @@
+import { type EntitlementCatalog, entitlementCatalogForEnvironment } from "./entitlement-policy";
+
 export const planCodes = ["free", "lite", "full", "family"] as const;
 export type PlanCode = (typeof planCodes)[number];
 
@@ -8,9 +10,6 @@ export const planAssignmentSources = [
   "development",
 ] as const;
 export type PlanAssignmentSource = (typeof planAssignmentSources)[number];
-
-const LOCAL_FULL_PLAN_ENVIRONMENTS = new Set(["development", "local"]);
-const DEVELOPMENT_FULL_PLAN_EFFECTIVE_AT = "1970-01-01T00:00:00.000Z";
 
 /** Stripeなどの決済事業者の語彙を利用側へ漏らさない、現在Planの読み取り契約。 */
 export type AccountPlanAssignment = Readonly<{
@@ -23,6 +22,8 @@ export type AccountPlanAssignment = Readonly<{
 }>;
 
 export interface AccountPlanAssignmentProvider {
+  /** サーバーが選択した構成。割当の保存・契約情報には含めない。 */
+  readonly entitlementCatalog?: EntitlementCatalog;
   findCurrent(accountId: string, at?: Date): Promise<AccountPlanAssignment>;
 }
 
@@ -50,28 +51,18 @@ export class FakeAccountPlanAssignmentProvider implements AccountPlanAssignmentP
   }
 }
 
-/** Localだけで全AccountへFullを付与する、永続化を伴わない開発用provider。 */
-export class DevelopmentFullPlanAssignmentProvider implements AccountPlanAssignmentProvider {
-  async findCurrent(accountId: string): Promise<AccountPlanAssignment> {
-    return Object.freeze({
-      accountId,
-      plan: "full",
-      source: "development",
-      effectiveAt: DEVELOPMENT_FULL_PLAN_EFFECTIVE_AT,
-      availableUntil: null,
-      payerAccountId: null,
-    });
-  }
-}
-
-/** Localだけ開発用Fullへ差し替え、Preview・Productionでは実Planのproviderを保つ。 */
+/** 実Planの取得を維持し、共通Entitlementへ環境別catalogを渡す。 */
 export function accountPlanAssignmentProviderForEnvironment(
   environment: string | undefined,
   fallback: AccountPlanAssignmentProvider,
+  configuredCatalog?: string,
 ): AccountPlanAssignmentProvider {
-  return LOCAL_FULL_PLAN_ENVIRONMENTS.has(environment?.trim() ?? "")
-    ? new DevelopmentFullPlanAssignmentProvider()
-    : fallback;
+  const entitlementCatalog = entitlementCatalogForEnvironment(environment, configuredCatalog);
+  if (entitlementCatalog === "standard" && !fallback.entitlementCatalog) return fallback;
+  return {
+    entitlementCatalog,
+    findCurrent: (accountId, at) => fallback.findCurrent(accountId, at),
+  };
 }
 
 export function freePlanAssignment(accountId: string, at = new Date()): AccountPlanAssignment {

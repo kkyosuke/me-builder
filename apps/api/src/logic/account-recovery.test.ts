@@ -74,7 +74,7 @@ describe("account recovery authentication boundary", () => {
     ).resolves.toEqual({ type: "paid-contract-required" });
   });
 
-  it("開発用Fullでは契約projectionがなくても復旧コードを発行する", async () => {
+  it("開発用Freeでは契約projectionがなくても復旧コードを発行する", async () => {
     const db = createTestDb();
     const target = await D1.shared.action.account.upsertIdentity(db, {
       provider: "line_login",
@@ -89,7 +89,10 @@ describe("account recovery authentication boundary", () => {
           authenticationMethod: "liff",
           authenticatedAt: new Date("2026-08-01T00:00:00.000Z"),
         },
-        planAssignmentProvider: new billing.DevelopmentFullPlanAssignmentProvider(),
+        planAssignmentProvider: billing.accountPlanAssignmentProviderForEnvironment(
+          "local",
+          new billing.FakeAccountPlanAssignmentProvider(),
+        ),
         now: new Date("2026-08-01T00:00:00.000Z"),
       }),
     ).resolves.toMatchObject({
