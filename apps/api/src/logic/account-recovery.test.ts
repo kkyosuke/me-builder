@@ -1,10 +1,10 @@
 import path from "node:path";
-import { D1 } from "@me-builder/lib";
+import { D1, billing } from "@me-builder/lib";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vitest";
-import { recoverAccountWithCode } from "./account-recovery";
+import { issueAccountRecoveryCode, recoverAccountWithCode } from "./account-recovery";
 
 function createTestDb(): D1.shared.Client {
   const sqlite = new Database(":memory:");
@@ -53,6 +53,51 @@ async function fixture() {
 }
 
 describe("account recovery authentication boundary", () => {
+  it("Freeでは復旧コードを発行しない", async () => {
+    const db = createTestDb();
+    const target = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "free-line-identity",
+    });
+
+    await expect(
+      issueAccountRecoveryCode({
+        db,
+        actor: {
+          accountId: target.account.id,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-01T00:00:00.000Z"),
+        },
+        planAssignmentProvider: new billing.FakeAccountPlanAssignmentProvider(),
+        now: new Date("2026-08-01T00:00:00.000Z"),
+      }),
+    ).resolves.toEqual({ type: "paid-contract-required" });
+  });
+
+  it("開発用Fullでは契約projectionがなくても復旧コードを発行する", async () => {
+    const db = createTestDb();
+    const target = await D1.shared.action.account.upsertIdentity(db, {
+      provider: "line_login",
+      providerAccountId: "development-line-identity",
+    });
+
+    await expect(
+      issueAccountRecoveryCode({
+        db,
+        actor: {
+          accountId: target.account.id,
+          authenticationMethod: "liff",
+          authenticatedAt: new Date("2026-08-01T00:00:00.000Z"),
+        },
+        planAssignmentProvider: new billing.DevelopmentFullPlanAssignmentProvider(),
+        now: new Date("2026-08-01T00:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      type: "issued",
+      expiresAt: "2026-08-31T00:00:00.000Z",
+    });
+  });
+
   it("復旧対象をコードから決定し、初回成功時だけ復旧先と移管元のsessionを失効する", async () => {
     const { db, accountId, code, now } = await fixture();
     const source = await D1.shared.action.account.upsertIdentity(db, {

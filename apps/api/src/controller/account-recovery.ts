@@ -8,6 +8,7 @@ import {
   AccountRecoveryUnavailableSchema,
 } from "../contract/account-recovery";
 import { ServiceUnavailableErrorSchema, UnauthorizedErrorSchema } from "../contract/shared/errors";
+import { accountPlanAssignmentProvider } from "../infrastructure/account-plan-assignment-provider";
 import { issueAccountRecoveryCode, recoverAccountWithCode } from "../logic/account-recovery";
 import { authenticatedActor, authenticatedSession } from "../middleware/authentication";
 import type { AppEnv } from "../types";
@@ -15,9 +16,11 @@ import type { AppEnv } from "../types";
 export async function postAccountRecoveryCode(c: Context<AppEnv>): Promise<Response> {
   if (!c.env?.DB)
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
+  const db = D1.shared.client.create(c.env.DB);
   const outcome = await issueAccountRecoveryCode({
     actor: authenticatedActor(c),
-    db: D1.shared.client.create(c.env.DB),
+    db,
+    planAssignmentProvider: accountPlanAssignmentProvider(c.env, db),
   });
   if (outcome.type === "issued") {
     c.header("Cache-Control", "no-store");

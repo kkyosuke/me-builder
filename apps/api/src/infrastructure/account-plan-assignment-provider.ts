@@ -1,5 +1,4 @@
 import { D1, billing } from "@me-builder/lib";
-import { getConfig } from "../config";
 import type { AppEnv } from "../types";
 
 /** 明示したtest providerを優先し、Localだけ全AccountをFullへ差し替える。 */
@@ -9,7 +8,7 @@ export function accountPlanAssignmentProvider(
 ): billing.AccountPlanAssignmentProvider {
   if (env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER) return env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER;
   return billing.accountPlanAssignmentProviderForEnvironment(
-    getConfig(env).environment,
+    env.ENVIRONMENT,
     new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db),
   );
 }
