@@ -58,6 +58,8 @@ jobs:
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
+      BASE_URL: https://api.${{ vars.BASE_DOMAIN }}
+      WEB_ORIGIN: https://${{ vars.BASE_DOMAIN }}
       VITE_ENVIRONMENT: preview
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
       # Vite は GitHub Actions 上のビルドで値を埋め込むため、LIFF ID は Pages 側ではなくここで渡す。
