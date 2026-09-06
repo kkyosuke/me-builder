@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   acceptServiceTerms,
   getServiceTermsAcceptanceHistory,
+  getServiceTermsStartupStatus,
   getServiceTermsStatus,
 } from "./service-terms";
 
@@ -68,6 +69,25 @@ describe("service terms", () => {
     expect(result).toMatchObject({
       type: "resolved",
       acceptance: { required: false, acceptedAt: "2026-08-15T01:23:45.000Z" },
+    });
+  });
+
+  it("起動判定では同意要否を返し、規約本文を含めない", async () => {
+    const result = await getServiceTermsStartupStatus(
+      { actor, db },
+      dependencies({ acceptedAt: "2026-08-15T01:23:45.000Z" }),
+    );
+
+    expect(result).toMatchObject({
+      document: {
+        version: currentServiceTerms.version,
+        contentHash: currentServiceTerms.contentHash,
+      },
+      acceptance: { required: false },
+    });
+    expect(result.document).toEqual({
+      version: currentServiceTerms.version,
+      contentHash: currentServiceTerms.contentHash,
     });
   });
 

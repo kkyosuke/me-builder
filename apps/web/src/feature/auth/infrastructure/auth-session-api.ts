@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { createAuthenticatedHttpClient } from "../../../infrastructure/http-client";
+import type { ServiceTermsStartupStatus } from "../../../model/web-startup";
 import type { AuthDisplayProfile, AuthFailureReason } from "../model/auth-state";
 
 const DisplayProfileSchema = v.object({
@@ -7,11 +8,37 @@ const DisplayProfileSchema = v.object({
   pictureUrl: v.optional(v.pipe(v.string(), v.url())),
 });
 
+const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty());
+const ServiceTermsStartupStatusSchema = v.object({
+  document: v.object({
+    version: NonEmptyStringSchema,
+    contentHash: v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/)),
+  }),
+  notice: v.nullable(
+    v.object({
+      type: v.picklist(["important-upcoming", "minor-update"]),
+      document: v.object({
+        version: NonEmptyStringSchema,
+        summary: NonEmptyStringSchema,
+      }),
+      effectiveAt: v.pipe(v.string(), v.isoTimestamp()),
+      displayUntil: v.pipe(v.string(), v.isoTimestamp()),
+    }),
+  ),
+  acceptance: v.object({
+    required: v.boolean(),
+    acceptedVersion: v.nullable(NonEmptyStringSchema),
+    documentHash: v.nullable(v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/))),
+    acceptedAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
+  }),
+}) satisfies v.GenericSchema<ServiceTermsStartupStatus>;
+
 const AuthenticatedSessionSchema = v.object({
   authenticated: v.literal(true),
   displayProfile: v.optional(DisplayProfileSchema),
   role: v.picklist(["user", "admin"]),
   csrfToken: v.pipe(v.string(), v.nonEmpty()),
+  terms: v.optional(ServiceTermsStartupStatusSchema),
 });
 
 const UnauthenticatedSessionSchema = v.object({
@@ -39,6 +66,7 @@ export type AuthSessionResponse =
       displayProfile?: AuthDisplayProfile | undefined;
       role: "user" | "admin";
       csrfToken: string;
+      terms?: ServiceTermsStartupStatus | undefined;
     }
   | { authenticated: false; reason?: AuthFailureReason | undefined };
 

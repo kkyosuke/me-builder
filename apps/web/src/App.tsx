@@ -64,6 +64,7 @@ import {
   preloadAvatarSettingsScreen,
   preloadMainApplication,
   preloadProfileSettingsScreen,
+  scheduleIdlePreload,
   scheduleIdlePreloadAfter,
 } from "./routes";
 
@@ -127,11 +128,15 @@ function AppContents() {
   const isMePath = mainApplicationRoute === "me";
   const isNotFoundPath = activeRoute === "not-found";
   const isProfileOpen = profileView !== "closed";
+  const isProfileOpenRef = useRef(isProfileOpen);
+  isProfileOpenRef.current = isProfileOpen;
+  const profileLoadRef = useRef<(() => void) | null>(null);
   const canUseDevelopmentTools =
     isDevelopmentEnvironment(config.environment) &&
     authSession.state.status === "authenticated" &&
     authSession.state.role === "admin";
   const currentMainRoute = isCompatibilityPath ? "compatibility" : isMePath ? "me" : "diagnosis";
+  const delayAuxiliaryUntilDiagnosisSettles = useRef(currentMainRoute === "diagnosis").current;
   const mainRouteScrollPositions = useRef(new Map<MainRoute, number>());
   const previousMainRoute = useRef<MainRoute | null>(null);
   const [avatar, setAvatar] = useState<AvatarSelection | null>(null);
@@ -164,7 +169,9 @@ function AppContents() {
         (authSession.state.status === "authenticated"
           ? authSession.state.profile.pictureUrl
           : undefined))
-      : undefined;
+      : authSession.state.status === "authenticated"
+        ? authSession.state.profile.pictureUrl
+        : undefined;
   const sessionRevision =
     authSession.state.status === "authenticated" ? authSession.state.revision : 0;
   const sessionRevisionRef = useRef(sessionRevision);
@@ -175,6 +182,9 @@ function AppContents() {
     setAvatar(uploadedAvatar(profile));
     setProfileLinePictureUrl(profile.avatar?.source === "line" ? profile.avatar.url : undefined);
     setProfileReadState({ status: "ready" });
+  }, []);
+  const loadAuxiliaryProfile = useCallback(() => {
+    profileLoadRef.current?.();
   }, []);
 
   useLayoutEffect(() => {
@@ -320,6 +330,10 @@ function AppContents() {
   }, [isProfileOpen]);
 
   useEffect(() => {
+    if (isProfileOpen) profileLoadRef.current?.();
+  }, [isProfileOpen]);
+
+  useEffect(() => {
     if (isAdminPath || isNotFoundPath) return;
     if (authSession.state.status !== "authenticated") return;
     const controller = new AbortController();
@@ -329,27 +343,57 @@ function AppContents() {
       profileReloadKey === 0 && current.status === "ready" ? current : { status: "loading" },
     );
     setEntitlementState({ status: "loading" });
-    void (async () => {
-      try {
-        applyAccountProfile(await fetchAccountProfile(config.apiUrl, controller.signal));
-        try {
-          const entitlement = await fetchProfileEntitlement(config.apiUrl, controller.signal);
+    let started = false;
+    let cancelScheduledLoad: () => void = () => undefined;
+    const load = () => {
+      if (started) return;
+      started = true;
+      cancelScheduledLoad();
+      void fetchAccountProfile(config.apiUrl, controller.signal)
+        .then((profile) => {
+          if (!controller.signal.aborted) applyAccountProfile(profile);
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) {
+            setProfileReadState({ status: "error", message: errorMessage(error) });
+          }
+        });
+      void fetchProfileEntitlement(config.apiUrl, controller.signal)
+        .then((entitlement) => {
           if (!controller.signal.aborted) {
             setEntitlementState({ status: "success", data: entitlement });
           }
-        } catch (error) {
+        })
+        .catch((error) => {
           if (!controller.signal.aborted) {
             setEntitlementState({ status: "error", message: errorMessage(error) });
           }
-        }
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setProfileReadState({ status: "error", message: errorMessage(error) });
-      }
-    })();
+        });
+    };
+    profileLoadRef.current = load;
+    const accountChanged =
+      previousSessionRevision.current !== null &&
+      previousSessionRevision.current !== sessionRevision;
+    if (isProfileOpenRef.current || accountChanged) {
+      load();
+    } else if (!delayAuxiliaryUntilDiagnosisSettles) {
+      cancelScheduledLoad = scheduleIdlePreload(load);
+    }
 
-    return () => controller.abort();
-  }, [applyAccountProfile, authSession.state, isAdminPath, isNotFoundPath, profileReloadKey]);
+    return () => {
+      if (profileLoadRef.current === load) profileLoadRef.current = null;
+      cancelScheduledLoad();
+      controller.abort();
+    };
+  }, [
+    applyAccountProfile,
+    authSession.state,
+    delayAuxiliaryUntilDiagnosisSettles,
+    isAdminPath,
+    isNotFoundPath,
+    profileReloadKey,
+    sessionRevision,
+  ]);
 
   useEffect(() => {
     if (authSession.state.status !== "authenticated") return;
@@ -659,6 +703,7 @@ function AppContents() {
                 <DiagnosisApplication
                   key={`${sessionRevision}:${accountDataResetKey}`}
                   onNavigationGuardChange={changeMainNavigationGuard}
+                  onPrimaryContentSettled={loadAuxiliaryProfile}
                 />
               )}
             </Suspense>
@@ -835,13 +880,13 @@ export function App() {
       {route === "account-recovery" ? (
         <AccountRecoveryScreen />
       ) : route === "mcp-authorization" ? (
-        <ServiceTermsGate>
+        <ServiceTermsGate startupRoute={route}>
           <McpAuthorizationScreen />
         </ServiceTermsGate>
       ) : route === "not-found" ? (
         <NotFoundScreen />
       ) : (
-        <ServiceTermsGate>
+        <ServiceTermsGate startupRoute={route}>
           <AppContents />
         </ServiceTermsGate>
       )}

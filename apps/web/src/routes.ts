@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { WebApplicationRoute } from "./model/web-application-route";
 
 type LazyApplicationModule = { default: ComponentType };
 export type MainApplicationRoute = "compatibility" | "diagnosis" | "me";
@@ -110,6 +111,22 @@ export function preloadProfileSettingsScreen(): void {
 
 export function preloadAvatarSettingsScreen(): void {
   void loadAvatarSettingsScreen().catch(() => undefined);
+}
+
+/** 認証・同意確認と並行し、要求画面のコードだけを副作用なしで先読みする。 */
+export function preloadWebApplicationRoute(route: WebApplicationRoute): void {
+  if (route === "admin") {
+    void loadAdminApplication().catch(() => undefined);
+    return;
+  }
+  if (route === "profile") {
+    preloadMainApplication("me");
+    preloadProfileSettingsScreen();
+    return;
+  }
+  if (route === "me" || route === "compatibility" || route === "diagnosis") {
+    preloadMainApplication(route);
+  }
 }
 
 type NavigatorWithConnection = Navigator & {

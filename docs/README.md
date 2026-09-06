@@ -47,6 +47,7 @@ docs/
 - [サービス紹介サイト設計](product/service-site-design.md) — 未ログインの公開サイトの役割、サイトマップ、トップページ構成、CTA、掲載原則、公開前の確認事項
 - [サブスクリプション・料金プラン設計](product/subscription-plan-design.md) — Free、Lite、Full、ファミリーパックの価格、利用権限、AI利用上限、変更・解約、家族内のプライバシー境界
 - [全体画面遷移設計](product/screen-navigation.md) — LINEとWebをまたぐ入口と、利用者・管理者向け画面の全体遷移
+- [Web初回起動体験設計](product/web-startup-experience.md) — Web機能リンクから要求画面または利用規約を操作できるまでの段階表示と通信優先順位
 - [わたしのまとめ仕様](product/profile-summary-experience.md) — 診断と日記からAI生成した版付きの「わたしのまとめ」と診断テーマの表示規則
 - [相性診断・うつし共有体験設計](product/compatibility-experience.md) — 招待リンクとLINE共有、双方の同意、相性一覧、「それぞれについて」と「2人について」、共有終了
 - [サービス利用規約・同意体験設計](product/service-terms-consent-experience.md) — 規約の版管理、Accountごとの同意履歴、初回・改定時の同意ゲート

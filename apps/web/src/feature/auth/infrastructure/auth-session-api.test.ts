@@ -67,6 +67,36 @@ describe("auth session API", () => {
     ).resolves.toEqual({ authenticated: true, role: "user", csrfToken: "csrf-token" });
   });
 
+  it("規約本文を含まない起動判定をsessionと同時に受理する", async () => {
+    const contentHash = `sha256:${"a".repeat(64)}`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          authenticated: true,
+          role: "user",
+          csrfToken: "csrf-token",
+          terms: {
+            document: { version: "2026-08-21", contentHash },
+            notice: null,
+            acceptance: {
+              required: false,
+              acceptedVersion: "2026-08-21",
+              documentHash: contentHash,
+              acceptedAt: "2026-08-21T00:00:00.000Z",
+            },
+          },
+        }),
+      ),
+    );
+
+    await expect(
+      fetchAuthSession("https://api.example.com", new AbortController().signal),
+    ).resolves.toMatchObject({
+      terms: { acceptance: { required: false }, document: { contentHash } },
+    });
+  });
+
   it("401を期限切れsessionとして正規化する", async () => {
     vi.stubGlobal(
       "fetch",

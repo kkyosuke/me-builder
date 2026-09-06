@@ -32,11 +32,13 @@ interface DiagnosisNavigationGuard {
 
 export default function DiagnosisApplication({
   onNavigationGuardChange,
+  onPrimaryContentSettled,
 }: {
   onNavigationGuardChange?: (guard: DiagnosisNavigationGuard | null) => void;
+  onPrimaryContentSettled?: () => void;
 }) {
   const diagnoses = useDiagnosisList();
-  const progression = useProfileProgression();
+  const progression = useProfileProgression({ enabled: diagnoses.state.status === "success" });
   const detail = useDiagnosisDetail({
     onProgress: diagnoses.updateProgress,
   });
@@ -71,6 +73,12 @@ export default function DiagnosisApplication({
     directDiagnosisId && diagnoses.state.status === "success"
       ? diagnoses.state.data.find(({ id }) => id === directDiagnosisId)
       : undefined;
+
+  useEffect(() => {
+    if (diagnoses.state.status === "success" || diagnoses.state.status === "error") {
+      onPrimaryContentSettled?.();
+    }
+  }, [diagnoses.state.status, onPrimaryContentSettled]);
 
   const openDiagnosis = useCallback(
     (diagnosis: Parameters<typeof detail.open>[0]) => {

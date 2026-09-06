@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
     status: string;
     revision?: number;
     message?: string;
+    terms?: unknown;
   },
   retry: vi.fn(),
   fetchStatus: vi.fn(),
@@ -143,6 +144,64 @@ describe("ServiceTermsGate", () => {
     expect(await screen.findByText("主機能")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: document.title })).toBeNull();
     expect(mocks.accept).not.toHaveBeenCalled();
+  });
+
+  it("認証応答で同意済みと判定できれば規約APIを呼ばない", async () => {
+    mocks.authState = {
+      status: "authenticated",
+      revision: 1,
+      terms: {
+        document: { version: document.version, contentHash: document.contentHash },
+        notice: null,
+        acceptance: {
+          required: false,
+          acceptedVersion: document.version,
+          documentHash: document.contentHash,
+          acceptedAt: "2026-08-15T01:23:45.000Z",
+        },
+      },
+    };
+
+    render(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(await screen.findByText("主機能")).toBeTruthy();
+    expect(mocks.fetchStatus).not.toHaveBeenCalled();
+  });
+
+  it("認証応答で同意が必要な場合だけ規約本文を取得する", async () => {
+    mocks.authState = {
+      status: "authenticated",
+      revision: 1,
+      terms: {
+        document: { version: document.version, contentHash: document.contentHash },
+        notice: null,
+        acceptance: {
+          required: true,
+          acceptedVersion: null,
+          documentHash: null,
+          acceptedAt: null,
+        },
+      },
+    };
+    mocks.fetchStatus.mockResolvedValue({
+      document,
+      notice: null,
+      acceptance: { required: true, acceptedVersion: null, documentHash: null, acceptedAt: null },
+    });
+
+    render(
+      <ServiceTermsGate>
+        <p>主機能</p>
+      </ServiceTermsGate>,
+    );
+
+    expect(await screen.findByRole("heading", { name: document.title })).toBeTruthy();
+    expect(mocks.fetchStatus).toHaveBeenCalledOnce();
+    expect(screen.queryByText("主機能")).toBeNull();
   });
 
   it("Account切替時は前Accountの同意状態を破棄して新しいsessionで再確認する", async () => {

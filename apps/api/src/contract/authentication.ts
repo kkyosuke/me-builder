@@ -1,5 +1,6 @@
 import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
 import * as v from "valibot";
+import { ServiceTermsStartupStatusSchema } from "./legal/terms";
 import { ForbiddenErrorSchema, authenticatedErrors, jsonResponse } from "./shared/errors";
 
 export const LiffAuthenticationExchangeRequestSchema = v.object({
@@ -13,6 +14,8 @@ export const ApplicationSessionResponseSchema = v.object({
   expiresAt: v.pipe(v.string(), v.isoTimestamp()),
   csrfToken: v.pipe(v.string(), v.nonEmpty()),
   role: v.picklist(["user", "admin"]),
+  // WebとAPIを独立して段階公開できるよう、移行中は省略可能にする。
+  terms: v.optional(ServiceTermsStartupStatusSchema),
   displayProfile: v.optional(
     v.object({
       displayName: v.optional(v.string()),

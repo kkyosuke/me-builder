@@ -1,14 +1,12 @@
-import { BellRing, ChevronDown } from "lucide-react";
-import type { ServiceTermsStatus } from "../model/service-terms";
-
-type Notice = NonNullable<ServiceTermsStatus["notice"]>;
+import { BellRing, ChevronRight } from "lucide-react";
+import type { ServiceTermsNoticeSummary } from "../../../model/web-startup";
 
 function displayDate(value: string): string {
   return value.slice(0, 10).replace(/-/g, ".");
 }
 
 /** 主機能を止めず、適用前の重要改定または適用後30日以内の軽微改定を表示する。 */
-export function ServiceTermsNotice({ notice }: { notice: Notice }) {
+export function ServiceTermsNotice({ notice }: { notice: ServiceTermsNoticeSummary }) {
   const upcoming = notice.type === "important-upcoming";
   return (
     <aside
@@ -31,27 +29,13 @@ export function ServiceTermsNotice({ notice }: { notice: Notice }) {
             </p>
           </div>
         </div>
-        <details className="group mt-2 text-sm">
-          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 font-bold text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-200">
-            改定後の全文を確認する
-            <ChevronDown
-              className="size-4 transition-transform group-open:rotate-180 motion-reduce:transition-none"
-              aria-hidden
-            />
-          </summary>
-          <article className="mt-2 space-y-4 rounded-2xl bg-white p-4 dark:bg-slate-900">
-            {notice.document.sections.map((section) => (
-              <section key={section.heading}>
-                <h2 className="font-bold">{section.heading}</h2>
-                <div className="mt-2 space-y-2 leading-6 text-slate-700 dark:text-slate-300">
-                  {section.paragraphs.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </article>
-        </details>
+        <a
+          href="/terms"
+          className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-bold text-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:text-sky-200"
+        >
+          改定後の全文を確認する
+          <ChevronRight className="size-4" aria-hidden />
+        </a>
       </div>
     </aside>
   );

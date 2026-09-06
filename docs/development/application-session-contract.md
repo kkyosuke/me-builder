@@ -58,4 +58,6 @@ session参照は`__Host-me_builder_session` cookieへ保存します。属性は
 - `GET /api/auth/session`: application sessionだけを受け付け、CSRF tokenを含む表示可能なsession状態を返す
 - `DELETE /api/auth/session`: application session、許可済みOrigin、`X-CSRF-Token`を要求し、Accountの全sessionを失効する
 
+`POST /api/auth/liff/exchange`と`GET /api/auth/session`の成功応答には、起動時の利用規約判定に必要な現在version、content hash、同意状態、改定告知の要約を含めます。規約本文は含めず、同意が必要な時または本人が全文を開いた時だけ`GET /api/legal/terms`で取得します。段階公開中の旧API応答も受け入れられるよう、Webではこの起動状態が省略された場合に限り従来の規約APIへフォールバックします。
+
 機能APIはapplication sessionだけを認証に使用します。`Authorization: Bearer`は認証情報として扱わず、Bearerだけのリクエストは拒否し、有効なcookie sessionへ添付されていても認証結果へ影響させません。`POST`、`PUT`、`PATCH`、`DELETE`では、cookieに加えて許可済みOriginの完全一致と`X-CSRF-Token`を必須にします。

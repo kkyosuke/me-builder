@@ -53,6 +53,7 @@ export function useAuthSessionState() {
       status: "authenticated",
       profile: response.displayProfile ?? {},
       role: response.role,
+      terms: response.terms ?? null,
       revision: revisionRef.current,
     };
   }, []);

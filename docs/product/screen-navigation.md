@@ -9,6 +9,7 @@
 | 対象 | SSoT |
 | --- | --- |
 | LINEとWebの役割、本人識別 | [プロジェクト概要](project-overview.md) |
+| Web初回起動の段階表示と通信優先順位 | [Web初回起動体験設計](web-startup-experience.md) |
 | 診断一覧、回答、個別の回答結果 | [Phase 1 診断体験設計](../diagnosis/diagnosis-experience.md) |
 | 診断と日記を横断した「わたしのまとめ」 | [わたしのまとめ仕様](profile-summary-experience.md) |
 | 招待リンク、相性一覧、2人の相性シート | [相性診断・うつし共有体験設計](compatibility-experience.md) |

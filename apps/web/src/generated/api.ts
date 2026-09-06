@@ -2328,6 +2328,30 @@ export interface operations {
             csrfToken: string;
             /** @enum {string} */
             role: "user" | "admin";
+            terms?: {
+              document: {
+                version: string;
+                contentHash: string;
+              };
+              notice: {
+                /** @enum {string} */
+                type: "important-upcoming" | "minor-update";
+                document: {
+                  version: string;
+                  summary: string;
+                };
+                /** Format: date-time */
+                effectiveAt: string;
+                /** Format: date-time */
+                displayUntil: string;
+              } | null;
+              acceptance: {
+                required: boolean;
+                acceptedVersion: string | null;
+                documentHash: string | null;
+                acceptedAt: string | null;
+              };
+            };
             displayProfile?: {
               displayName?: string;
               /** Format: uri */
@@ -2427,6 +2451,30 @@ export interface operations {
             csrfToken: string;
             /** @enum {string} */
             role: "user" | "admin";
+            terms?: {
+              document: {
+                version: string;
+                contentHash: string;
+              };
+              notice: {
+                /** @enum {string} */
+                type: "important-upcoming" | "minor-update";
+                document: {
+                  version: string;
+                  summary: string;
+                };
+                /** Format: date-time */
+                effectiveAt: string;
+                /** Format: date-time */
+                displayUntil: string;
+              } | null;
+              acceptance: {
+                required: boolean;
+                acceptedVersion: string | null;
+                documentHash: string | null;
+                acceptedAt: string | null;
+              };
+            };
             displayProfile?: {
               displayName?: string;
               /** Format: uri */
