@@ -63,6 +63,22 @@ describe("useProfileProgression", () => {
     });
   });
 
+  it("主要データの準備前は取得せず、有効化された時に開始する", async () => {
+    mocks.fetchProfileProgression.mockResolvedValue(progression);
+    const { rerender, result } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useProfileProgression({ enabled }),
+      { initialProps: { enabled: false } },
+    );
+
+    expect(result.current.state.status).toBe("loading");
+    expect(mocks.fetchProfileProgression).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+    expect(mocks.fetchProfileProgression).toHaveBeenCalledOnce();
+  });
+
   it("session APIが失敗してもloadingのままにしない", async () => {
     mocks.fetchProfileProgression.mockRejectedValue(new Error("session expired"));
     const { result } = renderHook(() => useProfileProgression());

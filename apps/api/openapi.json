@@ -1358,6 +1358,107 @@
                       "enum": ["user", "admin"],
                       "type": "string"
                     },
+                    "terms": {
+                      "type": "object",
+                      "properties": {
+                        "document": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "contentHash": {
+                              "type": "string",
+                              "pattern": "^sha256:[0-9a-f]{64}$"
+                            }
+                          },
+                          "required": ["version", "contentHash"]
+                        },
+                        "notice": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "enum": ["important-upcoming", "minor-update"],
+                                  "type": "string"
+                                },
+                                "document": {
+                                  "type": "object",
+                                  "properties": {
+                                    "version": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "summary": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["version", "summary"]
+                                },
+                                "effectiveAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "displayUntil": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": ["type", "document", "effectiveAt", "displayUntil"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "acceptance": {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "acceptedVersion": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "documentHash": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^sha256:[0-9a-f]{64}$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "acceptedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["required", "acceptedVersion", "documentHash", "acceptedAt"]
+                        }
+                      },
+                      "required": ["document", "notice", "acceptance"]
+                    },
                     "displayProfile": {
                       "type": "object",
                       "properties": {
@@ -1510,6 +1611,107 @@
                     "role": {
                       "enum": ["user", "admin"],
                       "type": "string"
+                    },
+                    "terms": {
+                      "type": "object",
+                      "properties": {
+                        "document": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "contentHash": {
+                              "type": "string",
+                              "pattern": "^sha256:[0-9a-f]{64}$"
+                            }
+                          },
+                          "required": ["version", "contentHash"]
+                        },
+                        "notice": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "enum": ["important-upcoming", "minor-update"],
+                                  "type": "string"
+                                },
+                                "document": {
+                                  "type": "object",
+                                  "properties": {
+                                    "version": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "summary": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["version", "summary"]
+                                },
+                                "effectiveAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "displayUntil": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": ["type", "document", "effectiveAt", "displayUntil"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "acceptance": {
+                          "type": "object",
+                          "properties": {
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "acceptedVersion": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "documentHash": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^sha256:[0-9a-f]{64}$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "acceptedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["required", "acceptedVersion", "documentHash", "acceptedAt"]
+                        }
+                      },
+                      "required": ["document", "notice", "acceptance"]
                     },
                     "displayProfile": {
                       "type": "object",

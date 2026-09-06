@@ -45,6 +45,32 @@ export async function getServiceTermsStatus(
   };
 }
 
+/** 起動判定に必要な情報だけを返し、規約本文を通常の再訪へ載せない。 */
+export async function getServiceTermsStartupStatus(
+  params: Params,
+  dependencies: Dependencies = defaultDependencies,
+) {
+  const outcome = await getServiceTermsStatus(params, dependencies);
+  return {
+    document: {
+      version: outcome.document.version,
+      contentHash: outcome.document.contentHash,
+    },
+    notice: outcome.notice
+      ? {
+          type: outcome.notice.type,
+          document: {
+            version: outcome.notice.document.version,
+            summary: outcome.notice.document.summary,
+          },
+          effectiveAt: outcome.notice.effectiveAt,
+          displayUntil: outcome.notice.displayUntil,
+        }
+      : null,
+    acceptance: outcome.acceptance,
+  };
+}
+
 export async function acceptServiceTerms(
   params: Params & { version: string },
   dependencies: Dependencies = defaultDependencies,

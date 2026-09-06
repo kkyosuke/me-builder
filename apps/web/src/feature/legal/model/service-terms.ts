@@ -1,3 +1,8 @@
+import type {
+  ServiceTermsAcceptanceSummary,
+  ServiceTermsNoticeSummary,
+} from "../../../model/web-startup";
+
 type ServiceTerms = Readonly<{
   documentKey: "terms_of_service";
   version: string;
@@ -11,18 +16,13 @@ type ServiceTerms = Readonly<{
 
 export type ServiceTermsStatus = Readonly<{
   document: ServiceTerms;
-  notice: Readonly<{
-    type: "important-upcoming" | "minor-update";
-    document: ServiceTerms;
-    effectiveAt: string;
-    displayUntil: string;
-  }> | null;
-  acceptance: Readonly<{
-    required: boolean;
-    acceptedVersion: string | null;
-    documentHash: string | null;
-    acceptedAt: string | null;
-  }>;
+  notice:
+    | (ServiceTermsNoticeSummary &
+        Readonly<{
+          document: ServiceTerms;
+        }>)
+    | null;
+  acceptance: ServiceTermsAcceptanceSummary;
 }>;
 
 export type ServiceTermsAcceptanceHistoryItem = Readonly<{

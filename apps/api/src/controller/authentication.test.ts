@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   logout: vi.fn(),
   issue: vi.fn(),
   clientState: vi.fn(),
+  getServiceTermsStartupStatus: vi.fn(),
 }));
 
 vi.mock("../logic/authentication/authenticate-liff", () => ({
@@ -21,6 +22,9 @@ vi.mock("../infrastructure/authentication/line-credential-verifier", () => ({
 vi.mock("../infrastructure/authentication/application-session-runtime", () => ({
   APPLICATION_SESSION_COOKIE: "__Host-me_builder_session",
   createApplicationSessionService: mocks.createApplicationSessionService,
+}));
+vi.mock("../logic/service-terms", () => ({
+  getServiceTermsStartupStatus: mocks.getServiceTermsStartupStatus,
 }));
 
 import {
@@ -87,6 +91,19 @@ describe("application session controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.createApplicationSessionService.mockReturnValue(runtime());
+    mocks.getServiceTermsStartupStatus.mockResolvedValue({
+      document: {
+        version: "2026-08-21",
+        contentHash: `sha256:${"a".repeat(64)}`,
+      },
+      notice: null,
+      acceptance: {
+        required: false,
+        acceptedVersion: "2026-08-21",
+        documentHash: `sha256:${"a".repeat(64)}`,
+        acceptedAt: "2026-08-21T00:00:00.000Z",
+      },
+    });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -177,6 +194,7 @@ describe("application session controller", () => {
       csrfToken: "csrf-token",
       role: "user",
       displayProfile: { displayName: "テストユーザー" },
+      terms: { acceptance: { required: false } },
     });
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(response.headers.get("Set-Cookie")).toContain("new-session");
@@ -277,7 +295,11 @@ describe("application session controller", () => {
       env,
     );
     expect(active.status).toBe(200);
-    expect(await active.json()).toMatchObject({ authenticated: true, csrfToken: "csrf-token" });
+    expect(await active.json()).toMatchObject({
+      authenticated: true,
+      csrfToken: "csrf-token",
+      terms: { acceptance: { required: false } },
+    });
     expect(active.headers.get("Cache-Control")).toBe("no-store");
   });
 

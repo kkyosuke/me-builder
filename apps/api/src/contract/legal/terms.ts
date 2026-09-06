@@ -22,6 +22,30 @@ const ServiceTermsDocumentSchema = v.object({
   ),
 });
 
+export const ServiceTermsStartupStatusSchema = v.object({
+  document: v.object({
+    version: NonEmptyStringSchema,
+    contentHash: v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/)),
+  }),
+  notice: v.nullable(
+    v.object({
+      type: v.picklist(["important-upcoming", "minor-update"]),
+      document: v.object({
+        version: NonEmptyStringSchema,
+        summary: NonEmptyStringSchema,
+      }),
+      effectiveAt: v.pipe(v.string(), v.isoTimestamp()),
+      displayUntil: v.pipe(v.string(), v.isoTimestamp()),
+    }),
+  ),
+  acceptance: v.object({
+    required: v.boolean(),
+    acceptedVersion: v.nullable(NonEmptyStringSchema),
+    documentHash: v.nullable(v.pipe(v.string(), v.regex(/^sha256:[0-9a-f]{64}$/))),
+    acceptedAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
+  }),
+});
+
 export const ServiceTermsStatusResponseSchema = v.object({
   document: ServiceTermsDocumentSchema,
   notice: v.nullable(

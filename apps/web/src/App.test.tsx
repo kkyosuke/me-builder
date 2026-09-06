@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
     revision: 1,
   },
   retryAuthSession: vi.fn(),
+  serviceTermsStartupRoute: vi.fn(),
   fetchAccountProfile: vi.fn(),
   fetchProfileEntitlement: vi.fn(),
   saveAccountAvatar: vi.fn(),
@@ -65,7 +66,16 @@ vi.mock("./config", () => ({
   config: mocks.config,
 }));
 vi.mock("./feature/legal", () => ({
-  ServiceTermsGate: ({ children }: { children: ReactNode }) => children,
+  ServiceTermsGate: ({
+    children,
+    startupRoute,
+  }: {
+    children: ReactNode;
+    startupRoute?: string;
+  }) => {
+    mocks.serviceTermsStartupRoute(startupRoute);
+    return children;
+  },
   ServiceTermsAcceptanceHistory: () => null,
 }));
 vi.mock("./feature/auth", async (importOriginal) => ({
@@ -473,6 +483,32 @@ describe("App", () => {
     expect(screen.queryByRole("heading", { name: "ページが見つかりません" })).toBeNull();
   });
 
+  it("診断一覧が確定するまでプロフィール・Plan・レベルの補助通信を待つ", async () => {
+    let resolveDiagnoses!: (items: DiagnosisListItem[]) => void;
+    const diagnosisList = new Promise<DiagnosisListItem[]>((resolve) => {
+      resolveDiagnoses = resolve;
+    });
+    mocks.fetchDiagnosisList.mockReturnValueOnce(diagnosisList);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "わたしの診断" })).toBeTruthy();
+    expect(mocks.fetchDiagnosisList).toHaveBeenCalledOnce();
+    expect(mocks.fetchAccountProfile).not.toHaveBeenCalled();
+    expect(mocks.fetchProfileEntitlement).not.toHaveBeenCalled();
+    expect(mocks.fetchProfileProgression).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveDiagnoses([diagnosis()]);
+      await diagnosisList;
+    });
+
+    expect(await screen.findByText("テスト診断")).toBeTruthy();
+    await waitFor(() => expect(mocks.fetchAccountProfile).toHaveBeenCalledOnce());
+    expect(mocks.fetchProfileEntitlement).toHaveBeenCalledOnce();
+    expect(mocks.fetchProfileProgression).toHaveBeenCalledOnce();
+  });
+
   it("未設定時はLINEプロフィール画像を右上アイコンに表示する", async () => {
     const linePictureUrl = "https://example.com/line-profile.jpg";
     mocks.authState.profile.pictureUrl = linePictureUrl;
@@ -821,7 +857,7 @@ describe("App", () => {
     scrollYSpy.mockRestore();
   });
 
-  it("保存画像の取得前にLINE画像を先に表示しない", async () => {
+  it("保存画像を取得するまでは認証応答のLINE画像を先に表示する", async () => {
     const linePictureUrl = "https://example.com/line-profile.jpg";
     let resolveProfile: ((profile: unknown) => void) | undefined;
     mocks.authState.profile.pictureUrl = linePictureUrl;
@@ -834,9 +870,11 @@ describe("App", () => {
     render(<App />);
 
     const profileButton = await screen.findByRole("button", { name: "プロフィールを開く" });
+    expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(linePictureUrl);
+
+    fireEvent.click(profileButton);
     await waitFor(() => expect(mocks.fetchAccountProfile).toHaveBeenCalled());
-    expect(profileButton.querySelector("img")).toBeNull();
-    expect(document.querySelector(`img[src="${linePictureUrl}"]`)).toBeNull();
+    expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(linePictureUrl);
 
     await act(async () => {
       resolveProfile?.({
@@ -850,10 +888,13 @@ describe("App", () => {
       });
     });
 
-    await waitFor(() =>
-      expect(profileButton.querySelector("img")?.getAttribute("src")).toBe(
-        "data:image/png;base64,c2F2ZWQ=",
-      ),
+    expect(await screen.findByText("設定した画像")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "プロフィールを閉じる" }));
+    const refreshedProfileButton = await screen.findByRole("button", {
+      name: "プロフィールを開く",
+    });
+    expect(refreshedProfileButton.querySelector("img")?.getAttribute("src")).toBe(
+      "data:image/png;base64,c2F2ZWQ=",
     );
   });
 
@@ -1230,6 +1271,15 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "わたしのまとめ" })).toBeTruthy();
     expect(mocks.fetchDiagnosisList).not.toHaveBeenCalled();
+  });
+
+  it("LIFFの規約導線を404にせず規約確認へ渡す", async () => {
+    window.history.replaceState({}, "", "/app?liff.state=%2Fterms");
+
+    render(<App />);
+
+    await waitFor(() => expect(mocks.serviceTermsStartupRoute).toHaveBeenCalledWith("terms"));
+    expect(screen.queryByRole("heading", { name: "ページが見つかりません" })).toBeNull();
   });
 
   it("Strict Modeでもまとめ取得を多重実行しない", async () => {

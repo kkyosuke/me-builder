@@ -18,6 +18,7 @@ import {
 import { createLineCredentialVerifier } from "../infrastructure/authentication/line-credential-verifier";
 import { authenticateLiff } from "../logic/authentication/authenticate-liff";
 import type { AuthenticationResult } from "../logic/authentication/types";
+import { getServiceTermsStartupStatus } from "../logic/service-terms";
 import { authenticatedSession } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 
@@ -55,17 +56,16 @@ export async function postLiffAuthenticationExchange(c: Context<AppEnv>): Promis
   if (!result.authenticatedIdentityId) {
     return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
-  const issued = await runtime.sessions.issue(
-    result.actor,
-    result.authenticatedIdentityId,
-    result.displayProfile,
-  );
+  const [issued, terms] = await Promise.all([
+    runtime.sessions.issue(result.actor, result.authenticatedIdentityId, result.displayProfile),
+    getServiceTermsStartupStatus({ actor: result.actor, db: runtime.db }),
+  ]);
   if (!issued) {
     return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
   setApplicationSessionCookie(c, issued.sessionToken, issued.expiresAt);
   c.header("Cache-Control", "no-store");
-  return c.json(sessionResponse(result, issued));
+  return c.json(sessionResponse(result, issued, terms));
 }
 
 export async function getApplicationSession(c: Context<AppEnv>): Promise<Response> {
@@ -77,16 +77,24 @@ export async function getApplicationSession(c: Context<AppEnv>): Promise<Respons
   if (!runtime || !sessionToken) {
     return c.json(v.parse(ServiceUnavailableErrorSchema, { error: "Service Unavailable" }), 503);
   }
-  const state = await runtime.sessions.clientState(sessionToken);
+  const authentication = authenticatedSession(c);
+  const [state, terms] = await Promise.all([
+    runtime.sessions.clientState(sessionToken),
+    getServiceTermsStartupStatus({ actor: authentication.actor, db: runtime.db }),
+  ]);
   if (!state) {
     return c.json(v.parse(UnauthorizedErrorSchema, { error: "Unauthorized" }), 401);
   }
   c.header("Cache-Control", "no-store");
   return c.json(
-    sessionResponse(authenticatedSession(c), {
-      csrfToken: state.csrfToken,
-      expiresAt: state.expiresAt,
-    }),
+    sessionResponse(
+      authentication,
+      {
+        csrfToken: state.csrfToken,
+        expiresAt: state.expiresAt,
+      },
+      terms,
+    ),
   );
 }
 
@@ -115,6 +123,7 @@ export async function deleteApplicationSession(c: Context<AppEnv>): Promise<Resp
 function sessionResponse(
   authentication: Extract<AuthenticationResult, { type: "authenticated" }>,
   session: Readonly<{ csrfToken: string; expiresAt: Date }>,
+  terms: Awaited<ReturnType<typeof getServiceTermsStartupStatus>>,
 ) {
   return v.parse(ApplicationSessionResponseSchema, {
     authenticated: true,
@@ -123,6 +132,7 @@ function sessionResponse(
     expiresAt: session.expiresAt.toISOString(),
     csrfToken: session.csrfToken,
     role: authentication.accountRole,
+    terms,
     ...(authentication.displayProfile ? { displayProfile: authentication.displayProfile } : {}),
   });
 }

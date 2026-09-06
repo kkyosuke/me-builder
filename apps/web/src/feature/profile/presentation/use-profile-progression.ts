@@ -4,7 +4,7 @@ import type { AsyncState } from "../../../model/async-state";
 import { fetchProfileProgression } from "../infrastructure/progression-api";
 import type { UtsushiProgression } from "../model/progression";
 
-export function useProfileProgression() {
+export function useProfileProgression({ enabled = true }: { enabled?: boolean } = {}) {
   const [state, setState] = useState<AsyncState<UtsushiProgression>>({ status: "loading" });
   const mounted = useRef(false);
   const request = useRef<AbortController | null>(null);
@@ -39,6 +39,7 @@ export function useProfileProgression() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     mounted.current = true;
     let active = true;
     queueMicrotask(() => {
@@ -49,7 +50,7 @@ export function useProfileProgression() {
       mounted.current = false;
       request.current?.abort();
     };
-  }, [load]);
+  }, [enabled, load]);
 
   useEffect(() => {
     if (state.status !== "success" || !state.data.isProcessing) return;
