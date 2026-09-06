@@ -6,13 +6,6 @@ import { createLineRetryKey, pushLineTextWithRetryKey } from "../infrastructure/
 export const MAX_PHOTO_DIARY_BYTES = 10 * 1024 * 1024;
 export const MAX_PHOTO_DIARY_PIXELS = 40_000_000;
 const THUMBNAIL_WIDTH = 512;
-const PHOTO_STORAGE_LIMITS = {
-  free: 500 * 1024 * 1024,
-  lite: 5 * 1024 * 1024 * 1024,
-  full: 20 * 1024 * 1024 * 1024,
-  family: 20 * 1024 * 1024 * 1024,
-} as const;
-
 const PHOTO_SAVED_REPLY =
   "写真を日記として保存しました。写真のAI分析はまだ行っていません。ほかの方が写る写真は、必要な了承と権利を確認して送ってね。";
 const PHOTO_INVALID_REPLY =
@@ -268,7 +261,7 @@ export async function processPhotoDiaryImage(
   const entitlement = await new billing.EntitlementService(
     cf.planAssignmentProvider ?? new billing.FamilyAwareAccountPlanAssignmentProvider(cf.d1),
   ).resolve(accountId);
-  const storageLimitBytes = PHOTO_STORAGE_LIMITS[entitlement.plan];
+  const storageLimitBytes = entitlement.policy.photoStorageLimitBytes;
   if (
     !existing &&
     (await accountData.execute("photoDiary.readStorageUsage")) >= storageLimitBytes

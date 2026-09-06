@@ -228,6 +228,7 @@ const profileEntitlement: ProfileEntitlement = {
   source: "free",
   effectiveAt: "2026-08-01T00:00:00.000Z",
   availableUntil: null,
+  capabilities: { familySeats: false, accountRecovery: false },
   aiReply: {
     limit: 10,
     used: 0,

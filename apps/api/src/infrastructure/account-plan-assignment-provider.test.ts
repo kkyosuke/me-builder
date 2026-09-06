@@ -1,20 +1,30 @@
 import { D1, billing } from "@me-builder/lib";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AppEnv } from "../types";
 import { accountPlanAssignmentProvider } from "./account-plan-assignment-provider";
 
 const db = {} as Parameters<typeof accountPlanAssignmentProvider>[1];
 
 describe("accountPlanAssignmentProvider", () => {
-  it.each(["development", "local"])("%sでは任意のAccountをFullへ解決する", async (environment) => {
-    const provider = accountPlanAssignmentProvider({ ENVIRONMENT: environment } as never, db);
+  it.each(["development", "local", "preview"])(
+    "%sでは実Planを保ち全機能を解決する",
+    async (environment) => {
+      const read = vi
+        .spyOn(D1.shared.action.billing.D1AccountPlanAssignmentProvider.prototype, "findCurrent")
+        .mockImplementation(async (id, at) => billing.freePlanAssignment(id, at));
+      const provider = accountPlanAssignmentProvider({ ENVIRONMENT: environment } as never, db);
 
-    await expect(provider.findCurrent("account-1")).resolves.toMatchObject({
-      accountId: "account-1",
-      plan: "full",
-      source: "development",
-    });
-  });
+      await expect(
+        new billing.EntitlementService(provider).resolve("account-1"),
+      ).resolves.toMatchObject({
+        accountId: "account-1",
+        plan: "free",
+        source: "free",
+        policy: { accountRecovery: true, familySeatLimit: 4 },
+      });
+      read.mockRestore();
+    },
+  );
 
   it("明示的に注入したproviderをLocalでも優先する", () => {
     const injected = new billing.FakeAccountPlanAssignmentProvider();
@@ -26,7 +36,7 @@ describe("accountPlanAssignmentProvider", () => {
     expect(accountPlanAssignmentProvider(env, db)).toBe(injected);
   });
 
-  it.each([undefined, "preview", "production"])(
+  it.each([undefined, "production"])(
     "ENVIRONMENT=%sでは実Planのproviderを維持する",
     (environment) => {
       const provider = accountPlanAssignmentProvider({ ENVIRONMENT: environment } as never, db);

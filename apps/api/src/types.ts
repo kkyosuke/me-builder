@@ -33,6 +33,7 @@ type Env = Omit<
   | "WEB_ORIGIN"
 > & {
   ENVIRONMENT?: string;
+  ENTITLEMENT_CATALOG?: string;
   LINE_CHANNEL_ACCESS_TOKEN?: string;
   LINE_CHANNEL_SECRET?: string;
   LINE_WEBHOOK_URL?: string;

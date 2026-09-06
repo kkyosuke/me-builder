@@ -23,7 +23,7 @@ export async function issueAccountRecoveryCode(
     params.actor.accountId,
     params.now,
   );
-  if (entitlement.plan === "free") {
+  if (!entitlement.policy.accountRecovery) {
     await D1.shared.action.accountRecovery.recordAccountRecoveryAudit(params.db, {
       accountId: params.actor.accountId,
       action: "issue",

@@ -81,3 +81,27 @@ describe("getProfileEntitlement", () => {
     expect(result).toMatchObject({ type: "resolved", status: "safe-default", plan: "free" });
   });
 });
+
+it.each(["local", "preview"])(
+  "%sのFreeへ実効capabilityと開発用利用上限を返す",
+  async (environment) => {
+    const provider = billing.accountPlanAssignmentProviderForEnvironment(
+      environment,
+      new billing.FakeAccountPlanAssignmentProvider(),
+    );
+    const result = await getProfileEntitlement({
+      actor,
+      db: {} as D1.shared.Client,
+      accountData,
+      planAssignmentProvider: provider,
+      at: new Date("2026-08-15T00:00:00.000Z"),
+    });
+    expect(result).toMatchObject({
+      status: "free",
+      plan: "free",
+      source: "free",
+      capabilities: { familySeats: true, accountRecovery: true },
+      aiReply: { limit: 600, remaining: 597, periodStartsAt: "2026-08-01T00:00:00.000Z" },
+    });
+  },
+);

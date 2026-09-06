@@ -101,6 +101,7 @@ describe("ProfileSettingsScreen", () => {
             source: "subscription",
             effectiveAt: "2026-08-01T00:00:00.000Z",
             availableUntil: "2026-09-01T00:00:00.000Z",
+            capabilities: { familySeats: false, accountRecovery: true },
             aiReply: {
               limit: 150,
               used: 0,
@@ -138,6 +139,7 @@ describe("ProfileSettingsScreen", () => {
             source: "free",
             effectiveAt: "2026-08-16T00:00:00.000Z",
             availableUntil: null,
+            capabilities: { familySeats: false, accountRecovery: false },
             aiReply: {
               limit: 60,
               used: 0,
@@ -463,6 +465,7 @@ describe("ProfileSettingsScreen", () => {
             source: "subscription",
             effectiveAt: "2026-08-01T00:00:00.000Z",
             availableUntil: "2027-08-01T00:00:00.000Z",
+            capabilities: { familySeats: false, accountRecovery: true },
             aiReply: {
               limit: 150,
               used: 10,
@@ -491,16 +494,17 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.queryByText("2026/09/01")).toBeNull();
   });
 
-  it("開発用Fullを契約と誤表示せず、UTC暦月のリセット日を表示する", () => {
+  it("開発用Freeを維持し、実効capabilityでファミリー管理を表示する", () => {
     render(
       <ProfileSettingsScreen
         avatar={null}
         entitlement={{
           status: "success",
           data: {
-            status: "active",
-            plan: "full",
-            source: "development",
+            status: "free",
+            plan: "free",
+            source: "free",
+            capabilities: { familySeats: true, accountRecovery: true },
             effectiveAt: "1970-01-01T00:00:00.000Z",
             availableUntil: null,
             aiReply: {
@@ -515,6 +519,7 @@ describe("ProfileSettingsScreen", () => {
         }}
         theme="dark"
         fontSize="medium"
+        onOpenFamily={vi.fn()}
         onBack={vi.fn()}
         onOpenAvatar={vi.fn()}
         onThemeChange={vi.fn()}
@@ -522,11 +527,12 @@ describe("ProfileSettingsScreen", () => {
       />,
     );
 
-    expect(screen.getByText("Full")).toBeTruthy();
-    expect(screen.getByText("開発環境")).toBeTruthy();
+    expect(screen.getByText("Free")).toBeTruthy();
+    expect(screen.getByText("無料プラン")).toBeTruthy();
     expect(screen.getByText("AI利用枠リセット")).toBeTruthy();
     expect(screen.getByText("2026/09/01")).toBeTruthy();
     expect(screen.queryByText("契約中")).toBeNull();
+    expect(screen.getByRole("button", { name: "ファミリー席を管理" })).toBeTruthy();
   });
 
   it("料金プラン画面から戻ると起点のボタンへフォーカスを戻す", () => {
@@ -540,6 +546,7 @@ describe("ProfileSettingsScreen", () => {
           source: "free" as const,
           effectiveAt: "2026-08-16T00:00:00.000Z",
           availableUntil: null,
+          capabilities: { familySeats: false, accountRecovery: false },
           aiReply: {
             limit: 60,
             used: 0,
@@ -581,6 +588,7 @@ describe("ProfileSettingsScreen", () => {
             source: "free",
             effectiveAt: "2026-08-01T00:00:00.000Z",
             availableUntil: null,
+            capabilities: { familySeats: false, accountRecovery: false },
             aiReply: {
               limit: 60,
               used: 0,

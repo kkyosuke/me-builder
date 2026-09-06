@@ -8,6 +8,7 @@ import {
   FamilySeatMutationResponseSchema,
 } from "../contract/family/seats";
 import { ForbiddenErrorSchema, ServiceUnavailableErrorSchema } from "../contract/shared/errors";
+import { accountPlanAssignmentProvider } from "../infrastructure/account-plan-assignment-provider";
 import {
   acceptFamilyInvitation,
   cancelFamilyInvitation,
@@ -23,9 +24,11 @@ import type { AppEnv } from "../types";
 function params(c: Context<AppEnv>) {
   const database = c.env.DB;
   if (!database) throw new Error("Family storage binding is not configured");
+  const db = D1.shared.client.create(database);
   return {
     actor: authenticatedActor(c),
-    db: D1.shared.client.create(database),
+    db,
+    planAssignmentProvider: accountPlanAssignmentProvider(c.env, db),
   };
 }
 

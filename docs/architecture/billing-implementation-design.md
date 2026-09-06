@@ -9,6 +9,7 @@
 - Stripe、Webhook、Billing Queue、共有D1の正本境界
 - Customer、Subscription、Accountの対応と状態収束
 - `AccountPlanAssignment`の読み取り契約
+- 環境別Entitlement policyの選択と伝播
 - 障害、重複、順序逆転からの収束原則
 
 ### 所有しない概念
@@ -56,9 +57,34 @@ flowchart LR
 
 Account不一致、不明なPlan・付与元、不正な日時、適用開始前、期限切れ、provider障害は、有料権限を推測せずFreeへ倒します。ファミリー席はFamily plan、本人とは異なる支払者Account、`family-seat`付与元が揃った場合だけファミリー由来として解決します。原因分類は運用上の区別に使い、決済事業者固有の状態を機能側へ公開しません。
 
-ローカル開発環境（`ENVIRONMENT=development | local`）では、決済データの有無にかかわらず全AccountへFullのpolicyを適用します。APIとWorkerは共通の開発用`AccountPlanAssignmentProvider`から、付与元`development`、期限なしの合成割当を解決します。この割当は共有D1やStripeへ保存せず、支払者Accountを持たず、AI利用期間はUTC暦月とします。テストが明示的に注入したproviderを優先し、Plan別の自動検証を維持します。
+#### 環境別のPlan・機能マッピング
 
-この上書きはLocalだけに限定します。共有PreviewはStripe sandboxからのPlan収束を検証する環境であるため適用せず、Productionも契約projectionを唯一の有料Plan付与元とします。
+契約の`AccountPlanAssignment`を維持し、`EntitlementService`が環境別のpolicy catalogを使って利用権限を解決します。GitHub Environmentの`dev`は実行時の`preview`に対応します。Localとdevは同じ開発用catalogを使用し、Freeのままプランで制限されるすべての機能を利用できます。
+
+```mermaid
+flowchart LR
+    A[実際のAccountPlanAssignment] --> E[EntitlementService]
+    C[サーバーの環境設定] --> M[環境別Plan・機能マッピング]
+    M --> E
+    E --> P[契約Planを維持した実効policy]
+    P --> API[API / Worker]
+    API --> UI[Webの機能表示]
+```
+
+対応表と環境選択は`packages/lib`へ集約します。providerの構成情報としてcatalogを渡しますが、保存する割当には含めません。API・Worker・Family用providerは同じcatalogを伝播し、機能側は実効policyを使います。環境変数に対応表を複製しません。
+
+| 対象 | マッピング |
+| --- | --- |
+| Local（`local` / `development`）、dev（`dev` / `preview`） | すべてのPlanに開発用の全機能policyを適用する |
+| Production、test・環境未指定・未知の環境 | 通常のPlan別policyを適用する |
+
+開発用policyはFamilyの機能・文脈参照範囲・有限の上限を再利用し、契約なしでのファミリー作成を追加で許可します。AI返信、写真容量、復旧コード、ファミリー管理も共通policyで判定します。契約Plan、付与元、期限、請求、trial履歴は変更せず、FreeのAI利用期間はUTC暦月とします。provider障害・不正な割当の`safe-default`には開発用上書きを適用せず、通常のFree policyへ倒します。
+
+ファミリー管理画面の取得では未作成の席一覧を返し、本人が招待を作成した時にだけ、開発環境の共有D1へ本人を管理者とするpackを作成します。既存の参加者は別packを作成できず、招待の受諾、同意、席数、所有者の検査は通常と共通です。開発catalogでは席から契約Planを合成せず、実際の契約を表示します。通常catalogでのFamily契約・席割当の解決は維持します。
+
+WebにはAPIから実効capabilityを返し、契約Plan表示を維持したまま機能導線を表示します。公開料金表は通常の販売条件を維持します。同意、本人所有権、管理者認可、機能公開フラグはPlanの利用権限と独立です。
+
+共有Previewで通常の課金検証を行う場合は、APIとWorkerの両方へ`ENTITLEMENT_CATALOG=standard`を設定します。未指定時は環境から選択し、未知のcatalog名および開発環境以外での`development`指定は構成エラーにします。テストが明示注入したproviderは通常catalogを既定とし、必要なテストだけ開発catalogを注入します。
 
 ### 3.2 AI利用量ledger
 
@@ -80,9 +106,9 @@ stateDiagram-v2
 
 AI返信はChat Turn ID、プロフィール要約はGeneration IDをrequest IDとして、Workerが生成前に利用枠を予約します。プロフィール要約のAPIは受付前にも残量を確認しますが、競合を含む最終判定はWorkerのatomicな予約です。上限到達時も入力済みの日記と生成済みのまとめ版は残し、閲覧、本人データの訂正・削除・特徴取得、共有停止を制限しません。切迫した危機表現の固定安全案内はAIを呼ばず、利用枠の予約対象にも含めません。
 
-AI返信の月次枠は、FreeではUTC暦月、契約Planでは`AccountPlanAssignment.effectiveAt`を起点とする月ごとの期間です。プロフィール要約には月次枠を設けず、入力または生成形式の変更と前回生成から7日経過の両方、および処理中の生成要求がないことをAccountDataで判定します。意味検索は共通Entitlementの期間をAccountDataの最終再認可へ渡し、Freeは30日、Liteは365日、Fullとファミリーは期間制限なしで候補を絞ります。
+AI返信の月次枠は、FreeではUTC暦月、契約Planでは`AccountPlanAssignment.effectiveAt`を起点とする月ごとの期間です。プロフィール要約には月次枠を設けず、入力または生成形式の変更と前回生成から7日経過の両方、および処理中の生成要求がないことをAccountDataで判定します。意味検索は共通Entitlementの期間をAccountDataの最終再認可へ渡します。通常catalogではFreeは30日、Liteは365日、Fullとファミリーは期間制限なしで候補を絞ります。
 
-本人向けの`GET /api/profile/entitlement`はPlan、付与元、適用開始、利用可能期限と、AI返信・まとめ生成の上限、確定量、予約量、残量、次回更新日時だけを返します。支払者Account IDや決済事業者の識別子は返しません。provider障害時は`safe-default`としてFree権限を適用し、有料権限を推測しません。WebはFreeへ契約変更されたとは表示せず、契約状態の再確認、問い合わせ、新しい購入の停止を同時に提示します。
+本人向けの`GET /api/profile/entitlement`はPlan、付与元、適用開始、利用可能期限と、AI返信の上限、確定量、予約量、残量、次回更新日時、画面の機能導線に使う実効capabilityを返します。支払者Account IDや決済事業者の識別子は返しません。provider障害時は`safe-default`としてFree権限を適用し、有料権限を推測しません。WebはFreeへ契約変更されたとは表示せず、契約状態の再確認、問い合わせ、新しい購入の停止を同時に提示します。
 
 ### 3.4 ファミリー席の保存境界
 
@@ -90,7 +116,7 @@ AI返信の月次枠は、FreeではUTC暦月、契約Planでは`AccountPlanAssi
 
 live状態は`invited | active`とし、pack内のslotと参加中Accountをpartial unique indexで一意にします。招待予約と承諾はこのDB制約を最終競合判定に使い、同時操作でも5席目や複数packへの参加を許可しません。取消、退出、席からの削除、契約終了は履歴行を消さず、それぞれ`cancelled | left | removed | ended`へ遷移させます。
 
-このmembershipはPlan付与だけを表します。同じpackへの参加を、相性共有、Relationship Category、個人コンテンツ閲覧の同意として扱いません。それらは既存の本人同意境界で個別に判定します。
+通常catalogでのmembershipはPlan付与だけを表します。開発catalogの扱いは[環境別のPlan・機能マッピング](#環境別のplan機能マッピング)を正とします。同じpackへの参加を、相性共有、Relationship Category、個人コンテンツ閲覧の同意として扱いません。それらは既存の本人同意境界で個別に判定します。
 
 招待APIが利用者へ一度だけ返すtokenは256 bitの乱数とし、共有D1にはSHA-256 hashだけを保存します。招待は48時間で失効し、承諾、辞退、支払者による取消のいずれかで消費済みにします。承諾はtoken、招待中の席、承諾Accountを同じtransactionで更新し、使用済みtokenを同一・別Accountのどちらから再送しても拒否します。
 

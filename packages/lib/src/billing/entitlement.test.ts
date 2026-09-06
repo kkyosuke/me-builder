@@ -4,6 +4,7 @@ import {
   type AccountPlanAssignmentProvider,
   FakeAccountPlanAssignmentProvider,
   type PlanCode,
+  accountPlanAssignmentProviderForEnvironment,
 } from "./account-plan-assignment";
 import { EntitlementService } from "./entitlement";
 
@@ -112,5 +113,85 @@ describe("EntitlementService", () => {
         fallbackReason,
       },
     );
+  });
+});
+
+describe("環境別Entitlement", () => {
+  it.each(["local", "development", "dev", "preview"])(
+    "%sでFreeを維持して全機能を使用する",
+    async (environment) => {
+      const provider = accountPlanAssignmentProviderForEnvironment(
+        environment,
+        new FakeAccountPlanAssignmentProvider(),
+      );
+      const result = await new EntitlementService(provider).resolve("account-1", NOW);
+      expect(result).toMatchObject({
+        plan: "free",
+        source: "free",
+        payerAccountId: null,
+        grantedByFamily: false,
+        resolution: "assignment",
+        policy: {
+          accountRecovery: true,
+          familyPackWithoutSubscription: true,
+          familySeatLimit: 4,
+          aiReply: { limit: 600 },
+          photoStorageLimitBytes: 20 * 1024 * 1024 * 1024,
+          semanticSearchDays: null,
+          monthlyChange: "full",
+          goalFollowUp: "relevant-active",
+          selfCareContext: "personalized-history",
+          relationshipQuestionContext: "confirmed-history",
+        },
+      });
+      expect(Object.values(result.policy.features).every(Boolean)).toBe(true);
+    },
+  );
+
+  it.each(["lite", "full", "family"] as const)(
+    "開発catalogでも%sの契約情報を変更しない",
+    async (plan) => {
+      const original = assignment(plan);
+      const provider = accountPlanAssignmentProviderForEnvironment(
+        "local",
+        new FakeAccountPlanAssignmentProvider([original]),
+      );
+      expect(await new EntitlementService(provider).resolve("account-1", NOW)).toMatchObject({
+        ...original,
+        policy: { aiReply: { limit: 600 }, familySeatLimit: 4 },
+      });
+    },
+  );
+
+  it.each(["local", "preview", "production", undefined])(
+    "%sの障害時は開発権限へ倒さない",
+    async (environment) => {
+      const provider = accountPlanAssignmentProviderForEnvironment(environment, {
+        findCurrent: async () => {
+          throw new Error("D1 unavailable");
+        },
+      });
+      expect(await new EntitlementService(provider).resolve("account-1", NOW)).toMatchObject({
+        plan: "free",
+        resolution: "safe-default",
+        policy: {
+          accountRecovery: false,
+          familySeatLimit: 0,
+          familyPackWithoutSubscription: false,
+          aiReply: { limit: 60 },
+        },
+      });
+    },
+  );
+
+  it("不正な割当では開発catalogを適用しない", async () => {
+    const result = await new EntitlementService({
+      entitlementCatalog: "development",
+      findCurrent: async () => ({ ...assignment("full"), accountId: "another" }),
+    }).resolve("account-1", NOW);
+    expect(result).toMatchObject({
+      resolution: "safe-default",
+      policy: { accountRecovery: false, familySeatLimit: 0 },
+    });
   });
 });

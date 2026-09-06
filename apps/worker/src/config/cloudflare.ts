@@ -34,13 +34,15 @@ export function getCloudflareBindings(env: Env): CloudflareBindings {
   const d1 = D1.shared.client.create(env.DB);
   const subscriptionAssignments = new D1.shared.action.billing.D1AccountPlanAssignmentProvider(d1);
   const configuredAssignments = env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER;
-  const familyAwareAssignments = new billing.FamilyAwareAccountPlanAssignmentProvider(
+  const planAssignmentProvider = new billing.FamilyAwareAccountPlanAssignmentProvider(
     d1,
-    configuredAssignments ?? subscriptionAssignments,
+    configuredAssignments ??
+      billing.accountPlanAssignmentProviderForEnvironment(
+        env.ENVIRONMENT,
+        subscriptionAssignments,
+        env.ENTITLEMENT_CATALOG,
+      ),
   );
-  const planAssignmentProvider = configuredAssignments
-    ? familyAwareAssignments
-    : billing.accountPlanAssignmentProviderForEnvironment(env.ENVIRONMENT, familyAwareAssignments);
   return {
     d1,
     ...(env.AVATAR_BUCKET ? { avatarBucket: env.AVATAR_BUCKET } : {}),

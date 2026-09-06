@@ -74,6 +74,7 @@ describe("subscription entitlement user journey", () => {
           source: "subscription",
           effectiveAt: "2026-08-01T00:00:00.000Z",
           availableUntil: "2027-08-01T00:00:00.000Z",
+          capabilities: { familySeats: false, accountRecovery: true },
           aiReply: {
             limit: 600,
             used: 10,
@@ -127,6 +128,7 @@ describe("subscription entitlement user journey", () => {
           source: "free",
           effectiveAt: "2026-08-01T00:00:00.000Z",
           availableUntil: null,
+          capabilities: { familySeats: false, accountRecovery: false },
           aiReply: {
             limit: 60,
             used: 0,
@@ -146,6 +148,47 @@ describe("subscription entitlement user journey", () => {
     expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
     expect(await screen.findByText("Free")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "プランをアップグレードする" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "料金プランを比較" })).toBeNull();
+    expect(
+      fetchMock.mock.calls.some(([input]) => urlOf(input).pathname.startsWith("/api/billing/")),
+    ).toBe(false);
+  }, 10_000);
+  it("開発用FreeでAPIの実効capabilityに従ってファミリー管理を表示する", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = urlOf(input);
+      if (url.pathname === "/api/auth/liff/exchange") return Response.json(authSession);
+      if (url.pathname === "/api/auth/session") return Response.json(authSession);
+      if (url.pathname === "/api/profile") {
+        return Response.json({ role: "user", displayName: "テスト", avatar: null });
+      }
+      if (url.pathname === "/api/profile/entitlement") {
+        return Response.json({
+          status: "free",
+          plan: "free",
+          source: "free",
+          effectiveAt: "2026-08-01T00:00:00.000Z",
+          availableUntil: null,
+          capabilities: { familySeats: true, accountRecovery: true },
+          aiReply: {
+            limit: 600,
+            used: 0,
+            reserved: 0,
+            remaining: 600,
+            periodStartsAt: "2026-08-01T00:00:00.000Z",
+            resetsAt: "2026-09-01T00:00:00.000Z",
+          },
+        });
+      }
+      throw new Error(`Unexpected E2E request: ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "プロフィール" })).toBeTruthy();
+    expect(await screen.findByText("Free")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "ファミリー席を管理" })).toBeTruthy();
+    expect(screen.getByText("残り 600 / 600")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "料金プランを比較" })).toBeNull();
     expect(
       fetchMock.mock.calls.some(([input]) => urlOf(input).pathname.startsWith("/api/billing/")),
