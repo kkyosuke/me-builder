@@ -19,6 +19,9 @@ describe("getCloudflareBindings plan assignment", () => {
       const read = vi
         .spyOn(D1.shared.action.billing.D1AccountPlanAssignmentProvider.prototype, "findCurrent")
         .mockImplementation(async (id, at) => billing.freePlanAssignment(id, at));
+      const familyRead = vi
+        .spyOn(billing.FamilySeatAccountPlanAssignmentProvider.prototype, "findCurrent")
+        .mockImplementation(async (id, at) => billing.freePlanAssignment(id, at));
       const cf = getCloudflareBindings(env(environment));
       if (!cf.planAssignmentProvider) throw new Error("Plan provider is missing");
 
@@ -31,6 +34,7 @@ describe("getCloudflareBindings plan assignment", () => {
         policy: { accountRecovery: true, familySeatLimit: 4 },
       });
       read.mockRestore();
+      familyRead.mockRestore();
     },
   );
 

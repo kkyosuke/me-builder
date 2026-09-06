@@ -85,6 +85,9 @@ describe("getProfileEntitlement", () => {
 it.each(["local", "preview"])(
   "%sのFreeへ実効capabilityと開発用利用上限を返す",
   async (environment) => {
+    const familyRead = vi
+      .spyOn(billing.FamilySeatAccountPlanAssignmentProvider.prototype, "findCurrent")
+      .mockImplementation(async (id, at) => billing.freePlanAssignment(id, at));
     const provider = billing.accountPlanAssignmentProviderForEnvironment(
       environment,
       new billing.FakeAccountPlanAssignmentProvider(),
@@ -103,5 +106,6 @@ it.each(["local", "preview"])(
       capabilities: { familySeats: true, accountRecovery: true },
       aiReply: { limit: 600, remaining: 597, periodStartsAt: "2026-08-01T00:00:00.000Z" },
     });
+    familyRead.mockRestore();
   },
 );

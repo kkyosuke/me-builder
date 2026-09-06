@@ -13,7 +13,10 @@ import {
 } from "../d1/shared/action/family-seat";
 import type { SharedD1Client } from "../d1/shared/client";
 import * as schema from "../d1/shared/schema";
-import { FakeAccountPlanAssignmentProvider } from "./account-plan-assignment";
+import {
+  FakeAccountPlanAssignmentProvider,
+  accountPlanAssignmentProviderForEnvironment,
+} from "./account-plan-assignment";
 import { EntitlementService } from "./entitlement";
 import {
   FamilyAwareAccountPlanAssignmentProvider,
@@ -238,5 +241,46 @@ describe("FamilySeatAccountPlanAssignmentProvider", () => {
     await expect(
       service.resolve(member, new Date("2026-08-16T01:00:00.000Z")),
     ).resolves.toMatchObject({ plan: "free", grantedByFamily: false });
+  });
+});
+
+it.each(["local", "preview"])("%sでも実Family契約からの席割当を維持する", async (environment) => {
+  const db = createTestDb();
+  const payer = await account(db, "paid-payer");
+  const member = await account(db, "paid-member");
+  const at = new Date("2026-08-16T00:00:00.000Z");
+  await createFamilyPack(db, payer, at);
+  await reserveFamilySeat(db, payer, "paid-invite", at);
+  await activateFamilySeat(db, "paid-invite", member, at);
+  const primary = new FakeAccountPlanAssignmentProvider([
+    {
+      accountId: payer,
+      plan: "family",
+      source: "subscription",
+      effectiveAt: at.toISOString(),
+      availableUntil: "2026-09-16T00:00:00.000Z",
+      payerAccountId: payer,
+    },
+  ]);
+  const service = new EntitlementService(
+    new FamilyAwareAccountPlanAssignmentProvider(
+      db,
+      accountPlanAssignmentProviderForEnvironment(environment, primary),
+    ),
+  );
+  expect(await service.resolve(member, at)).toMatchObject({
+    plan: "family",
+    source: "family-seat",
+    payerAccountId: payer,
+    grantedByFamily: true,
+    availableUntil: "2026-09-16T00:00:00.000Z",
+    policy: { familyPackWithoutSubscription: true },
+  });
+  expect(await service.resolve(member, new Date("2026-09-16T00:00:00.000Z"))).toMatchObject({
+    plan: "free",
+    source: "free",
+    payerAccountId: null,
+    grantedByFamily: false,
+    policy: { familyPackWithoutSubscription: true },
   });
 });

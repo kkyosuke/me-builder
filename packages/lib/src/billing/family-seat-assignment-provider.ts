@@ -69,8 +69,6 @@ export class FamilyAwareAccountPlanAssignmentProvider implements AccountPlanAssi
   }
 
   async findCurrent(accountId: string, at = new Date()): Promise<AccountPlanAssignment> {
-    // 開発用の席管理は契約を付与しない。実Planと全機能policyを独立に保つ。
-    if (this.entitlementCatalog === "development") return this.#primary.findCurrent(accountId, at);
     const results = await Promise.allSettled([
       this.#primary.findCurrent(accountId, at),
       this.#family.findCurrent(accountId, at),
