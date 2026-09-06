@@ -196,6 +196,11 @@ describe("requirePulumiGcsBackend", () => {
       expect(workflow).not.toContain("secrets.GOOGLE_VERTEX_AI_API_KEY");
     }
     expect(productionWorkflow).toContain("environment: production");
+    for (const workflow of [previewWorkflow, productionWorkflow]) {
+      expect(workflow).toContain("BASE_URL: https://api.${{ vars.BASE_DOMAIN }}");
+      expect(workflow).toContain("WEB_ORIGIN: https://${{ vars.BASE_DOMAIN }}");
+      expect(workflow).not.toMatch(/^ {6}BASE_URL:/mu);
+    }
     expect(resetWorkflow).toContain("environment: development");
     expect(resetWorkflow).toContain("environment: infra");
     expect(resetWorkflow).toContain('expected_confirmation="reset-preview:${RESET_REF}"');

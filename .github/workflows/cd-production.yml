@@ -44,6 +44,8 @@ jobs:
       SSO_ROLLOUT_MODE: ${{ vars.SSO_ROLLOUT_MODE }}
       SSO_ROLLOUT_PERCENT: ${{ vars.SSO_ROLLOUT_PERCENT }}
       BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
+      # BASE_URLはWebでは公開URL、APIではAPI URLを表すためjob全体へ設定しない。
+      WEB_ORIGIN: https://${{ vars.BASE_DOMAIN }}
       LIFF_ID: ${{ vars.LIFF_ID }}
       VITE_ENVIRONMENT: production
       VITE_BASE_DOMAIN: ${{ vars.BASE_DOMAIN }}
@@ -231,6 +233,8 @@ jobs:
 
       # URL が変わっていなければ現在の登録状態を 1 回問い合わせるだけで終わる。
       - name: Register LINE Webhook (Production)
+        env:
+          BASE_URL: https://api.${{ vars.BASE_DOMAIN }}
         run: |
           bun --cwd apps/api scripts/register-webhook.ts
 
