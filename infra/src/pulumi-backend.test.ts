@@ -108,6 +108,15 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformProgram).toContain("new gcp.secretmanager.Secret(");
     expect(gcpPlatformProgram).toContain("new gcp.secretmanager.SecretVersion(");
     expect(gcpPlatformProgram).toContain("new gcp.secretmanager.SecretIamMember(");
+    for (const runtimeSecretSuffix of [
+      "identity-platform-api-key",
+      "identity-platform-tenant-id",
+      "google-oauth-client-id",
+      "google-oauth-client-secret",
+      "vertex-ai-api-key",
+    ]) {
+      expect(gcpPlatformProgram).toContain(`me-builder-\${environment}-${runtimeSecretSuffix}`);
+    }
     expect(gcpPlatformProgram).toContain('role: "roles/secretmanager.secretAccessor"');
     expect(gcpPlatformProgram).toContain(
       "workloadIdentityPools/github-actions/attribute.environment/${githubEnvironment}",
@@ -159,11 +168,15 @@ describe("requirePulumiGcsBackend", () => {
     expect(gcpPlatformWorkflow).not.toContain("GCP_PLATFORM_PROJECT_NAME");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage buckets");
     expect(gcpPlatformWorkflow).not.toContain("gcloud storage managed-folders");
+    expect(gcpPlatformWorkflow).not.toContain("stack output identityPlatformTenantId");
     expect(loadGcpRuntimeSecretsAction).toContain("uses: google-github-actions/auth@v2");
     expect(loadGcpRuntimeSecretsAction).toContain("uses: google-github-actions/setup-gcloud@v3");
     expect(loadGcpRuntimeSecretsAction).toContain("${GITHUB_ACTION_PATH}/load-secret.sh");
     expect(loadGcpRuntimeSecretsAction).toContain("me-builder-${GCP_RUNTIME_ENVIRONMENT}");
     expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_IDENTITY_PLATFORM_API_KEY");
+    expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_IDENTITY_PLATFORM_TENANT_ID");
+    expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_OAUTH_CLIENT_ID");
+    expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_OAUTH_CLIENT_SECRET");
     expect(loadGcpRuntimeSecretsAction).toContain("GOOGLE_VERTEX_AI_API_KEY");
     expect(loadGcpRuntimeSecretsAction).not.toContain("pulumi");
     for (const workflow of [previewWorkflow, productionWorkflow, resetWorkflow]) {
@@ -171,6 +184,9 @@ describe("requirePulumiGcsBackend", () => {
       expect(workflow).toContain("uses: ./.github/actions/load-gcp-runtime-secrets");
       expect(workflow).toContain("vars.GCP_PLATFORM_PROJECT_ID");
       expect(workflow).not.toContain("secrets.GOOGLE_IDENTITY_PLATFORM_API_KEY");
+      expect(workflow).not.toContain("vars.GOOGLE_IDENTITY_PLATFORM_TENANT_ID");
+      expect(workflow).not.toContain("vars.GOOGLE_OAUTH_CLIENT_ID");
+      expect(workflow).not.toContain("secrets.GOOGLE_OAUTH_CLIENT_SECRET");
     }
     expect(previewWorkflow).toContain("environment: development");
     expect(previewWorkflow).toContain(

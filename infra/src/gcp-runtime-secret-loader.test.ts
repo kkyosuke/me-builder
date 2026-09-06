@@ -99,4 +99,21 @@ describe("GCP runtime secret loader", () => {
     expect(action).toContain("LEGACY_VERTEX_AI_API_KEY");
     expect(action).not.toContain('"${LEGACY_VERTEX_AI_API_KEY}"');
   });
+
+  it("SSO実行時の4値を同じ環境のSecret Managerから読み込む", async () => {
+    const action = await readFile(
+      new URL("../../.github/actions/load-gcp-runtime-secrets/action.yml", import.meta.url),
+      "utf8",
+    );
+
+    for (const [environmentVariable, secretSuffix] of [
+      ["GOOGLE_IDENTITY_PLATFORM_API_KEY", "identity-platform-api-key"],
+      ["GOOGLE_IDENTITY_PLATFORM_TENANT_ID", "identity-platform-tenant-id"],
+      ["GOOGLE_OAUTH_CLIENT_ID", "google-oauth-client-id"],
+      ["GOOGLE_OAUTH_CLIENT_SECRET", "google-oauth-client-secret"],
+    ]) {
+      expect(action).toContain(environmentVariable);
+      expect(action).toContain(`\${secret_prefix}-${secretSuffix}`);
+    }
+  });
 });

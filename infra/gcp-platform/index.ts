@@ -249,6 +249,9 @@ if (!activeIdentityPlatformApiKey) throw new Error("Active Identity Platform API
 
 const runtimeSecretIds = {
   identityPlatformApiKey: `me-builder-${environment}-identity-platform-api-key`,
+  identityPlatformTenantId: `me-builder-${environment}-identity-platform-tenant-id`,
+  googleOAuthClientId: `me-builder-${environment}-google-oauth-client-id`,
+  googleOAuthClientSecret: `me-builder-${environment}-google-oauth-client-secret`,
   vertexAiApiKey: `me-builder-${environment}-vertex-ai-api-key`,
 } as const;
 
@@ -273,6 +276,18 @@ function runtimeSecret(name: string, secretId: string): gcp.secretmanager.Secret
 const identityPlatformApiKeySecret = runtimeSecret(
   "identityPlatformApiKeyRuntimeSecret",
   runtimeSecretIds.identityPlatformApiKey,
+);
+const identityPlatformTenantIdSecret = runtimeSecret(
+  "identityPlatformTenantIdRuntimeSecret",
+  runtimeSecretIds.identityPlatformTenantId,
+);
+const googleOAuthClientIdSecret = runtimeSecret(
+  "googleOAuthClientIdRuntimeSecret",
+  runtimeSecretIds.googleOAuthClientId,
+);
+const googleOAuthClientSecretRuntimeSecret = runtimeSecret(
+  "googleOAuthClientSecretRuntimeSecret",
+  runtimeSecretIds.googleOAuthClientSecret,
 );
 const vertexAiApiKeySecret = runtimeSecret(
   "vertexAiApiKeyRuntimeSecret",
@@ -302,6 +317,18 @@ const identityPlatformApiKeySecretAccess = grantRuntimeSecretAccess(
   "identityPlatformApiKeyRuntimeSecretAccess",
   identityPlatformApiKeySecret,
 );
+const identityPlatformTenantIdSecretAccess = grantRuntimeSecretAccess(
+  "identityPlatformTenantIdRuntimeSecretAccess",
+  identityPlatformTenantIdSecret,
+);
+const googleOAuthClientIdSecretAccess = grantRuntimeSecretAccess(
+  "googleOAuthClientIdRuntimeSecretAccess",
+  googleOAuthClientIdSecret,
+);
+const googleOAuthClientSecretAccess = grantRuntimeSecretAccess(
+  "googleOAuthClientSecretRuntimeSecretAccess",
+  googleOAuthClientSecretRuntimeSecret,
+);
 grantRuntimeSecretAccess("vertexAiApiKeyRuntimeSecretAccess", vertexAiApiKeySecret);
 
 new gcp.secretmanager.SecretVersion(
@@ -313,6 +340,45 @@ new gcp.secretmanager.SecretVersion(
   },
   {
     dependsOn: identityPlatformApiKeySecretAccess,
+    additionalSecretOutputs: ["secretData"],
+  },
+);
+
+new gcp.secretmanager.SecretVersion(
+  "identityPlatformTenantIdRuntimeSecretVersion",
+  {
+    secret: identityPlatformTenantIdSecret.id,
+    secretData: identityPlatformTenant.name,
+    deletionPolicy: "DISABLE",
+  },
+  {
+    dependsOn: identityPlatformTenantIdSecretAccess,
+    additionalSecretOutputs: ["secretData"],
+  },
+);
+
+new gcp.secretmanager.SecretVersion(
+  "googleOAuthClientIdRuntimeSecretVersion",
+  {
+    secret: googleOAuthClientIdSecret.id,
+    secretData: googleOAuthClientId,
+    deletionPolicy: "DISABLE",
+  },
+  {
+    dependsOn: googleOAuthClientIdSecretAccess,
+    additionalSecretOutputs: ["secretData"],
+  },
+);
+
+new gcp.secretmanager.SecretVersion(
+  "googleOAuthClientSecretRuntimeSecretVersion",
+  {
+    secret: googleOAuthClientSecretRuntimeSecret.id,
+    secretData: googleOAuthClientSecret,
+    deletionPolicy: "DISABLE",
+  },
+  {
+    dependsOn: googleOAuthClientSecretAccess,
     additionalSecretOutputs: ["secretData"],
   },
 );

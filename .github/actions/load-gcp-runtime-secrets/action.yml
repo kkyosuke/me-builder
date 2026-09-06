@@ -1,5 +1,5 @@
 name: Load GCP Runtime Secrets
-description: Load environment-scoped application API keys from GCP Secret Manager through Direct WIF
+description: Load environment-scoped application runtime settings from GCP Secret Manager through Direct WIF
 
 inputs:
   project-id:
@@ -61,6 +61,15 @@ runs:
         "${GITHUB_ACTION_PATH}/load-secret.sh" \
           GOOGLE_IDENTITY_PLATFORM_API_KEY \
           "${secret_prefix}-identity-platform-api-key"
+        "${GITHUB_ACTION_PATH}/load-secret.sh" \
+          GOOGLE_IDENTITY_PLATFORM_TENANT_ID \
+          "${secret_prefix}-identity-platform-tenant-id"
+        "${GITHUB_ACTION_PATH}/load-secret.sh" \
+          GOOGLE_OAUTH_CLIENT_ID \
+          "${secret_prefix}-google-oauth-client-id"
+        "${GITHUB_ACTION_PATH}/load-secret.sh" \
+          GOOGLE_OAUTH_CLIENT_SECRET \
+          "${secret_prefix}-google-oauth-client-secret"
         "${GITHUB_ACTION_PATH}/load-secret.sh" \
           GOOGLE_VERTEX_AI_API_KEY \
           "${secret_prefix}-vertex-ai-api-key" \

@@ -225,9 +225,9 @@ Cloud Billing予算とVertex AIの費用はTenantでは分離できないため�
 
 ```mermaid
 flowchart LR
-    Pulumi["環境別Pulumi Stack"] --> IdentityKey["Identity Platform API key"]
+    Pulumi["環境別Pulumi Stack"] --> SsoRuntime["Tenant ID / API key / OAuth client"]
     Operator["運用者"] --> VertexKey["Vertex AI API key"]
-    IdentityKey --> EnvSecret["環境別Secret Manager"]
+    SsoRuntime --> EnvSecret["環境別Secret Manager"]
     VertexKey --> EnvSecret
     EnvSecret --> CD["対応するdev / prd CD"]
     CD --> Cloudflare["Cloudflare runtime Secret"]
@@ -235,7 +235,7 @@ flowchart LR
 
 Google Auth Platformは共有projectのOAuth同意画面と一般ユーザー向けWeb OAuth clientを所有します。Development clientにはLocalとPreviewの完全一致callback、Production clientにはProduction callbackだけを登録します。Web OAuth clientの作成はPulumi管理対象外とし、そのClient IDとSecretを環境別Pulumi configへ入力して対応TenantのGoogle providerへ接続します。IAP用またはworkload用OAuth clientで代用しません。
 
-Pulumiは環境別Secret Manager containerを所有し、activeなIdentity Platform API keyをSecret Versionへ書き込みます。Vertex AI keyは手動で対応環境のcontainerへ登録します。Cloudflare CDはGitHub Environment `dev`または`prd`のDirect WIFで対応環境の2 Secretだけを読み、GCS Pulumi state、暗号化passphrase、他環境のSecretへアクセスしません。OAuth Client SecretはPulumi configとGitHub Environmentの両方でsecretにし、Stack output、CIログ、artifactへ出力しません。CloudflareとGCPのPulumi projectはbootstrap済みのstate用GCP projectにある`gs://kagami-infra/`を使い、`kagami/cloudflare/`と`kagami/gcp-platform/`のManaged Folder、暗号化passphrase、IAM accessを分離します。Pulumi Cloudやlocal file backendへ状態を分岐させません。backendの認証・暗号化・初回adoptionは[`infra/README.md`](../../infra/README.md#one-time-state-backend-bootstrap)、GCP共通projectの適用手順とVertex key初回登録は[`infra/gcp-platform/README.md`](../../infra/gcp-platform/README.md)を正とします。
+Pulumiは環境別Secret Manager containerを所有し、Tenant ID、activeなIdentity Platform API key、OAuth Client ID、OAuth Client SecretをそれぞれSecret Versionへ書き込みます。OAuth clientの元のIDとSecretは、Google Auth Platformで手動発行した後、承認境界を持つGitHub Environment `infra`から暗号化済みPulumi configへ入力します。Vertex AI keyは手動で対応環境のcontainerへ登録します。Cloudflare CDはGitHub Environment `dev`または`prd`のDirect WIFで対応環境の5 Secretだけを読み、GCS Pulumi state、暗号化passphrase、`infra` Environment、他環境のSecretへアクセスしません。OAuth Client SecretはPulumi configとSecret Managerでsecretにし、Stack output、CIログ、artifactへ出力しません。Tenant IDとOAuth Client IDもCloudflare runtime設定の一貫した配布元を持たせるためSecret Managerから読み、GitHub Environmentへ複製しません。CloudflareとGCPのPulumi projectはbootstrap済みのstate用GCP projectにある`gs://kagami-infra/`を使い、`kagami/cloudflare/`と`kagami/gcp-platform/`のManaged Folder、暗号化passphrase、IAM accessを分離します。Pulumi Cloudやlocal file backendへ状態を分岐させません。backendの認証・暗号化・初回adoptionは[`infra/README.md`](../../infra/README.md#one-time-state-backend-bootstrap)、GCP共通projectの適用手順とVertex key初回登録は[`infra/gcp-platform/README.md`](../../infra/gcp-platform/README.md)を正とします。
 
 ### 6.3 APIドキュメントのCloudflare Access境界
 

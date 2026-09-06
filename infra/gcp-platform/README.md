@@ -141,7 +141,7 @@ The spend cap remains a Console-owned control. Pulumi manages the project budget
 
 ### Runtime secret distribution to Cloudflare CD
 
-Cloudflare CD does not read or decrypt the GCS Pulumi state. Each Stack owns two environment-specific Secret Manager containers, and grants `roles/secretmanager.secretAccessor` only to the matching GitHub Environment principal. CD authenticates with Direct WIF, reads only the active runtime values, masks them, and passes them to `wrangler deploy --secrets-file` with the application version.
+Cloudflare CD does not read or decrypt the GCS Pulumi state. Each Stack owns five environment-specific Secret Manager containers, and grants `roles/secretmanager.secretAccessor` only to the matching GitHub Environment principal. CD authenticates with Direct WIF, reads only the active runtime values, masks them, and passes them to `wrangler deploy --secrets-file` with the application version.
 
 GCP Platformのpreviewとapplyは、保存済みstateだけでなくGCP上の実体を毎回refreshしてから差分を計画します。管理対象resourceが実体側で欠落している場合は、次のapplyで再作成対象として扱い、state上だけ存在する状態をCDへ持ち越しません。
 
@@ -150,11 +150,17 @@ apply時に旧Vertex authorization key実装のservice account、custom role、I
 | Stack | Secret Manager ID | CD destination |
 | --- | --- | --- |
 | Development | `me-builder-development-identity-platform-api-key` | API `GOOGLE_IDENTITY_PLATFORM_API_KEY` |
+| Development | `me-builder-development-identity-platform-tenant-id` | API `GOOGLE_IDENTITY_PLATFORM_TENANT_ID` |
+| Development | `me-builder-development-google-oauth-client-id` | API `GOOGLE_OAUTH_CLIENT_ID` |
+| Development | `me-builder-development-google-oauth-client-secret` | API `GOOGLE_OAUTH_CLIENT_SECRET` |
 | Development | `me-builder-development-vertex-ai-api-key` | Worker / MCP `GOOGLE_VERTEX_AI_API_KEY` |
 | Production | `me-builder-production-identity-platform-api-key` | API `GOOGLE_IDENTITY_PLATFORM_API_KEY` |
+| Production | `me-builder-production-identity-platform-tenant-id` | API `GOOGLE_IDENTITY_PLATFORM_TENANT_ID` |
+| Production | `me-builder-production-google-oauth-client-id` | API `GOOGLE_OAUTH_CLIENT_ID` |
+| Production | `me-builder-production-google-oauth-client-secret` | API `GOOGLE_OAUTH_CLIENT_SECRET` |
 | Production | `me-builder-production-vertex-ai-api-key` | Worker / MCP `GOOGLE_VERTEX_AI_API_KEY` |
 
-Configure `GCP_PLATFORM_PROJECT_ID` as a variable and `GCP_WORKLOAD_IDENTITY_PROVIDER` as a secret in both GitHub Environments `dev` and `prd`. Remove the former `GOOGLE_IDENTITY_PLATFORM_API_KEY` and `GOOGLE_VERTEX_AI_API_KEY` GitHub Secrets only after each CD workflow has read its matching Secret Manager values successfully. Keep `GOOGLE_IDENTITY_PLATFORM_TENANT_ID` and `GOOGLE_OAUTH_CLIENT_ID` as environment variables and keep the manually issued `GOOGLE_OAUTH_CLIENT_SECRET` as an environment secret.
+Configure `GCP_PLATFORM_PROJECT_ID` as a variable and `GCP_WORKLOAD_IDENTITY_PROVIDER` as a secret in both GitHub Environments `dev` and `prd`. Keep the manually issued OAuth Client ID and Secret only in the approval-protected `infra` Environment as the Pulumi input. Do not copy `GOOGLE_IDENTITY_PLATFORM_TENANT_ID`, `GOOGLE_OAUTH_CLIENT_ID`, or `GOOGLE_OAUTH_CLIENT_SECRET` into `dev` or `prd`; the matching Stack publishes them to Secret Manager and CD reads them through Direct WIF. Remove the former `GOOGLE_IDENTITY_PLATFORM_API_KEY` and `GOOGLE_VERTEX_AI_API_KEY` GitHub Secrets only after each CD workflow has read its matching Secret Manager values successfully.
 
 Preview CDは移行期間に限り、DevelopmentのVertex Secretを正常に参照でき、かつ有効なversionが0件の場合だけ`dev` Environmentの既存`GOOGLE_VERTEX_AI_API_KEY`へフォールバックします。WIF、権限、API、version取得の失敗ではfallbackせずCDを停止します。Secret Managerへ登録してCDが有効なversionを読み取ったことを確認後、このfallbackと旧GitHub Secretを同じreview済み変更で削除してください。Identity Platform keyとProductionにはfallbackを設けません。
 
@@ -171,7 +177,7 @@ unset GOOGLE_VERTEX_AI_API_KEY
 
 Repeat with `me-builder-production-vertex-ai-api-key` only when preparing Production. Do not pass the value as a command argument or print it.
 
-The non-secret `identityPlatformTenantId` Stack output must still be copied to `GOOGLE_IDENTITY_PLATFORM_TENANT_ID` in `dev` for Development and `prd` for Production. Never print secret Pulumi outputs in CI logs.
+The `identityPlatformTenantId` Stack output is available for infrastructure diagnosis only. Runtime distribution uses the matching Secret Manager version; do not copy the output into a GitHub Environment. Never print secret Pulumi outputs in CI logs.
 
 The Vertex AI key remains externally owned: Pulumi manages its Secret container and CD access but does not claim or alter the key or its API restrictions. Verify it with the existing Vertex connectivity check after every replacement.
 
