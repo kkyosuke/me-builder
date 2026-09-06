@@ -8,7 +8,9 @@ export function resolveEntitlementUsagePeriod(
   at = new Date(),
 ): AiUsagePeriod {
   assertValidDate(at);
-  if (entitlement.source === "free") return utcCalendarMonth(at);
+  if (entitlement.source === "free" || entitlement.source === "development") {
+    return utcCalendarMonth(at);
+  }
   return assignmentMonth(entitlement.effectiveAt, at);
 }
 

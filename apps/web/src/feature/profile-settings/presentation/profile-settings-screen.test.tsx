@@ -491,6 +491,44 @@ describe("ProfileSettingsScreen", () => {
     expect(screen.queryByText("2026/09/01")).toBeNull();
   });
 
+  it("開発用Fullを契約と誤表示せず、UTC暦月のリセット日を表示する", () => {
+    render(
+      <ProfileSettingsScreen
+        avatar={null}
+        entitlement={{
+          status: "success",
+          data: {
+            status: "active",
+            plan: "full",
+            source: "development",
+            effectiveAt: "1970-01-01T00:00:00.000Z",
+            availableUntil: null,
+            aiReply: {
+              limit: 600,
+              used: 0,
+              reserved: 0,
+              remaining: 600,
+              periodStartsAt: "2026-08-01T00:00:00.000Z",
+              resetsAt: "2026-09-01T00:00:00.000Z",
+            },
+          },
+        }}
+        theme="dark"
+        fontSize="medium"
+        onBack={vi.fn()}
+        onOpenAvatar={vi.fn()}
+        onThemeChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Full")).toBeTruthy();
+    expect(screen.getByText("開発環境")).toBeTruthy();
+    expect(screen.getByText("AI利用枠リセット")).toBeTruthy();
+    expect(screen.getByText("2026/09/01")).toBeTruthy();
+    expect(screen.queryByText("契約中")).toBeNull();
+  });
+
   it("料金プラン画面から戻ると起点のボタンへフォーカスを戻す", () => {
     const props = {
       avatar: null,

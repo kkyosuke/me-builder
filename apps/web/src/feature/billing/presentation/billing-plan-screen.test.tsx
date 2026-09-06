@@ -169,6 +169,29 @@ describe("BillingPlanScreen", () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
+  it("開発用Fullでは利用可能であることを示し、購入操作を表示しない", () => {
+    render(
+      <BillingPlanScreen
+        plans={{ status: "success", data: plans }}
+        entitlement={{
+          status: "success",
+          data: { ...free, status: "active", plan: "full", source: "development" },
+        }}
+        checkoutState={{ status: "idle" }}
+        completionMessage={null}
+        onBack={vi.fn()}
+        onCheckout={vi.fn()}
+        onManageSubscription={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("開発環境ではFullを利用できます")).toBeTruthy();
+    expect(screen.getByText(/購入やプラン変更は行いません/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /プランを変更する/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "契約を管理" })).toBeNull();
+  });
+
   it("表示時に閉じるボタンへフォーカスし、ファミリー参加中は購入操作を表示しない", () => {
     render(
       <BillingPlanScreen

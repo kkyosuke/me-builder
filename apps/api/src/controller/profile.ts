@@ -26,6 +26,7 @@ import {
   WeeklyReflectionResponseSchema,
 } from "../contract/profile/weekly-reflection";
 import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
+import { accountPlanAssignmentProvider } from "../infrastructure/account-plan-assignment-provider";
 import { agreeGoalFollowUp, getGoalFollowUps, updateGoalFollowUp } from "../logic/goal-follow-up";
 import { getProfileEntitlement } from "../logic/profile-entitlement";
 import { getProfileProgression } from "../logic/profile-progression";
@@ -38,13 +39,6 @@ import {
 import { authenticatedActor } from "../middleware/authentication";
 import type { AppEnv } from "../types";
 
-function planAssignmentProvider(c: Context<AppEnv>, db: D1.shared.Client) {
-  return (
-    c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER ??
-    new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db)
-  );
-}
-
 function goalFollowUpParams(c: Context<AppEnv>) {
   if (!c.env?.DB || !c.env.ACCOUNT_DATA) return undefined;
   const db = D1.shared.client.create(c.env.DB);
@@ -52,7 +46,7 @@ function goalFollowUpParams(c: Context<AppEnv>) {
     actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
-    planAssignmentProvider: planAssignmentProvider(c, db),
+    planAssignmentProvider: accountPlanAssignmentProvider(c.env, db),
   };
 }
 
@@ -163,7 +157,7 @@ export async function getProfileEntitlementContents(c: Context<AppEnv>): Promise
     actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
-    planAssignmentProvider: planAssignmentProvider(c, db),
+    planAssignmentProvider: accountPlanAssignmentProvider(c.env, db),
   });
   c.header("Cache-Control", "no-store");
   return c.json(v.parse(ProfileEntitlementResponseSchema, outcome));
@@ -260,7 +254,7 @@ export async function getWeeklyReflectionContents(c: Context<AppEnv>): Promise<R
     actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
-    planAssignmentProvider: planAssignmentProvider(c, db),
+    planAssignmentProvider: accountPlanAssignmentProvider(c.env, db),
   });
   switch (outcome.type) {
     case "resolved":
@@ -279,7 +273,7 @@ export async function postWeeklyReflectionGeneration(c: Context<AppEnv>): Promis
     db,
     accountData: c.env.ACCOUNT_DATA,
     queue: c.env.PROFILE_SUMMARY_QUEUE,
-    planAssignmentProvider: planAssignmentProvider(c, db),
+    planAssignmentProvider: accountPlanAssignmentProvider(c.env, db),
   });
   switch (outcome.type) {
     case "accepted":

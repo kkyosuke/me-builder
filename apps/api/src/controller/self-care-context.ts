@@ -9,6 +9,7 @@ import {
   SelfCareContextUnavailableSchema,
 } from "../contract/profile/self-care-context";
 import { ServiceUnavailableErrorSchema } from "../contract/shared/errors";
+import { accountPlanAssignmentProvider } from "../infrastructure/account-plan-assignment-provider";
 import {
   confirmSelfCareContext,
   getSelfCareContexts,
@@ -24,9 +25,7 @@ function params(c: Context<AppEnv>) {
     actor: authenticatedActor(c),
     db,
     accountData: c.env.ACCOUNT_DATA,
-    planAssignmentProvider:
-      c.env.ACCOUNT_PLAN_ASSIGNMENT_PROVIDER ??
-      new D1.shared.action.billing.D1AccountPlanAssignmentProvider(db),
+    planAssignmentProvider: accountPlanAssignmentProvider(c.env, db),
   };
 }
 

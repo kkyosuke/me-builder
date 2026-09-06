@@ -1,4 +1,4 @@
-import { D1 } from "@me-builder/lib";
+import { D1, billing } from "@me-builder/lib";
 import type { AuthenticatedActor } from "./authentication/types";
 
 const RECOVERY_CODE_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
@@ -13,12 +13,17 @@ export type VerifiedRecoveryIdentity = Readonly<{
 }>;
 
 export async function issueAccountRecoveryCode(
-  params: BaseParams & { actor: AuthenticatedActor; now?: Date },
+  params: BaseParams & {
+    actor: AuthenticatedActor;
+    planAssignmentProvider: billing.AccountPlanAssignmentProvider;
+    now?: Date;
+  },
 ) {
-  const assignment = await new D1.shared.action.billing.D1AccountPlanAssignmentProvider(
-    params.db,
-  ).findCurrent(params.actor.accountId, params.now);
-  if (assignment.plan === "free") {
+  const entitlement = await new billing.EntitlementService(params.planAssignmentProvider).resolve(
+    params.actor.accountId,
+    params.now,
+  );
+  if (entitlement.plan === "free") {
     await D1.shared.action.accountRecovery.recordAccountRecoveryAudit(params.db, {
       accountId: params.actor.accountId,
       action: "issue",
