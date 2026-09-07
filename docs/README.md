@@ -44,6 +44,7 @@ docs/
 ### プロダクト全体を知る
 
 - [プロジェクト概要](product/project-overview.md) — 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段
+- [次に検討する機能候補](product/project-overview.md#次に検討する機能候補) — 検討順と、各案を所有する設計・残タスク文書への入口
 - [サービス紹介サイト設計](product/service-site-design.md) — 未ログインの公開サイトの役割、サイトマップ、トップページ構成、CTA、掲載原則、公開前の確認事項
 - [サブスクリプション・料金プラン設計](product/subscription-plan-design.md) — Free、Lite、Full、ファミリーパックの価格、利用権限、AI利用上限、変更・解約、家族内のプライバシー境界
 - [全体画面遷移設計](product/screen-navigation.md) — LINEとWebをまたぐ入口と、利用者・管理者向け画面の全体遷移
@@ -133,7 +134,7 @@ docs/
 - [Brain Item残タスク](development/brain-item-remaining-tasks.md) — Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能
 - [アバター設定残タスク](development/avatar-remaining-tasks.md) — アバター設定に残っている実ブラウザE2E、LIFF実端末確認、Private R2の運用改善
 - [わたしのまとめ残タスク](development/profile-summary-remaining-tasks.md) — 「わたしのまとめ」で未完了の実環境検証と完了条件
-- [日記入力残タスク](development/diary-remaining-tasks.md) — 日記入力で未実装の送信取り消し（unsend）と写真添付
+- [日記入力残タスク](development/diary-remaining-tasks.md) — 未実装の送信取り消し（unsend）と写真添付の公開前作業
 - [PR作成手順書](development/pull-request-guidelines.md) — PRタイトル、概要、作成前の準備と検証手順
 
 ## ドキュメントを更新する
