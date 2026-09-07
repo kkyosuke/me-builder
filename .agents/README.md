@@ -14,20 +14,20 @@
 | --- | --- |
 | [README](../README.md) | プロジェクトの短い入口と文書リンク |
 | [ドキュメントガイド](../docs/README.md) | `docs/` のディレクトリ構造、文書の探し方、全ドキュメントへの入口 |
-| [プロジェクト概要](../docs/product/project-overview.md) | 目的、主要要件、MVP、ロードマップ、Phase 1の入力体験とログイン手段 |
+| [プロジェクト概要](../docs/product/project-overview.md) | 目的、主要要件、MVP、ロードマップ、次の機能候補の検討順、Phase 1の入力体験とログイン手段、目的に合わせた初回ガイドの検討案 |
 | [サービス紹介サイト設計](../docs/product/service-site-design.md) | 未ログインの公開サイトの役割、サイトマップ、トップページ構成、CTA、掲載原則、公開前の確認事項 |
 | [サブスクリプション・料金プラン設計](../docs/product/subscription-plan-design.md) | Free、Lite、Full、ファミリーパックの価格、利用権限、AI利用上限、トライアル、変更・解約、家族内のプライバシー境界 |
 | [サービス紹介サイト残タスク](../docs/development/service-site-remaining-tasks.md) | サービス紹介サイトで未完了の意思決定、法務確認、実環境検証と各項目の完了条件 |
 | [全体画面遷移設計](../docs/product/screen-navigation.md) | LINEとWebをまたぐ入口、主ナビゲーション、右上のプロフィール、診断・相性・わたしのまとめ・セルフケア・AI相談・管理者画面の接続 |
 | [Web初回起動体験設計](../docs/product/web-startup-experience.md) | Web機能リンクを開いてから要求画面または利用規約を操作できるまでの段階表示、通信の優先順位、失敗時の縮退 |
-| [わたしのまとめ仕様](../docs/product/profile-summary-experience.md) | 診断と日記からAI生成した版付きの「わたしのまとめ」、診断テーマ、導線、状態、受け入れ条件 |
-| [相性診断・うつし共有体験設計](../docs/product/compatibility-experience.md) | 1対1の招待リンク、LINE共有、双方の同意、相性一覧、「私について」と「2人について」、共有終了の体験 |
+| [わたしのまとめ仕様](../docs/product/profile-summary-experience.md) | 診断と日記からAI生成した版付きの「わたしのまとめ」、診断テーマ、導線、状態、受け入れ条件、本人が日記を検索・閲覧する「自分の記憶帳」の検討案 |
+| [相性診断・うつし共有体験設計](../docs/product/compatibility-experience.md) | 1対1の招待リンク、LINE共有、双方の同意、相性一覧、「私について」と「2人について」、共有終了の体験、ふたりの「試してみること」の検討案 |
 | [サービス利用規約・同意体験設計](../docs/product/service-terms-consent-experience.md) | 規約の版管理、Accountごとの同意履歴、初回・改定時の同意ゲート |
 | [成長・報酬体験の提案](../docs/product/progression-reward-experience.md) | Brainの成長イベントによる上限のないうつしレベル、集めたかけらと有効なかけら、ペア単位のふたりレベル、安全上の制約 |
 | [プロフィール設定体験設計](../docs/product/profile-settings-experience.md) | 共通ヘッダー右上の入口、プロフィール画面、アバター設定への接続、ライト・ダークテーマの選択と保存 |
 | [アバター設定体験設計](../docs/product/avatar-experience.md) | LINEプロフィール画像の初期表示、端末画像の選択・プレビュー・設定、差し替え・削除の体験と責務境界 |
 | [ストレスの手がかりとAIセルフケア相談体験設計](../docs/product/self-care-ai-consultation-experience.md) | 本人向けの負荷の手がかり、早期サイン、対処、相談先の表示とAI相談、安全上の切り替え |
-| [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけの配信判断・個別化情報・段階導入、出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間 |
+| [日記チャット体験設計](../docs/product/diary-chat-experience.md) | 日々の声かけの配信判断・個別化情報・段階導入、出来事と行動原理を探り、記憶を使って助言する対話体験と応答時間、迷いごと比較ノートの検討案 |
 | [日記チャット実装設計](../docs/architecture/diary-chat-implementation-design.md) | 日記チャットのAccountDataモデル、声かけコンテキストの保存、Cloudflare実行基盤、プロンプト、ガードレール、応答期限 |
 | [管理者向けダッシュボード設計](../docs/architecture/admin-statistics-dashboard.md) | 管理者認可、Account一覧、成長projection、Gemini・LINE統計、障害時の表示 |
 | [Phase 1 診断体験設計](../docs/diagnosis/diagnosis-experience.md) | 診断一覧、回答、回答内容、LINE通知、リッチメニューのUIと遷移、縦切りの完了条件 |
@@ -57,7 +57,7 @@
 | [Brainのラベル・アクセス制御設計](../docs/domain/brain/brain-access-label-design.md) | Topic Label、Access Label、Access Profile、MCP提供時の原則、Source Recordの既定ラベル |
 | [インフラ・システム構成](../docs/architecture/infrastructure-architecture.md) | Cloudflareを全面的に採用したインフラ基盤、システム構成、サービス配置 |
 | [MCP連携設計](../docs/architecture/mcp-integration-design.md) | 管理者限定MCPのtransport、認証・認可、同意、開示、監査、解除、仕様更新と停止境界 |
-| [LINE写真日記入力設計](../docs/architecture/photo-diary-input-design.md) | LINE写真日記の取得、検証、原本・派生物、容量、安全性、AI利用、削除の境界 |
+| [LINE写真日記入力設計](../docs/architecture/photo-diary-input-design.md) | LINE写真日記の取得、検証、原本・派生物、容量、安全性、AI利用、削除の境界、公開で届ける体験と価値の検証観点 |
 | [Web認証・アプリケーションセッション設計](../docs/architecture/web-authentication-design.md) | LIFF／SSOの入口選択、外部Identity検証、Account解決、provider非依存session、認証と認可の境界、移行順序 |
 | [課金・Plan紐付け実装設計](../docs/architecture/billing-implementation-design.md) | Stripe、Billing Queue、共有D1、AccountPlanAssignmentの境界と収束原則、環境別の利用権限解決 |
 | [Account復旧設計](../docs/architecture/account-recovery-design.md) | LINE Account喪失時の復旧資格情報、Identity再接続、監査、復旧不能時の境界 |
@@ -93,7 +93,7 @@
 | [Brain Item残タスク](../docs/development/brain-item-remaining-tasks.md) | Brain Item生成・意味的重複判定・Vectorize利用に残っている検証、品質改善、延期中の機能 |
 | [アバター設定残タスク](../docs/development/avatar-remaining-tasks.md) | アバター設定で未完了の実ブラウザE2E、LIFF実端末確認、Private R2孤立objectの運用改善 |
 | [わたしのまとめ残タスク](../docs/development/profile-summary-remaining-tasks.md) | 「わたしのまとめ」で未完了の実環境検証、完了条件、検証後の追跡先 |
-| [日記入力残タスク](../docs/development/diary-remaining-tasks.md) | 日記入力で未実装の送信取り消し（unsend）と写真添付、各項目の完了条件 |
+| [日記入力残タスク](../docs/development/diary-remaining-tasks.md) | 日記入力で未実装の送信取り消し（unsend）、写真添付の公開前作業への参照、各項目の完了条件 |
 | [PR作成手順書](../docs/development/pull-request-guidelines.md) | PRタイトルの命名規則、概要の書き方、作成前の準備・検証手順 |
 
 この表は各文書へのナビゲーションです。概念の定義そのものはリンク先だけに記載します。

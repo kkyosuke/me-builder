@@ -8,6 +8,7 @@ me-builderは、さまざまな質問への回答を蓄積し、その人らし�
 
 - [ドキュメントガイド](docs/README.md) — ディレクトリ構造、文書の探し方、全ドキュメントへの入口
 - [プロジェクト概要](docs/product/project-overview.md) — 目的、MVP、Phase 1の入力体験とログイン手段
+- [次に検討する機能候補](docs/product/project-overview.md#次に検討する機能候補) — 検討順と各案の参照先
 - [サービス紹介サイト設計](docs/product/service-site-design.md) — 公開サイトのサイトマップ、ページ構成、掲載内容と公開前の確認事項
 - [サブスクリプション・料金プラン設計](docs/product/subscription-plan-design.md) — Free、Lite、Full、ファミリーパックの価格と提供価値
 - [ドメイン設計](docs/domain/domain-design.md) — Account / Brain / Sourceの責務・境界、Diagnosisの位置づけ、設計順序と進捗
